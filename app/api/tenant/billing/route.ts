@@ -8,14 +8,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const tenantId = (session.user as any).tenantId;
+
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { credits: true },
   });
+
   const usage = await prisma.usageRecord.findMany({
     where: { tenantId },
     orderBy: { createdAt: 'desc' },
     take: 20,
   });
+
   return NextResponse.json({ tenant, usage });
 }
