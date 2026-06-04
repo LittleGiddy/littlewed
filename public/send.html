@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Little Wed - Send Invitations</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #1e293b; }
+        .guest { border-bottom: 1px solid #e2e8f0; padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .guest:last-child { border-bottom: none; }
+        .info { flex: 1; }
+        .name { font-weight: bold; }
+        .phone { font-size: 0.9em; color: #64748b; }
+        .status { font-size: 0.8em; margin-top: 5px; }
+        .qr-ready { color: #10b981; }
+        .no-qr { color: #f59e0b; }
+        button { background: #4f46e5; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading { font-size: 0.8em; color: #6366f1; }
+        .error { color: #ef4444; font-size: 0.8em; }
+        .success { color: #10b981; font-size: 0.8em; }
+        #bulkBtn { width: 100%; margin-bottom: 20px; padding: 12px; background: #10b981; font-size: 1.1em; }
+        input, button { margin: 10px 0; }
+        input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📱 Send WhatsApp Invitations</h1>
+    <div>
+        <label>Event ID:</label>
+        <input type="text" id="eventId" placeholder="Enter Event ID" value="cmo6q9n180001g72co0g17yei">
+        <button id="loadBtn">Load Guests</button>
+    </div>
+    <div id="guestsList" style="margin-top: 20px;"></div>
+</div>
+
+<script>
+    let guests = [];
+    const loadBtn = document.getElementById('loadBtn');
+    const eventIdInput = document.getElementById('eventId');
+    const guestsDiv = document.getElementById('guestsList');
+
+    loadBtn.addEventListener('click', async () => {
+        const eventId = eventIdInput.value.trim();
+        if (!eventId) {
+            alert('Please enter Event ID');
+            return;
+        }
+        guestsDiv.innerHTML = '<div class="loading">Loading guests...</div>';
+        try {
+            const res = await fetch(`/api/events/${eventId}/guests`);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                guests = data;
+                renderGuests();
+            } else {
+                guestsDiv.innerHTML = `<div class="error">Error: ${data.error || 'Failed to load'}</div>`;
+            }
+        } catch (err) {
+            guestsDiv.innerHTML = `<div class="error">Network error: ${err.message}</div>`;
+        }
+    });
+
+    function renderGuests() {
+        if (!guests.length) {
+            guestsDiv.innerHTML = '<div class="loading">No guests found.</div>';
+            return;
+        }
+        const html = `
+            <button id="bulkBtn">📱 Send All via WhatsApp</button>
+            <div id="guestsListInner">
+                ${guests.map(guest => `
+                    <div class="guest" data-id="${guest.id}">
+                        <div class="info">
+                            <div class="name">${escapeHtml(guest.name)}</div>
+                            <div class="phone">${guest.phone || 'No phone'}</div>
+                            <div class="status ${guest.invitationCard ? 'qr-ready' : 'no-qr'}">
+                                ${guest.invitationCard ? '✓ QR ready' : '⚠ No QR'}
+                            </div>
+                            <div class="send-status" id="status-${guest.id}"></div>
+                        </div>
+                        <div>
+                            <button class="send-btn" data-id="${guest.id}" data-phone="${guest.phone}" data-card="${guest.invitationCard || ''}" ${!guest.phone || !guest.invitationCard ? 'disabled' : ''}>
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        guestsDiv.innerHTML = html;
+        // Attach event listeners
+        document.querySelectorAll('.send-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const guestId = btn.getAttribute('data-id');
+                sendToGuest(guestId);
+            });
+        });
+        const bulkBtn = document.getElementById('bulkBtn');
+        if (bulkBtn) bulkBtn.addEventListener('click', sendBulk);
+    }
+
+    async function sendToGuest(guestId) {
+        const statusDiv = document.getElementById(`status-${guestId}`);
+        statusDiv.innerHTML = '<span class="loading">Sending...</span>';
+        try {
+            const res = await fetch('/api/invitations/send-whatsapp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ guestId, eventId: eventIdInput.value.trim() })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                statusDiv.innerHTML = '<span class="success">✅ Sent</span>';
+            } else {
+                statusDiv.innerHTML = `<span class="error">❌ ${data.error || 'Failed'}</span>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<span class="error">❌ Network error</span>`;
+        }
+    }
+
+    async function sendBulk() {
+        const eligibleGuests = guests.filter(g => g.phone && g.invitationCard);
+        if (eligibleGuests.length === 0) {
+            alert('No guests with both phone and QR card');
+            return;
+        }
+        for (const guest of eligibleGuests) {
+            await sendToGuest(guest.id);
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+</script>
+</body>
+</html>

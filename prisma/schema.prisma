@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Tenant {
+  id                 String   @id @default(cuid())
+  name               String
+  subdomain          String   @unique
+  plan               String   @default("BASIC")
+  status             String   @default("ACTIVE")
+  subscriptionStatus String   @default("inactive") // "active" | "inactive" | "cancelled"
+  maxGuests          Int      @default(200)
+  createdAt          DateTime @default(now())
+  creditBalance      Int      @default(0)          // in smallest currency unit (TZS or cents)
+  credits        Int      @default(0)
+  transactions   Transaction[]  
+  simpleEventMode Boolean @default(false)
+
+  // Invitation template fields (merged from TenantSettings)
+  templateCardUrl    String?
+  qrPlacementX       Float?
+  qrPlacementY       Float?
+  qrSize             Int?
+  
+  users              User[]
+  events             Event[]
+  pendingEvents      PendingEvent[]   // 👈 add this relation
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  name            String
+  date            DateTime
+  venue           String
+  address         String
+  total_budget    Int?          // in TZS
+  commission_paid Boolean   @default(false)
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  guests          Guest[]
+  createdAt       DateTime  @default(now())
+}
+
+model PendingEvent {
+  id           String   @id @default(cuid())
+  name         String
+  date         DateTime
+  venue        String
+  address      String
+  total_budget Int
+  commission   Int
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+}
+
+model Guest {
+  id             String    @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  onWhatsApp     Boolean   @default(false)  @map("on_whatsapp")
+  attending      String    @default("pending")
+  checkedIn      Boolean   @default(false)
+  checkedInAt    DateTime?
+  smsCode        String?   @unique
+  invitationCard String?
+  qrToken        String?
+  routingChannel String    @default("sms") @map("routing_channel")
+  eventId        String
+  event          Event     @relation(fields: [eventId], references: [id])
+  createdAt      DateTime  @default(now())
+}
+
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  tenantId  String
+  eventId   String?
+  channel   String   // "whatsapp" or "sms"
+  cost      Int      // in same unit as creditBalance
+  createdAt DateTime @default(now())
+}
+
+
+
+model Transaction {
+  id              String   @id @default(cuid())
+  amount          Int
+  type            String   // "CREDIT_PURCHASE" or "COMMISSION_PAYMENT"
+  status          String   // "PENDING", "COMPLETED", "FAILED"
+  stripeSessionId String?
+  tenantId        String
+  eventId         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}

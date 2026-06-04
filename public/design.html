@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Little Wed - Invitation Designer</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f4f8; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #1e293b; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .section { background: #f8fafc; padding: 20px; border-radius: 15px; }
+        .preview-area { position: relative; display: inline-block; max-width: 100%; }
+        .qr-overlay { position: absolute; border: 2px solid white; border-radius: 8px; background: rgba(0,0,0,0.3); cursor: move; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold; }
+        button { background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        input[type="file"], input[type="range"] { margin: 10px 0; }
+        .status { margin-top: 10px; padding: 10px; border-radius: 8px; }
+        .success { background: #d1fae5; color: #065f46; }
+        .error { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🎨 Design Invitation Card</h1>
+    <div class="grid">
+        <div class="section">
+            <h2>1. Upload Card</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="cardFile" name="image" accept="image/png,image/jpeg" required>
+                <input type="text" id="eventId" placeholder="Event ID" required style="width:100%; margin:10px 0; padding:8px;">
+                <button type="submit">Upload Card</button>
+            </form>
+            <div id="uploadStatus"></div>
+
+            <div id="qrControls" style="display:none;">
+                <h2>2. QR Settings</h2>
+                <label>QR Size (px): <span id="sizeValue">120</span></label>
+                <input type="range" id="qrSize" min="60" max="200" value="120">
+                <button id="generateBtn">✨ Generate QR Codes for All Guests</button>
+                <div id="generateStatus"></div>
+            </div>
+        </div>
+        <div class="section">
+            <h2>Preview</h2>
+            <div id="previewContainer" style="display:none;">
+                <div class="preview-area" id="previewArea">
+                    <img id="cardImage" style="max-width:100%; border-radius:10px;">
+                    <div id="qrOverlay" class="qr-overlay">QR</div>
+                </div>
+                <p style="font-size:12px; text-align:center;">Drag the QR box to reposition</p>
+            </div>
+            <div id="noPreview">Upload a card to see preview</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCardUrl = null;
+    let currentEventId = null;
+    let isDragging = false;
+    let dragOffsetX = 0, dragOffsetY = 0;
+
+    const uploadForm = document.getElementById('uploadForm');
+    const cardFile = document.getElementById('cardFile');
+    const eventIdInput = document.getElementById('eventId');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const qrControls = document.getElementById('qrControls');
+    const previewContainer = document.getElementById('previewContainer');
+    const noPreview = document.getElementById('noPreview');
+    const cardImage = document.getElementById('cardImage');
+    const qrOverlay = document.getElementById('qrOverlay');
+    const qrSizeSlider = document.getElementById('qrSize');
+    const sizeValue = document.getElementById('sizeValue');
+    const generateBtn = document.getElementById('generateBtn');
+    const generateStatus = document.getElementById('generateStatus');
+
+    // Upload form submission
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = cardFile.files[0];
+        const eventId = eventIdInput.value.trim();
+        if (!file || !eventId) {
+            uploadStatus.innerHTML = '<div class="status error">Please select a file and enter Event ID.</div>';
+            return;
+        }
+        currentEventId = eventId;
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('eventId', eventId);
+        uploadStatus.innerHTML = '<div class="status">Uploading...</div>';
+        try {
+            const res = await fetch('/api/upload-base-card', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (res.ok) {
+                currentCardUrl = data.url;
+                uploadStatus.innerHTML = '<div class="status success">✅ Card uploaded successfully!</div>';
+                // Show preview
+                cardImage.src = currentCardUrl;
+                previewContainer.style.display = 'block';
+                noPreview.style.display = 'none';
+                qrControls.style.display = 'block';
+                // Set initial overlay size and position
+                updateQRSize();
+                // Allow dragging
+                enableDragging();
+            } else {
+                uploadStatus.innerHTML = `<div class="status error">❌ Upload failed: ${data.error}</div>`;
+            }
+        } catch (err) {
+            uploadStatus.innerHTML = `<div class="status error">❌ Network error: ${err.message}</div>`;
+        }
+    });
+
+    // Update QR overlay size
+    function updateQRSize() {
+        const size = parseInt(qrSizeSlider.value);
+        sizeValue.innerText = size;
+        qrOverlay.style.width = size + 'px';
+        qrOverlay.style.height = size + 'px';
+        // Clamp position to image bounds
+        const imgRect = cardImage.getBoundingClientRect();
+        const containerRect = document.getElementById('previewArea').getBoundingClientRect();
+        let left = parseInt(qrOverlay.style.left) || 80;
+        let top = parseInt(qrOverlay.style.top) || 300;
+        left = Math.min(Math.max(0, left), imgRect.width - size);
+        top = Math.min(Math.max(0, top), imgRect.height - size);
+        qrOverlay.style.left = left + 'px';
+        qrOverlay.style.top = top + 'px';
+    }
+    qrSizeSlider.addEventListener('input', updateQRSize);
+
+    // Dragging functionality
+    function enableDragging() {
+        qrOverlay.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            const rect = qrOverlay.getBoundingClientRect();
+            const containerRect = document.getElementById('previewArea').getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const containerRect = document.getElementById('previewArea').getBoundingClientRect();
+            let newLeft = e.clientX - containerRect.left - dragOffsetX;
+            let newTop = e.clientY - containerRect.top - dragOffsetY;
+            const maxLeft = cardImage.clientWidth - parseInt(qrOverlay.style.width);
+            const maxTop = cardImage.clientHeight - parseInt(qrOverlay.style.height);
+            newLeft = Math.min(Math.max(0, newLeft), maxLeft);
+            newTop = Math.min(Math.max(0, newTop), maxTop);
+            qrOverlay.style.left = newLeft + 'px';
+            qrOverlay.style.top = newTop + 'px';
+        });
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    }
+
+    // Generate QR codes
+    generateBtn.addEventListener('click', async () => {
+        if (!currentCardUrl || !currentEventId) return;
+        const size = parseInt(qrSizeSlider.value);
+        const left = parseFloat(qrOverlay.style.left);
+        const top = parseFloat(qrOverlay.style.top);
+        const qrPosition = { x: left, y: top, size: size };
+        generateBtn.disabled = true;
+        generateStatus.innerHTML = '<div class="status">Generating QR codes for all guests... Please wait.</div>';
+        try {
+            const res = await fetch('/api/invitations/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ eventId: currentEventId, qrPosition, baseCardUrl: currentCardUrl })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                generateStatus.innerHTML = '<div class="status success">✅ QR codes generated successfully! Redirecting to send page...</div>';
+                setTimeout(() => {
+                    window.location.href = `/send-invitations-server/${currentEventId}`;
+                }, 2000);
+            } else {
+                generateStatus.innerHTML = `<div class="status error">❌ Generation failed: ${data.error}</div>`;
+                generateBtn.disabled = false;
+            }
+        } catch (err) {
+            generateStatus.innerHTML = `<div class="status error">❌ Network error: ${err.message}</div>`;
+            generateBtn.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

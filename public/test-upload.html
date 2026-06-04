@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test</title>
+</head>
+<body>
+    <button onclick="document.getElementById('fileInput').click()">Click to Upload</button>
+    <input type="file" id="fileInput" style="display:none" onchange="alert('File selected: ' + this.files[0].name)">
+    <script>
+        console.log('Page loaded');
+        alert('JavaScript works');
+    </script>
+</body>
+</html>
