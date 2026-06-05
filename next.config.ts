@@ -17,9 +17,7 @@ const nextConfig = {
       },
     ],
   },
-  turbopack: {
-    root: __dirname,
-  },
+  // Removed turbopack — not essential for most apps
   async rewrites() {
     return [
       {
