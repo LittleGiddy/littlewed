@@ -17,15 +17,6 @@ const nextConfig = {
       },
     ],
   },
-  // Removed turbopack — not essential for most apps
-  async rewrites() {
-    return [
-      {
-        source: '/:path*',
-        destination: '/:path*',
-      },
-    ];
-  },
 };
 
 module.exports = nextConfig;
