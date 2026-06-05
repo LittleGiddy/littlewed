@@ -4,12 +4,15 @@ const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TO
 
 export async function isWhatsAppNumber(phoneNumber: string): Promise<boolean> {
   try {
-    const lookup = await client.lookups.v2.phoneNumbers(phoneNumber).fetch({
+    const formatted = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+    const lookup = await client.lookups.v2.phoneNumbers(formatted).fetch({
       fields: 'whatsapp',
     });
-    return lookup.whatsapp?.status === 'active';
+    // Use type assertion to bypass TypeScript's incomplete definitions
+    const whatsappStatus = (lookup as any).whatsapp?.status;
+    return whatsappStatus === 'active';
   } catch (error) {
     console.error(`WhatsApp lookup failed for ${phoneNumber}:`, error);
-    return false;
+    return false; // fallback to SMS
   }
 }
