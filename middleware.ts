@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { prisma } from '@/lib/prisma'; // ✅ import Prisma for DB lookup
+import { prisma } from '@/lib/prisma';
 
 export async function middleware(req: NextRequest) {
   const host = req.headers.get('host') || '';
   const { pathname } = req.nextUrl;
 
-  // ─────────────────────────────────────────────────────────────────
-  // 1️⃣ Always allow essential paths (public, assets, auth, APIs)
-  // ─────────────────────────────────────────────────────────────────
+  // 1️⃣ Always allow essential paths
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
@@ -26,9 +24,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // 2️⃣ Extract subdomain (works for both localhost and real domains)
-  // ─────────────────────────────────────────────────────────────────
+  // 2️⃣ Extract subdomain
   const hostname = host.split(':')[0];
   const parts = hostname.split('.');
   let subdomain: string | null = null;
@@ -41,9 +37,7 @@ export async function middleware(req: NextRequest) {
 
   const isMainDomain = !subdomain || ['app', 'www', 'admin'].includes(subdomain);
 
-  // ─────────────────────────────────────────────────────────────────
-  // 3️⃣ MAIN DOMAIN (app.weddingsaas.com, www.weddingsaas.com, localhost)
-  // ─────────────────────────────────────────────────────────────────
+  // 3️⃣ MAIN DOMAIN
   if (isMainDomain) {
     const token = await getToken({
       req,
@@ -55,45 +49,35 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL('/login', req.url));
     }
 
-    // ✅ Subscription check for main domain clients
     if (pathname.startsWith('/client')) {
       const subscriptionStatus = token.subscriptionStatus as string;
       const role = token.role as string;
-
       if (role !== 'SUPER_ADMIN' && subscriptionStatus !== 'active') {
         return NextResponse.redirect(new URL('/subscribe', req.url));
       }
     }
-
     return NextResponse.next();
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  // 4️⃣ SUBDOMAIN (tenant specific, e.g. myevent.weddingsaas.com)
-  // ─────────────────────────────────────────────────────────────────
-  // Look up tenant directly in the database
+  // 4️⃣ SUBDOMAIN (tenant specific)
+  // Use camelCase field names as in schema
   const tenant = await prisma.tenant.findUnique({
     where: { subdomain: subdomain! },
-    select: { subscription_status: true, id: true },
+    select: { subscriptionStatus: true, id: true },
   });
 
-  // No tenant → 404
   if (!tenant) {
     return NextResponse.redirect(new URL('/404', req.url));
   }
 
-  // Subscription check for tenant paths
   const isClientPath = pathname.startsWith('/client');
-  const isBillingPath = pathname === '/billing';
-
-  if (isClientPath && tenant.subscription_status !== 'active') {
-    // Redirect to the tenant's billing page (or global subscribe)
+  if (isClientPath && tenant.subscriptionStatus !== 'active') {
     const billingUrl = new URL('/subscribe', req.url);
     billingUrl.searchParams.set('tenantId', tenant.id);
     return NextResponse.redirect(billingUrl);
   }
 
-  // ✅ All good – forward tenant context via headers
+  // Forward tenant context
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-tenant-id', tenant.id);
   requestHeaders.set('x-subdomain', subdomain as string);
