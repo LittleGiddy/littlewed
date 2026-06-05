@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react' // ✅ add import
 
-export default function CheckInPage() {
+function CheckInContent() {
   const searchParams = useSearchParams()
   const eventId = searchParams.get('event')
   
@@ -23,6 +24,7 @@ export default function CheckInPage() {
     const res = await fetch('/api/check-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ add this for session
       body: JSON.stringify({ smsCode: code })
     })
 
@@ -31,7 +33,6 @@ export default function CheckInPage() {
       setMessage(`✅ Checked in: ${data.guest.name}`)
       setGuestName(data.guest.name)
       setCode('')
-      // Optional: play a sound
       new Audio('/beep.mp3').play().catch(() => {})
     } else {
       setMessage(`❌ ${data.error}`)
@@ -85,5 +86,18 @@ export default function CheckInPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// ✅ Wrap in Suspense to fix prerender error
+export default function CheckInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <CheckInContent />
+    </Suspense>
   )
 }
