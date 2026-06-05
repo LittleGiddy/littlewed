@@ -1,14 +1,12 @@
-export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { prisma } from '@/lib/prisma';
 
 export async function middleware(req: NextRequest) {
   const host = req.headers.get('host') || '';
   const { pathname } = req.nextUrl;
 
-  // 1️⃣ Always allow essential paths
+  // 1️⃣ Allow essential paths
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
@@ -61,26 +59,9 @@ export async function middleware(req: NextRequest) {
   }
 
   // 4️⃣ SUBDOMAIN (tenant specific)
-  // Use camelCase field names as in schema
-  const tenant = await prisma.tenant.findUnique({
-    where: { subdomain: subdomain! },
-    select: { subscriptionStatus: true, id: true },
-  });
-
-  if (!tenant) {
-    return NextResponse.redirect(new URL('/404', req.url));
-  }
-
-  const isClientPath = pathname.startsWith('/client');
-  if (isClientPath && tenant.subscriptionStatus !== 'active') {
-    const billingUrl = new URL('/subscribe', req.url);
-    billingUrl.searchParams.set('tenantId', tenant.id);
-    return NextResponse.redirect(billingUrl);
-  }
-
-  // Forward tenant context
+  // ✅ Don't use Prisma in middleware — just pass subdomain via headers
+  // Pages/API routes will query Prisma to get tenant info
   const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-tenant-id', tenant.id);
   requestHeaders.set('x-subdomain', subdomain as string);
   requestHeaders.set('x-host', host);
 
