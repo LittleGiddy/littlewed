@@ -9,7 +9,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.littlewed.com',
+        hostname: '*.vercel.app', // ✅ Vercel free plan domain
+      },
+      {
+        protocol: 'https',
+        hostname: '*.littlewed.com', // Keep for future production
       },
       {
         protocol: 'https',
