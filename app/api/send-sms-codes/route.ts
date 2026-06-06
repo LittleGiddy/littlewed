@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { prisma } from '@/lib/prisma';
-import africastalking from 'africastalking';
-
-function getEnvVar(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name} in .env file`);
-  return value;
-}
-
-const at = africastalking({
-  apiKey: getEnvVar('AT_API_KEY'),
-  username: getEnvVar('AT_USERNAME'),
-});
-
-const sms = at.SMS;
 
 async function generateUniqueCode(): Promise<string> {
   let code = '';
@@ -27,34 +13,33 @@ async function generateUniqueCode(): Promise<string> {
   return code;
 }
 
-async function sendSms(phone: string, name: string, code: string, eventName: string) {
-  const message = `Hello ${name}, your entry code for ${eventName} is: ${code}. Please show this at the entrance.`;
-  const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+export async function POST(req: NextRequest) {
+  // Lazy‑initialize Africa's Talking inside the handler
+  const AT_USERNAME = process.env.AT_USERNAME;
+  const AT_API_KEY = process.env.AT_API_KEY;
+  const AT_SENDER_ID = process.env.AT_SENDER_ID;
 
-  const result: any = await sms.send({
-    to: formattedPhone,
-    message,
-  } as any);
-
-  const recipient = result?.SMSMessageData?.Recipients?.[0];
-  if (!recipient || recipient.status !== 'Success') {
-    throw new Error(recipient?.status || result?.SMSMessageData?.Message || 'SMS failed');
+  if (!AT_USERNAME || !AT_API_KEY || !AT_SENDER_ID) {
+    console.error('Missing Africa\'s Talking credentials');
+    return NextResponse.json({ error: 'SMS service not configured' }, { status: 500 });
   }
 
-  return result;
-}
+  // Dynamically import the module and initialize
+  const africastalking = require('africastalking');
+  const at = africastalking({ username: AT_USERNAME, apiKey: AT_API_KEY });
+  const sms = at.SMS;
 
-export async function POST(req: NextRequest) {
   const session = await getServerSession();
-  if (!session) {
+  if (!session || (session.user as any).role !== 'CLIENT') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const tenantId = (session.user as any).tenantId;
   const { eventId } = await req.json();
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    include: { guests: true }
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
+    include: { guests: true },
   });
 
   if (!event) {
@@ -68,9 +53,23 @@ export async function POST(req: NextRequest) {
         const smsCode = await generateUniqueCode();
         await prisma.guest.update({
           where: { id: guest.id },
-          data: { smsCode }
+          data: { smsCode },
         });
-        await sendSms(guest.phone, guest.name, smsCode, event.name);
+
+        const message = `Hello ${guest.name}, your entry code for ${event.name} is: ${smsCode}. Please show this at the entrance.`;
+        const formattedPhone = guest.phone.startsWith('+') ? guest.phone : `+${guest.phone}`;
+
+        const result: any = await sms.send({
+          to: formattedPhone,
+          message,
+          from: AT_SENDER_ID,
+        });
+
+        const recipient = result?.SMSMessageData?.Recipients?.[0];
+        if (!recipient || recipient.status !== 'Success') {
+          throw new Error(recipient?.status || result?.SMSMessageData?.Message || 'SMS failed');
+        }
+
         results.push({ guestId: guest.id, success: true });
       } catch (error: any) {
         console.error(`Failed for ${guest.name}:`, error.message);
