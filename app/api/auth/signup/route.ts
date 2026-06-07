@@ -3,35 +3,39 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
-  const { business_name, email, password, plan } = await req.json();
-  if (!business_name || !email || !password) {
-    return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  const { business_name, subdomain, email, password, name } = await req.json();
+
+  if (!business_name || !subdomain || !email || !password || !name) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
     return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
   }
 
-  const subdomain = business_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-  const hashed = await bcrypt.hash(password, 10);
+  const existingTenant = await prisma.tenant.findUnique({ where: { subdomain } });
+  if (existingTenant) {
+    return NextResponse.json({ error: 'Subdomain already taken' }, { status: 400 });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const tenant = await prisma.tenant.create({
-  data: {
-    name: business_name,
-    subdomain,
-    plan: 'BASIC',        // unused but keep
-    subscriptionStatus: 'active',
-    maxGuests: 200,
-    creditBalance: 0,
-  },
-});
+    data: {
+      name: business_name,
+      subdomain,
+      subscriptionStatus: 'active',
+      maxGuests: 200,
+      credits: 0, // ✅ changed from creditBalance to credits
+    },
+  });
 
   await prisma.user.create({
     data: {
       email,
-      password: hashed,
-      name: 'Admin',
+      password: hashedPassword,
+      name,
       role: 'CLIENT',
       tenantId: tenant.id,
     },
