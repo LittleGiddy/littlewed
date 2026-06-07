@@ -76,7 +76,6 @@ export async function POST(req: NextRequest) {
     });
     if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-    // Fetch tenant settings
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { credits: true, templateCardUrl: true, qrPlacementX: true, qrPlacementY: true, qrSize: true },
@@ -85,7 +84,6 @@ export async function POST(req: NextRequest) {
     if (!tenant.templateCardUrl)
       return NextResponse.json({ error: 'No invitation card configured. Please upload a card in Settings.' }, { status: 400 });
 
-    // ✅ After the guard, we can safely use non‑null assertion
     const templateCardUrl = tenant.templateCardUrl!;
     const qrPosition = {
       x: tenant.qrPlacementX ?? 100,
@@ -122,12 +120,12 @@ export async function POST(req: NextRequest) {
       const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
       try {
         if (channel === 'whatsapp') {
-          // ✅ Use non‑null assertion because we will generate the card if missing
           let cardUrl = guest.invitationCard;
           if (!cardUrl) {
             cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
           }
-          await sendWhatsAppInvitation(guest.phone, cardUrl!, event.name);
+          // Non‑null assertions for both phone and cardUrl (we have them)
+          await sendWhatsAppInvitation(guest.phone!, cardUrl!, event.name);
         } else {
           await sendSmsCode(guest, event.name);
         }
