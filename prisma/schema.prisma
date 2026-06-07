@@ -55,6 +55,10 @@ model Event {
   tenant          Tenant    @relation(fields: [tenantId], references: [id])
   guests          Guest[]
   createdAt       DateTime  @default(now())
+  templateCardUrl String?
+  qrPlacementX    Float?   @default(100)
+  qrPlacementY    Float?   @default(100)
+  qrSize          Int?     @default(200)
 }
 
 model PendingEvent {
