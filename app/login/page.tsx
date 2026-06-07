@@ -20,16 +20,20 @@ export default function LoginPage() {
     setError('');
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
+      console.log('signIn result:', result);
       if (result?.ok && !result?.error) {
+
         // Fetch session to get role
         const res = await fetch('/api/auth/session');
         const session = await res.json();
 
-        if (email === 'super@littlewed.com') {
+        // Temporary hard redirect for super admin (remove after)
+if (email === 'super@littlewed.com') {
   window.location.href = '/admin/dashboard';
   return;
 }
-        const role = session?.user?.role;
+  
+      const role = session?.user?.role;
         if (role === 'SUPER_ADMIN') {
           window.location.href = '/admin/dashboard';
         } else if (role === 'STAFF') {

@@ -9,31 +9,43 @@ export default function ManageTenantPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/admin/tenants/${id}`).then(res => res.json()).then(setTenant);
+    fetch(`/api/admin/tenants/${id}`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(setTenant);
   }, [id]);
 
-  const toggleStatus = async () => {
-    await fetch(`/api/admin/tenants/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: tenant.subscriptionStatus === 'active' ? 'inactive' : 'active' }),
-    });
-    setTenant({ ...tenant, subscriptionStatus: tenant.subscriptionStatus === 'active' ? 'inactive' : 'active' });
-  };
+const toggleStatus = async () => {
+  await fetch(`/api/admin/tenants/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: tenant.subscriptionStatus === 'active' ? 'inactive' : 'active' }),
+    credentials: 'include',
+  });
+  setTenant({ ...tenant, subscriptionStatus: tenant.subscriptionStatus === 'active' ? 'inactive' : 'active' });
+};
 
-  const addCredit = async () => {
-    const amount = parseInt(creditAmount);
-    if (isNaN(amount)) return;
-    setLoading(true);
-    await fetch(`/api/admin/tenants/${id}/credit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
-    });
-    setTenant({ ...tenant, creditBalance: tenant.creditBalance + amount });
+const addCredit = async () => {
+  const amount = parseInt(creditAmount);
+  if (isNaN(amount) || amount <= 0) {
+    alert('Please enter a valid amount');
+    return;
+  }
+  setLoading(true);
+  const res = await fetch(`/api/admin/tenants/${id}/credit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+    credentials: 'include',
+  });
+  if (res.ok) {
+    setTenant({ ...tenant, credits: (tenant.credits || 0) + amount });
     setCreditAmount('');
-    setLoading(false);
-  };
+  } else {
+    const error = await res.json();
+    alert(`Failed: ${error.error}`);
+  }
+  setLoading(false);
+};
 
   if (!tenant) return <div>Loading...</div>;
 
@@ -48,9 +60,17 @@ export default function ManageTenantPage() {
           </button>
         </div>
         <div className="bg-white p-4 rounded shadow">
-          <p><strong>Credit Balance (TZS):</strong> {tenant.creditBalance}</p>
-          <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Amount in TZS" className="border p-2 mr-2" />
-          <button onClick={addCredit} disabled={loading} className="bg-green-600 text-white px-4 py-2 rounded">Add Credit</button>
+          <p><strong>Credit Balance (TZS):</strong> {tenant.credits ?? 0}</p>
+          <input
+            type="number"
+            value={creditAmount}
+            onChange={e => setCreditAmount(e.target.value)}
+            placeholder="Amount in TZS"
+            className="border p-2 mr-2 rounded"
+          />
+          <button onClick={addCredit} disabled={loading} className="bg-green-600 text-white px-4 py-2 rounded">
+            {loading ? 'Adding...' : 'Add Credit'}
+          </button>
         </div>
       </div>
     </div>

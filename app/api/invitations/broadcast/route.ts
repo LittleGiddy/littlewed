@@ -4,16 +4,27 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
 import twilio from 'twilio';
+const isMock = true; // 👈 force mock mode
 
-const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+// Check for mock mode (set MOCK_SMS=true in .env.local)
+
+console.log(`Broadcast API running in ${isMock ? 'MOCK' : 'LIVE'} mode`);
+
+// Initialize Twilio only if not in mock mode
+const twilioClient = isMock ? null : twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const fromWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
 const fromSms = process.env.TWILIO_SMS_NUMBER;
+
 const COST_WHATSAPP = 50;
 const COST_SMS = 25;
 
 async function sendWhatsAppInvitation(phone: string, imageUrl: string, eventName: string) {
+  if (isMock) {
+    console.log(`[MOCK] WhatsApp to ${phone}: image ${imageUrl}, event ${eventName}`);
+    return;
+  }
   const normalized = phone.startsWith('+') ? phone : `+${phone}`;
-  await twilioClient.messages.create({
+  await twilioClient!.messages.create({
     body: `You're invited to ${eventName}! Scan the QR code at the entrance.`,
     from: `whatsapp:${fromWhatsApp}`,
     to: `whatsapp:${normalized}`,
@@ -27,8 +38,12 @@ async function sendSmsCode(guest: any, eventName: string) {
     code = Math.floor(100000 + Math.random() * 900000).toString();
     await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
   }
+  if (isMock) {
+    console.log(`[MOCK] SMS to ${guest.phone}: code ${code}, event ${eventName}`);
+    return;
+  }
   const normalized = guest.phone.startsWith('+') ? guest.phone : `+${guest.phone}`;
-  await twilioClient.messages.create({
+  await twilioClient!.messages.create({
     body: `You're invited to ${eventName}! Your check-in code is: ${code}`,
     from: fromSms || fromWhatsApp,
     to: normalized,
