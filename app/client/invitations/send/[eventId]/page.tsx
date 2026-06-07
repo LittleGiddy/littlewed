@@ -26,7 +26,7 @@ export default function SendInvitationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/events/${eventId}/guests`)
+    fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }) // ✅ add this
       .then(res => res.json())
       .then(data => {
         setGuests(data);
@@ -39,6 +39,7 @@ export default function SendInvitationsPage() {
     const res = await fetch('/api/invitations/broadcast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // ✅ add this — sends session cookie
       body: JSON.stringify({ eventId }),
     });
     const data = await res.json();
