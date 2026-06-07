@@ -143,15 +143,16 @@ export async function POST(req: NextRequest) {
       const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
 
       try {
-        if (channel === 'whatsapp') {
-          let cardUrl = guest.invitationCard;
-          if (!cardUrl) {
-            cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
-          }
-          await sendWhatsAppInvitation(guest.phone, cardUrl, event.name);
-        } else {
-          await sendSmsCode(guest, event.name);
-        }
+       if (channel === 'whatsapp') {
+  let cardUrl = guest.invitationCard;
+  if (!cardUrl) {
+    cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
+  }
+  if (!cardUrl) throw new Error('Failed to generate card URL');
+  await sendWhatsAppInvitation(guest.phone!, cardUrl, event.name);
+} else {
+  await sendSmsCode(guest, event.name);
+}
 
         // Deduct credit and record usage
         await prisma.$transaction([
