@@ -13,17 +13,13 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: { tenant: true },
         });
-
         if (!user) return null;
-
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
-
         return {
           id: user.id,
           email: user.email,
@@ -63,15 +59,10 @@ export const authOptions: NextAuthOptions = {
       return `${baseUrl}/client/dashboard`;
     },
   },
-  pages: {
-    signIn: '/login',
-  },
-  session: {
-    strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60,
-  },
+  pages: { signIn: '/login' },
+  session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
-  // ✅ Add cookies configuration for HTTPS (Vercel)
+  // ✅ Essential for HTTPS (Vercel)
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,
