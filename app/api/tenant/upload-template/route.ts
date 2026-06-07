@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth'; // ✅ add this
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import { authOptions } from '@/lib/auth';
+import { uploadToBlob } from '@/lib/storage';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions); // ✅ pass authOptions
-    console.log('Session in upload-template:', session?.user);
-
+    const session = await getServerSession(authOptions);
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized - No session' }, { status: 401 });
     }
@@ -27,12 +24,8 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), 'public', 'tenant-templates', tenantId || 'unknown');
-    await mkdir(uploadDir, { recursive: true });
-    const fileName = `template-${Date.now()}.png`;
-    const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
-    const url = `/tenant-templates/${tenantId || 'unknown'}/${fileName}`;
+    const key = `tenants/${tenantId}/template-${Date.now()}.png`;
+    const url = await uploadToBlob(key, buffer, file.type);
 
     return NextResponse.json({ url });
   } catch (error: any) {

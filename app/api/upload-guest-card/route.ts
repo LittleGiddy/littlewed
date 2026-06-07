@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { uploadToBlob } from '@/lib/storage';
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    console.log('Received body keys:', Object.keys(body));
-    console.log('guestId:', body.guestId);
-    console.log('base64Image length:', body.base64Image?.length);
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    const { guestId, base64Image } = body;
+    const tenantId = (session.user as any).tenantId;
+    const { guestId, base64Image } = await req.json();
 
     if (!guestId) {
       return NextResponse.json({ error: 'Missing guestId' }, { status: 400 });
@@ -18,22 +20,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing or invalid base64Image' }, { status: 400 });
     }
 
-    // Extract the base64 data (remove prefix if present)
+    // Extract the base64 data
     let base64Data = base64Image;
     if (base64Image.includes('base64,')) {
       base64Data = base64Image.split('base64,')[1];
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
-    console.log('Buffer size:', buffer.length);
+    const key = `guests/${tenantId}/${guestId}.png`;
+    const url = await uploadToBlob(key, buffer, 'image/png');
 
-    const uploadDir = path.join(process.cwd(), 'public', 'invitations');
-    await mkdir(uploadDir, { recursive: true });
-    const fileName = `${guestId}.png`;
-    const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
-
-    const url = `/invitations/${fileName}`;
     return NextResponse.json({ url });
   } catch (error: any) {
     console.error('Upload guest card error:', error);

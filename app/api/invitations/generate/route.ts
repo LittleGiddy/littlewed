@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
   const isCloudflareTunnel =
     host.includes('trycloudflare.com') || host.includes('loca.lt');
 
-  // ── Auth ──────────────────────────────────────────────────────────
   let session = null;
   if (!isCloudflareTunnel) {
     session = await getServerSession(authOptions);
@@ -22,21 +21,15 @@ export async function POST(req: NextRequest) {
 
   const { eventId } = await req.json();
 
-  // ── Fetch event with guests only ──────────────────────────────────
-  // ✅ removed `include: { tenant: { include: { settings: true } } }`
-  // because TenantSettings model no longer exists — fields are on Tenant directly
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    include: {
-      guests: true, // ✅ guests is a direct relation on Event — this is fine
-    },
+    include: { guests: true },
   });
 
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  // ── Verify ownership (non-tunnel) ─────────────────────────────────
   if (!isCloudflareTunnel && session) {
     const tenantId = (session.user as any).tenantId;
     if (
@@ -47,15 +40,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // ── Fetch tenant settings directly from Tenant model ─────────────
-  // ✅ query Tenant directly — templateCardUrl, qrPlacementX/Y/Size are on Tenant
   const tenant = await prisma.tenant.findUnique({
     where: { id: event.tenantId },
     select: {
       templateCardUrl: true,
-      qrPlacementX:    true,
-      qrPlacementY:    true,
-      qrSize:          true,
+      qrPlacementX: true,
+      qrPlacementY: true,
+      qrSize: true,
     },
   });
 
@@ -67,43 +58,36 @@ export async function POST(req: NextRequest) {
   }
 
   const qrPosition = {
-    x:    tenant.qrPlacementX ?? 100,
-    y:    tenant.qrPlacementY ?? 100,
-    size: tenant.qrSize       ?? 200,
+    x: tenant.qrPlacementX ?? 100,
+    y: tenant.qrPlacementY ?? 100,
+    size: tenant.qrSize ?? 200,
   };
 
-  // ── Read base card from filesystem ────────────────────────────────
-  const baseCardPath = path.join(process.cwd(), 'public', tenant.templateCardUrl);
-
+  // The baseCardUrl is now a full blob URL (public). We need to fetch it as buffer.
+  let cardBuffer: Buffer;
   try {
-    await fs.access(baseCardPath);
-  } catch {
+    const response = await fetch(tenant.templateCardUrl);
+    if (!response.ok) throw new Error(`Failed to fetch base card: ${response.statusText}`);
+    const arrayBuffer = await response.arrayBuffer();
+    cardBuffer = Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('Error fetching base card:', error);
     return NextResponse.json(
-      { error: `Base card image not found at: ${tenant.templateCardUrl}` },
+      { error: 'Could not load base card image. Please re‑upload the template in Settings.' },
       { status: 400 }
     );
   }
 
-  const cardBuffer = await fs.readFile(baseCardPath);
-
-  // ── Generate cards for each guest ─────────────────────────────────
   const results = [];
 
   for (const guest of event.guests) {
     try {
-      // 1. Generate JWT token
       const token = generateGuestToken(guest.id, eventId);
-
-      // 2. Generate QR buffer
       const qrBuffer = await generateQRBuffer(token, qrPosition.size);
-
-      // 3. Composite QR onto card
       const finalCardBuffer = await compositeQROnCard(cardBuffer, qrBuffer, qrPosition);
-
-      // 4. Convert to base64
       const base64Card = finalCardBuffer.toString('base64');
 
-      // 5. Upload to public folder
+      // Upload using the guest card API (which now uses Vercel Blob)
       const uploadRes = await fetch(`${process.env.NEXTAUTH_URL}/api/upload-guest-card`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,16 +99,11 @@ export async function POST(req: NextRequest) {
         throw new Error(err.error || 'Upload failed');
       }
 
-      const { url: relativeUrl } = await uploadRes.json();
+      const { url: imageUrl } = await uploadRes.json(); // This is now a full blob URL
 
-      // 6. Build absolute URL for Twilio
-      const baseUrl = (process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, '');
-      const absoluteUrl = `${baseUrl}${relativeUrl}`;
-
-      // 7. Save to guest record
       await prisma.guest.update({
         where: { id: guest.id },
-        data: { invitationCard: absoluteUrl, qrToken: token },
+        data: { invitationCard: imageUrl, qrToken: token },
       });
 
       results.push({ guestId: guest.id, name: guest.name, success: true });
@@ -142,13 +121,13 @@ export async function POST(req: NextRequest) {
   }
 
   const successCount = results.filter(r => r.success).length;
-  const failCount    = results.filter(r => !r.success).length;
+  const failCount = results.filter(r => !r.success).length;
 
   return NextResponse.json({
     success: true,
-    total:     results.length,
+    total: results.length,
     generated: successCount,
-    failed:    failCount,
+    failed: failCount,
     results,
   });
 }
