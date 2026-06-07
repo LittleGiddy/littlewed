@@ -4,15 +4,10 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
 import twilio from 'twilio';
-import fs from 'fs/promises';
-import path from 'path';
 
-// Twilio configuration
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const fromWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
 const fromSms = process.env.TWILIO_SMS_NUMBER;
-
-// Costs (in TZS)
 const COST_WHATSAPP = 50;
 const COST_SMS = 25;
 
@@ -30,10 +25,7 @@ async function sendSmsCode(guest: any, eventName: string) {
   let code = guest.smsCode;
   if (!code) {
     code = Math.floor(100000 + Math.random() * 900000).toString();
-    await prisma.guest.update({
-      where: { id: guest.id },
-      data: { smsCode: code },
-    });
+    await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
   }
   const normalized = guest.phone.startsWith('+') ? guest.phone : `+${guest.phone}`;
   await twilioClient.messages.create({
@@ -53,15 +45,12 @@ async function generateAndSaveCard(
   const qrBuffer = await generateQRBuffer(token, qrPosition.size);
   const finalBuffer = await compositeQROnCard(cardBuffer, qrBuffer, qrPosition);
   const base64Card = finalBuffer.toString('base64');
-  // Use the existing guest card upload API (which uses Vercel Blob)
   const uploadRes = await fetch(`${process.env.NEXTAUTH_URL}/api/upload-guest-card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ guestId: guest.id, base64Image: base64Card }),
   });
-  if (!uploadRes.ok) {
-    throw new Error(await uploadRes.text());
-  }
+  if (!uploadRes.ok) throw new Error(await uploadRes.text());
   const { url } = await uploadRes.json();
   await prisma.guest.update({
     where: { id: guest.id },
@@ -72,41 +61,47 @@ async function generateAndSaveCard(
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'CLIENT') {
+    if (!session || (session.user as any).role !== 'CLIENT')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     const tenantId = (session.user as any).tenantId;
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
-    }
+    if (!tenantId) return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
 
     const { eventId } = await req.json();
+    if (!eventId) return NextResponse.json({ error: 'Missing eventId' }, { status: 400 });
 
-    // 2. Fetch event and guests
     const event = await prisma.event.findFirst({
       where: { id: eventId, tenantId },
       include: { guests: true },
     });
     if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-    // 3. Fetch tenant settings (template and QR placement)
+    // Fetch tenant settings
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: {
-        templateCardUrl: true,
-        qrPlacementX: true,
-        qrPlacementY: true,
-        qrSize: true,
-        credits: true,
-      },
+      select: { credits: true, templateCardUrl: true, qrPlacementX: true, qrPlacementY: true, qrSize: true },
     });
-    if (!tenant?.templateCardUrl) {
-      return NextResponse.json({ error: 'No card template uploaded. Please upload in Settings.' }, { status: 400 });
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    if (!tenant.templateCardUrl)
+      return NextResponse.json({ error: 'No invitation card configured. Please upload a card in Settings.' }, { status: 400 });
+
+    // ✅ After the guard, we can safely use non‑null assertion
+    const templateCardUrl = tenant.templateCardUrl!;
+    const qrPosition = {
+      x: tenant.qrPlacementX ?? 100,
+      y: tenant.qrPlacementY ?? 100,
+      size: tenant.qrSize ?? 200,
+    };
+
+    let cardBuffer: Buffer;
+    try {
+      const response = await fetch(templateCardUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      cardBuffer = Buffer.from(await response.arrayBuffer());
+    } catch {
+      return NextResponse.json({ error: 'Could not load invitation card image.' }, { status: 400 });
     }
 
-    // 4. Check credit balance
     const eligibleGuests = event.guests.filter(g => g.phone);
     let estimatedCost = 0;
     for (const g of eligibleGuests) {
@@ -119,54 +114,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Fetch base card image (from Vercel Blob URL)
-    let cardBuffer: Buffer;
-    try {
-      const response = await fetch(tenant.templateCardUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      cardBuffer = Buffer.from(arrayBuffer);
-    } catch {
-      return NextResponse.json({ error: 'Could not fetch base card image.' }, { status: 400 });
-    }
-
-    const qrPosition = {
-      x: tenant.qrPlacementX ?? 100,
-      y: tenant.qrPlacementY ?? 100,
-      size: tenant.qrSize ?? 200,
-    };
-
     const results = [];
     let totalCost = 0;
 
     for (const guest of eligibleGuests) {
       const channel = guest.routingChannel === 'whatsapp' ? 'whatsapp' : 'sms';
       const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
-
       try {
-       if (channel === 'whatsapp') {
-  let cardUrl = guest.invitationCard;
-  if (!cardUrl) {
-    cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
-  }
-  if (!cardUrl) throw new Error('Failed to generate card URL');
-  await sendWhatsAppInvitation(guest.phone!, cardUrl, event.name);
-} else {
-  await sendSmsCode(guest, event.name);
-}
+        if (channel === 'whatsapp') {
+          // ✅ Use non‑null assertion because we will generate the card if missing
+          let cardUrl = guest.invitationCard;
+          if (!cardUrl) {
+            cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
+          }
+          await sendWhatsAppInvitation(guest.phone, cardUrl!, event.name);
+        } else {
+          await sendSmsCode(guest, event.name);
+        }
 
-        // Deduct credit and record usage
         await prisma.$transaction([
-          prisma.tenant.update({
-            where: { id: tenantId },
-            data: { credits: { decrement: cost } },
-          }),
+          prisma.tenant.update({ where: { id: tenantId }, data: { credits: { decrement: cost } } }),
           prisma.usageRecord.create({
-            data: {
-              tenantId,
-              eventId: event.id,
-              channel,
-              cost,
-            },
+            data: { tenantId, eventId: event.id, channel, cost },
           }),
         ]);
         totalCost += cost;
@@ -175,7 +144,7 @@ export async function POST(req: NextRequest) {
         console.error(`Failed for ${guest.name}:`, error.message);
         results.push({ guestId: guest.id, name: guest.name, channel, success: false, error: error.message });
       }
-      await new Promise(resolve => setTimeout(resolve, 500)); // rate limit
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     return NextResponse.json({
