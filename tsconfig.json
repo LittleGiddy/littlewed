@@ -30,6 +30,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "scripts/create-test-user.js"  ],
+, "scripts/create-test-user.js", "middleware.ts.bak"  ],
   "exclude": ["node_modules"]
 }
