@@ -76,29 +76,35 @@ export async function POST(req: NextRequest) {
     });
     if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { credits: true, templateCardUrl: true, qrPlacementX: true, qrPlacementY: true, qrSize: true },
-    });
-    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
-    if (!tenant.templateCardUrl)
-      return NextResponse.json({ error: 'No invitation card configured. Please upload a card in Settings.' }, { status: 400 });
+    // ✅ Use event’s own card settings
+    if (!event.templateCardUrl) {
+      return NextResponse.json(
+        { error: 'No invitation card designed for this event. Please design it first.' },
+        { status: 400 }
+      );
+    }
 
-    const templateCardUrl = tenant.templateCardUrl!;
     const qrPosition = {
-      x: tenant.qrPlacementX ?? 100,
-      y: tenant.qrPlacementY ?? 100,
-      size: tenant.qrSize ?? 200,
+      x: event.qrPlacementX ?? 100,
+      y: event.qrPlacementY ?? 100,
+      size: event.qrSize ?? 200,
     };
 
     let cardBuffer: Buffer;
     try {
-      const response = await fetch(templateCardUrl);
+      const response = await fetch(event.templateCardUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       cardBuffer = Buffer.from(await response.arrayBuffer());
     } catch {
-      return NextResponse.json({ error: 'Could not load invitation card image.' }, { status: 400 });
+      return NextResponse.json({ error: 'Could not load invitation card image. Please re-upload it.' }, { status: 400 });
     }
+
+    // Fetch tenant credits only (no template needed)
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { credits: true },
+    });
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
     const eligibleGuests = event.guests.filter(g => g.phone);
     let estimatedCost = 0;
@@ -124,7 +130,6 @@ export async function POST(req: NextRequest) {
           if (!cardUrl) {
             cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition);
           }
-          // Non‑null assertions for both phone and cardUrl (we have them)
           await sendWhatsAppInvitation(guest.phone!, cardUrl!, event.name);
         } else {
           await sendSmsCode(guest, event.name);
