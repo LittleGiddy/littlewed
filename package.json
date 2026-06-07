@@ -8,8 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "prebuild": "prisma generate",
     "postinstall": "prisma generate"
   },
+  
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.4.0",
