@@ -3,13 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
-import fs from 'fs/promises';
-import path from 'path';
+import { put } from '@vercel/blob';
 
 export async function POST(req: NextRequest) {
   const host = req.headers.get('host') || '';
-  const isCloudflareTunnel =
-    host.includes('trycloudflare.com') || host.includes('loca.lt');
+  const isCloudflareTunnel = host.includes('trycloudflare.com') || host.includes('loca.lt');
 
   let session = null;
   if (!isCloudflareTunnel) {
@@ -32,48 +30,36 @@ export async function POST(req: NextRequest) {
 
   if (!isCloudflareTunnel && session) {
     const tenantId = (session.user as any).tenantId;
-    if (
-      event.tenantId !== tenantId &&
-      (session.user as any).role !== 'SUPER_ADMIN'
-    ) {
+    if (event.tenantId !== tenantId && (session.user as any).role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
   }
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: event.tenantId },
-    select: {
-      templateCardUrl: true,
-      qrPlacementX: true,
-      qrPlacementY: true,
-      qrSize: true,
-    },
-  });
-
-  if (!tenant?.templateCardUrl) {
+  // Use the event's own card settings (not tenant's)
+  if (!event.templateCardUrl) {
     return NextResponse.json(
-      { error: 'No invitation card configured for this tenant. Please upload a base card in Settings.' },
+      { error: 'No invitation card configured for this event. Please design it first.' },
       { status: 400 }
     );
   }
 
   const qrPosition = {
-    x: tenant.qrPlacementX ?? 100,
-    y: tenant.qrPlacementY ?? 100,
-    size: tenant.qrSize ?? 200,
+    x: event.qrPlacementX ?? 100,
+    y: event.qrPlacementY ?? 100,
+    size: event.qrSize ?? 200,
   };
 
-  // The baseCardUrl is now a full blob URL (public). We need to fetch it as buffer.
+  // Fetch the base card from its public Blob URL
   let cardBuffer: Buffer;
   try {
-    const response = await fetch(tenant.templateCardUrl);
+    const response = await fetch(event.templateCardUrl);
     if (!response.ok) throw new Error(`Failed to fetch base card: ${response.statusText}`);
     const arrayBuffer = await response.arrayBuffer();
     cardBuffer = Buffer.from(arrayBuffer);
   } catch (error) {
     console.error('Error fetching base card:', error);
     return NextResponse.json(
-      { error: 'Could not load base card image. Please re‑upload the template in Settings.' },
+      { error: 'Could not load base card image. Please re‑upload the template.' },
       { status: 400 }
     );
   }
@@ -85,25 +71,17 @@ export async function POST(req: NextRequest) {
       const token = generateGuestToken(guest.id, eventId);
       const qrBuffer = await generateQRBuffer(token, qrPosition.size);
       const finalCardBuffer = await compositeQROnCard(cardBuffer, qrBuffer, qrPosition);
-      const base64Card = finalCardBuffer.toString('base64');
 
-      // Upload using the guest card API (which now uses Vercel Blob)
-      const uploadRes = await fetch(`${process.env.NEXTAUTH_URL}/api/upload-guest-card`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestId: guest.id, base64Image: base64Card }),
+      // Upload directly to Vercel Blob
+      const key = `guests/${event.tenantId}/${guest.id}.png`;
+      const blob = await put(key, finalCardBuffer, {
+        access: 'public',
+        contentType: 'image/png',
       });
-
-      if (!uploadRes.ok) {
-        const err = await uploadRes.json();
-        throw new Error(err.error || 'Upload failed');
-      }
-
-      const { url: imageUrl } = await uploadRes.json(); // This is now a full blob URL
 
       await prisma.guest.update({
         where: { id: guest.id },
-        data: { invitationCard: imageUrl, qrToken: token },
+        data: { invitationCard: blob.url, qrToken: token },
       });
 
       results.push({ guestId: guest.id, name: guest.name, success: true });
