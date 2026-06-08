@@ -49,7 +49,7 @@ export default async function ClientDashboard() {
     );
   }
 
-  // Fetch all required data including simpleEventMode
+  // Fetch all required data
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { credits: true, name: true, simpleEventMode: true },
@@ -81,27 +81,9 @@ export default async function ClientDashboard() {
   const firstName = session.user.name?.split(' ')[0] ?? 'there';
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F0F4F8',
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      paddingBottom: 80,
-    }}>
+    <div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .dash-wrap {
-          max-width: 860px;
-          margin: 0 auto;
-          padding: 40px 24px 32px;
-          animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
 
         .dash-header {
           display: flex;
@@ -355,7 +337,6 @@ export default async function ClientDashboard() {
         .empty-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(13,79,79,0.35); }
 
         @media (max-width: 640px) {
-          .dash-wrap { padding: 24px 16px 20px; }
           .dash-title { font-size: 26px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
           .stat-value { font-size: 24px; }
@@ -366,7 +347,8 @@ export default async function ClientDashboard() {
         }
       `}</style>
 
-      <div className="dash-wrap">
+      {/* ✅ Removed .dash-wrap wrapper - now uses full width from layout */}
+      <div>
         <div className="dash-header">
           <div>
             <div className="dash-greeting">Your Dashboard</div>
