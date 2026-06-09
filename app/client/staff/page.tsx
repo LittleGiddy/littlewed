@@ -72,21 +72,10 @@ export default function StaffPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F0F4F8',
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      paddingBottom: 80,
-    }}>
+    <div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .wrap {
-          max-width: 900px; margin: 0 auto;
-          padding: 40px 24px 32px;
-          animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both;
-        }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -349,7 +338,6 @@ export default function StaffPage() {
         }
 
         @media (max-width: 640px) {
-          .wrap { padding: 20px 16px 24px; }
           .page-header { flex-direction: column; }
           .page-title { font-size: 26px; }
           .add-btn { width: 100%; justify-content: center; }
@@ -357,7 +345,8 @@ export default function StaffPage() {
         }
       `}</style>
 
-      <div className="wrap">
+      {/* ✅ Removed .wrap div wrapper */}
+      <div>
 
         {/* Back */}
         <Link href="/client/dashboard" className="back-link">

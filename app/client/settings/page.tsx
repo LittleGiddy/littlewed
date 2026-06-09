@@ -8,7 +8,7 @@ export default function TenantSettings() {
   const [qrX, setQrX] = useState(50);
   const [qrY, setQrY] = useState(50);
   const [qrSize, setQrSize] = useState(150);
-  const [simpleMode, setSimpleMode] = useState(false); // 👈 new state
+  const [simpleMode, setSimpleMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -23,7 +23,7 @@ export default function TenantSettings() {
         if (data.qrX !== undefined) setQrX(data.qrX);
         if (data.qrY !== undefined) setQrY(data.qrY);
         if (data.qrSize) setQrSize(data.qrSize);
-        if (data.simpleEventMode !== undefined) setSimpleMode(data.simpleEventMode); // 👈
+        if (data.simpleEventMode !== undefined) setSimpleMode(data.simpleEventMode);
         setLoading(false);
       })
       .catch(() => {
@@ -61,7 +61,7 @@ export default function TenantSettings() {
           qrX,
           qrY,
           qrSize,
-          simpleEventMode: simpleMode, // 👈 include the toggle value
+          simpleEventMode: simpleMode,
         }),
       });
       if (res.ok) {
@@ -98,21 +98,10 @@ export default function TenantSettings() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F0F4F8',
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      paddingBottom: 80,
-    }}>
+    <div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .wrap {
-          max-width: 900px; margin: 0 auto;
-          padding: 40px 24px 32px;
-          animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both;
-        }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -397,7 +386,6 @@ export default function TenantSettings() {
         }
 
         @media (max-width: 768px) {
-          .wrap { padding: 24px 16px 20px; }
           .page-title { font-size: 26px; }
           .grid-2 { grid-template-columns: 1fr; }
           .preview-card { grid-row: span 1; }
@@ -405,8 +393,8 @@ export default function TenantSettings() {
         }
       `}</style>
 
-      <div className="wrap">
-
+      {/* ✅ Removed .wrap div wrapper */}
+      <div>
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
           <Link
