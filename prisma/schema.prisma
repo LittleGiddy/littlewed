@@ -54,12 +54,19 @@ model Event {
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   guests          Guest[]
   createdAt       DateTime @default(now())
-
   // Per‑event invitation card (overrides tenant‑level if present)
   templateCardUrl String?
   qrPlacementX    Float?
   qrPlacementY    Float?
   qrSize          Int?
+  includeName         Boolean? @default(false)
+  namePlacementX      Float?
+  namePlacementY      Float?
+  nameFontSize        Int?
+  nameFontColor       String? @default("#000000")
+  customMessage   String?   // custom invitation message (optional)
+  qrColor         String?  @default("#000000")
+  qrDotStyle      String?  @default("square") // square, circle, rounded
 }
 
 model PendingEvent {

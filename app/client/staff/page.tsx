@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { UserPlus, Trash2, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Trash2, ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<any[]>([]);
@@ -47,6 +48,7 @@ export default function StaffPage() {
         setPassword('');
         setName('');
         loadStaff();
+        toast.success('Staff member added');
       } else {
         const data = await res.json();
         setError(data.error || 'Failed to add staff');
@@ -60,464 +62,176 @@ export default function StaffPage() {
   const deleteStaff = async (id: string) => {
     if (confirm('Delete this staff member?')) {
       try {
-        await fetch(`/api/staff/${id}`, {
-          method: 'DELETE',
-          credentials: 'include',
-        });
-        loadStaff();
+        const res = await fetch(`/api/staff/${id}`, { method: 'DELETE', credentials: 'include' });
+        if (res.ok) {
+          loadStaff();
+          toast.success('Staff member deleted');
+        } else {
+          const data = await res.json();
+          setError(data.error || 'Failed to delete');
+        }
       } catch {
-        setError('Failed to delete staff');
+        setError('Network error');
       }
     }
   };
 
   return (
-    <div>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <div className="max-w-4xl mx-auto">
+      {/* Back link */}
+      <Link
+        href="/client/dashboard"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
+      >
+        <ArrowLeft size={14} /> Back to Dashboard
+      </Link>
 
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Back link */
-        .back-link {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 13px; font-weight: 700; color: #0D4F4F;
-          text-decoration: none; margin-bottom: 24px;
-          padding: 7px 14px;
-          background: rgba(13,79,79,0.08);
-          border: 1px solid rgba(13,79,79,0.12);
-          border-radius: 10px;
-          transition: background 0.15s;
-        }
-        .back-link:hover { background: rgba(13,79,79,0.14); }
-
-        /* Header */
-        .page-header {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          gap: 16px; margin-bottom: 28px;
-        }
-
-        .page-eyebrow {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
-        }
-        .page-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 32px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.1; letter-spacing: -0.5px;
-        }
-        .page-title span { color: #E8A598; }
-
-        .add-btn {
-          display: flex; align-items: center; gap: 8px;
-          padding: 12px 22px; border: none; border-radius: 14px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; font-size: 14px; font-weight: 700; font-family: inherit;
-          cursor: pointer; box-shadow: 0 4px 16px rgba(13,79,79,0.35);
-          transition: transform 0.15s, box-shadow 0.15s;
-          position: relative; overflow: hidden;
-        }
-        .add-btn::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
-          opacity: 0; transition: opacity 0.2s;
-        }
-        .add-btn:hover::after { opacity: 1; }
-        .add-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
-
-        /* Form modal */
-        .form-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 50; padding: 20px;
-          animation: fadeInOverlay 0.2s ease-out;
-        }
-
-        @keyframes fadeInOverlay {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .form-card {
-          background: white; border-radius: 20px; width: 100%; max-width: 420px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-          animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1);
-        }
-
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(24px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .form-header {
-          padding: 24px 24px 0;
-          border-bottom: 1.5px solid #F0F4F8;
-        }
-
-        .form-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px; font-weight: 800; color: #0D1B1B;
-        }
-
-        .form-body { padding: 24px; }
-
-        /* Form fields */
-        .field-wrap { position: relative; margin-bottom: 16px; }
-        .field-label {
-          position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-          font-size: 13px; color: #9BAAB8; pointer-events: none;
-          background: white; padding: 0 4px; font-weight: 500;
-          transition: top 0.2s, font-size 0.2s, color 0.2s;
-        }
-        .field-label.up { top: 0; font-size: 10px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.2px; }
-
-        .field-input {
-          width: 100%; padding: 14px; border: 1.5px solid #E2EAF0;
-          border-radius: 13px; font-size: 14px; font-family: inherit;
-          outline: none; color: #0D1B1B; background: white; font-weight: 500;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
-
-        .pw-eye {
-          position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-          background: none; border: none; cursor: pointer; color: #9BAAB8;
-          display: flex; align-items: center; padding: 4px; transition: color 0.15s;
-        }
-        .pw-eye:hover { color: #0D4F4F; }
-
-        .form-actions {
-          display: flex; gap: 10px; margin-top: 20px;
-        }
-
-        .btn-submit {
-          flex: 1; padding: 13px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; font-size: 14px; font-weight: 700; font-family: inherit;
-          cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-          display: flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .btn-submit:hover:not(:disabled) { transform: translateY(-2px); }
-        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .btn-cancel {
-          flex: 1; padding: 13px; border: 1.5px solid #E2EAF0;
-          border-radius: 13px; background: white; color: #4A6072;
-          font-size: 14px; font-weight: 600; font-family: inherit;
-          cursor: pointer; transition: border-color 0.15s, background 0.15s;
-        }
-        .btn-cancel:hover { border-color: #0D4F4F; background: rgba(13,79,79,0.04); }
-
-        .spinner {
-          width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white; border-radius: 50%;
-          animation: spin 0.7s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* Error */
-        .err-box {
-          background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
-          padding: 12px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
-          margin-bottom: 20px; display: flex; gap: 8px; align-items: flex-start;
-          animation: shake 0.35s ease;
-        }
-        @keyframes shake {
-          0%,100% { transform: translateX(0); }
-          20%      { transform: translateX(-5px); }
-          60%      { transform: translateX(5px); }
-        }
-
-        /* Staff table card */
-        .table-card {
-          background: white; border-radius: 20px; overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
-          animation: cardPop 0.55s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes cardPop {
-          from { opacity: 0; transform: translateY(12px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .table-header {
-          display: flex; align-items: center; padding: 16px 22px;
-          border-bottom: 1.5px solid #F0F4F8;
-        }
-
-        .table-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 16px; font-weight: 800; color: #0D1B1B;
-        }
-
-        .table-badge {
-          margin-left: auto;
-          font-size: 11px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); padding: 4px 12px;
-          border-radius: 20px;
-        }
-
-        /* Table */
-        .table-wrap {
-          overflow-x: auto;
-        }
-
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 14px;
-        }
-
-        thead tr {
-          border-bottom: 1.5px solid #F0F4F8;
-        }
-
-        th {
-          padding: 14px 22px; text-align: left;
-          font-size: 11px; font-weight: 700; color: #9BAAB8;
-          letter-spacing: 0.5px; text-transform: uppercase;
-        }
-
-        tbody tr {
-          border-bottom: 1px solid #F7F9FB;
-          transition: background 0.15s;
-        }
-        tbody tr:hover { background: #F7FAFA; }
-        tbody tr:last-child { border-bottom: none; }
-
-        td {
-          padding: 14px 22px; color: #4A6072; font-weight: 500;
-        }
-
-        .staff-name {
-          color: #0D1B1B; font-weight: 700;
-        }
-
-        .staff-email {
-          font-size: 13px; color: #9BAAB8;
-        }
-
-        .staff-date {
-          font-size: 13px; color: #9BAAB8;
-        }
-
-        .delete-btn {
-          background: none; border: none; cursor: pointer;
-          color: #E05C5C; transition: color 0.15s;
-          padding: 4px; display: inline-flex;
-        }
-        .delete-btn:hover { color: #C0392B; }
-
-        .empty-state {
-          padding: 56px 24px; text-align: center;
-        }
-
-        .empty-icon {
-          width: 60px; height: 60px; border-radius: 16px;
-          background: rgba(13,79,79,0.07);
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 16px; font-size: 24px;
-        }
-
-        .empty-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 18px; font-weight: 800; color: #0D1B1B;
-          margin-bottom: 6px;
-        }
-
-        .empty-sub { font-size: 13.5px; color: #9BAAB8; }
-
-        .loading-spinner {
-          width: 44px; height: 44px; border: 3px solid #E2EAF0;
-          border-top-color: #0D4F4F; border-radius: 50%;
-          animation: spin 0.7s linear infinite; margin: 32px auto;
-        }
-
-        @media (max-width: 640px) {
-          .page-header { flex-direction: column; }
-          .page-title { font-size: 26px; }
-          .add-btn { width: 100%; justify-content: center; }
-          th, td { padding: 12px 16px; font-size: 13px; }
-        }
-      `}</style>
-
-      {/* ✅ Removed .wrap div wrapper */}
-      <div>
-
-        {/* Back */}
-        <Link href="/client/dashboard" className="back-link">
-          <ArrowLeft size={14} /> Back to Dashboard
-        </Link>
-
-        {/* Header */}
-        <div className="page-header">
-          <div>
-            <div className="page-eyebrow">Management</div>
-            <div className="page-title">Staff <span>Members</span></div>
-          </div>
-          <button className="add-btn" onClick={() => setShowForm(true)}>
-            <UserPlus size={16} /> Add Staff
-          </button>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <div className="text-[11px] font-bold tracking-wide uppercase text-[#0D4F4F] mb-1">Management</div>
+          <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">
+            Staff <span className="text-[#E8A598]">Members</span>
+          </h1>
         </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-4 py-2 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center gap-2"
+        >
+          <UserPlus size={16} /> Add Staff
+        </button>
+      </div>
 
-        {/* Error */}
-        {error && (
-          <div className="err-box">
-            ⚠️ {error}
-            <button
-              onClick={() => setError('')}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#C0392B' }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl flex items-center justify-between mb-6">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700">✕</button>
+        </div>
+      )}
 
-        {/* Add form modal */}
-        {showForm && (
-          <div className="form-overlay" onClick={() => setShowForm(false)}>
-            <div className="form-card" onClick={e => e.stopPropagation()}>
-              <div className="form-header">
-                <h2 className="form-title">Add Staff Member</h2>
-              </div>
-              <div className="form-body">
-                {error && (
-                  <div className="err-box" style={{ marginBottom: 14 }}>
-                    ⚠️ {error}
-                  </div>
-                )}
-                <form onSubmit={addStaff}>
-
-                  <div className="field-wrap">
-                    <label className={`field-label ${focused === 'name' ? 'up' : ''}`}>
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="field-input"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      onFocus={() => setFocused('name')}
-                      onBlur={() => setFocused(null)}
-                    />
-                  </div>
-
-                  <div className="field-wrap">
-                    <label className={`field-label ${focused === 'email' ? 'up' : ''}`}>
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      className="field-input"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      onFocus={() => setFocused('email')}
-                      onBlur={() => setFocused(null)}
-                    />
-                  </div>
-
-                  <div className="field-wrap">
-                    <label className={`field-label ${focused === 'password' ? 'up' : ''}`}>
-                      Password
-                    </label>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      className="field-input"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      onFocus={() => setFocused('password')}
-                      onBlur={() => setFocused(null)}
-                      style={{ paddingRight: 40 }}
-                    />
-                    <button
-                      type="button"
-                      className="pw-eye"
-                      onClick={() => setShowPassword(!showPassword)}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  </div>
-
-                  <div className="form-actions">
-                    <button type="submit" className="btn-submit" disabled={submitting}>
-                      {submitting ? (
-                        <><div className="spinner" /> Creating…</>
-                      ) : (
-                        <>Create Staff</>
-                      )}
-                    </button>
-                    <button type="button" className="btn-cancel" onClick={() => setShowForm(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </div>
+      {/* Add Staff Modal */}
+      {showForm && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <h2 className="font-serif text-xl font-extrabold text-gray-800">Add Staff Member</h2>
             </div>
+            <form onSubmit={addStaff} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-2 rounded-lg font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2"
+                >
+                  {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {submitting ? 'Creating...' : 'Create Staff'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Staff table */}
+      {/* Staff List Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
+          <h2 className="font-serif text-lg font-extrabold text-gray-800">Team Members</h2>
+          <span className="text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2.5 py-1 rounded-full">
+            {staff.length} staff
+          </span>
+        </div>
         {loading ? (
-          <div className="loading-spinner" />
+          <div className="flex justify-center py-12">
+            <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+          </div>
+        ) : staff.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="text-4xl mb-3">👥</div>
+            <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No staff members yet</h3>
+            <p className="text-sm text-gray-400">Add your first team member to get started.</p>
+          </div>
         ) : (
-          <div className="table-card">
-            <div className="table-header">
-              <h2 className="table-title">Team Members</h2>
-              <div className="table-badge">{staff.length} staff</div>
-            </div>
-
-            {staff.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">👥</div>
-                <div className="empty-title">No staff members yet</div>
-                <p className="empty-sub">Add your first team member to get started.</p>
-              </div>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Joined</th>
-                      <th style={{ width: 40 }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {staff.map(s => (
-                      <tr key={s.id}>
-                        <td className="staff-name">{s.name}</td>
-                        <td className="staff-email">{s.email}</td>
-                        <td className="staff-date">
-                          {new Date(s.createdAt).toLocaleDateString('en-TZ', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </td>
-                        <td>
-                          <button
-                            className="delete-btn"
-                            onClick={() => deleteStaff(s.id)}
-                            title="Delete staff member"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th className="px-5 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
+                  <th className="px-5 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {staff.map(s => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="px-5 py-3 font-semibold text-gray-800">{s.name}</td>
+                    <td className="px-5 py-3 text-gray-600">{s.email}</td>
+                    <td className="px-5 py-3 text-gray-500">{new Date(s.createdAt).toLocaleDateString()}</td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={() => deleteStaff(s.id)}
+                        className="text-red-500 hover:text-red-700 transition"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

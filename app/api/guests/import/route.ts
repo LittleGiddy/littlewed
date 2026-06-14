@@ -12,19 +12,18 @@ const twilioClient = twilio(
 
 // Check if a phone number is on WhatsApp via Twilio lookup
 async function isOnWhatsApp(phone: string): Promise<boolean> {
+  if (process.env.MOCK_WHATSAPP === 'true') {
+    // Mock: assume numbers starting with +2557 are WhatsApp
+    return phone.startsWith('+2557');
+  }
   try {
-    // Normalize phone number to E.164 format
     const normalized = phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`
-
     const lookup = await twilioClient.lookups.v2
       .phoneNumbers(normalized)
       .fetch({ fields: 'channels' })
-
-    // channels.whatsapp.has_whatsapp is true if number is on WhatsApp
     const channels = (lookup as any).channels
     return channels?.whatsapp?.has_whatsapp === true
   } catch (err) {
-    // If lookup fails (invalid number, etc.), assume not on WhatsApp
     console.error(`WhatsApp lookup failed for ${phone}:`, err)
     return false
   }
@@ -33,14 +32,15 @@ async function isOnWhatsApp(phone: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const tenantId = (session.user as any).tenantId
 
   const formData = await req.formData()
   const file = formData.get('file') as File
   const eventId = formData.get('eventId') as string
+  if (!file || !eventId) return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 })
 
-  if (!file || !eventId) {
-    return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 })
-  }
+  const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } })
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 })
 
   const text = await file.text()
   const result = Papa.parse(text, { header: true, skipEmptyLines: true })
@@ -57,18 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     let onWhatsApp = false
-
-    // Only check WhatsApp if phone number is provided
     if (guest.phone) {
       console.log(`Checking WhatsApp for ${guest.name} (${guest.phone})...`)
       onWhatsApp = await isOnWhatsApp(guest.phone)
       console.log(`${guest.name}: onWhatsApp = ${onWhatsApp}`)
-
-      whatsappResults.push({
-        name: guest.name,
-        phone: guest.phone,
-        onWhatsApp,
-      })
+      whatsappResults.push({ name: guest.name, phone: guest.phone, onWhatsApp })
+      await new Promise(resolve => setTimeout(resolve, 500))
     }
 
     const newGuest = await prisma.guest.create({
@@ -76,19 +70,16 @@ export async function POST(req: NextRequest) {
         name: guest.name,
         email: guest.email || null,
         phone: guest.phone || null,
-        eventId: eventId,
-        // Store WhatsApp status — add `onWhatsApp Boolean @default(false)` to your Guest model
-        // onWhatsApp,
+        eventId,
+        routingChannel: onWhatsApp ? 'whatsapp' : 'sms',
       },
     })
-
     created.push({ ...newGuest, onWhatsApp })
   }
 
-  // Summary
-  const whatsappCount = whatsappResults.filter((r) => r.onWhatsApp).length
-  const noWhatsAppCount = whatsappResults.filter((r) => !r.onWhatsApp).length
-  const noPhoneCount = guests.filter((g) => g.name && !g.phone).length
+  const whatsappCount = whatsappResults.filter(r => r.onWhatsApp).length
+  const noWhatsAppCount = whatsappResults.filter(r => !r.onWhatsApp).length
+  const noPhoneCount = guests.filter(g => g.name && !g.phone).length
 
   return NextResponse.json({
     success: true,

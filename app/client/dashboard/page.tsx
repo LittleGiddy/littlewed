@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { Calendar, Users, Mail, QrCode, ArrowRight, Plus, Coins } from 'lucide-react';
 import Link from 'next/link';
+import DeleteEventButton from '@/components/DeleteEventButton';
 
 export default async function ClientDashboard() {
   const session = await getServerSession(authOptions);
@@ -406,6 +407,7 @@ export default async function ClientDashboard() {
                     <div className="event-meta">{event.venue}</div>
                   </div>
                   <div className="event-guests-badge">{event._count.guests} guests</div>
+                  <DeleteEventButton eventId={event.id} />
                   <ArrowRight size={15} className="event-arrow" />
                 </Link>
               );

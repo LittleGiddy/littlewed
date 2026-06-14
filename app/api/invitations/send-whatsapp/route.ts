@@ -4,170 +4,131 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import twilio from 'twilio';
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
-const fromSmsNumber = process.env.TWILIO_SMS_NUMBER;
+const isMock = process.env.MOCK_SMS === 'true';
+console.log(`Send invitation API running in ${isMock ? 'MOCK' : 'LIVE'} mode`);
 
-if (!accountSid || !authToken || !fromNumber) {
-  console.warn('Missing Twilio credentials');
-}
+const twilioClient = isMock ? null : twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+const fromWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
+const fromSms = process.env.TWILIO_SMS_NUMBER;
 
-const client = accountSid && authToken ? twilio(accountSid, authToken) : null;
+const COST_WHATSAPP = 50;
+const COST_SMS = 25;
 
 export async function POST(req: NextRequest) {
   try {
     const host = req.headers.get('host') || '';
-    const isCloudflareTunnel =
-      host.includes('trycloudflare.com') || host.includes('loca.lt');
+    const isCloudflareTunnel = host.includes('trycloudflare.com') || host.includes('loca.lt');
 
     const { guestId, eventId } = await req.json();
-
     if (!guestId || !eventId) {
-      return NextResponse.json(
-        { error: 'Missing guestId or eventId' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing guestId or eventId' }, { status: 400 });
     }
 
     let tenantId: string | undefined;
 
-    // ✅ Auth check for non-tunnel requests
     if (!isCloudflareTunnel) {
       const session = await getServerSession(authOptions);
-      if (!session) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
+      if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       const role = (session.user as any).role;
       tenantId = (session.user as any).tenantId;
-
       if (role !== 'CLIENT' && role !== 'SUPER_ADMIN' && role !== 'STAFF') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
-
-      if (!tenantId) {
-        return NextResponse.json(
-          { error: 'Missing tenant context' },
-          { status: 400 }
-        );
-      }
+      if (!tenantId) return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
     }
 
-    // ✅ Fetch guest and verify ownership
     const guest = await prisma.guest.findFirst({
       where: { id: guestId },
       include: { event: true },
     });
-
-    if (!guest) {
-      return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
-    }
-
-    // ✅ Verify tenant ownership (non-tunnel only)
+    if (!guest) return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     if (!isCloudflareTunnel && tenantId && guest.event.tenantId !== tenantId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (!guest.phone) {
+    if (!guest.phone) return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
+
+    const channel = guest.routingChannel || 'sms';
+    const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
+
+    // Fetch tenant credits
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: guest.event.tenantId },
+      select: { credits: true },
+    });
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    if (tenant.credits < cost) {
       return NextResponse.json(
-        { error: 'Guest has no phone number' },
-        { status: 400 }
+        { error: `Insufficient credits. Need ${cost} TZS, have ${tenant.credits} TZS.` },
+        { status: 402 }
       );
     }
 
-    if (!guest.invitationCard) {
-      return NextResponse.json(
-        { error: 'No invitation card generated yet' },
-        { status: 400 }
-      );
-    }
+    const customMessage = guest.event.customMessage || "You're invited!";
 
-    // Normalize phone to E.164
-    let phone = guest.phone;
-    if (!phone.startsWith('+')) phone = '+' + phone;
+    if (channel === 'whatsapp') {
+      if (!guest.invitationCard) {
+        return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
+      }
+      const messageText = `${customMessage} Scan the QR code at the entrance.`;
+      const imageUrl = guest.invitationCard;
+      let phone = guest.phone;
+      if (!phone.startsWith('+')) phone = '+' + phone;
 
-    if (!client) {
-      return NextResponse.json(
-        { error: 'Twilio client not configured' },
-        { status: 500 }
-      );
-    }
-
-    const messageText = `You're invited to ${guest.event.name}! Scan the QR code at the entrance.`;
-    const imageUrl = guest.invitationCard;
-    const channel = guest.routingChannel ?? 'sms';
-
-    try {
-      if (channel === 'whatsapp') {
-        // ── WhatsApp ──────────────────────────────────────────────
-        if (!fromNumber) {
-          return NextResponse.json(
-            { error: 'WhatsApp number not configured' },
-            { status: 500 }
-          );
-        }
-
-        const twilioMessage = await client.messages.create({
+      if (!isMock) {
+        if (!fromWhatsApp) return NextResponse.json({ error: 'WhatsApp number not configured' }, { status: 500 });
+        await twilioClient!.messages.create({
           body: messageText,
-          from: `whatsapp:${fromNumber}`,
+          from: `whatsapp:${fromWhatsApp}`,
           to: `whatsapp:${phone}`,
           mediaUrl: [imageUrl],
         });
-
-        console.log(`WhatsApp sent to ${phone}:`, twilioMessage.sid);
-
-        return NextResponse.json(
-          {
-            success: true,
-            channel: 'whatsapp',
-            messageSid: twilioMessage.sid,
-          },
-          { status: 200 }
-        );
       } else {
-        // ── SMS ──────────────────────────────────────────────────
-        const smsFrom = fromSmsNumber || fromNumber;
-        if (!smsFrom) {
-          return NextResponse.json(
-            { error: 'SMS number not configured' },
-            { status: 500 }
-          );
-        }
+        console.log(`[MOCK] WhatsApp to ${phone}: ${messageText}, image ${imageUrl}`);
+      }
+    } else {
+      // SMS
+      let code = guest.smsCode;
+      if (!code) {
+        code = Math.floor(100000 + Math.random() * 900000).toString();
+        await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
+      }
+      const messageText = `${customMessage} Your check-in code is: ${code}`;
+      let phone = guest.phone;
+      if (!phone.startsWith('+')) phone = '+' + phone;
 
-        const twilioMessage = await client.messages.create({
+      if (!isMock) {
+        const smsFrom = fromSms || fromWhatsApp;
+        if (!smsFrom) return NextResponse.json({ error: 'SMS number not configured' }, { status: 500 });
+        await twilioClient!.messages.create({
           body: messageText,
           from: smsFrom,
           to: phone,
-          mediaUrl: [imageUrl],
         });
-
-        console.log(`SMS sent to ${phone}:`, twilioMessage.sid);
-
-        return NextResponse.json(
-          {
-            success: true,
-            channel: 'sms',
-            messageSid: twilioMessage.sid,
-          },
-          { status: 200 }
-        );
+      } else {
+        console.log(`[MOCK] SMS to ${phone}: ${messageText}`);
       }
-    } catch (twilioError: any) {
-      console.error(
-        `Twilio error (${channel}) for ${phone}:`,
-        twilioError.message
-      );
-      return NextResponse.json(
-        { error: `Twilio failed: ${twilioError.message}` },
-        { status: 500 }
-      );
     }
+
+    // Deduct credits and record usage
+    await prisma.$transaction([
+      prisma.tenant.update({
+        where: { id: guest.event.tenantId },
+        data: { credits: { decrement: cost } },
+      }),
+      prisma.usageRecord.create({
+        data: {
+          tenantId: guest.event.tenantId,
+          eventId: guest.event.id,
+          channel,
+          cost,
+        },
+      }),
+    ]);
+
+    return NextResponse.json({ success: true, channel, cost });
   } catch (error: any) {
-    console.error('POST /api/send-invitation error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('POST /api/invitations/send-whatsapp error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

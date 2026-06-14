@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite database (local development)
+dev.db
+prisma/dev.db
+*.db
+*.db-journal
+
+# Local uploads (not needed in production, use Vercel Blob)
+public/uploads/
+public/invitations/
+public/tenant-templates/
+public/event-cards/

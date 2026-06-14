@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Use the event's own card settings (not tenant's)
+  // Use the event's own card settings
   if (!event.templateCardUrl) {
     return NextResponse.json(
       { error: 'No invitation card configured for this event. Please design it first.' },
@@ -48,6 +48,15 @@ export async function POST(req: NextRequest) {
     y: event.qrPlacementY ?? 100,
     size: event.qrSize ?? 200,
   };
+
+  const namePosition = event.includeName
+    ? {
+        x: event.namePlacementX ?? 50,
+        y: event.namePlacementY ?? 50,
+        fontSize: event.nameFontSize ?? 24,
+        fontColor: event.nameFontColor ?? '#000000',
+      }
+    : undefined;
 
   // Fetch the base card from its public Blob URL
   let cardBuffer: Buffer;
@@ -70,13 +79,18 @@ export async function POST(req: NextRequest) {
     try {
       const token = generateGuestToken(guest.id, eventId);
       const qrBuffer = await generateQRBuffer(token, qrPosition.size);
-      const finalCardBuffer = await compositeQROnCard(cardBuffer, qrBuffer, qrPosition);
+      const finalCardBuffer = await compositeQROnCard(
+        cardBuffer,
+        qrBuffer,
+        qrPosition,
+        namePosition,
+        event.includeName ? guest.name : undefined
+      );
 
-      // Upload directly to Vercel Blob
       const key = `guests/${event.tenantId}/${guest.id}.png`;
       const blob = await put(key, finalCardBuffer, {
         access: 'public',
-        contentType: 'image/png',
+        contentType: 'image/png',    
       });
 
       await prisma.guest.update({

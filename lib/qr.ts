@@ -8,46 +8,77 @@ export function generateGuestToken(guestId: string, eventId: string): string {
   return jwt.sign({ guestId, eventId }, JWT_SECRET, { expiresIn: '30d' });
 }
 
-export async function generateQRBuffer(token: string, size: number = 200): Promise<Buffer> {
-  // Force at least 200px to ensure scanability
-  const qrSize = Math.max(200, size);
+export async function generateQRBuffer(token: string, size: number = 200, color: string = '#000000'): Promise<Buffer> {
   return QRCode.toBuffer(token, {
-    width: qrSize,
-    margin: 2,
-    color: { dark: '#000000', light: '#FFFFFF' }
+    width: size,
+    margin: 1,
+    color: { dark: color, light: '#FFFFFF' }
+  });
+}
+
+function escapeXml(unsafe: string): string {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+      default: return c;
+    }
   });
 }
 
 export async function compositeQROnCard(
   cardBuffer: Buffer,
   qrBuffer: Buffer,
-  position: { x: number; y: number; size: number }
+  qrPosition: { x: number; y: number; size: number },
+  namePosition?: { x: number; y: number; fontSize: number; fontColor: string; fontFamily?: string },
+  guestName?: string
 ): Promise<Buffer> {
-  const top = Math.round(position.y);
-  const left = Math.round(position.x);
-  const qrDisplaySize = Math.max(150, Math.round(position.size)); // visible size on card
+  const metadata = await sharp(cardBuffer).metadata();
+  const cardWidth = metadata.width || 1000;
+  const cardHeight = metadata.height || 1000;
 
-  // Resize QR to the desired display size (preserves sharpness)
-  const qrResized = await sharp(qrBuffer)
-    .resize(qrDisplaySize, qrDisplaySize)
-    .toBuffer();
+  const composites = [];
 
-  // Create a white background rectangle behind the QR
-  const whiteBg = await sharp({
-    create: {
-      width: qrDisplaySize,
-      height: qrDisplaySize,
-      channels: 3,
-      background: { r: 255, g: 255, b: 255 }
-    }
-  }).png().toBuffer();
+  const qrTop = Math.round(qrPosition.y);
+  const qrLeft = Math.round(qrPosition.x);
+  const qrSize = Math.round(qrPosition.size);
+  composites.push({
+    input: qrBuffer,
+    top: qrTop,
+    left: qrLeft,
+    width: qrSize,
+    height: qrSize,
+  });
 
-  // Composite: first white rectangle, then QR on top
+  if (guestName && namePosition) {
+    const svgText = `
+      <svg width="${cardWidth}" height="${cardHeight}" xmlns="http://www.w3.org/2000/svg">
+        <text
+          x="${namePosition.x}"
+          y="${namePosition.y}"
+          font-family="${namePosition.fontFamily || 'Arial, sans-serif'}"
+          font-size="${namePosition.fontSize}px"
+          fill="${namePosition.fontColor}"
+          text-anchor="middle"
+          dominant-baseline="middle"
+        >${escapeXml(guestName)}</text>
+      </svg>
+    `;
+    const svgBuffer = Buffer.from(svgText);
+    composites.push({
+      input: svgBuffer,
+      top: 0,
+      left: 0,
+      width: cardWidth,
+      height: cardHeight,
+    });
+  }
+
   return sharp(cardBuffer)
-    .composite([
-      { input: whiteBg, top, left },
-      { input: qrResized, top, left }
-    ])
+    .composite(composites)
     .png({ quality: 95 })
     .toBuffer();
 }

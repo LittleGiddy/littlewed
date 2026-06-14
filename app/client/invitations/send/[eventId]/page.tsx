@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, Users } from 'lucide-react';
+import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, CheckSquare, Square, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -24,22 +24,30 @@ interface BroadcastResult {
 
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
-  const router = useRouter();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<BroadcastResult[]>([]);
   const [credits, setCredits] = useState<number | null>(null);
-  const [estimatedCost, setEstimatedCost] = useState<number>(0);
+  const [customMessage, setCustomMessage] = useState('');
+  const [savingMessage, setSavingMessage] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'whatsapp' | 'sms' | 'all'>('whatsapp');
+  const [sendingGuestId, setSendingGuestId] = useState<string | null>(null);
+  const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
+  const [deletingGuestId, setDeletingGuestId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-  // Load guests and credit balance
   useEffect(() => {
     Promise.all([
       fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }).then(res => res.json()),
       fetch('/api/tenant/billing', { credentials: 'include' }).then(res => res.json()),
-    ]).then(([guestsData, billingData]) => {
-      setGuests(guestsData);
+      fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }).then(res => res.json()),
+    ]).then(([guestsData, billingData, eventSettings]) => {
+      const fixedGuests = guestsData.map((g: any) => ({ ...g, routingChannel: g.routingChannel || 'sms' }));
+      setGuests(fixedGuests);
       setCredits(billingData.tenant?.credits ?? 0);
+      setCustomMessage(eventSettings.customMessage || '');
       setLoading(false);
     }).catch(() => {
       toast.error('Failed to load data');
@@ -47,73 +55,175 @@ export default function SendInvitationsPage() {
     });
   }, [eventId]);
 
-  // Calculate estimated cost
-  useEffect(() => {
-    const cost = guests.reduce((sum, g) => {
-      if (!g.phone) return sum;
-      return sum + (g.routingChannel === 'whatsapp' ? 50 : 25);
-    }, 0);
-    setEstimatedCost(cost);
-  }, [guests]);
+  const saveCustomMessage = async () => {
+    setSavingMessage(true);
+    try {
+      await fetch(`/api/events/${eventId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customMessage }),
+        credentials: 'include',
+      });
+      toast.success('Message saved');
+    } catch {
+      toast.error('Failed to save message');
+    } finally {
+      setSavingMessage(false);
+    }
+  };
 
-  const broadcast = async () => {
-    const eligibleCount = guests.filter(g => g.phone).length;
-    if (eligibleCount === 0) {
-      toast.error('No guests with phone numbers to send to.');
+  const whatsappGuests = guests.filter(g => g.routingChannel === 'whatsapp' && g.phone);
+  const smsGuests = guests.filter(g => g.routingChannel === 'sms' && g.phone);
+  const allGuests = guests.filter(g => g.phone);
+  const estimatedCostWhatsApp = whatsappGuests.length * 50;
+  const estimatedCostSMS = smsGuests.length * 25;
+  const totalEstimatedCost = estimatedCostWhatsApp + estimatedCostSMS;
+
+  const toggleSelectAll = () => {
+    const currentList = activeFilter === 'whatsapp' ? whatsappGuests : smsGuests;
+    const allSelected = currentList.length > 0 && currentList.every(g => selectedGuests.has(g.id));
+    if (allSelected) {
+      setSelectedGuests(prev => {
+        const newSet = new Set(prev);
+        currentList.forEach(g => newSet.delete(g.id));
+        return newSet;
+      });
+    } else {
+      setSelectedGuests(prev => {
+        const newSet = new Set(prev);
+        currentList.forEach(g => newSet.add(g.id));
+        return newSet;
+      });
+    }
+  };
+
+  const sendSelected = async () => {
+    const currentList = activeFilter === 'whatsapp' ? whatsappGuests : smsGuests;
+    const selected = currentList.filter(g => selectedGuests.has(g.id));
+    if (selected.length === 0) {
+      toast.error(`No ${activeFilter === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests selected.`);
       return;
     }
-    if (credits !== null && credits < estimatedCost) {
-      toast.error(`Insufficient credits. Need ${estimatedCost} TZS, you have ${credits} TZS.`);
+    const costPerGuest = activeFilter === 'whatsapp' ? 50 : 25;
+    const totalCost = selected.length * costPerGuest;
+    if (credits !== null && credits < totalCost) {
+      toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
       return;
     }
-    const confirm = window.confirm(
-      `Send invitations to ${eligibleCount} guests?\nEstimated cost: ${estimatedCost} TZS.\nWhatsApp guests will receive QR cards, SMS guests will receive numeric codes.`
-    );
-    if (!confirm) return;
+    await saveCustomMessage();
+    if (!window.confirm(`Send invitations to ${selected.length} selected ${activeFilter === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests? Estimated cost: ${totalCost} TZS.`)) return;
 
     setSending(true);
-    setResults([]);
+    let successCount = 0;
+    for (const guest of selected) {
+      try {
+        const res = await fetch('/api/invitations/send-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guestId: guest.id, eventId }),
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (res.ok) {
+          successCount++;
+          setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: activeFilter, success: true }]);
+        } else {
+          setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: activeFilter, success: false, error: data.error }]);
+        }
+      } catch {
+        setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: activeFilter, success: false, error: 'Network error' }]);
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    const billingRes = await fetch('/api/tenant/billing', { credentials: 'include' });
+    const billingData = await billingRes.json();
+    setCredits(billingData.tenant?.credits ?? 0);
+    toast.success(`Sent to ${successCount} of ${selected.length} guests.`);
+    setSending(false);
+    setSelectedGuests(new Set());
+  };
+
+  const sendToGuest = async (guest: Guest) => {
+    const cost = guest.routingChannel === 'whatsapp' ? 50 : 25;
+    if (credits !== null && credits < cost) {
+      toast.error(`Insufficient credits. Need ${cost} TZS, you have ${credits} TZS.`);
+      return;
+    }
+    if (guest.routingChannel === 'whatsapp' && !guest.invitationCard) {
+      toast.error('QR card not generated yet. Generate QR codes first.');
+      return;
+    }
+    if (guest.routingChannel === 'sms' && !guest.smsCode) {
+      toast.error('SMS code not generated yet. Generate QR codes first.');
+      return;
+    }
+
+    setSendingGuestId(guest.id);
     try {
-      const res = await fetch('/api/invitations/broadcast', {
+      const res = await fetch('/api/invitations/send-whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId }),
+        body: JSON.stringify({ guestId: guest.id, eventId }),
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok && data.results) {
-        setResults(data.results);
-        // Refresh credit balance
+      if (res.ok) {
+        toast.success(`Invitation sent to ${guest.name}`);
+        setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: guest.routingChannel, success: true }]);
         const billingRes = await fetch('/api/tenant/billing', { credentials: 'include' });
         const billingData = await billingRes.json();
         setCredits(billingData.tenant?.credits ?? 0);
-        toast.success(`Broadcast completed! ${data.results.filter((r: BroadcastResult) => r.success).length} sent.`);
       } else {
-        toast.error(data.error || 'Broadcast failed');
+        toast.error(`Failed to send to ${guest.name}: ${data.error}`);
+        setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: guest.routingChannel, success: false, error: data.error }]);
+      }
+    } catch {
+      toast.error(`Network error sending to ${guest.name}`);
+    } finally {
+      setSendingGuestId(null);
+    }
+  };
+
+  const deleteGuest = async (guestId: string) => {
+    if (!confirm('Delete this guest?')) return;
+    setDeletingGuestId(guestId);
+    try {
+      const res = await fetch(`/api/guests/${guestId}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        toast.success('Guest deleted');
+        setGuests(prev => prev.filter(g => g.id !== guestId));
+        setSelectedGuests(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(guestId);
+          return newSet;
+        });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete');
       }
     } catch {
       toast.error('Network error');
     } finally {
-      setSending(false);
+      setDeletingGuestId(null);
     }
   };
 
   const getGuestStatus = (guest: Guest) => {
-    const result = results.find((r: BroadcastResult) => r.guestId === guest.id);
+    const result = results.find(r => r.guestId === guest.id);
     if (result) {
       return {
         text: result.success ? 'Sent' : (result.error || 'Failed'),
-        icon: result.success ? <CheckCircle size={14} style={{ color: '#1A7A4A' }} /> : <XCircle size={14} style={{ color: '#C0392B' }} />
+        icon: result.success ? <CheckCircle size={14} className="text-green-600" /> : <XCircle size={14} className="text-red-600" />
       };
     }
     if (guest.routingChannel === 'whatsapp') {
       return guest.invitationCard
         ? { text: 'QR ready', icon: null }
-        : { text: 'No QR', icon: <AlertTriangle size={14} style={{ color: '#C07A20' }} /> };
+        : { text: 'No QR', icon: <AlertTriangle size={14} className="text-amber-600" /> };
     } else {
       return guest.smsCode
         ? { text: 'Code ready', icon: null }
-        : { text: 'No code', icon: <AlertTriangle size={14} style={{ color: '#C07A20' }} /> };
+        : { text: 'No code', icon: <AlertTriangle size={14} className="text-amber-600" /> };
     }
   };
 
@@ -124,248 +234,152 @@ export default function SendInvitationsPage() {
   };
 
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F0F4F8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 44, height: 44, border: '3px solid #E2EAF0', borderTopColor: '#0D4F4F', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 12px' }} />
-          <p style={{ color: '#9BAAB8', fontSize: 14, fontWeight: 500 }}>Loading guests…</p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
   }
 
-  const eligibleCount = guests.filter(g => g.phone).length;
+  const currentList = activeFilter === 'all' ? allGuests : (activeFilter === 'whatsapp' ? whatsappGuests : smsGuests);
+  const totalPages = Math.ceil(currentList.length / itemsPerPage);
+  const paginatedGuests = currentList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#F0F4F8',
-      fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
-      paddingBottom: 100,
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <div className="max-w-5xl mx-auto">
+      <Link href={`/client/events/${eventId}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6">
+        <ArrowLeft size={14} /> Back to Event
+      </Link>
 
-        .wrap {
-          max-width: 900px; margin: 0 auto;
-          padding: 40px 24px 32px;
-          animation: fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both;
-        }
+      <div className="flex justify-between items-start mb-6">
+        <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">Send Invitations</h1>
+        <button onClick={copyInviteLink} className="flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-full px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)]">
+          <Copy size={14} /> Copy link
+        </button>
+      </div>
 
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Custom Invitation Message (optional)</label>
+        <textarea rows={3} value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} onBlur={saveCustomMessage}
+          placeholder="e.g., Dear guest, we can't wait to celebrate with you! Scan the QR code at the entrance."
+          className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none" />
+        {savingMessage && <p className="text-xs text-gray-400 mt-1">Saving...</p>}
+      </div>
 
-        .back-link {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 13px; font-weight: 700; color: #0D4F4F;
-          text-decoration: none; margin-bottom: 24px;
-          padding: 7px 14px;
-          background: rgba(13,79,79,0.08);
-          border: 1px solid rgba(13,79,79,0.12);
-          border-radius: 10px;
-          transition: background 0.15s;
-        }
-        .back-link:hover { background: rgba(13,79,79,0.14); }
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <div><p className="text-sm text-gray-500">Your credits</p><p className="font-serif text-2xl font-black text-[#0D4F4F]">{credits?.toLocaleString() ?? '?'} TZS</p></div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Estimated cost</p>
+            <div className="space-y-1">
+              <p className="text-sm">WhatsApp: {estimatedCostWhatsApp} TZS</p>
+              <p className="text-sm">SMS: {estimatedCostSMS} TZS</p>
+              <p className="text-sm font-bold">Total: {totalEstimatedCost} TZS</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        .header-flex {
-          display: flex; justify-content: space-between; align-items: flex-start;
-          margin-bottom: 24px;
-          flex-wrap: wrap; gap: 12px;
-        }
+      <div className="flex gap-2 border-b mb-4">
+        {(['whatsapp', 'sms', 'all'] as const).map(filter => (
+          <button key={filter} onClick={() => { setActiveFilter(filter); setCurrentPage(1); setSelectedGuests(new Set()); }} className={`px-4 py-2 text-sm font-medium transition-colors ${activeFilter === filter ? 'text-[#0D4F4F] border-b-2 border-[#0D4F4F]' : 'text-gray-500'}`}>
+            {filter === 'all' ? 'All Guests' : filter === 'whatsapp' ? 'WhatsApp' : 'SMS'} ({filter === 'all' ? allGuests.length : filter === 'whatsapp' ? whatsappGuests.length : smsGuests.length})
+          </button>
+        ))}
+      </div>
 
-        .page-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 32px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.1; letter-spacing: -0.5px;
-        }
-
-        .copy-btn {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 13px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-          border-radius: 30px; padding: 6px 14px;
-          cursor: pointer; transition: background 0.15s;
-        }
-        .copy-btn:hover { background: rgba(13,79,79,0.14); }
-
-        .card {
-          background: white; border-radius: 20px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
-          padding: 20px 24px;
-          margin-bottom: 28px;
-          animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes cardPop {
-          from { opacity: 0; transform: translateY(12px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .credit-row {
-          display: flex; justify-content: space-between; align-items: center;
-          flex-wrap: wrap; gap: 12px;
-        }
-
-        .credit-label {
-          font-size: 13px; color: #7A8FA6; font-weight: 500;
-        }
-
-        .credit-amount {
-          font-size: 26px; font-weight: 800; color: #0D4F4F;
-          font-family: 'Playfair Display', serif;
-        }
-
-        .cost-amount {
-          font-size: 20px; font-weight: 800; color: #0D1B1B;
-        }
-
-        .warning {
-          color: #C07A20; font-size: 12px; margin-top: 6px;
-        }
-
-        .broadcast-btn {
-          width: 100%; border: none; border-radius: 14px;
-          padding: 16px 20px; font-size: 15px; font-weight: 700;
-          font-family: inherit; display: flex; align-items: center;
-          justify-content: center; gap: 8px; cursor: pointer;
-          transition: transform 0.15s, box-shadow 0.15s;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; box-shadow: 0 4px 12px rgba(13,79,79,0.3);
-          margin-bottom: 28px;
-        }
-        .broadcast-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(13,79,79,0.35); }
-        .broadcast-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        /* Guest list */
-        .guest-header {
-          display: flex; justify-content: space-between; align-items: center;
-          margin-bottom: 16px; padding-bottom: 12px;
-          border-bottom: 1.5px solid #F0F4F8;
-        }
-        .guest-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 18px; font-weight: 800; color: #0D1B1B;
-        }
-        .guest-badge {
-          font-size: 12px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); padding: 3px 10px;
-          border-radius: 20px;
-        }
-
-        .guest-list {
-          max-height: 500px; overflow-y: auto;
-        }
-        .guest-row {
-          padding: 14px 0; border-bottom: 1px solid #F7F9FB;
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 12px;
-        }
-        .guest-row:last-child { border-bottom: none; }
-        .guest-info { flex: 1; min-width: 0; }
-        .guest-name { font-size: 14px; font-weight: 700; color: #0D1B1B; }
-        .guest-phone { font-size: 12px; color: #9BAAB8; margin-top: 2px; }
-        .guest-channel {
-          display: inline-flex; align-items: center; gap: 4px;
-          font-size: 11px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.07); padding: 2px 8px;
-          border-radius: 12px; margin-top: 4px;
-        }
-        .guest-status { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-        .guest-status-text { font-size: 13px; font-weight: 500; color: #4A6072; }
-
-        @media (max-width: 640px) {
-          .wrap { padding: 24px 16px 20px; }
-          .page-title { font-size: 26px; }
-          .card { padding: 16px; }
-          .credit-amount { font-size: 22px; }
-          .cost-amount { font-size: 18px; }
-        }
-      `}</style>
-
-      <div className="wrap">
-        {/* Back link */}
-        <Link href={`/client/events/${eventId}`} className="back-link">
-          <ArrowLeft size={14} /> Back to Event
-        </Link>
-
-        <div className="header-flex">
-          <h1 className="page-title">Send Invitations</h1>
-          <button onClick={copyInviteLink} className="copy-btn">
-            <Copy size={14} /> Copy link
+      {(activeFilter === 'whatsapp' || activeFilter === 'sms') && currentList.length > 0 && (
+        <div className="flex justify-between items-center mb-4 p-3 bg-gray-50 rounded-lg">
+          <button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-700">
+            {currentList.length > 0 && currentList.every(g => selectedGuests.has(g.id)) ? <CheckSquare size={18} /> : <Square size={18} />}
+            {currentList.length > 0 && currentList.every(g => selectedGuests.has(g.id)) ? 'Deselect All' : 'Select All'}
+          </button>
+          <button
+            onClick={sendSelected}
+            disabled={sending || selectedGuests.size === 0}
+            className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-4 py-1.5 rounded-lg font-semibold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center gap-2"
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            Send Selected ({selectedGuests.size})
           </button>
         </div>
+      )}
 
-        {/* Credit info card */}
-        <div className="card">
-          <div className="credit-row">
-            <div>
-              <div className="credit-label">Your credit balance</div>
-              <div className="credit-amount">{credits?.toLocaleString() ?? '?'} TZS</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="credit-label">Estimated cost</div>
-              <div className="cost-amount">{estimatedCost.toLocaleString()} TZS</div>
-              {credits !== null && credits < estimatedCost && (
-                <div className="warning">⚠️ Insufficient credits</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Broadcast button */}
-        <button
-          className="broadcast-btn"
-          onClick={broadcast}
-          disabled={sending || eligibleCount === 0 || (credits !== null && credits < estimatedCost)}
-        >
-          {sending ? (
-            <><Loader2 size={18} style={{ animation: 'spin 0.7s linear infinite' }} /> Broadcasting...</>
-          ) : (
-            <><Send size={18} /> Broadcast All ({eligibleCount} guests)</>
-          )}
-        </button>
-
-        {/* Guest list card */}
-        <div className="card" style={{ padding: '20px 24px' }}>
-          <div className="guest-header">
-            <h2 className="guest-title">Guest List</h2>
-            <div className="guest-badge">{guests.length} guest{guests.length !== 1 ? 's' : ''}</div>
-          </div>
-          <div className="guest-list">
-            {guests.map(guest => {
-              const status = getGuestStatus(guest);
-              return (
-                <div key={guest.id} className="guest-row">
-                  <div className="guest-info">
-                    <div className="guest-name">{guest.name}</div>
-                    {guest.phone && <div className="guest-phone">{guest.phone}</div>}
-                    <div className="guest-channel">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          {paginatedGuests.map(guest => {
+            const status = getGuestStatus(guest);
+            const isSending = sendingGuestId === guest.id;
+            const isDeleting = deletingGuestId === guest.id;
+            const isSelected = selectedGuests.has(guest.id);
+            const showActions = activeFilter !== 'all';
+            return (
+              <div key={guest.id} className="px-5 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  {showActions && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedGuests(prev => new Set(prev).add(guest.id));
+                        } else {
+                          setSelectedGuests(prev => {
+                            const newSet = new Set(prev);
+                            newSet.delete(guest.id);
+                            return newSet;
+                          });
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+                    />
+                  )}
+                  <div>
+                    <p className="font-semibold text-gray-800">{guest.name}</p>
+                    {guest.phone && <p className="text-xs text-gray-500">{guest.phone}</p>}
+                    <div className="flex items-center gap-1 mt-1">
                       {guest.routingChannel === 'whatsapp' ? (
-                        <><MessageCircle size={11} /> WhatsApp</>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full"><MessageCircle size={10} /> WhatsApp</span>
                       ) : (
-                        <><Phone size={11} /> SMS</>
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full"><Phone size={10} /> SMS</span>
                       )}
                     </div>
                   </div>
-                  <div className="guest-status">
-                    {status.icon}
-                    <span className="guest-status-text">{status.text}</span>
-                  </div>
                 </div>
-              );
-            })}
-            {guests.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 0', color: '#9BAAB8' }}>
-                No guests found. Add guests first.
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    {status.icon}
+                    <span className="text-sm text-gray-600">{status.text}</span>
+                  </div>
+                  {showActions && (
+                    <>
+                      <button
+                        onClick={() => sendToGuest(guest)}
+                        disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < (guest.routingChannel === 'whatsapp' ? 50 : 25))}
+                        className="px-3 py-1 bg-[#0D4F4F] text-white text-sm rounded-lg hover:bg-[#0A3D3D] disabled:opacity-50 transition flex items-center gap-1"
+                      >
+                        {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send
+                      </button>
+                      <button
+                        onClick={() => deleteGuest(guest.id)}
+                        disabled={isDeleting}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-50 transition"
+                      >
+                        {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={16} />}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })}
+          {currentList.length === 0 && <div className="py-12 text-center text-gray-500">No guests found in this category.</div>}
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-2 mt-4">
+          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border rounded disabled:opacity-50">Previous</button>
+          <span className="px-3 py-1">Page {currentPage} of {totalPages}</span>
+          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 border rounded disabled:opacity-50">Next</button>
+        </div>
+      )}
     </div>
   );
 }

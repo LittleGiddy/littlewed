@@ -14,7 +14,6 @@ async function generateUniqueCode(): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  // Lazy‑initialize Africa's Talking inside the handler
   const AT_USERNAME = process.env.AT_USERNAME;
   const AT_API_KEY = process.env.AT_API_KEY;
   const AT_SENDER_ID = process.env.AT_SENDER_ID;
@@ -24,7 +23,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'SMS service not configured' }, { status: 500 });
   }
 
-  // Dynamically import the module and initialize
   const africastalking = require('africastalking');
   const at = africastalking({ username: AT_USERNAME, apiKey: AT_API_KEY });
   const sms = at.SMS;
@@ -41,22 +39,18 @@ export async function POST(req: NextRequest) {
     where: { id: eventId, tenantId },
     include: { guests: true },
   });
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-  if (!event) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  }
+  const customMessage = event.customMessage || "You're invited!";
 
   const results = [];
   for (const guest of event.guests) {
     if (guest.phone && !guest.smsCode) {
       try {
         const smsCode = await generateUniqueCode();
-        await prisma.guest.update({
-          where: { id: guest.id },
-          data: { smsCode },
-        });
+        await prisma.guest.update({ where: { id: guest.id }, data: { smsCode } });
 
-        const message = `Hello ${guest.name}, your entry code for ${event.name} is: ${smsCode}. Please show this at the entrance.`;
+        const message = `${customMessage} Hello ${guest.name}, your entry code for ${event.name} is: ${smsCode}. Please show this at the entrance.`;
         const formattedPhone = guest.phone.startsWith('+') ? guest.phone : `+${guest.phone}`;
 
         const result: any = await sms.send({

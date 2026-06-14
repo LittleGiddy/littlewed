@@ -2,12 +2,13 @@
 import { useState, useEffect } from 'react';
 import { Upload, Save, Move, Maximize2, AlertCircle, X, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 export default function TenantSettings() {
   const [templateUrl, setTemplateUrl] = useState<string | null>(null);
   const [qrX, setQrX] = useState(50);
   const [qrY, setQrY] = useState(50);
-  const [qrSize, setQrSize] = useState(150);
+  const [qrSize, setQrSize] = useState(150); // ✅ fixed
   const [simpleMode, setSimpleMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -66,6 +67,7 @@ export default function TenantSettings() {
       });
       if (res.ok) {
         setSaved(true);
+        toast.success('Settings saved!');
         setTimeout(() => setSaved(false), 3000);
       } else {
         setError('Save failed. Please try again.');
@@ -78,534 +80,192 @@ export default function TenantSettings() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh', background: '#F0F4F8',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'DM Sans', sans-serif",
-      }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap');`}</style>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 44, height: 44, border: '3px solid #E2EAF0',
-            borderTopColor: '#0D4F4F', borderRadius: '50%',
-            animation: 'spin 0.7s linear infinite', margin: '0 auto 12px',
-          }} />
-          <p style={{ color: '#9BAAB8', fontSize: 14, fontWeight: 500 }}>Loading settings…</p>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="flex items-center justify-center h-64">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <Link
+          href="/client/dashboard"
+          className="inline-flex items-center gap-1 text-sm text-[#0D4F4F] hover:underline mb-4"
+        >
+          ← Back to Dashboard
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">Card Template</h1>
+        <p className="text-gray-500 text-sm mt-1">Upload your design once – it will be used for all your events.</p>
+      </div>
 
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center justify-between mb-6">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
-        .page-eyebrow {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
-        }
-        .page-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 32px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.1; letter-spacing: -0.5px; margin-bottom: 6px;
-        }
-        .page-title span { color: #E8A598; }
-        .page-sub { color: #7A8FA6; font-size: 14px; font-weight: 400; }
-
-        .grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-top: 28px;
-        }
-
-        .card {
-          background: white; border-radius: 20px; overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
-          animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
-          transition: box-shadow 0.2s;
-        }
-        .card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.09); }
-
-        @keyframes cardPop {
-          from { opacity: 0; transform: translateY(12px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .card:nth-child(1) { animation-delay: 0.05s; }
-        .card:nth-child(2) { animation-delay: 0.1s; }
-        .card:nth-child(3) { animation-delay: 0.15s; }
-
-        .card-header {
-          display: flex; align-items: center; gap: 12px;
-          padding: 18px 22px; border-bottom: 1.5px solid #F0F4F8;
-        }
-
-        .card-icon {
-          width: 36px; height: 36px; border-radius: 10px;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
-          flex-shrink: 0;
-        }
-
-        .card-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 16px; font-weight: 800; color: #0D1B1B;
-        }
-
-        .card-step {
-          margin-left: auto;
-          font-size: 11px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-          padding: 3px 10px; border-radius: 20px;
-        }
-
-        .card-body { padding: 22px; }
-
-        .upload-zone {
-          border: 2px dashed #E2EAF0; border-radius: 14px;
-          padding: 32px 20px; text-align: center; cursor: pointer;
-          transition: border-color 0.2s, background 0.2s;
-          position: relative;
-        }
-        .upload-zone:hover { border-color: #0D4F4F; background: rgba(13,79,79,0.02); }
-
-        .upload-icon-wrap {
-          width: 56px; height: 56px; border-radius: 16px;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-          display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 14px; color: #0D4F4F;
-          transition: transform 0.2s;
-        }
-        .upload-zone:hover .upload-icon-wrap { transform: scale(1.08); }
-
-        .upload-label {
-          font-size: 13.5px; font-weight: 700; color: #0D1B1B; margin-bottom: 4px;
-        }
-        .upload-hint { font-size: 12px; color: #9BAAB8; font-weight: 400; }
-
-        .upload-pulse {
-          font-size: 13px; font-weight: 600; color: #0D4F4F;
-          margin-top: 10px; animation: pulse 1.2s ease-in-out infinite;
-        }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-        .preview-img-wrap {
-          position: relative; display: inline-block;
-        }
-        .preview-img {
-          max-height: 200px; border-radius: 12px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-        }
-        .remove-btn {
-          position: absolute; top: -8px; right: -8px;
-          width: 24px; height: 24px; border-radius: 50%;
-          background: #E05C5C; border: 2px solid white;
-          display: flex; align-items: center; justify-content: center;
-          cursor: pointer; color: white; transition: background 0.15s;
-        }
-        .remove-btn:hover { background: #C0392B; }
-
-        .slider-row { margin-bottom: 22px; }
-        .slider-row:last-child { margin-bottom: 0; }
-
-        .slider-top {
-          display: flex; justify-content: space-between; align-items: center;
-          margin-bottom: 8px;
-        }
-
-        .slider-label { font-size: 13px; font-weight: 600; color: #4A6072; }
-
-        .slider-value {
-          font-size: 12px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); padding: 2px 10px;
-          border-radius: 20px; font-family: monospace;
-        }
-
-        .slider {
-          -webkit-appearance: none; appearance: none;
-          width: 100%; height: 6px; border-radius: 3px;
-          background: #E2EAF0; outline: none; cursor: pointer;
-          transition: background 0.2s;
-        }
-        .slider::-webkit-slider-thumb {
-          -webkit-appearance: none; appearance: none;
-          width: 18px; height: 18px; border-radius: 50%;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          cursor: pointer; border: 2px solid white;
-          box-shadow: 0 2px 8px rgba(13,79,79,0.4);
-          transition: transform 0.15s;
-        }
-        .slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
-        .slider::-moz-range-thumb {
-          width: 18px; height: 18px; border-radius: 50%;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          cursor: pointer; border: 2px solid white;
-        }
-
-        .preview-card {
-          background: white; border-radius: 20px; overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
-          display: flex; flex-direction: column;
-          animation: cardPop 0.5s 0.15s cubic-bezier(0.16,1,0.3,1) both;
-          transition: box-shadow 0.2s;
-          grid-row: span 2;
-        }
-        .preview-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.09); }
-
-        .preview-body {
-          padding: 22px; flex: 1;
-          display: flex; flex-direction: column;
-        }
-
-        .preview-canvas {
-          flex: 1; min-height: 300px;
-          border-radius: 14px; overflow: hidden;
-          background: #F0F4F8; position: relative;
-          display: flex; align-items: center; justify-content: center;
-        }
-
-        .preview-canvas img { width: 100%; display: block; }
-
-        .qr-overlay {
-          position: absolute;
-          background: rgba(13,79,79,0.75);
-          border: 2px solid white;
-          border-radius: 10px;
-          display: flex; align-items: center; justify-content: center;
-          color: white; font-size: 11px; font-weight: 800;
-          letter-spacing: 1px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-          backdrop-filter: blur(2px);
-          transition: left 0.2s, top 0.2s, width 0.2s, height 0.2s;
-        }
-
-        .preview-empty {
-          flex: 1; display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          color: #C8D4DE; gap: 10px; min-height: 300px;
-        }
-
-        .preview-empty-icon {
-          width: 56px; height: 56px; border-radius: 16px;
-          background: #F0F4F8; display: flex;
-          align-items: center; justify-content: center;
-        }
-
-        .preview-caption {
-          font-size: 11.5px; color: #9BAAB8; text-align: center;
-          margin-top: 12px; line-height: 1.5;
-        }
-
-        .err-banner {
-          background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
-          padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 600;
-          margin-bottom: 20px; display: flex; gap: 8px; align-items: center;
-          animation: shake 0.35s ease;
-        }
-        @keyframes shake {
-          0%,100% { transform: translateX(0); }
-          20%      { transform: translateX(-5px); }
-          60%      { transform: translateX(5px); }
-        }
-
-        .save-bar {
-          position: fixed; bottom: 0; left: 0; right: 0;
-          background: white; border-top: 1.5px solid #F0F4F8;
-          padding: 14px 24px;
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 12px; z-index: 50;
-          box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
-          animation: slideUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to   { transform: translateY(0); }
-        }
-
-        .save-hint { font-size: 13px; color: #9BAAB8; font-weight: 500; }
-        .save-hint strong { color: #0D4F4F; }
-
-        .save-btn {
-          display: flex; align-items: center; gap: 8px;
-          padding: 13px 28px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; font-size: 14px; font-weight: 700; font-family: inherit;
-          cursor: pointer; box-shadow: 0 4px 16px rgba(13,79,79,0.35);
-          transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-          position: relative; overflow: hidden;
-        }
-        .save-btn::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
-          opacity: 0; transition: opacity 0.2s;
-        }
-        .save-btn:hover:not(:disabled)::after { opacity: 1; }
-        .save-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
-        .save-btn:active:not(:disabled) { transform: translateY(0); }
-        .save-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .save-btn-success {
-          background: linear-gradient(135deg, #1A7A4A, #155C38) !important;
-        }
-
-        .spinner {
-          width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white; border-radius: 50%;
-          animation: spin 0.7s linear infinite; flex-shrink: 0;
-        }
-
-        .checkbox-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-top: 22px;
-          padding-top: 16px;
-          border-top: 1px solid #F0F4F8;
-        }
-
-        .checkbox-label {
-          font-size: 13px;
-          font-weight: 600;
-          color: #4A6072;
-        }
-
-        .checkbox-desc {
-          font-size: 11.5px;
-          color: #9BAAB8;
-          margin-left: auto;
-        }
-
-        @media (max-width: 768px) {
-          .page-title { font-size: 26px; }
-          .grid-2 { grid-template-columns: 1fr; }
-          .preview-card { grid-row: span 1; }
-          .save-bar { padding: 12px 16px; }
-        }
-      `}</style>
-
-      {/* ✅ Removed .wrap div wrapper */}
-      <div>
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
-          <Link
-            href="/client/dashboard"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 13, fontWeight: 700, color: '#0D4F4F',
-              textDecoration: 'none', marginBottom: 16,
-              padding: '7px 14px',
-              background: 'rgba(13,79,79,0.08)',
-              border: '1px solid rgba(13,79,79,0.12)',
-              borderRadius: 10,
-              transition: 'background 0.15s, transform 0.15s',
-            }}
-            onMouseOver={e => (e.currentTarget.style.background = 'rgba(13,79,79,0.14)')}
-            onMouseOut={e => (e.currentTarget.style.background = 'rgba(13,79,79,0.08)')}
-          >
-            ← Back Home
-          </Link>
-          <div className="page-eyebrow">Settings</div>
-          <div className="page-title">Card <span>Template</span></div>
-          <p className="page-sub">Upload your design once — it will be used for all your events.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Upload Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Upload size={18} className="text-[#0D4F4F]" />
+            <h2 className="font-semibold text-gray-800">1. Upload Card</h2>
+          </div>
+          {templateUrl ? (
+            <div className="text-center">
+              <img src={templateUrl} alt="Card template" className="max-h-48 mx-auto rounded-lg shadow-sm" />
+              <button
+                onClick={() => setTemplateUrl(null)}
+                className="mt-3 text-sm text-red-500 hover:text-red-600"
+              >
+                Remove
+              </button>
+              <label className="inline-block mt-2 cursor-pointer text-sm text-indigo-600 hover:text-indigo-700">
+                Replace image
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              </label>
+            </div>
+          ) : (
+            <label className="block border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#0D4F4F] transition">
+              <ImageIcon size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-600">Click to upload PNG or JPG</p>
+              <p className="text-xs text-gray-400 mt-1">Recommended: 1080×1350px</p>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+              {uploading && <p className="text-sm text-[#0D4F4F] mt-2 animate-pulse">Uploading...</p>}
+            </label>
+          )}
         </div>
 
-        {/* Error banner */}
-        {error && (
-          <div className="err-banner">
-            <AlertCircle size={16} />{error}
-            <button
-              onClick={() => setError(null)}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#C0392B' }}
-            >
-              <X size={15} />
-            </button>
+        {/* QR Controls */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Move size={18} className="text-[#0D4F4F]" />
+            <h2 className="font-semibold text-gray-800">2. Position QR Code</h2>
           </div>
-        )}
-
-        <div className="grid-2">
-
-          {/* Upload card */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-icon"><Upload size={16} /></div>
-              <div className="card-title">Upload your card</div>
-              <div className="card-step">Step 1</div>
+          <div className="space-y-5">
+            <div>
+              <label className="flex justify-between text-sm text-gray-700 mb-1">
+                Horizontal position <span className="font-mono text-[#0D4F4F]">{qrX}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={qrX}
+                onChange={e => setQrX(Number(e.target.value))}
+                className="w-full accent-[#0D4F4F]"
+              />
             </div>
-            <div className="card-body">
-              {templateUrl ? (
-                <div style={{ textAlign: 'center' }}>
-                  <div className="preview-img-wrap">
-                    <img src={templateUrl} alt="Template" className="preview-img" />
-                    <button className="remove-btn" onClick={() => setTemplateUrl(null)}>
-                      <X size={12} />
-                    </button>
-                  </div>
-                  <p style={{ fontSize: 12, color: '#9BAAB8', marginTop: 12, fontWeight: 500 }}>
-                    Template uploaded ✓ — upload a new one to replace
-                  </p>
-                  <label htmlFor="template-upload" style={{ cursor: 'pointer' }}>
-                    <div style={{
-                      marginTop: 12, padding: '9px 16px', border: '1.5px solid #E2EAF0',
-                      borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#4A6072',
-                      display: 'inline-block', transition: 'border-color 0.15s',
-                    }}>
-                      Replace image
-                    </div>
-                    <input type="file" accept="image/*" onChange={handleImageUpload}
-                      style={{ display: 'none' }} id="template-upload" disabled={uploading} />
-                  </label>
-                </div>
-              ) : (
-                <>
-                  <input type="file" accept="image/*" onChange={handleImageUpload}
-                    style={{ display: 'none' }} id="template-upload" disabled={uploading} />
-                  <label htmlFor="template-upload">
-                    <div className="upload-zone">
-                      <div className="upload-icon-wrap">
-                        <ImageIcon size={22} />
-                      </div>
-                      <div className="upload-label">Click to upload PNG or JPG</div>
-                      <div className="upload-hint">Recommended: 1080 × 1350px</div>
-                      {uploading && <div className="upload-pulse">Uploading…</div>}
-                    </div>
-                  </label>
-                </>
-              )}
+            <div>
+              <label className="flex justify-between text-sm text-gray-700 mb-1">
+                Vertical position <span className="font-mono text-[#0D4F4F]">{qrY}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={qrY}
+                onChange={e => setQrY(Number(e.target.value))}
+                className="w-full accent-[#0D4F4F]"
+              />
+            </div>
+            <div>
+              <label className="flex justify-between text-sm text-gray-700 mb-1">
+                QR size <span className="font-mono text-[#0D4F4F]">{qrSize}px</span>
+              </label>
+              <input
+                type="range"
+                min="100"
+                max="300"
+                step="10"
+                value={qrSize}
+                onChange={e => setQrSize(Number(e.target.value))}
+                className="w-full accent-[#0D4F4F]"
+              />
             </div>
           </div>
+        </div>
 
-          {/* QR controls */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-icon"><Move size={16} /></div>
-              <div className="card-title">Position the QR code</div>
-              <div className="card-step">Step 2</div>
-            </div>
-            <div className="card-body">
-              <div className="slider-row">
-                <div className="slider-top">
-                  <span className="slider-label">Horizontal position</span>
-                  <span className="slider-value">{qrX}%</span>
-                </div>
-                <input type="range" min="0" max="100" value={qrX}
-                  onChange={e => setQrX(Number(e.target.value))} className="slider" />
-              </div>
-
-              <div className="slider-row">
-                <div className="slider-top">
-                  <span className="slider-label">Vertical position</span>
-                  <span className="slider-value">{qrY}%</span>
-                </div>
-                <input type="range" min="0" max="100" value={qrY}
-                  onChange={e => setQrY(Number(e.target.value))} className="slider" />
-              </div>
-
-              <div className="slider-row">
-                <div className="slider-top">
-                  <span className="slider-label">QR size</span>
-                  <span className="slider-value">{qrSize}px</span>
-                </div>
-                <input type="range" min="100" max="300" step="10" value={qrSize}
-                  onChange={e => setQrSize(Number(e.target.value))} className="slider" />
-              </div>
-
-              {/* Simple event mode toggle */}
-              <div className="checkbox-row">
-                <input
-                  type="checkbox"
-                  id="simpleEventMode"
-                  checked={simpleMode}
-                  onChange={e => setSimpleMode(e.target.checked)}
-                  style={{ width: 18, height: 18, cursor: 'pointer' }}
-                />
-                <label htmlFor="simpleEventMode" className="checkbox-label">
-                  Quick Event Mode
-                </label>
-                <span className="checkbox-desc">
-                  Create events without budget (no Stripe payment)
-                </span>
-              </div>
-            </div>
+        {/* Live Preview */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Maximize2 size={18} className="text-[#0D4F4F]" />
+            <h2 className="font-semibold text-gray-800">Live Preview</h2>
           </div>
-
-          {/* Live preview */}
-          <div className="preview-card">
-            <div className="card-header">
-              <div className="card-icon"><Maximize2 size={16} /></div>
-              <div className="card-title">Live Preview</div>
-            </div>
-            <div className="preview-body">
-              <div className="preview-canvas">
-                {templateUrl ? (
-                  <>
-                    <img src={templateUrl} alt="Preview" />
-                    <div
-                      className="qr-overlay"
-                      style={{
-                        left: `${qrX}%`,
-                        top: `${qrY}%`,
-                        width: qrSize,
-                        height: qrSize,
-                        transform: 'translate(-50%, -50%)',
-                      }}
-                    >
-                      QR
-                    </div>
-                  </>
-                ) : (
-                  <div className="preview-empty">
-                    <div className="preview-empty-icon">
-                      <ImageIcon size={22} color="#C8D4DE" />
-                    </div>
-                    <p style={{ fontSize: 13, color: '#9BAAB8', fontWeight: 500 }}>
-                      Upload a template to preview
-                    </p>
-                  </div>
-                )}
+          <div className="relative rounded-lg overflow-hidden bg-gray-100 min-h-[300px] flex items-center justify-center">
+            {templateUrl ? (
+              <>
+                <img src={templateUrl} alt="Preview" className="w-full object-contain" />
+                <div
+                  className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono"
+                  style={{
+                    left: `${qrX}%`,
+                    top: `${qrY}%`,
+                    width: qrSize,
+                    height: qrSize,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  QR
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-gray-400">
+                <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
+                <p>Upload a template to preview</p>
               </div>
-              <p className="preview-caption">
-                The QR code will be placed exactly where shown above.<br />
-                Drag the sliders to reposition.
-              </p>
-            </div>
+            )}
           </div>
-
+          <p className="text-xs text-gray-400 text-center mt-3">
+            The QR code will be placed exactly where shown above. Use the sliders to reposition.
+          </p>
         </div>
       </div>
 
-      {/* Sticky save bar */}
-      <div className="save-bar">
-        <p className="save-hint">
-          {saved
-            ? <><strong>✓ Saved!</strong> Your template settings are live.</>
-            : templateUrl
-              ? <>Ready to save — <strong>QR at {qrX}%, {qrY}%</strong>, size {qrSize}px</>
-              : 'Upload a template card to enable saving.'
-          }
-        </p>
+      {/* Save button */}
+      <div className="flex justify-end mt-8">
         <button
-          className={`save-btn${saved ? ' save-btn-success' : ''}`}
           onClick={handleSave}
           disabled={saving || !templateUrl}
+          className={`px-6 py-2 rounded-lg font-semibold text-white transition-all ${
+            saved
+              ? 'bg-green-600'
+              : 'bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] hover:shadow-md disabled:opacity-50'
+          }`}
         >
           {saving ? (
-            <><div className="spinner" /> Saving…</>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Saving...
+            </div>
           ) : saved ? (
-            <><CheckCircle size={15} /> Saved!</>
+            <div className="flex items-center gap-2">
+              <CheckCircle size={16} /> Saved!
+            </div>
           ) : (
-            <><Save size={15} /> Save Settings</>
+            <div className="flex items-center gap-2">
+              <Save size={16} /> Save Settings
+            </div>
           )}
         </button>
+      </div>
+
+      {/* Simple mode toggle */}
+      <div className="mt-8 pt-6 border-t border-gray-200 flex items-center justify-between">
+        <div>
+          <label className="font-medium text-gray-800">Quick Event Mode</label>
+          <p className="text-sm text-gray-500">Create events without budget (no Stripe payment)</p>
+        </div>
+        <input
+          type="checkbox"
+          checked={simpleMode}
+          onChange={e => setSimpleMode(e.target.checked)}
+          className="w-5 h-5 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+        />
       </div>
     </div>
   );

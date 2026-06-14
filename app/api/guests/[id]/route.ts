@@ -3,22 +3,16 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function PATCH(
+export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session) {
+  if (!session || (session.user as any).role !== 'CLIENT') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const role = (session.user as any).role;
-  // Allow both STAFF and CLIENT (case-insensitive)
-  if (!role || (role.toUpperCase() !== 'STAFF' && role.toUpperCase() !== 'CLIENT')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const tenantId = (session.user as any).tenantId;
   const { id } = await params;
-  const { checkedIn } = await req.json();
 
   const guest = await prisma.guest.findFirst({
     where: { id, event: { tenantId } },
@@ -27,9 +21,6 @@ export async function PATCH(
     return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
   }
 
-  const updated = await prisma.guest.update({
-    where: { id },
-    data: { checkedIn, checkedInAt: checkedIn ? new Date() : null },
-  });
-  return NextResponse.json(updated);
+  await prisma.guest.delete({ where: { id } });
+  return NextResponse.json({ success: true });
 }
