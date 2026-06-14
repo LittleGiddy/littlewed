@@ -19,6 +19,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       router.push('/login');
       return;
     }
+
+    // Allow check‑in page for any authenticated user (no role check)
+    if (pathname.startsWith('/client/check-in')) {
+      return;
+    }
     const role = (session.user as any)?.role;
     if (role !== 'CLIENT' && role !== 'STAFF') {
       router.push('/login');
@@ -87,11 +92,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
-                    isActive
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${isActive
                       ? 'bg-[#0D4F4F] text-white shadow-md'
                       : 'text-gray-700 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-medium">{item.label}</span>
@@ -183,11 +187,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                           key={item.path}
                           href={item.path}
                           onClick={() => setSidebarOpen(false)}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
-                            isActive
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${isActive
                               ? 'bg-[#0D4F4F] text-white shadow-md'
                               : 'text-gray-700 hover:bg-gray-100'
-                          }`}
+                            }`}
                         >
                           <item.icon className="w-5 h-5" />
                           <span className="text-sm font-medium">{item.label}</span>
