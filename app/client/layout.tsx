@@ -14,21 +14,28 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
+    console.log('Layout useEffect - pathname:', pathname, 'status:', status, 'session:', !!session);
+
     if (status === 'loading') return;
     if (!session) {
+      console.log('No session, redirecting to login');
       router.push('/login');
       return;
     }
 
     // Allow check‑in page for any authenticated user (no role check)
     if (pathname.startsWith('/client/check-in')) {
+      console.log('Check‑in page allowed');
       return;
     }
+
     const role = (session.user as any)?.role;
+    console.log('Role:', role);
     if (role !== 'CLIENT' && role !== 'STAFF') {
+      console.log('Role not allowed, redirecting to login');
       router.push('/login');
     }
-  }, [session, status, router, pathname]);
+  }, [session, status, router, pathname]); // ✅ pathname added
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -53,10 +60,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { path: '/client/staff/dashboard', icon: Home, label: 'Check‑in' },
   ];
 
-  // New sidebar design: cleaner, pill‑shaped items, card‑like user profile
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Desktop Sidebar - New Design */}
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:block fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 overflow-y-auto">
         <div className="flex flex-col h-full p-5">
           {/* Logo */}
@@ -92,10 +98,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${isActive
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
+                    isActive
                       ? 'bg-[#0D4F4F] text-white shadow-md'
                       : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                  }`}
                 >
                   <item.icon className="w-5 h-5 flex-shrink-0" />
                   <span className="text-sm font-medium">{item.label}</span>
@@ -117,9 +124,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      {/* Mobile Drawer - Same new design */}
+      {/* Mobile Drawer */}
       <div className="flex-1 lg:ml-72">
-        {/* Mobile Header */}
         <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center shadow-sm">
@@ -134,7 +140,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </button>
         </div>
 
-        {/* Mobile Drawer */}
         <AnimatePresence>
           {sidebarOpen && (
             <>
@@ -187,10 +192,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                           key={item.path}
                           href={item.path}
                           onClick={() => setSidebarOpen(false)}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${isActive
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
+                            isActive
                               ? 'bg-[#0D4F4F] text-white shadow-md'
                               : 'text-gray-700 hover:bg-gray-100'
-                            }`}
+                          }`}
                         >
                           <item.icon className="w-5 h-5" />
                           <span className="text-sm font-medium">{item.label}</span>
@@ -214,7 +220,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           )}
         </AnimatePresence>
 
-        {/* Page Content */}
         <AnimatePresence mode="wait">
           <motion.main
             key={pathname}
