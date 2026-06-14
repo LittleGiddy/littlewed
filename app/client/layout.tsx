@@ -28,7 +28,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     if (role !== 'CLIENT' && role !== 'STAFF') {
       router.push('/login');
     }
-  }, [session, status, router]);
+  }, [session, status, router, pathname]);
 
   useEffect(() => {
     setSidebarOpen(false);
