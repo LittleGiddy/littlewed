@@ -67,6 +67,7 @@ model Event {
   customMessage   String?   // custom invitation message (optional)
   qrColor         String?  @default("#000000")
   qrDotStyle      String?  @default("square") // square, circle, rounded
+  guestCount   Int?    // number of guests entered by organiser
 }
 
 model PendingEvent {
@@ -81,6 +82,7 @@ model PendingEvent {
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
   createdAt    DateTime @default(now())
   expiresAt    DateTime
+  guestCount   Int?    // optional, for reporting
 }
 
 model Guest {

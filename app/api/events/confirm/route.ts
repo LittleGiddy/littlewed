@@ -12,7 +12,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/client/events?error=expired', req.url));
   }
 
-  // Create the real event
   await prisma.event.create({
     data: {
       name: pending.name,
@@ -26,6 +25,5 @@ export async function GET(req: NextRequest) {
   });
 
   await prisma.pendingEvent.delete({ where: { id: pendingId } });
-
   return NextResponse.redirect(new URL('/client/events?success=paid', req.url));
 }

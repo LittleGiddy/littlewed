@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, Users, Plus } from 'lucide-react';
+import { Calendar, MapPin, Users, Plus, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Event {
@@ -77,7 +77,12 @@ export default function EventsPage() {
               className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition cursor-pointer"
               onClick={() => window.location.href = `/client/events/${event.id}`}
             >
-              <h2 className="text-lg font-semibold text-gray-900">{event.name}</h2>
+              <div className="flex justify-between items-start">
+                <h2 className="text-lg font-semibold text-gray-900">{event.name}</h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <CheckCircle size={12} /> Active
+                </span>
+              </div>
               <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
                 <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date(event.date).toLocaleDateString()}</span>
                 <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {event.venue}</span>

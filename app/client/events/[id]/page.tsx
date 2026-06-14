@@ -2,10 +2,9 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, Upload, Plus, Palette, Send, Smartphone } from 'lucide-react';
+import { Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, Upload, Plus, Palette, Send, Smartphone, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { authOptions } from '@/lib/auth';
-
 
 export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -54,12 +53,19 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         <ArrowLeft size={14} /> Back to Dashboard
       </Link>
 
-      {/* Event header */}
+      {/* Event header with active badge */}
       <div className="mb-7">
-        <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight mb-3">
-          {event.name}
-        </h1>
-        <div className="flex flex-wrap gap-3 text-sm text-gray-500 mb-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">
+            {event.name}
+          </h1>
+          {event.commission_paid && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <CheckCircle size={12} /> Active
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 text-sm text-gray-500 mt-2">
           <div className="flex items-center gap-1.5">
             <Calendar size={16} className="text-[#0D4F4F]" />
             {format(new Date(event.date), 'PPP')}
@@ -69,7 +75,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
             {event.venue}
           </div>
         </div>
-        <p className="text-sm text-gray-400">{event.address}</p>
+        <p className="text-sm text-gray-400 mt-1">{event.address}</p>
       </div>
 
       {/* Stats cards */}
