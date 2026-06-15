@@ -23,7 +23,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       return;
     }
 
-    // Allow check‑in page for any authenticated user (no role check)
     if (pathname.startsWith('/client/check-in')) {
       console.log('Check‑in page allowed');
       return;
@@ -65,12 +64,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 overflow-y-auto">
         <div className="flex flex-col h-full p-5">
-          {/* Logo - replaced with image */}
-          <div className="mb-8 flex justify-center">
+          {/* Logo - larger size */}
+          <div className="mb-8 flex justify-center py-2">
             <img
               src="/Little Wed Logo_.svg"
               alt="Little Wed"
-              className="h-20 w-auto object-contain"
+              className="h-14 w-auto object-contain" // increased from h-10 to h-14
             />
           </div>
 
@@ -124,11 +123,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* Mobile Drawer */}
       <div className="flex-1 lg:ml-72">
         <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-          {/* Mobile header logo */}
+          {/* Mobile header logo - larger */}
           <img
             src="/Little Wed Logo_.svg"
             alt="Little Wed"
-            className="h-8 w-auto object-contain"
+            className="h-10 w-auto object-contain" // increased from h-8 to h-10
           />
           <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-full">
             <Menu className="w-5 h-5" />
@@ -154,11 +153,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               >
                 <div className="flex flex-col h-full p-5">
                   <div className="flex items-center justify-between mb-6">
-                    {/* Mobile drawer logo */}
+                    {/* Mobile drawer logo - larger */}
                     <img
                       src="/Little Wed Logo_.svg"
                       alt="Little Wed"
-                      className="h-8 w-auto object-contain"
+                      className="h-10 w-auto object-contain" // increased from h-8 to h-10
                     />
                     <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
                       <X className="w-5 h-5" />
@@ -174,7 +173,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <p className="font-semibold text-gray-800 truncate">{userName}</p>
                         <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                       </div>
-                    </div>F
+                    </div>
                   </div>
 
                   <nav className="flex-1 space-y-1">
