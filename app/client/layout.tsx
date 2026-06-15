@@ -35,7 +35,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       console.log('Role not allowed, redirecting to login');
       router.push('/login');
     }
-  }, [session, status, router, pathname]); // ✅ pathname added
+  }, [session, status, router, pathname]);
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -65,16 +65,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 overflow-y-auto">
         <div className="flex flex-col h-full p-5">
-          {/* Logo */}
+          {/* Logo - replaced with image */}
           <div className="mb-8 flex justify-center">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center shadow-sm">
-                <span className="text-white text-xs font-bold">LW</span>
-              </div>
-              <h1 className="text-xl font-bold tracking-tight" style={{ color: '#0D4F4F' }}>
-                Little<span style={{ color: '#E8A598' }}>Wed</span>
-              </h1>
-            </div>
+            <img
+              src="/Little Wed Logo_.svg"
+              alt="Little Wed"
+              className="h-20 w-auto object-contain"
+            />
           </div>
 
           {/* User Profile Card */}
@@ -127,14 +124,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       {/* Mobile Drawer */}
       <div className="flex-1 lg:ml-72">
         <div className="lg:hidden sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center shadow-sm">
-              <span className="text-white text-xs font-bold">LW</span>
-            </div>
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: '#0D4F4F' }}>
-              Little<span style={{ color: '#E8A598' }}>Wed</span>
-            </h1>
-          </div>
+          {/* Mobile header logo */}
+          <img
+            src="/Little Wed Logo_.svg"
+            alt="Little Wed"
+            className="h-8 w-auto object-contain"
+          />
           <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-full">
             <Menu className="w-5 h-5" />
           </button>
@@ -159,14 +154,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               >
                 <div className="flex flex-col h-full p-5">
                   <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center shadow-sm">
-                        <span className="text-white text-xs font-bold">LW</span>
-                      </div>
-                      <h1 className="text-xl font-bold tracking-tight" style={{ color: '#0D4F4F' }}>
-                        Little<span style={{ color: '#E8A598' }}>Wed</span>
-                      </h1>
-                    </div>
+                    {/* Mobile drawer logo */}
+                    <img
+                      src="/Little Wed Logo_.svg"
+                      alt="Little Wed"
+                      className="h-8 w-auto object-contain"
+                    />
                     <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
                       <X className="w-5 h-5" />
                     </button>
@@ -181,7 +174,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <p className="font-semibold text-gray-800 truncate">{userName}</p>
                         <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                       </div>
-                    </div>
+                    </div>F
                   </div>
 
                   <nav className="flex-1 space-y-1">
@@ -194,7 +187,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                           onClick={() => setSidebarOpen(false)}
                           className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
                             isActive
-                              ? 'bg-[#0D4F4F] text-white shadow-md'
+                              ? 'bg-[rgb(13,79,79)] text-white shadow-md'
                               : 'text-gray-700 hover:bg-gray-100'
                           }`}
                         >
