@@ -3,7 +3,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Menu, X } from 'lucide-react';
+import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Menu, X, Info  } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 
@@ -51,10 +51,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const navItems = role === 'CLIENT' ? [
     { path: '/client/dashboard', icon: Home, label: 'Dashboard' },
     { path: '/client/events', icon: Calendar, label: 'Events' },
-    { path: '/client/guests', icon: Users, label: 'Guests' },
     { path: '/client/invitations', icon: Mail, label: 'Invitations' },
     { path: '/client/staff', icon: UserPlus, label: 'Team' },
     { path: '/client/settings', icon: Settings, label: 'Settings' },
+    { path: '/client/about', icon: Info, label: 'About' },
   ] : [
     { path: '/client/staff/dashboard', icon: Home, label: 'Check‑in' },
   ];
@@ -200,7 +200,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   <div className="mt-auto pt-6">
                     <button
                       onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+                      className="w-full flex items-center gap-3 px-4 py-6.5 rounded-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
                     >
                       <LogOut className="w-5 h-5" />
                       <span className="text-sm font-medium">Sign Out</span>
