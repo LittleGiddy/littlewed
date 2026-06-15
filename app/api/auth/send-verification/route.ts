@@ -6,9 +6,24 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   const { email } = await req.json();
-  if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 });
+  if (!email) {
+    return NextResponse.json({ error: 'Email required' }, { status: 400 });
+  }
 
-  // Delete any previous OTP for this email
+  // ✅ Check if email already registered
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true }, // only check existence
+  });
+
+  if (existingUser) {
+    return NextResponse.json(
+      { error: 'Email already registered. Please log in instead.' },
+      { status: 409 } // Conflict
+    );
+  }
+
+  // Delete any previous OTP for this email (cleanup)
   await prisma.verificationToken.deleteMany({ where: { email } });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -20,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await resend.emails.send({
-      from: 'LittleWed <onboarding@resend.dev>', // use your verified domain
+      from: 'LittleWed <onboarding@resend.dev>', // replace with your verified domain when ready
       to: [email],
       subject: 'Verify your email address',
       html: `
