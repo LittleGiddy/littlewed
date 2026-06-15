@@ -16,6 +16,16 @@ model User {
   tenantId  String?
   tenant    Tenant?  @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now())
+  phone          String?   // optional, for admin use
+  emailVerified  DateTime? // null = not verified
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  email      String
+  otp        String   // 6-digit code
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
 }
 
 model Tenant {
@@ -125,3 +135,4 @@ model Transaction {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
+

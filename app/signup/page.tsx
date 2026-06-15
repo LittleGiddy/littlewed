@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight, Phone } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -10,9 +10,11 @@ export default function SignupPage() {
     business_name: '',
     subdomain: '',
     email: '',
+    phone: '',
     password: '',
     name: '',
   });
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
@@ -28,6 +30,56 @@ export default function SignupPage() {
     }));
   };
 
+  // Send OTP via Resend
+  const sendVerification = async () => {
+    if (!form.email) {
+      setError('Email is required');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      // Move to OTP input step
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Verify OTP and then create account
+  const verifyEmail = async () => {
+    if (otp.length !== 6) {
+      setError('Please enter the 6-digit code');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email, otp }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      // OTP is correct → proceed with account creation
+      await handleSubmit();
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  // Final account creation
   const handleSubmit = async () => {
     setLoading(true);
     setError('');
@@ -35,7 +87,7 @@ export default function SignupPage() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, emailVerified: true }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -52,6 +104,7 @@ export default function SignupPage() {
 
   const isStep1Valid = form.business_name.trim() && form.subdomain.trim();
   const isStep2Valid = form.name.trim() && form.email.trim() && form.password.length >= 8;
+  const isStep3Valid = otp.length === 6 && !loading;
 
   const Logo = () => (
     <img
@@ -76,7 +129,7 @@ export default function SignupPage() {
 
         .page { display: flex; min-height: 100vh; }
 
-        /* ── Left panel (desktop only) ── */
+        /* Left panel (desktop) */
         .left {
           width: 420px; flex-shrink: 0;
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
@@ -112,14 +165,8 @@ export default function SignupPage() {
           50%      { transform: translate(-15px,15px) scale(1.08); }
         }
 
-        .left-logo {
-          position: relative; z-index: 2;
-          animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        .left-copy {
-          position: relative; z-index: 2;
-          animation: fadeDown 0.6s 0.35s cubic-bezier(0.16,1,0.3,1) both;
-        }
+        .left-logo { position: relative; z-index: 2; animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both; }
+        .left-copy { position: relative; z-index: 2; animation: fadeDown 0.6s 0.35s cubic-bezier(0.16,1,0.3,1) both; }
 
         @keyframes fadeDown {
           from { opacity: 0; transform: translateY(-16px); }
@@ -152,21 +199,17 @@ export default function SignupPage() {
           display: flex; align-items: center; justify-content: center; color: #E8A598;
         }
 
-        /* ── Right panel ── */
+        /* Right panel */
         .right {
           flex: 1; display: flex; align-items: center; justify-content: center;
           padding: 40px 24px; background: #F0F4F8;
           animation: fadeIn 0.6s 0.1s both;
         }
 
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
         .right-inner { width: 100%; max-width: 460px; }
 
-        /* ── Card ── */
         .card {
           background: white; border-radius: 24px; overflow: hidden;
           box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.07), 0 24px 48px rgba(0,0,0,0.05);
@@ -178,7 +221,7 @@ export default function SignupPage() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* ── Mobile hero (hidden on desktop) ── */
+        /* Mobile hero */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -187,7 +230,6 @@ export default function SignupPage() {
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
           position: relative; overflow: hidden; text-align: center;
         }
-
         .mobile-hero::before {
           content: ''; position: absolute; top: -60px; right: -60px;
           width: 220px; height: 220px; border-radius: 50%;
@@ -200,13 +242,7 @@ export default function SignupPage() {
           background: rgba(232,165,152,0.07);
           animation: floatB 10s ease-in-out infinite;
         }
-
-        .mobile-logo-wrap {
-          position: relative; z-index: 2;
-          margin-bottom: 20px;
-          animation: fadeDown 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
+        .mobile-logo-wrap { position: relative; z-index: 2; margin-bottom: 20px; animation: fadeDown 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
         .mobile-tagline {
           position: relative; z-index: 2;
           font-family: 'Playfair Display', serif;
@@ -215,20 +251,17 @@ export default function SignupPage() {
           animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
         .mobile-tagline span { color: #E8A598; }
-
         .mobile-sub {
           position: relative; z-index: 2;
           color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
           margin-bottom: 22px; max-width: 300px;
           animation: fadeDown 0.6s 0.3s cubic-bezier(0.16,1,0.3,1) both;
         }
-
         .mobile-pills {
           position: relative; z-index: 2;
           display: flex; flex-wrap: wrap; gap: 7px; justify-content: center;
           animation: fadeUp 0.6s 0.4s cubic-bezier(0.16,1,0.3,1) both;
         }
-
         .pill {
           display: flex; align-items: center; gap: 5px;
           background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
@@ -248,7 +281,6 @@ export default function SignupPage() {
 
         /* Form */
         .form-body { padding: 36px 36px 32px; }
-
         .step-label {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
           color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
@@ -265,9 +297,7 @@ export default function SignupPage() {
           position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
           font-size: 14px; color: #9BAAB8; pointer-events: none; background: white;
           padding: 0 4px; font-weight: 500;
-          transition: top 0.2s cubic-bezier(0.4,0,0.2,1),
-                      font-size 0.2s cubic-bezier(0.4,0,0.2,1),
-                      color 0.2s cubic-bezier(0.4,0,0.2,1);
+          transition: top 0.2s cubic-bezier(0.4,0,0.2,1), font-size 0.2s cubic-bezier(0.4,0,0.2,1), color 0.2s cubic-bezier(0.4,0,0.2,1);
         }
         .field-label.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
 
@@ -364,7 +394,6 @@ export default function SignupPage() {
         .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
         .footer-link a:hover { text-decoration: underline; }
 
-        /* Mobile bottom feature list */
         .mobile-bottom {
           padding: 22px 20px 36px;
           display: flex; flex-direction: column; gap: 10px;
@@ -380,28 +409,15 @@ export default function SignupPage() {
           display: flex; align-items: center; justify-content: center; color: #0D4F4F;
         }
 
-        /* ── Mobile breakpoint ── */
         @media (max-width: 768px) {
           .left { display: none; }
-
-          .right {
-            padding: 0;
-            background: #F0F4F8;
-            align-items: flex-start;
-          }
-
+          .right { padding: 0; background: #F0F4F8; align-items: flex-start; }
           .right-inner { max-width: 100%; }
-
-          .card {
-            border-radius: 0 0 28px 28px;
-            animation: cardInMobile 0.6s 0.05s cubic-bezier(0.16,1,0.3,1) both;
-          }
-
+          .card { border-radius: 0 0 28px 28px; animation: cardInMobile 0.6s 0.05s cubic-bezier(0.16,1,0.3,1) both; }
           @keyframes cardInMobile {
             from { opacity: 0; transform: translateY(-24px); }
             to   { opacity: 1; transform: translateY(0); }
           }
-
           .mobile-hero { display: flex; }
           .form-body { padding: 26px 22px 22px; }
           .footer-link { padding: 12px 22px 20px; }
@@ -414,11 +430,9 @@ export default function SignupPage() {
       `}</style>
 
       <div className="page">
-
-        {/* ── Desktop left panel ── */}
+        {/* Desktop left panel */}
         <div className="left">
           <div className="left-logo"><Logo /></div>
-
           <div className="left-copy">
             <div className="tagline">
               Beautiful weddings,<br /><span>perfectly managed.</span>
@@ -427,7 +441,6 @@ export default function SignupPage() {
               Create your workspace and start managing guest lists, invitations, and check-ins in minutes.
             </p>
           </div>
-
           <div className="features-left">
             {features.map(({ icon, label }) => (
               <div className="feat" key={label}>
@@ -438,12 +451,11 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* ── Right panel ── */}
+        {/* Right panel */}
         <div className="right">
           <div className="right-inner">
             <div className="card">
-
-              {/* Mobile hero — same teal branding as desktop left panel */}
+              {/* Mobile hero */}
               <div className="mobile-hero">
                 <div className="mobile-logo-wrap"><Logo /></div>
                 <div className="mobile-tagline">
@@ -454,28 +466,22 @@ export default function SignupPage() {
                 </p>
                 <div className="mobile-pills">
                   {features.map(({ icon, label }) => (
-                    <div className="pill" key={label}>
-                      {icon}<span>{label}</span>
-                    </div>
+                    <div className="pill" key={label}>{icon}<span>{label}</span></div>
                   ))}
                 </div>
               </div>
 
-              {/* Progress bar */}
               <div className="step-bar-wrap">
-                <div className="step-bar-fill" style={{ width: step === 1 ? '50%' : '100%' }} />
+                <div className="step-bar-fill" style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }} />
               </div>
 
-              {/* Form */}
               <div className="form-body">
-                {step === 1 ? (
+                {step === 1 && (
                   <>
-                    <div className="step-label">Step 1 of 2</div>
+                    <div className="step-label">Step 1 of 3</div>
                     <div className="form-title">Your Workspace</div>
                     <p className="form-subtitle">Set up your business profile and unique URL.</p>
-
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
-
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'business_name' || form.business_name ? 'up' : ''}`}>
                         Business Name
@@ -488,7 +494,6 @@ export default function SignupPage() {
                         onBlur={() => setFocused(null)}
                       />
                     </div>
-
                     <div className="field-wrap">
                       <div className="subdomain-wrap">
                         <div className="subdomain-prefix">littlewed.com /</div>
@@ -503,7 +508,6 @@ export default function SignupPage() {
                         <div className="hint">Your URL: <strong>{form.subdomain}.littlewed.com</strong></div>
                       )}
                     </div>
-
                     <button
                       className="btn-primary"
                       disabled={!isStep1Valid}
@@ -512,14 +516,14 @@ export default function SignupPage() {
                       Continue <ArrowRight size={16} />
                     </button>
                   </>
-                ) : (
+                )}
+
+                {step === 2 && (
                   <>
-                    <div className="step-label">Step 2 of 2</div>
+                    <div className="step-label">Step 2 of 3</div>
                     <div className="form-title">Your Account</div>
                     <p className="form-subtitle">Create your login credentials.</p>
-
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
-
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'name' || form.name ? 'up' : ''}`}>
                         Full Name
@@ -532,7 +536,6 @@ export default function SignupPage() {
                         onBlur={() => setFocused(null)}
                       />
                     </div>
-
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'email' || form.email ? 'up' : ''}`}>
                         Email Address
@@ -546,7 +549,21 @@ export default function SignupPage() {
                         onBlur={() => setFocused(null)}
                       />
                     </div>
-
+                    <div className="field-wrap">
+                      <label className={`field-label ${focused === 'phone' || form.phone ? 'up' : ''}`}>
+                        Phone Number <span style={{ fontWeight: 'normal', color: '#9BAAB8' }}>(optional)</span>
+                      </label>
+                      <input
+                        type="tel"
+                        className="field-input"
+                        placeholder="e.g., +255712345678"
+                        value={form.phone}
+                        onChange={e => set('phone', e.target.value)}
+                        onFocus={() => setFocused('phone')}
+                        onBlur={() => setFocused(null)}
+                      />
+                      <div className="hint">Only used for administrative records – no verification.</div>
+                    </div>
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'password' || form.password ? 'up' : ''}`}>
                         Password
@@ -568,7 +585,6 @@ export default function SignupPage() {
                       >
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </button>
-
                       {form.password && (
                         <div className="pw-strength">
                           {[1, 2, 3, 4].map(i => {
@@ -583,27 +599,67 @@ export default function SignupPage() {
                         </div>
                       )}
                     </div>
-
                     <button
                       className="btn-primary"
                       disabled={!isStep2Valid || loading}
-                      onClick={handleSubmit}
+                      onClick={sendVerification}
                     >
-                      {loading
-                        ? <><div className="spinner" /> Creating account…</>
-                        : <>Create Account <ArrowRight size={16} /></>
-                      }
+                      {loading ? <><div className="spinner" /> Sending code…</> : 'Verify Email →'}
                     </button>
-
                     <button className="btn-secondary" onClick={() => setStep(1)}>
                       ← Back
                     </button>
                   </>
                 )}
 
+                {step === 3 && (
+                  <>
+                    <div className="step-label">Step 3 of 3</div>
+                    <div className="form-title">Verify your email</div>
+                    <p className="form-subtitle">
+                      We sent a 6‑digit code to <strong>{form.email}</strong>
+                    </p>
+                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+                    <div className="field-wrap">
+                      <label className={`field-label ${focused === 'otp' || otp ? 'up' : ''}`}>
+                        Verification Code
+                      </label>
+                      <input
+                        className="field-input"
+                        value={otp}
+                        onChange={e => setOtp(e.target.value)}
+                        onFocus={() => setFocused('otp')}
+                        onBlur={() => setFocused(null)}
+                        maxLength={6}
+                        placeholder="000000"
+                      />
+                    </div>
+                    <button
+                      className="btn-primary"
+                      disabled={!isStep3Valid}
+                      onClick={verifyEmail}
+                    >
+                      {loading ? <><div className="spinner" /> Verifying…</> : 'Verify & Create Account'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => setStep(2)}>
+                      ← Back to edit
+                    </button>
+                    <div className="hint" style={{ textAlign: 'center', marginTop: 12 }}>
+                      Didn't receive the code?{' '}
+                      <button
+                        onClick={sendVerification}
+                        style={{ background: 'none', border: 'none', color: '#0D4F4F', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Resend
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 <div className="step-dots">
                   <div className={`dot ${step === 1 ? 'active' : ''}`} />
                   <div className={`dot ${step === 2 ? 'active' : ''}`} />
+                  <div className={`dot ${step >= 3 ? 'active' : ''}`} />
                 </div>
               </div>
             </div>
@@ -611,8 +667,6 @@ export default function SignupPage() {
             <div className="footer-link">
               Already have an account? <a href="/login">Sign in</a>
             </div>
-
-            {/* Mobile bottom features */}
             <div className="mobile-bottom">
               {features.map(({ icon, label }) => (
                 <div className="mobile-bottom-feat" key={label}>
@@ -621,7 +675,6 @@ export default function SignupPage() {
                 </div>
               ))}
             </div>
-
           </div>
         </div>
       </div>

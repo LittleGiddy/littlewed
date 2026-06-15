@@ -3,43 +3,53 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
-  const { business_name, subdomain, email, password, name } = await req.json();
+  const { business_name, subdomain, email, phone, password, name, emailVerified } = await req.json();
 
+  // Validate required fields
   if (!business_name || !subdomain || !email || !password || !name) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  if (!emailVerified) {
+    return NextResponse.json({ error: 'Email must be verified before account creation' }, { status: 400 });
+  }
+
+  // Check if email already used
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return NextResponse.json({ error: 'Email already registered' }, { status: 400 });
   }
 
+  // Check if subdomain taken
   const existingTenant = await prisma.tenant.findUnique({ where: { subdomain } });
   if (existingTenant) {
     return NextResponse.json({ error: 'Subdomain already taken' }, { status: 400 });
   }
 
+  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  // Create tenant and user in a transaction
   const tenant = await prisma.tenant.create({
     data: {
       name: business_name,
       subdomain,
-      subscriptionStatus: 'active',
-      credits: 0, // ✅ changed from creditBalance to credits
-      maxGuests: 200,
+      credits: 0,
+      simpleEventMode: false,
     },
   });
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
-      email,
-      password: hashedPassword,
       name,
+      email,
+      phone: phone || null, // optional phone
+      password: hashedPassword,
       role: 'CLIENT',
       tenantId: tenant.id,
+      emailVerified: new Date(),
     },
   });
 
-  return NextResponse.json({ success: true, tenantId: tenant.id });
+  return NextResponse.json({ message: 'Account created successfully' });
 }
