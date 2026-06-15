@@ -3,6 +3,7 @@
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Eye, EyeOff, ArrowRight, Mail, CheckCircle, Globe, Building } from 'lucide-react';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,12 +29,12 @@ export default function LoginPage() {
         const session = await res.json();
 
         // Temporary hard redirect for super admin (remove after)
-if (email === 'super@littlewed.com') {
-  window.location.href = '/admin/dashboard';
-  return;
-}
-  
-      const role = session?.user?.role;
+        if (email === 'super@littlewed.com') {
+          window.location.href = '/admin/dashboard';
+          return;
+        }
+
+        const role = session?.user?.role;
         if (role === 'SUPER_ADMIN') {
           window.location.href = '/admin/dashboard';
         } else if (role === 'STAFF') {
@@ -505,7 +506,9 @@ if (email === 'super@littlewed.com') {
                     </button>
                   </div>
 
-                  <a href="/forgot-password" className="forgot">Forgot password?</a>
+                  <Link href="/forgot-password" className="text-sm text-[#0D4F4F] hover:underline mt-2 block text-right">
+                    Forgot password?
+                  </Link>
 
                   <button type="button" className="btn" disabled={loading} onClick={handleSubmit}>
                     {loading

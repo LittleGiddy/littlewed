@@ -136,3 +136,12 @@ model Transaction {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
 
+// prisma/schema.prisma
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
