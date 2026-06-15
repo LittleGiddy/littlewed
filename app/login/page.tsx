@@ -23,12 +23,9 @@ export default function LoginPage() {
       const result = await signIn('credentials', { email, password, redirect: false });
       console.log('signIn result:', result);
       if (result?.ok && !result?.error) {
-
-        // Fetch session to get role
         const res = await fetch('/api/auth/session');
         const session = await res.json();
 
-        // Temporary hard redirect for super admin (remove after)
         if (email === 'super@littlewed.com') {
           window.location.href = '/admin/dashboard';
           return;
@@ -52,19 +49,24 @@ export default function LoginPage() {
     }
   };
 
-  const Logo = () => (
+  const Logo = ({ size = 'default' }: { size?: 'default' | 'mobile' }) => (
     <img
       src="/Little Wed Logo.svg"
       alt="Little Wed"
-      style={{ display: 'block', width: '180px', height: 'auto' }}
+      style={{
+        display: 'block',
+        width: size === 'mobile' ? '160px' : '100%',
+        maxWidth: size === 'mobile' ? '160px' : '220px',
+        height: 'auto',
+      }}
     />
   );
 
   const features = [
-    { icon: <Mail size={13} />, label: 'WhatsApp & SMS invitations' },
-    { icon: <CheckCircle size={13} />, label: 'QR code check-in system' },
-    { icon: <Globe size={13} />, label: 'Real-time guest dashboard' },
-    { icon: <Building size={13} />, label: 'Custom invitation cards' },
+    { icon: <Mail size={14} />, label: 'WhatsApp & SMS invitations' },
+    { icon: <CheckCircle size={14} />, label: 'QR code check-in system' },
+    { icon: <Globe size={14} />, label: 'Real-time guest dashboard' },
+    { icon: <Building size={14} />, label: 'Custom invitation cards' },
   ];
 
   return (
@@ -73,13 +75,12 @@ export default function LoginPage() {
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* ── Page layout ── */
         .page {
           display: flex;
           min-height: 100vh;
         }
 
-        /* ── Left panel (desktop) ── */
+        /* ── Left panel ── */
         .left {
           width: 420px;
           flex-shrink: 0;
@@ -87,7 +88,7 @@ export default function LoginPage() {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 48px 40px;
+          padding: 52px 44px;
           position: relative;
           overflow: hidden;
           animation: panelIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
@@ -120,9 +121,14 @@ export default function LoginPage() {
           50%      { transform: translate(-15px,15px) scale(1.08); }
         }
 
+        /* Logo wrapper on desktop left panel */
         .left-logo {
-          position: relative; z-index: 2;
+          position: relative;
+          z-index: 2;
           animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+          /* Give it breathing room without affecting siblings */
+          display: flex;
+          align-items: flex-start;
         }
 
         .left-copy {
@@ -150,7 +156,7 @@ export default function LoginPage() {
 
         .features {
           position: relative; z-index: 2;
-          display: flex; flex-direction: column; gap: 11px;
+          display: flex; flex-direction: column; gap: 12px;
           animation: fadeUp 0.6s 0.5s cubic-bezier(0.16,1,0.3,1) both;
         }
 
@@ -160,11 +166,11 @@ export default function LoginPage() {
         }
 
         .feat {
-          display: flex; align-items: center; gap: 11px;
+          display: flex; align-items: center; gap: 12px;
           color: rgba(255,255,255,0.72); font-size: 13.5px; font-weight: 500;
         }
         .feat-dot {
-          width: 27px; height: 27px; border-radius: 8px; flex-shrink: 0;
+          width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
           background: rgba(232,165,152,0.18); border: 1px solid rgba(232,165,152,0.28);
           display: flex; align-items: center; justify-content: center; color: #E8A598;
         }
@@ -199,12 +205,12 @@ export default function LoginPage() {
 
         .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
 
-        /* Mobile hero — hidden on desktop */
+        /* ── Mobile hero ── */
         .mobile-hero {
           display: none;
           flex-direction: column;
           align-items: center;
-          padding: 36px 32px 28px;
+          padding: 40px 28px 32px;
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
           position: relative;
           overflow: hidden;
@@ -218,8 +224,13 @@ export default function LoginPage() {
           animation: floatA 8s ease-in-out infinite;
         }
 
+        /* Mobile logo wrapper — sized to feel prominent */
         .mobile-logo {
-          position: relative; z-index: 1; margin-bottom: 20px;
+          position: relative;
+          z-index: 1;
+          margin-bottom: 24px;
+          display: flex;
+          justify-content: center;
         }
 
         .mobile-tagline {
@@ -233,7 +244,7 @@ export default function LoginPage() {
         .mobile-sub {
           position: relative; z-index: 1;
           color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
-          margin-bottom: 20px;
+          margin-bottom: 22px;
         }
 
         .mobile-features {
@@ -375,16 +386,13 @@ export default function LoginPage() {
             to   { opacity: 1; transform: translateY(0); }
           }
 
-          /* Show mobile hero */
           .mobile-hero { display: flex; }
-
           .card-bar { display: none; }
 
           .form-body { padding: 28px 24px 24px; }
           .form-title { font-size: 22px; }
           .card-footer { padding: 12px 24px 24px; }
 
-          /* Bottom content on mobile */
           .mobile-bottom {
             padding: 24px 20px 32px;
             display: flex; flex-direction: column; gap: 10px;
@@ -438,9 +446,11 @@ export default function LoginPage() {
           <div className="right-inner">
             <div className="card">
 
-              {/* Mobile hero — visible only on mobile */}
+              {/* Mobile hero */}
               <div className="mobile-hero">
-                <div className="mobile-logo"><Logo /></div>
+                <div className="mobile-logo">
+                  <Logo size="mobile" />
+                </div>
                 <div className="mobile-tagline">
                   Welcome <span>back.</span>
                 </div>
@@ -526,7 +536,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Mobile bottom features (below card) */}
+            {/* Mobile bottom features */}
             <div className="mobile-bottom">
               {features.map(({ icon, label }) => (
                 <div className="mobile-bottom-feat" key={label}>
