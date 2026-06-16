@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserPlus, Phone, User, ArrowLeft, ArrowRight } from 'lucide-react';
+import { UserPlus, Phone, User, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
 
 export default function AddGuestPage() {
   const { eventId } = useParams();
@@ -12,9 +12,17 @@ export default function AddGuestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
+  const [limit, setLimit] = useState<{ remaining: number; totalGuests: number } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/events/${eventId}/guests/count`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => setLimit({ remaining: data.guestCount - data.totalGuests, totalGuests: data.totalGuests }))
+      .catch(() => setLimit(null));
+  }, [eventId]);
 
   const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) e.preventDefault();
+    e?.preventDefault();
     setLoading(true);
     setError('');
     try {
@@ -58,7 +66,6 @@ export default function AddGuestPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* Back link */
         .ag-back {
           display: inline-flex; align-items: center; gap: 6px;
           font-size: 13px; font-weight: 700; color: #0D4F4F;
@@ -67,7 +74,6 @@ export default function AddGuestPage() {
         }
         .ag-back:hover { opacity: 0.7; gap: 4px; }
 
-        /* Header */
         .ag-eyebrow {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
           color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
@@ -84,7 +90,6 @@ export default function AddGuestPage() {
 
         .ag-subtitle { font-size: 14px; color: #7A8FA6; line-height: 1.6; margin: 0 0 28px; }
 
-        /* Card */
         .ag-card {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 22px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
@@ -99,7 +104,6 @@ export default function AddGuestPage() {
         .ag-card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
         .ag-card-body { padding: 32px 32px 28px; }
 
-        /* Fields */
         .ag-field { position: relative; margin-bottom: 20px; }
 
         .ag-label {
@@ -139,7 +143,6 @@ export default function AddGuestPage() {
         .ag-hint { font-size: 11px; color: #9BAAB8; margin-top: 5px; padding-left: 46px; }
         .ag-hint strong { color: #0D4F4F; }
 
-        /* Error */
         .ag-error {
           background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
           padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
@@ -153,7 +156,6 @@ export default function AddGuestPage() {
           80%      { transform: translateX(-3px); }
         }
 
-        /* Button */
         .ag-btn {
           width: 100%; padding: 15px; border: none; border-radius: 13px;
           background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
@@ -188,12 +190,10 @@ export default function AddGuestPage() {
       `}</style>
 
       <div className="ag-wrap">
-        {/* Back link */}
         <Link href={`/client/events/${eventId}`} className="ag-back">
           <ArrowLeft size={14} /> Back to Event
         </Link>
 
-        {/* Header */}
         <div className="ag-eyebrow">
           <div className="ag-eyebrow-dot" />
           Guest Management
@@ -201,7 +201,12 @@ export default function AddGuestPage() {
         <h1 className="ag-title">Add a <span>Guest</span></h1>
         <p className="ag-subtitle">Fill in the guest's details to add them to this event.</p>
 
-        {/* Card */}
+        {limit !== null && (
+          <div className="mb-4 text-sm">
+            <span className="font-semibold">Remaining guest slots:</span> {Math.max(0, limit.remaining)}
+          </div>
+        )}
+
         <div className="ag-card">
           <div className="ag-card-bar" />
           <div className="ag-card-body">
@@ -211,7 +216,6 @@ export default function AddGuestPage() {
             )}
 
             <form onSubmit={handleSubmit} noValidate>
-              {/* Name field */}
               <div className="ag-field">
                 <label className={`ag-label ${focused === 'name' || name ? 'up' : ''}`}>Full Name</label>
                 <div className={`ag-input-wrap ${focused === 'name' ? 'focused' : ''}`}>
@@ -229,7 +233,6 @@ export default function AddGuestPage() {
                 </div>
               </div>
 
-              {/* Phone field */}
               <div className="ag-field">
                 <label className={`ag-label ${focused === 'phone' || phone ? 'up' : ''}`}>Phone Number</label>
                 <div className={`ag-input-wrap ${focused === 'phone' ? 'focused' : ''}`}>
@@ -248,12 +251,15 @@ export default function AddGuestPage() {
                 <div className="ag-hint">Include country code, e.g. <strong>+255712345678</strong></div>
               </div>
 
-              <button type="submit" className="ag-btn" disabled={!isValid || loading}>
+              <button type="submit" className="ag-btn" disabled={!isValid || loading || limit?.remaining === 0}>
                 {loading
                   ? <><div className="ag-spinner" /> Adding Guest…</>
                   : <><UserPlus size={16} /> Add Guest</>
                 }
               </button>
+              {limit?.remaining === 0 && (
+                <p className="text-xs text-amber-600 mt-2 text-center">Guest limit reached. Please top up to add more.</p>
+              )}
             </form>
           </div>
         </div>

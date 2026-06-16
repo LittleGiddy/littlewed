@@ -2,66 +2,61 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { randomBytes } from 'crypto';
+import { normalizePhone } from '@/lib/phone';
 
 export async function POST(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    console.log('Session in /api/guests:', session?.user);
-
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized - no session' }, { status: 401 });
-    }
-
-    const role = (session.user as any).role;
-    const tenantId = (session.user as any).tenantId;
-
-    // Allow both 'CLIENT' and 'SUPER_ADMIN' (case-insensitive optional)
-    if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: `Forbidden - role: ${role}` }, { status: 403 });
-    }
-
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
-    }
-
-    const { name, phone, eventId } = await req.json();
-    if (!name || !phone || !eventId) {
-      return NextResponse.json({ error: 'Missing name, phone, or eventId' }, { status: 400 });
-    }
-
-    const event = await prisma.event.findFirst({
-      where: { id: eventId, tenantId },
-    });
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found or access denied' }, { status: 404 });
-    }
-
-    // Optional: detect WhatsApp number (if you have a utility)
-    let routingChannel = 'sms';
-    if (process.env.MOCK_WHATSAPP === 'true' && phone.startsWith('+2557')) {
-      routingChannel = 'whatsapp';
-    } else if (process.env.TWILIO_ACCOUNT_SID) {
-      try {
-        const { isWhatsAppNumber } = await import('@/lib/validate-whatsapp');
-        const isWhatsApp = await isWhatsAppNumber(phone);
-        routingChannel = isWhatsApp ? 'whatsapp' : 'sms';
-      } catch (err) {
-        console.warn('WhatsApp detection failed, defaulting to SMS');
-      }
-    }
-
-    const guest = await prisma.guest.create({
-      data: {
-        name,
-        phone,
-        eventId,
-        routingChannel,
-      },
-    });
-
-    return NextResponse.json(guest, { status: 201 });
-  } catch (error: any) {
-    console.error('POST /api/guests error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const session = await getServerSession(authOptions);
+  if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const { name, phone, eventId } = await req.json();
+  if (!name || !phone || !eventId) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  // Normalize: must start with '+'
+  const { normalized, isValid } = normalizePhone(phone);
+  if (!isValid) {
+    return NextResponse.json({ error: 'Invalid phone number format. Must start with "+" and include country code (e.g., +255712345678).' }, { status: 400 });
+  }
+
+  // Check duplicate
+  const existing = await prisma.guest.findFirst({
+    where: { eventId, phone: normalized },
+  });
+  if (existing) {
+    return NextResponse.json({ error: 'Guest already exists in this event' }, { status: 409 });
+  }
+
+  // Check limit
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: { tenant: { select: { bypassPayment: true } } },
+  });
+  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  if (!event.tenant?.bypassPayment && event.guestCount) {
+    const currentCount = await prisma.guest.count({ where: { eventId } });
+    if (currentCount >= event.guestCount) {
+      return NextResponse.json({
+        error: `Guest limit reached (${event.guestCount}). Please top up to add more.`,
+      }, { status: 400 });
+    }
+  }
+
+  const guest = await prisma.guest.create({
+    data: {
+      name,
+      phone: normalized,
+      email: null,
+      eventId,
+      routingChannel: 'sms',
+      smsCode: randomBytes(4).toString('hex').toUpperCase(),
+      qrToken: randomBytes(16).toString('hex'),
+    },
+  });
+
+  return NextResponse.json(guest);
 }
