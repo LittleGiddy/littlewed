@@ -38,6 +38,9 @@ export default function SendInvitationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Cost per guest = 300 TZS (commission amount)
+  const COST_PER_GUEST = 300;
+
   useEffect(() => {
     Promise.all([
       fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }).then(res => res.json()),
@@ -75,9 +78,9 @@ export default function SendInvitationsPage() {
   const whatsappGuests = guests.filter(g => g.routingChannel === 'whatsapp' && g.phone);
   const smsGuests = guests.filter(g => g.routingChannel === 'sms' && g.phone);
   const allGuests = guests.filter(g => g.phone);
-  const estimatedCostWhatsApp = whatsappGuests.length * 50;
-  const estimatedCostSMS = smsGuests.length * 25;
-  const totalEstimatedCost = estimatedCostWhatsApp + estimatedCostSMS;
+
+  // Total cost for all guests (for display only, no longer shown in UI)
+  const totalAllGuestsCost = allGuests.length * COST_PER_GUEST;
 
   const toggleSelectAll = () => {
     const currentList = activeFilter === 'whatsapp' ? whatsappGuests : smsGuests;
@@ -104,14 +107,13 @@ export default function SendInvitationsPage() {
       toast.error(`No ${activeFilter === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests selected.`);
       return;
     }
-    const costPerGuest = activeFilter === 'whatsapp' ? 50 : 25;
-    const totalCost = selected.length * costPerGuest;
+    const totalCost = selected.length * COST_PER_GUEST;
     if (credits !== null && credits < totalCost) {
       toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
       return;
     }
     await saveCustomMessage();
-    if (!window.confirm(`Send invitations to ${selected.length} selected ${activeFilter === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests? Estimated cost: ${totalCost} TZS.`)) return;
+    if (!window.confirm(`Send invitations to ${selected.length} selected ${activeFilter === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests? This will cost ${totalCost} TZS.`)) return;
 
     setSending(true);
     let successCount = 0;
@@ -144,7 +146,7 @@ export default function SendInvitationsPage() {
   };
 
   const sendToGuest = async (guest: Guest) => {
-    const cost = guest.routingChannel === 'whatsapp' ? 50 : 25;
+    const cost = COST_PER_GUEST;
     if (credits !== null && credits < cost) {
       toast.error(`Insufficient credits. Need ${cost} TZS, you have ${credits} TZS.`);
       return;
@@ -262,16 +264,16 @@ export default function SendInvitationsPage() {
         {savingMessage && <p className="text-xs text-gray-400 mt-1">Saving...</p>}
       </div>
 
+      {/* Credits display – only remaining credits, no cost summary */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
-        <div className="flex justify-between items-center flex-wrap gap-3">
-          <div><p className="text-sm text-gray-500">Your credits</p><p className="font-serif text-2xl font-black text-[#0D4F4F]">{credits?.toLocaleString() ?? '?'} TZS</p></div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Estimated cost</p>
-            <div className="space-y-1">
-              <p className="text-sm">WhatsApp: {estimatedCostWhatsApp} TZS</p>
-              <p className="text-sm">SMS: {estimatedCostSMS} TZS</p>
-              <p className="text-sm font-bold">Total: {totalEstimatedCost} TZS</p>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-gray-500">Available Credits</p>
+            <p className="font-serif text-3xl font-black text-[#0D4F4F]">{credits?.toLocaleString() ?? '?'} TZS</p>
+          </div>
+          <div className="text-sm text-gray-400 text-right">
+            <p>Each guest costs <span className="font-semibold text-[#0D4F4F]">{COST_PER_GUEST}</span> TZS</p>
+            <p className="text-xs">Remaining credits update after each send</p>
           </div>
         </div>
       </div>
@@ -351,7 +353,7 @@ export default function SendInvitationsPage() {
                     <>
                       <button
                         onClick={() => sendToGuest(guest)}
-                        disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < (guest.routingChannel === 'whatsapp' ? 50 : 25))}
+                        disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < COST_PER_GUEST)}
                         className="px-3 py-1 bg-[#0D4F4F] text-white text-sm rounded-lg hover:bg-[#0A3D3D] disabled:opacity-50 transition flex items-center gap-1"
                       >
                         {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send

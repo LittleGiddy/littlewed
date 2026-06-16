@@ -163,12 +163,7 @@ export default function AboutPage() {
                     <span className="font-semibold text-gray-800">Response time:</span> Within 24 hours on business days.
                   </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <Heart className="w-5 h-5 text-[#0D4F4F] flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-gray-600">
-                    We speak <span className="font-semibold">English</span> and <span className="font-semibold">Swahili</span>.
-                  </p>
-                </div>
+                
               </div>
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <Link
