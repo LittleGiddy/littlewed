@@ -13,11 +13,11 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { status } = await req.json();
+  const { bypassPayment } = await req.json();
 
   const tenant = await prisma.tenant.update({
     where: { id },
-    data: { subscriptionStatus: status },
+    data: { bypassPayment },
   });
 
   return NextResponse.json(tenant);

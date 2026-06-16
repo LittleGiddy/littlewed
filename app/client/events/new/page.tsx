@@ -18,10 +18,9 @@ export default function NewEventPage() {
   const [focused, setFocused] = useState<string | null>(null);
 
   const guestCount = parseInt(form.guestCount, 10) || 0;
-  const commissionPerGuest = 200;
+  const commissionPerGuest = 300;
   const totalCommission = guestCount * commissionPerGuest;
 
-  // Helper: label stays up if field is focused OR has a value
   const isLabelUp = (fieldName: string) => {
     if (focused === fieldName) return true;
     const value = form[fieldName as keyof typeof form];
@@ -46,8 +45,17 @@ export default function NewEventPage() {
         }),
       });
       const data = await res.json();
-      if (res.ok && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+      if (res.ok) {
+        // ✅ Bypass mode – event created immediately
+        if (data.eventId) {
+          router.push(`/client/events/${data.eventId}`);
+        }
+        // ✅ Normal payment flow – redirect to ClickPesa checkout
+        else if (data.checkoutUrl) {
+          window.location.href = data.checkoutUrl;
+        } else {
+          setError('Unexpected response from server');
+        }
       } else {
         setError(data.error || 'Failed to prepare event');
       }
@@ -356,7 +364,7 @@ export default function NewEventPage() {
           New <span>Event</span>
         </h1>
         <p className="page-sub">
-          Set up your event details and proceed to payment. You'll be charged 200 TZS per guest as a service fee.
+          Set up your event details and proceed to payment. You'll be charged 300 TZS per guest as a service fee.
         </p>
       </div>
 
@@ -371,9 +379,7 @@ export default function NewEventPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="field-wrap">
-              <label className={`field-label ${isLabelUp('name') ? 'up' : ''}`}>
-                Event Name
-              </label>
+              <label className={`field-label ${isLabelUp('name') ? 'up' : ''}`}>Event Name</label>
               <input
                 type="text"
                 required
@@ -386,9 +392,7 @@ export default function NewEventPage() {
             </div>
 
             <div className="field-wrap">
-              <label className={`field-label ${isLabelUp('date') ? 'up' : ''}`}>
-                Date & Time
-              </label>
+              <label className={`field-label ${isLabelUp('date') ? 'up' : ''}`}>Date & Time</label>
               <input
                 type="datetime-local"
                 required
@@ -401,9 +405,7 @@ export default function NewEventPage() {
             </div>
 
             <div className="field-wrap">
-              <label className={`field-label ${isLabelUp('venue') ? 'up' : ''}`}>
-                Venue Name
-              </label>
+              <label className={`field-label ${isLabelUp('venue') ? 'up' : ''}`}>Venue Name</label>
               <input
                 type="text"
                 required
@@ -416,9 +418,7 @@ export default function NewEventPage() {
             </div>
 
             <div className="field-wrap">
-              <label className={`field-label ${isLabelUp('address') ? 'up' : ''}`}>
-                Address
-              </label>
+              <label className={`field-label ${isLabelUp('address') ? 'up' : ''}`}>Address</label>
               <textarea
                 required
                 className="field-textarea"
@@ -430,9 +430,7 @@ export default function NewEventPage() {
             </div>
 
             <div className="field-wrap">
-              <label className={`field-label ${isLabelUp('guestCount') ? 'up' : ''}`}>
-                Number of Guests
-              </label>
+              <label className={`field-label ${isLabelUp('guestCount') ? 'up' : ''}`}>Number of Guests</label>
               <input
                 type="number"
                 required

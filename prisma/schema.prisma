@@ -40,6 +40,7 @@ model Tenant {
   credits            Int      @default(0)          // unified credit balance
   transactions       Transaction[]
   simpleEventMode    Boolean  @default(false)
+  bypassPayment Boolean @default(false)  // admin bypass for free events
 
   // Invitation template fields (tenant‑level – optional, can be overridden per event)
   templateCardUrl    String?

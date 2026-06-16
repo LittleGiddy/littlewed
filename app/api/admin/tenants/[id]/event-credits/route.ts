@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-export async function PATCH(
+export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -13,12 +13,16 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { status } = await req.json();
+  const { amount } = await req.json();
+
+  if (!amount || amount <= 0) {
+    return NextResponse.json({ error: 'Invalid credit amount' }, { status: 400 });
+  }
 
   const tenant = await prisma.tenant.update({
     where: { id },
-    data: { subscriptionStatus: status },
+    data: { credits: { increment: amount } },
   });
 
-  return NextResponse.json(tenant);
+  return NextResponse.json({ credits: tenant.credits });
 }
