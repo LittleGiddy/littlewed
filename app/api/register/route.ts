@@ -10,6 +10,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  // Phone is optional, but if provided, ensure it's a valid format (optional)
+  if (phone && !phone.match(/^\+?[0-9]{8,15}$/)) {
+    return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
+  }
+
   if (!emailVerified) {
     return NextResponse.json({ error: 'Email must be verified before account creation' }, { status: 400 });
   }
@@ -47,9 +52,10 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: 'CLIENT',
       tenantId: tenant.id,
-      emailVerified: new Date(),
+      emailVerified: new Date(), // mark as verified after OTP check
+      isActive: false, // 🔒 require admin activation
     },
   });
 
-  return NextResponse.json({ message: 'Account created successfully' });
+  return NextResponse.json({ message: 'Account created successfully. Awaiting admin activation.' });
 }

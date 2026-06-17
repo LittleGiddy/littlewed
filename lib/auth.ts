@@ -28,6 +28,7 @@ export const authOptions: NextAuthOptions = {
           tenantId: user.tenantId,
           tenant: user.tenant,
           subscriptionStatus: user.tenant?.subscriptionStatus ?? 'inactive',
+          isActive: user.isActive, // ✅ add this
         } as any;
       },
     }),
@@ -40,6 +41,7 @@ export const authOptions: NextAuthOptions = {
         token.tenantId = (user as any).tenantId;
         token.tenant = (user as any).tenant;
         token.subscriptionStatus = (user as any).subscriptionStatus;
+        token.isActive = (user as any).isActive; // ✅ add this
       }
       return token;
     },
@@ -50,6 +52,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).tenant = token.tenant;
         (session.user as any).subscriptionStatus = token.subscriptionStatus;
+        (session.user as any).isActive = token.isActive; // ✅ add this
       }
       return session;
     },
@@ -62,7 +65,6 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: '/login' },
   session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
-  // ✅ Essential for HTTPS (Vercel)
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,

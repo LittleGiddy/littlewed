@@ -18,6 +18,7 @@ model User {
   createdAt DateTime @default(now())
   phone          String?   // optional, for admin use
   emailVerified  DateTime? // null = not verified
+  isActive      Boolean  @default(false) // 🔒 new field
 }
 
 model VerificationToken {

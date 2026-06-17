@@ -32,9 +32,23 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       return;
     }
     if (pathname.startsWith('/client/check-in')) return;
-    const role = (session.user as any)?.role;
+
+    const user = session.user as any;
+    const role = user?.role;
+
     if (role !== 'CLIENT' && role !== 'STAFF') {
       router.push('/login');
+      return;
+    }
+
+    // Check active status for CLIENT users
+    if (role === 'CLIENT' && !user.isActive && pathname !== '/client/pending-activation') {
+      router.push('/client/pending-activation');
+      return;
+    }
+
+    if (user.isActive && pathname === '/client/pending-activation') {
+      router.push('/client/dashboard');
     }
   }, [session, status, router, pathname]);
 
@@ -61,67 +75,76 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { path: '/client/staff/dashboard', icon: Home, label: 'Check‑in' },
   ];
 
+  // Reusable sidebar content
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full p-5">
+      {/* Logo */}
+      <div className="mb-8 flex justify-center py-2">
+        <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-14 w-auto object-contain" />
+      </div>
+
+      {/* User profile */}
+      <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center text-white font-semibold text-base shadow-sm">
+            {userInitial}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-800 truncate">{userName}</p>
+            <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1">
+        {navItems.map((item) => {
+          const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              onClick={() => !isLargeScreen && setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
+                isActive
+                  ? 'bg-[#0D4F4F] text-white shadow-md'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Sign Out – with separator and improved styling */}
+      <div className="mt-auto pt-4 border-t border-gray-200">
+        <button
+          onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200 group"
+        >
+          <LogOut className="w-5 h-5 transition-transform group-hover:scale-110" />
+          <span className="text-sm font-medium">Sign Out</span>
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <aside
         className={`fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 transition-transform duration-300 ease-in-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex flex-col h-full p-5">
-          <div className="mb-8 flex justify-center py-2">
-            <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-14 w-auto object-contain" />
-          </div>
-
-          <div className="bg-gray-50 rounded-2xl p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center text-white font-semibold text-base shadow-sm">
-                {userInitial}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-800 truncate">{userName}</p>
-                <p className="text-xs text-gray-500 truncate">{userEmail}</p>
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex-1 space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  onClick={() => !isLargeScreen && setSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
-                    isActive
-                      ? 'bg-[#0D4F4F] text-white shadow-md'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm font-medium">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="mt-auto pt-6">
-            <button
-              onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
-              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-medium">Sign Out</span>
-            </button>
-          </div>
-        </div>
+        <SidebarContent />
       </aside>
 
       {/* Main content */}
       <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-0'}`}>
-        {/* Top header – no logo on desktop, only on mobile */}
+        {/* Top header */}
         <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-4">
             <button
@@ -130,7 +153,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            {/* Logo only on mobile */}
             <img
               src="/Little Wed Logo_.svg"
               alt="Little Wed"
@@ -145,16 +167,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
 
-        {/* Overlay backdrop (only on small screens) */}
+        {/* Mobile drawer */}
         <AnimatePresence>
           {sidebarOpen && !isLargeScreen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-20"
-            />
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setSidebarOpen(false)}
+                className="fixed inset-0 bg-black/30 backdrop-blur-sm z-20"
+              />
+              <motion.aside
+                initial={{ x: '-100%', opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: '-100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="fixed left-0 top-0 h-screen w-72 bg-white shadow-xl z-50 flex flex-col overflow-y-auto"
+              >
+                <SidebarContent />
+              </motion.aside>
+            </>
           )}
         </AnimatePresence>
 
