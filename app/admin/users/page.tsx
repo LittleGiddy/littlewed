@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle, Users, RefreshCw, XCircle, ShieldCheck, Clock } from 'lucide-react';
+import { CheckCircle, Users, RefreshCw, XCircle, ShieldCheck, Clock, Trash2 } from 'lucide-react';
 
 interface User {
   id: string;
@@ -55,6 +55,28 @@ export default function AdminUsersPage() {
     }
   };
 
+  // ✅ Delete user
+  const deleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`Delete user "${userName}"? This action cannot be undone.`)) return;
+    setProcessing(userId);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`User "${userName}" deleted successfully`);
+        setUsers(prev => prev.filter(u => u.id !== userId));
+      } else {
+        toast.error(data.error || 'Failed to delete user');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const inactiveUsers = users.filter(u => !u.isActive);
   const activeUsers = users.filter(u => u.isActive);
 
@@ -75,7 +97,6 @@ export default function AdminUsersPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Header ── */
         .au-header {
           display: flex; align-items: flex-start;
           justify-content: space-between; gap: 16px;
@@ -115,7 +136,6 @@ export default function AdminUsersPage() {
         .au-refresh-btn.spinning svg { animation: auSpin 0.8s linear infinite; }
         @keyframes auSpin { to { transform: rotate(360deg); } }
 
-        /* ── Stats row ── */
         .au-stats {
           display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap;
         }
@@ -133,7 +153,6 @@ export default function AdminUsersPage() {
         .au-stat-num { font-size: 22px; font-weight: 900; color: #0D1B1B; font-family: 'Playfair Display', serif; line-height: 1; }
         .au-stat-label { font-size: 11.5px; color: #9BAAB8; font-weight: 600; margin-top: 2px; }
 
-        /* ── Section card ── */
         .au-section {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 22px;
           overflow: hidden;
@@ -146,9 +165,8 @@ export default function AdminUsersPage() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        .au-section-bar { height: 4px; }
-        .au-section-bar.pending { background: linear-gradient(90deg, #0D4F4F, #E8A598); }
-        .au-section-bar.active  { background: linear-gradient(90deg, #1A7A4A, #3AB795); }
+        .au-section-bar.pending { background: linear-gradient(90deg, #0D4F4F, #E8A598); height: 4px; }
+        .au-section-bar.active  { background: linear-gradient(90deg, #1A7A4A, #3AB795); height: 4px; }
 
         .au-section-header {
           display: flex; align-items: center; justify-content: space-between;
@@ -171,7 +189,6 @@ export default function AdminUsersPage() {
         .au-badge.pending { color: #C07A20; background: rgba(192,122,32,0.1); border: 1px solid rgba(192,122,32,0.2); }
         .au-badge.active  { color: #1A7A4A; background: rgba(26,122,74,0.08); border: 1px solid rgba(26,122,74,0.18); }
 
-        /* ── User rows ── */
         .au-row {
           display: flex; align-items: center; gap: 14px;
           padding: 16px 24px; border-bottom: 1px solid #F7F9FB;
@@ -186,7 +203,6 @@ export default function AdminUsersPage() {
           to   { opacity: 1; transform: translateX(0); }
         }
 
-        /* Avatar */
         .au-avatar {
           width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
           background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
@@ -198,7 +214,6 @@ export default function AdminUsersPage() {
           background: linear-gradient(135deg, #1A7A4A, #145C38);
         }
 
-        /* User info */
         .au-user-info { flex: 1 1 0; min-width: 0; }
         .au-user-name {
           font-size: 14px; font-weight: 700; color: #0D1B1B;
@@ -215,12 +230,16 @@ export default function AdminUsersPage() {
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        /* Action button */
+        .au-actions {
+          display: flex; align-items: center; gap: 8px;
+          flex-shrink: 0;
+        }
+
         .au-action-btn {
           display: flex; align-items: center; gap: 7px;
           padding: 9px 16px; border: none; border-radius: 11px;
           font-size: 13px; font-weight: 700; font-family: inherit;
-          cursor: pointer; flex-shrink: 0; white-space: nowrap;
+          cursor: pointer; white-space: nowrap;
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
           position: relative; overflow: hidden;
         }
@@ -246,13 +265,23 @@ export default function AdminUsersPage() {
         }
         .au-action-btn.deactivate:hover:not(:disabled) { box-shadow: 0 6px 16px rgba(192,57,43,0.36); }
 
+        .au-action-btn.delete {
+          background: transparent;
+          color: #9BAAB8;
+          padding: 9px 11px;
+        }
+        .au-action-btn.delete:hover:not(:disabled) {
+          color: #C0392B;
+          background: rgba(192,57,43,0.08);
+          box-shadow: none;
+        }
+
         .au-spinner {
           width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
           border-top-color: white; border-radius: 50%;
           animation: auSpin 0.7s linear infinite; flex-shrink: 0;
         }
 
-        /* ── Empty state ── */
         .au-empty {
           padding: 44px 24px; text-align: center;
         }
@@ -267,7 +296,6 @@ export default function AdminUsersPage() {
         }
         .au-empty-sub { font-size: 13px; color: #9BAAB8; }
 
-        /* ── Loading skeleton ── */
         .au-skeleton-row {
           display: flex; align-items: center; gap: 14px;
           padding: 16px 24px; border-bottom: 1px solid #F7F9FB;
@@ -281,22 +309,22 @@ export default function AdminUsersPage() {
         @media (max-width: 560px) {
           .au-wrap { padding: 28px 16px 48px; }
           .au-title { font-size: 26px; }
-          .au-row { padding: 14px 16px; gap: 10px; }
+          .au-row { padding: 14px 16px; gap: 10px; flex-wrap: wrap; }
           .au-section-header { padding: 14px 16px; }
           .au-action-btn span { display: none; }
           .au-action-btn { padding: 9px 11px; }
+          .au-actions { margin-left: auto; }
           .au-stats { gap: 10px; }
+          .au-user-meta { font-size: 10px; }
         }
       `}</style>
 
       <div className="au-wrap">
-
-        {/* Header */}
         <div className="au-header">
           <div>
             <div className="au-eyebrow"><div className="au-eyebrow-dot" />Admin Panel</div>
             <h1 className="au-title">User <span>Management</span></h1>
-            <p className="au-subtitle">Activate or deactivate client accounts.</p>
+            <p className="au-subtitle">Activate, deactivate, or delete client accounts.</p>
           </div>
           <button
             className={`au-refresh-btn ${loading ? 'spinning' : ''}`}
@@ -308,7 +336,6 @@ export default function AdminUsersPage() {
           </button>
         </div>
 
-        {/* Stats */}
         <div className="au-stats">
           <div className="au-stat">
             <div className="au-stat-icon" style={{ background: 'rgba(192,122,32,0.1)' }}>
@@ -339,7 +366,7 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* ── Pending section ── */}
+        {/* Pending section */}
         <div className="au-section" style={{ animationDelay: '60ms' }}>
           <div className="au-section-bar pending" />
           <div className="au-section-header">
@@ -372,9 +399,7 @@ export default function AdminUsersPage() {
           ) : (
             inactiveUsers.map((user, i) => (
               <div key={user.id} className="au-row" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="au-avatar">
-                  {user.name?.charAt(0).toUpperCase() ?? '?'}
-                </div>
+                <div className="au-avatar">{user.name?.charAt(0).toUpperCase() ?? '?'}</div>
                 <div className="au-user-info">
                   <div className="au-user-name">{user.name}</div>
                   <div className="au-user-email">{user.email}</div>
@@ -382,23 +407,29 @@ export default function AdminUsersPage() {
                     {user.tenant?.name ?? 'No tenant'} · Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </div>
                 </div>
-                <button
-                  className="au-action-btn activate"
-                  onClick={() => toggleActive(user.id, user.isActive)}
-                  disabled={processing === user.id}
-                >
-                  {processing === user.id
-                    ? <div className="au-spinner" />
-                    : <CheckCircle size={14} />
-                  }
-                  <span>Activate</span>
-                </button>
+                <div className="au-actions">
+                  <button
+                    className="au-action-btn activate"
+                    onClick={() => toggleActive(user.id, user.isActive)}
+                    disabled={processing === user.id}
+                  >
+                    {processing === user.id ? <div className="au-spinner" /> : <CheckCircle size={14} />}
+                    <span>Activate</span>
+                  </button>
+                  <button
+                    className="au-action-btn delete"
+                    onClick={() => deleteUser(user.id, user.name)}
+                    disabled={processing === user.id}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
 
-        {/* ── Active users section ── */}
+        {/* Active users section */}
         <div className="au-section" style={{ animationDelay: '120ms' }}>
           <div className="au-section-bar active" />
           <div className="au-section-header">
@@ -431,30 +462,33 @@ export default function AdminUsersPage() {
           ) : (
             activeUsers.map((user, i) => (
               <div key={user.id} className="au-row" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="au-avatar active-user">
-                  {user.name?.charAt(0).toUpperCase() ?? '?'}
-                </div>
+                <div className="au-avatar active-user">{user.name?.charAt(0).toUpperCase() ?? '?'}</div>
                 <div className="au-user-info">
                   <div className="au-user-name">{user.name}</div>
                   <div className="au-user-email">{user.email}</div>
                   <div className="au-user-meta">{user.tenant?.name ?? 'No tenant'}</div>
                 </div>
-                <button
-                  className="au-action-btn deactivate"
-                  onClick={() => toggleActive(user.id, user.isActive)}
-                  disabled={processing === user.id}
-                >
-                  {processing === user.id
-                    ? <div className="au-spinner" />
-                    : <XCircle size={14} />
-                  }
-                  <span>Deactivate</span>
-                </button>
+                <div className="au-actions">
+                  <button
+                    className="au-action-btn deactivate"
+                    onClick={() => toggleActive(user.id, user.isActive)}
+                    disabled={processing === user.id}
+                  >
+                    {processing === user.id ? <div className="au-spinner" /> : <XCircle size={14} />}
+                    <span>Deactivate</span>
+                  </button>
+                  <button
+                    className="au-action-btn delete"
+                    onClick={() => deleteUser(user.id, user.name)}
+                    disabled={processing === user.id}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
-
       </div>
     </>
   );

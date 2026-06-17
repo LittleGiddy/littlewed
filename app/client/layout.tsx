@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Menu, X, Info } from 'lucide-react';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -75,15 +76,12 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { path: '/client/staff/dashboard', icon: Home, label: 'Check‑in' },
   ];
 
-  // Reusable sidebar content
   const SidebarContent = () => (
     <div className="flex flex-col h-full p-5">
-      {/* Logo */}
       <div className="mb-8 flex justify-center py-2">
         <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-14 w-auto object-contain" />
       </div>
 
-      {/* User profile */}
       <div className="bg-gray-50 rounded-2xl p-4 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center text-white font-semibold text-base shadow-sm">
@@ -96,7 +94,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
           const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
@@ -105,11 +102,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               key={item.path}
               href={item.path}
               onClick={() => !isLargeScreen && setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${
-                isActive
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-full transition-all duration-200 ${isActive
                   ? 'bg-[#0D4F4F] text-white shadow-md'
                   : 'text-gray-700 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <item.icon className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm font-medium">{item.label}</span>
@@ -118,7 +114,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         })}
       </nav>
 
-      {/* Sign Out – with separator and improved styling */}
       <div className="mt-auto pt-4 border-t border-gray-200">
         <button
           onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
@@ -133,16 +128,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="min-h-screen flex bg-gray-50">
-      {/* Desktop Sidebar */}
       <aside
-        className={`fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed left-0 top-0 h-screen w-72 bg-white shadow-lg z-30 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <SidebarContent />
       </aside>
 
-      {/* Main content */}
       <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-72' : 'ml-0'}`}>
         {/* Top header */}
         <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between shadow-sm">
@@ -159,7 +151,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               className="h-8 w-auto object-contain lg:hidden"
             />
           </div>
+
+          {/* ✅ Notification Bell placed here – visible on all screens */}
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <span className="text-sm text-gray-500 hidden sm:block">{userName}</span>
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#E8A598] flex items-center justify-center text-white text-xs font-semibold">
               {userInitial}
@@ -167,7 +162,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
 
-        {/* Mobile drawer */}
         <AnimatePresence>
           {sidebarOpen && !isLargeScreen && (
             <>
@@ -191,7 +185,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           )}
         </AnimatePresence>
 
-        {/* Page content */}
         <AnimatePresence mode="wait">
           <motion.main
             key={pathname}

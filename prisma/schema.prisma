@@ -19,6 +19,7 @@ model User {
   phone          String?   // optional, for admin use
   emailVerified  DateTime? // null = not verified
   isActive      Boolean  @default(false) // 🔒 new field
+  notifications Notification[]
 }
 
 model VerificationToken {
@@ -145,5 +146,20 @@ model PasswordResetToken {
   email     String
   otp       String
   expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+
+// prisma/schema.prisma
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String?
+  type      String   // "info", "warning", "success", "alert"
+  isRead    Boolean  @default(false)
+  link      String?  // optional URL to navigate to
   createdAt DateTime @default(now())
 }

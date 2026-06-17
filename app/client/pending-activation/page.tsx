@@ -51,7 +51,7 @@ export default function PendingActivationPage() {
               <AlertCircle className="w-4 h-4 text-amber-600" />
             </div>
             <p className="text-sm text-amber-700">
-              You'll receive an email notification at the address above once your account has been activated.
+              You&apos;ll be notified once your account has been activated.
             </p>
           </div>
 

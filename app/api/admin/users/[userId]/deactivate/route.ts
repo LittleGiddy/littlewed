@@ -8,11 +8,6 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  
-  // Log session for debugging
-  console.log('Session in deactivate route:', session);
-  console.log('User role:', (session?.user as any)?.role);
-
   if (!session || (session.user as any).role !== 'SUPER_ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -23,6 +18,16 @@ export async function PATCH(
     where: { id: userId },
     data: { isActive: false },
     select: { name: true, email: true },
+  });
+
+  // ✅ Create notification for the user
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: 'Account Deactivated',
+      message: `Your account has been deactivated by an administrator. Please contact support if you believe this is a mistake.`,
+      type: 'alert',
+    },
   });
 
   return NextResponse.json(user);

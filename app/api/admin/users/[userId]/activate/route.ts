@@ -14,10 +14,21 @@ export async function PATCH(
 
   const { userId } = await params;
 
+  // Update the user
   const user = await prisma.user.update({
     where: { id: userId },
     data: { isActive: true },
     select: { name: true, email: true },
+  });
+
+  // ✅ Create notification for the user
+  await prisma.notification.create({
+    data: {
+      userId,
+      title: 'Account Activated',
+      message: `Your account has been activated by an administrator. You can now log in and create events.`,
+      type: 'success',
+    },
   });
 
   return NextResponse.json(user);
