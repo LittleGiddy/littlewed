@@ -14,9 +14,12 @@ export default function LoginPage() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (!email || !password) { setError('Please enter both email and password.'); return; }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -121,12 +124,10 @@ export default function LoginPage() {
           50%      { transform: translate(-15px,15px) scale(1.08); }
         }
 
-        /* Logo wrapper on desktop left panel */
         .left-logo {
           position: relative;
           z-index: 2;
           animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
-          /* Give it breathing room without affecting siblings */
           display: flex;
           align-items: flex-start;
         }
@@ -191,7 +192,6 @@ export default function LoginPage() {
 
         .right-inner { width: 100%; max-width: 460px; }
 
-        /* ── Card ── */
         .card {
           background: white; border-radius: 24px; overflow: hidden;
           box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.07), 0 24px 48px rgba(0,0,0,0.05);
@@ -205,7 +205,6 @@ export default function LoginPage() {
 
         .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
 
-        /* ── Mobile hero ── */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -224,7 +223,6 @@ export default function LoginPage() {
           animation: floatA 8s ease-in-out infinite;
         }
 
-        /* Mobile logo wrapper — sized to feel prominent */
         .mobile-logo {
           position: relative;
           z-index: 1;
@@ -260,7 +258,6 @@ export default function LoginPage() {
         }
         .mobile-feat-pill svg { color: #E8A598; flex-shrink: 0; }
 
-        /* Form body */
         .form-body { padding: 36px 36px 32px; }
 
         .eyebrow {
@@ -273,7 +270,6 @@ export default function LoginPage() {
         }
         .form-sub { font-size: 13.5px; color: #7A8FA6; margin-bottom: 28px; line-height: 1.5; }
 
-        /* Fields */
         .field { position: relative; margin-bottom: 18px; }
         .flabel {
           position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
@@ -308,7 +304,6 @@ export default function LoginPage() {
         }
         .forgot:hover { opacity: 0.65; }
 
-        /* Error */
         .err-box {
           background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
           padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
@@ -322,7 +317,6 @@ export default function LoginPage() {
           80%      { transform: translateX(-3px); }
         }
 
-        /* Button */
         .btn {
           width: 100%; padding: 15px; border: none; border-radius: 13px;
           background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
@@ -349,14 +343,12 @@ export default function LoginPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Divider */
         .divider {
           display: flex; align-items: center; gap: 10px;
           margin: 20px 0 0; color: #C8D4DE; font-size: 11.5px; font-weight: 600;
         }
         .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #EEF2F6; }
 
-        /* Footer */
         .card-footer {
           text-align: center; font-size: 13px; color: #7A8FA6;
           padding: 16px 36px 28px;
@@ -364,45 +356,28 @@ export default function LoginPage() {
         .card-footer a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
         .card-footer a:hover { text-decoration: underline; }
 
-        /* ── Mobile ── */
         @media (max-width: 768px) {
           .left { display: none; }
-
-          .right {
-            padding: 0;
-            background: #F0F4F8;
-            align-items: flex-start;
-          }
-
+          .right { padding: 0; background: #F0F4F8; align-items: flex-start; }
           .right-inner { max-width: 100%; }
-
-          .card {
-            border-radius: 0 0 28px 28px;
-            animation: cardInMobile 0.65s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-          }
-
+          .card { border-radius: 0 0 28px 28px; animation: cardInMobile 0.65s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
           @keyframes cardInMobile {
             from { opacity: 0; transform: translateY(-20px); }
             to   { opacity: 1; transform: translateY(0); }
           }
-
           .mobile-hero { display: flex; }
           .card-bar { display: none; }
-
           .form-body { padding: 28px 24px 24px; }
           .form-title { font-size: 22px; }
           .card-footer { padding: 12px 24px 24px; }
-
           .mobile-bottom {
             padding: 24px 20px 32px;
             display: flex; flex-direction: column; gap: 10px;
           }
-
           .mobile-bottom-feat {
             display: flex; align-items: center; gap: 10px;
             color: #4A6072; font-size: 13px; font-weight: 500;
           }
-
           .mobile-bottom-dot {
             width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
             background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
@@ -416,47 +391,31 @@ export default function LoginPage() {
       `}</style>
 
       <div className="page">
-        {/* ── Desktop left panel ── */}
+        {/* Left panel (desktop) */}
         <div className="left">
-          <div className="left-logo">
-            <Logo />
-          </div>
-
+          <div className="left-logo"><Logo /></div>
           <div className="left-copy">
-            <div className="tagline">
-              Welcome<br /><span>back.</span>
-            </div>
-            <p className="tagline-sub">
-              Sign in to manage your events, guests, and invitations — all in one place.
-            </p>
+            <div className="tagline">Welcome<br /><span>back.</span></div>
+            <p className="tagline-sub">Sign in to manage your events, guests, and invitations — all in one place.</p>
           </div>
-
           <div className="features">
             {features.map(({ icon, label }) => (
               <div className="feat" key={label}>
-                <div className="feat-dot">{icon}</div>
-                <span>{label}</span>
+                <div className="feat-dot">{icon}</div><span>{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Right panel ── */}
+        {/* Right panel */}
         <div className="right">
           <div className="right-inner">
             <div className="card">
-
               {/* Mobile hero */}
               <div className="mobile-hero">
-                <div className="mobile-logo">
-                  <Logo size="mobile" />
-                </div>
-                <div className="mobile-tagline">
-                  Welcome <span>back.</span>
-                </div>
-                <p className="mobile-sub">
-                  Sign in to manage your events, guests, and invitations.
-                </p>
+                <div className="mobile-logo"><Logo size="mobile" /></div>
+                <div className="mobile-tagline">Welcome <span>back.</span></div>
+                <p className="mobile-sub">Sign in to manage your events, guests, and invitations.</p>
                 <div className="mobile-features">
                   {features.map(({ icon, label }) => (
                     <div className="mobile-feat-pill" key={label}>
@@ -466,7 +425,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Desktop top bar */}
               <div className="card-bar" />
 
               <div className="form-body">
@@ -475,12 +433,11 @@ export default function LoginPage() {
                 <p className="form-sub">Enter your credentials to access your dashboard.</p>
 
                 {error && (
-                  <div className="err-box">
-                    <span>⚠️</span><span>{error}</span>
-                  </div>
+                  <div className="err-box"><span>⚠️</span><span>{error}</span></div>
                 )}
 
-                <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Enter') handleSubmit(e); }} noValidate>
+                {/* ✅ FIXED: Use onSubmit on form, button type="submit" */}
+                <form onSubmit={handleSubmit} noValidate>
                   <div className="field">
                     <label className={`flabel ${emailFocused || email ? 'up' : ''}`} htmlFor="email">
                       Email address
@@ -520,7 +477,7 @@ export default function LoginPage() {
                     Forgot password?
                   </Link>
 
-                  <button type="button" className="btn" disabled={loading} onClick={handleSubmit}>
+                  <button type="submit" className="btn" disabled={loading}>
                     {loading
                       ? <><div className="spinner" /> Signing in…</>
                       : <>Sign In <ArrowRight size={16} /></>
@@ -536,12 +493,10 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Mobile bottom features */}
             <div className="mobile-bottom">
               {features.map(({ icon, label }) => (
                 <div className="mobile-bottom-feat" key={label}>
-                  <div className="mobile-bottom-dot">{icon}</div>
-                  <span>{label}</span>
+                  <div className="mobile-bottom-dot">{icon}</div><span>{label}</span>
                 </div>
               ))}
             </div>

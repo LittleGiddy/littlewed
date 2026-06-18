@@ -11,10 +11,27 @@ export async function GET(
   try {
     const guests = await prisma.guest.findMany({
       where: { eventId },
-      select: { id: true, name: true, phone: true, invitationCard: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        invitationCard: true,
+        checkedIn: true,        // ✅ Add this field
+        routingChannel: true,   // ✅ Add for completeness (used in UI)
+        attending: true,        // ✅ Add for completeness
+      },
+      orderBy: { name: 'asc' },
     });
     console.log('Found guests:', guests.length);
-    return NextResponse.json(guests);
+
+    // ✅ Prevent caching so the staff dashboard always gets fresh data
+    return NextResponse.json(guests, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   } catch (error) {
     console.error('Error fetching guests:', error);
     return NextResponse.json({ error: 'Database error' }, { status: 500 });

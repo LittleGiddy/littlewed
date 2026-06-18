@@ -28,7 +28,7 @@ export const authOptions: NextAuthOptions = {
           tenantId: user.tenantId,
           tenant: user.tenant,
           subscriptionStatus: user.tenant?.subscriptionStatus ?? 'inactive',
-          isActive: user.isActive, // ✅ add this
+          isActive: user.isActive,
         } as any;
       },
     }),
@@ -41,7 +41,7 @@ export const authOptions: NextAuthOptions = {
         token.tenantId = (user as any).tenantId;
         token.tenant = (user as any).tenant;
         token.subscriptionStatus = (user as any).subscriptionStatus;
-        token.isActive = (user as any).isActive; // ✅ add this
+        token.isActive = (user as any).isActive;
       }
       return token;
     },
@@ -52,14 +52,13 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).tenantId = token.tenantId;
         (session.user as any).tenant = token.tenant;
         (session.user as any).subscriptionStatus = token.subscriptionStatus;
-        (session.user as any).isActive = token.isActive; // ✅ add this
+        (session.user as any).isActive = token.isActive;
       }
       return session;
     },
     async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) return url;
       if (url.startsWith('/')) return `${baseUrl}${url}`;
-      return `${baseUrl}/client/dashboard`;
+      return baseUrl;
     },
   },
   pages: { signIn: '/login' },
@@ -72,7 +71,12 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        // ✅ For ngrok (HTTPS), we need secure: true
+        secure: process.env.NEXTAUTH_URL?.startsWith('https://') || false,
+        // ✅ Explicitly set the domain to the current host (without scheme)
+        domain: process.env.NEXTAUTH_URL
+          ? new URL(process.env.NEXTAUTH_URL).hostname
+          : undefined,
       },
     },
   },

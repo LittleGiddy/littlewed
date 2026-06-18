@@ -13,6 +13,7 @@ export default function ManageTenantPage() {
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [bypassLoading, setBypassLoading] = useState(false);
+  const [testModeLoading, setTestModeLoading] = useState(false); // ✅ added
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -72,6 +73,28 @@ export default function ManageTenantPage() {
       setError(err.error || 'Failed to update bypass setting');
     }
     setBypassLoading(false);
+  };
+
+  // ✅ Test mode toggle
+  const toggleTestMode = async () => {
+    setTestModeLoading(true);
+    setError('');
+    setSuccess('');
+    const newTestMode = !tenant.testMode;
+    const res = await fetch(`/api/admin/tenants/${id}/test-mode`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testMode: newTestMode }),
+      credentials: 'include',
+    });
+    if (res.ok) {
+      setTenant({ ...tenant, testMode: newTestMode });
+      setSuccess(`Test mode ${newTestMode ? 'enabled' : 'disabled'} for this tenant`);
+    } else {
+      const err = await res.json();
+      setError(err.error || 'Failed to update test mode');
+    }
+    setTestModeLoading(false);
   };
 
   const addEventCredits = async () => {
@@ -171,7 +194,40 @@ export default function ManageTenantPage() {
             </div>
           </motion.div>
 
-          {/* Bypass Payment Card */}
+          {/* Test Mode Card */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]">
+                  <Shield size={20} />
+                </div>
+                <h2 className="font-serif text-xl font-bold text-gray-800">Test Mode</h2>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                  <span className="text-gray-500 text-sm">Card preview & test check‑in</span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.testMode ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {tenant.testMode ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                    {tenant.testMode ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <button
+                  onClick={toggleTestMode}
+                  disabled={testModeLoading}
+                  className="w-full py-2.5 rounded-xl font-semibold text-sm transition bg-[#0D4F4F] hover:bg-[#0A3D3D] text-white shadow-md"
+                >
+                  {testModeLoading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto" /> : tenant.testMode ? 'Disable Test Mode' : 'Enable Test Mode'}
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  When enabled, tenants can preview guest cards and test check‑in without sending real invitations.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Bypass Payment Card */}
+        <div className="grid md:grid-cols-2 gap-6 mt-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">

@@ -16,17 +16,28 @@ interface Guest {
   attending: string;
 }
 
+interface EventData {
+  id: string;
+  name: string;
+  date: string;
+  venue: string;
+  address: string;
+  commission_paid: boolean;
+  tenant: {
+    testMode: boolean;
+  };
+}
+
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [eventId, setEventId] = useState<string | null>(null);
-  const [event, setEvent] = useState<any>(null);
+  const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  // Resolve params and fetch data
   useEffect(() => {
     params.then(({ id }) => {
       setEventId(id);
@@ -329,6 +340,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
                       )}
                     </div>
+                    {/* ✅ Preview Card link (only when test mode is enabled) */}
+                    {event.tenant?.testMode && (
+                      <Link
+                        href={`/invite/preview/${guest.id}`}
+                        target="_blank"
+                        className="text-xs text-[#0D4F4F] hover:underline font-medium ml-2"
+                      >
+                        Preview Card
+                      </Link>
+                    )}
                     <button
                       onClick={() => deleteGuest(guest.id)}
                       className="text-gray-400 hover:text-red-500 transition"

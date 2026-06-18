@@ -49,6 +49,7 @@ model Tenant {
   qrPlacementX       Float?
   qrPlacementY       Float?
   qrSize             Int?
+  testMode Boolean @default(false)
 
   users              User[]
   events             Event[]

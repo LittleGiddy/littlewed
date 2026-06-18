@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-// GET /api/events/[eventId] – fetch event details and guests
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
@@ -30,6 +29,11 @@ export async function GET(
         },
         orderBy: { name: 'asc' },
       },
+      tenant: {
+        select: {
+          testMode: true, // ✅ include testMode
+        },
+      },
     },
   });
 
@@ -41,7 +45,6 @@ export async function GET(
   return NextResponse.json({ event: eventData, guests });
 }
 
-// DELETE /api/events/[eventId] – delete event
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
