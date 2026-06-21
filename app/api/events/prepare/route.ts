@@ -70,10 +70,17 @@ export async function POST(req: NextRequest) {
 
   if (!clickpesaApiKey || !clickpesaSecret) {
     console.error('Missing ClickPesa credentials');
+    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 });
   }
 
-  const payload = {
+  // Try multiple possible endpoints
+  const endpoints = ['/checkout/create', '/payment/checkout/initiate', '/checkout'];
+  let checkoutUrl = null;
+  let lastError = null;
+
+  // Build base payload
+  const basePayload = {
     amount: commission,
     currency: 'TZS',
     customer_email: (session.user as any).email || 'customer@example.com',
@@ -85,32 +92,54 @@ export async function POST(req: NextRequest) {
     metadata: { pendingId: pending.id },
   };
 
-  try {
-    const response = await fetch(`${baseUrl}/checkout/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${clickpesaApiKey}`,
-        'X-Secret': clickpesaSecret,
-      },
-      body: JSON.stringify(payload),
-    });
+  for (const endpoint of endpoints) {
+    const url = `${baseUrl}${endpoint}`;
+    console.log(`Trying ClickPesa endpoint: ${url}`);
 
-    const data = await response.json();
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${clickpesaApiKey}`,
+          'X-Secret': clickpesaSecret,
+        },
+        body: JSON.stringify(basePayload),
+      });
 
-    if (!response.ok) {
-      console.error('ClickPesa error:', data);
-      await prisma.pendingEvent.delete({ where: { id: pending.id } });
-      return NextResponse.json({ error: 'Payment gateway error: ' + (data.message || 'Unknown') }, { status: 500 });
+      const data = await response.json();
+
+      console.log(`ClickPesa response status: ${response.status}`);
+      console.log(`ClickPesa response body:`, JSON.stringify(data, null, 2));
+
+      if (!response.ok) {
+        console.error(`ClickPesa error at ${endpoint}:`, data);
+        lastError = data;
+        continue; // try next endpoint
+      }
+
+      // Try to extract checkout URL
+      checkoutUrl = data.checkout_url || data.redirect_url || data.data?.checkout_url || data.url || data.payment_url;
+      if (checkoutUrl) {
+        console.log(`✅ Checkout URL found from ${endpoint}: ${checkoutUrl}`);
+        break;
+      }
+      console.warn(`⚠️ No checkout URL in response from ${endpoint}`);
+    } catch (err) {
+      console.error(`Request failed for ${endpoint}:`, err);
+      lastError = err;
     }
-
-    const checkoutUrl = data.checkout_url || data.redirect_url || data.data?.checkout_url;
-    if (!checkoutUrl) throw new Error('No checkout URL returned from ClickPesa');
-
-    return NextResponse.json({ checkoutUrl });
-  } catch (error) {
-    console.error('ClickPesa request failed:', error);
-    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
-    return NextResponse.json({ error: 'Failed to initiate payment' }, { status: 500 });
   }
+
+  // If no checkout URL was found, clean up and return error
+  if (!checkoutUrl) {
+    console.error('All ClickPesa endpoints failed.');
+    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    return NextResponse.json(
+      { error: 'Failed to initiate payment: no checkout URL. Check logs for details.' },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ checkoutUrl });
 }
