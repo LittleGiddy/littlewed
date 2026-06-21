@@ -5,6 +5,27 @@ import { prisma } from '@/lib/prisma';
 
 const COMMISSION_PER_GUEST = 300; // TZS per guest
 
+// ─── ClickPesa: exchange client-id + api-key for a short-lived JWT ───────────
+async function getClickPesaToken(clientId: string, apiKey: string): Promise<string> {
+  const res = await fetch('https://api.clickpesa.com/third-parties/generate-token', {
+    method: 'POST',
+    headers: {
+      'client-id': clientId,
+      'api-key': apiKey,
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok || !data.token) {
+    console.error('ClickPesa token generation failed:', data);
+    throw new Error(data.message || 'Failed to generate ClickPesa auth token');
+  }
+
+  // data.token already includes the "Bearer " prefix per ClickPesa docs
+  return data.token;
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
@@ -44,11 +65,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // 2. NORMAL PAYMENT FLOW – ClickPesa checkout
+  // 2. NORMAL PAYMENT FLOW – ClickPesa hosted checkout
   // ─────────────────────────────────────────────────────────────────
   const commission = guestCount * COMMISSION_PER_GUEST;
 
-  // Create pending event
+  // Create pending event first (so we have an ID for the order reference)
   const pending = await prisma.pendingEvent.create({
     data: {
       name,
@@ -63,98 +84,97 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // ClickPesa configuration
-  const clickpesaApiKey = process.env.CLICKPESA_API_KEY;
-  const clickpesaSecret = process.env.CLICKPESA_SECRET;
-  const baseUrl = process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com';
+  // Validate credentials
+  const clientId = process.env.CLICKPESA_CLIENT_ID;
+  const apiKey = process.env.CLICKPESA_API_KEY;
 
-  if (!clickpesaApiKey || !clickpesaSecret) {
-    console.error('Missing ClickPesa credentials');
+  if (!clientId || !apiKey) {
+    console.error('Missing ClickPesa credentials (CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY)');
     await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 });
   }
 
+  // Step 1: Get JWT token
+  let jwtToken: string;
+  try {
+    jwtToken = await getClickPesaToken(clientId, apiKey);
+  } catch (err: any) {
+    console.error('ClickPesa auth error:', err.message);
+    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    return NextResponse.json(
+      { error: `Payment gateway auth failed: ${err.message}` },
+      { status: 500 }
+    );
+  }
+
   const user = session.user as any;
-  // Build the correct payload for ClickPesa
+
+  // ClickPesa requires phone WITHOUT the leading '+' (e.g. 255712345678)
+  const rawPhone: string = (user.phone || '255712345678').replace(/^\+/, '');
+
+  // Order reference must be alphanumeric only (no underscores or hyphens)
+  const orderReference = `event${pending.id.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+  // Step 2: Generate checkout link using the JWT
   const payload = {
     totalPrice: commission.toString(),
-    orderReference: `event_${pending.id}`,
+    orderReference,
+    orderCurrency: 'TZS',                        // ← required field, was missing
     customerName: user.name || 'Event Organizer',
     customerEmail: user.email || 'customer@example.com',
-    customerPhone: user.phone || '+255712345678', // Ensure this field exists on your User model
+    customerPhone: rawPhone,                       // ← no '+' prefix
     description: `Commission for event: ${name}`,
     callbackUrl: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
   };
 
-  // Try multiple possible endpoints (correct one first, fallback for older versions)
-  const endpoints = [
-    {
-      url: `${baseUrl}/third-parties/checkout-link/generate-checkout-url`,
-      payload: payload,
-    },
-    {
-      url: `${baseUrl}/v1/checkout/create`,
-      payload: {
-        amount: commission,
-        currency: 'TZS',
-        customer_email: user.email || 'customer@example.com',
-        customer_name: user.name || 'Event Organizer',
-        reference: `event_${pending.id}`,
-        callback_url: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
-        redirect_url: `${process.env.NEXTAUTH_URL}/client/dashboard`,
-        cancel_url: `${process.env.NEXTAUTH_URL}/client/events/new`,
-        metadata: { pendingId: pending.id },
-      },
-    },
-  ];
+  console.log('ClickPesa checkout payload:', JSON.stringify(payload, null, 2));
 
-  let checkoutUrl = null;
-  let lastError = null;
+  let checkoutUrl: string | null = null;
 
-  for (const endpoint of endpoints) {
-    console.log(`Trying ClickPesa endpoint: ${endpoint.url}`);
-
-    try {
-      const response = await fetch(endpoint.url, {
+  try {
+    const response = await fetch(
+      'https://api.clickpesa.com/third-parties/checkout-link/generate-checkout-url',
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${clickpesaApiKey}`,
-          'X-Secret': clickpesaSecret,
+          // JWT token from step 1 already contains "Bearer " prefix
+          'Authorization': jwtToken,
         },
-        body: JSON.stringify(endpoint.payload),
-      });
-
-      const data = await response.json();
-
-      console.log(`ClickPesa response status: ${response.status}`);
-      console.log(`ClickPesa response body:`, JSON.stringify(data, null, 2));
-
-      if (!response.ok) {
-        console.error(`ClickPesa error at ${endpoint.url}:`, data);
-        lastError = data;
-        continue; // try next endpoint
+        body: JSON.stringify(payload),
       }
+    );
 
-      // Try to extract checkout URL from the correct response field
-      checkoutUrl = data.checkoutLink || data.checkout_url || data.redirect_url || data.data?.checkout_url || data.url || data.payment_url;
-      if (checkoutUrl) {
-        console.log(`✅ Checkout URL found from ${endpoint.url}: ${checkoutUrl}`);
-        break;
-      }
-      console.warn(`⚠️ No checkout URL in response from ${endpoint.url}`);
-    } catch (err) {
-      console.error(`Request failed for ${endpoint.url}:`, err);
-      lastError = err;
+    const data = await response.json();
+
+    console.log('ClickPesa checkout response status:', response.status);
+    console.log('ClickPesa checkout response body:', JSON.stringify(data, null, 2));
+
+    if (!response.ok) {
+      console.error('ClickPesa checkout error:', data);
+      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+      return NextResponse.json(
+        { error: data.message || 'Payment initiation failed' },
+        { status: response.status }
+      );
     }
-  }
 
-  // If no checkout URL was found, clean up and return error
-  if (!checkoutUrl) {
-    console.error('All ClickPesa endpoints failed. Last error:', lastError);
+    // Per ClickPesa docs the response field is `checkoutLink`
+    checkoutUrl = data.checkoutLink ?? null;
+
+    if (!checkoutUrl) {
+      console.error('No checkoutLink in ClickPesa response:', data);
+      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+      return NextResponse.json(
+        { error: 'Payment gateway returned no checkout URL' },
+        { status: 500 }
+      );
+    }
+  } catch (err: any) {
+    console.error('ClickPesa request failed:', err);
     await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
     return NextResponse.json(
-      { error: 'Failed to initiate payment: no checkout URL. Check logs for details.' },
+      { error: 'Network error contacting payment gateway' },
       { status: 500 }
     );
   }
