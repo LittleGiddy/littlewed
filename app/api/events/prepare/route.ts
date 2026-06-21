@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   // ClickPesa configuration
   const clickpesaApiKey = process.env.CLICKPESA_API_KEY;
   const clickpesaSecret = process.env.CLICKPESA_SECRET;
-  const baseUrl = process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com/v1';
+  const baseUrl = process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com';
 
   if (!clickpesaApiKey || !clickpesaSecret) {
     console.error('Missing ClickPesa credentials');
@@ -74,69 +74,90 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 });
   }
 
-  // Build base payload
-  const basePayload = {
-    amount: commission,
-    currency: 'TZS',
-    customer_email: (session.user as any).email || 'customer@example.com',
-    customer_name: (session.user as any).name || 'Event Organizer',
-    reference: `event_${pending.id}`,
-    callback_url: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
-    redirect_url: `${process.env.NEXTAUTH_URL}/client/dashboard`,
-    cancel_url: `${process.env.NEXTAUTH_URL}/client/events/new`,
-    metadata: { pendingId: pending.id },
+  const user = session.user as any;
+  // Build the correct payload for ClickPesa
+  const payload = {
+    totalPrice: commission.toString(),
+    orderReference: `event_${pending.id}`,
+    customerName: user.name || 'Event Organizer',
+    customerEmail: user.email || 'customer@example.com',
+    customerPhone: user.phone || '+255712345678', // Ensure this field exists on your User model
+    description: `Commission for event: ${name}`,
+    callbackUrl: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
   };
 
-  // Try the main endpoint first
-  const endpoint = '/checkout/create';
-  const url = `${baseUrl}${endpoint}`;
-  console.log(`Trying ClickPesa endpoint: ${url}`);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${clickpesaApiKey}`,
-        'X-Secret': clickpesaSecret,
+  // Try multiple possible endpoints (correct one first, fallback for older versions)
+  const endpoints = [
+    {
+      url: `${baseUrl}/third-parties/checkout-link/generate-checkout-url`,
+      payload: payload,
+    },
+    {
+      url: `${baseUrl}/v1/checkout/create`,
+      payload: {
+        amount: commission,
+        currency: 'TZS',
+        customer_email: user.email || 'customer@example.com',
+        customer_name: user.name || 'Event Organizer',
+        reference: `event_${pending.id}`,
+        callback_url: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
+        redirect_url: `${process.env.NEXTAUTH_URL}/client/dashboard`,
+        cancel_url: `${process.env.NEXTAUTH_URL}/client/events/new`,
+        metadata: { pendingId: pending.id },
       },
-      body: JSON.stringify(basePayload),
-    });
+    },
+  ];
 
-    const data = await response.json();
+  let checkoutUrl = null;
+  let lastError = null;
 
-    console.log(`ClickPesa response status: ${response.status}`);
-    console.log(`ClickPesa response body:`, JSON.stringify(data, null, 2));
+  for (const endpoint of endpoints) {
+    console.log(`Trying ClickPesa endpoint: ${endpoint.url}`);
 
-    if (!response.ok) {
-      console.error('ClickPesa error:', data);
-      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
-      // 🔍 Return the error details from ClickPesa
-      return NextResponse.json({
-        error: 'ClickPesa error',
-        details: data,
-        status: response.status,
-      }, { status: 500 });
+    try {
+      const response = await fetch(endpoint.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${clickpesaApiKey}`,
+          'X-Secret': clickpesaSecret,
+        },
+        body: JSON.stringify(endpoint.payload),
+      });
+
+      const data = await response.json();
+
+      console.log(`ClickPesa response status: ${response.status}`);
+      console.log(`ClickPesa response body:`, JSON.stringify(data, null, 2));
+
+      if (!response.ok) {
+        console.error(`ClickPesa error at ${endpoint.url}:`, data);
+        lastError = data;
+        continue; // try next endpoint
+      }
+
+      // Try to extract checkout URL from the correct response field
+      checkoutUrl = data.checkoutLink || data.checkout_url || data.redirect_url || data.data?.checkout_url || data.url || data.payment_url;
+      if (checkoutUrl) {
+        console.log(`✅ Checkout URL found from ${endpoint.url}: ${checkoutUrl}`);
+        break;
+      }
+      console.warn(`⚠️ No checkout URL in response from ${endpoint.url}`);
+    } catch (err) {
+      console.error(`Request failed for ${endpoint.url}:`, err);
+      lastError = err;
     }
-
-    // Try to extract checkout URL
-    const checkoutUrl = data.checkout_url || data.redirect_url || data.data?.checkout_url || data.url || data.payment_url;
-    if (!checkoutUrl) {
-      // 🔍 Return the full response so you can see what fields are present
-      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
-      return NextResponse.json({
-        error: 'No checkout URL returned from ClickPesa',
-        response: data,
-      }, { status: 500 });
-    }
-
-    return NextResponse.json({ checkoutUrl });
-  } catch (error: any) {
-    console.error('ClickPesa request failed:', error);
-    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
-    return NextResponse.json({
-      error: 'Failed to initiate payment',
-      message: error.message,
-    }, { status: 500 });
   }
+
+  // If no checkout URL was found, clean up and return error
+  if (!checkoutUrl) {
+    console.error('All ClickPesa endpoints failed. Last error:', lastError);
+    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    return NextResponse.json(
+      { error: 'Failed to initiate payment: no checkout URL. Check logs for details.' },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ checkoutUrl });
 }
