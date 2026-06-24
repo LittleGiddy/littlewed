@@ -13,7 +13,7 @@ export default function ManageTenantPage() {
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
   const [bypassLoading, setBypassLoading] = useState(false);
-  const [testModeLoading, setTestModeLoading] = useState(false); // ✅ added
+  const [testModeLoading, setTestModeLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -75,7 +75,6 @@ export default function ManageTenantPage() {
     setBypassLoading(false);
   };
 
-  // ✅ Test mode toggle
   const toggleTestMode = async () => {
     setTestModeLoading(true);
     setError('');
@@ -97,10 +96,10 @@ export default function ManageTenantPage() {
     setTestModeLoading(false);
   };
 
-  const addEventCredits = async () => {
+  const addCredits = async () => {
     const amount = parseInt(creditAmount);
     if (isNaN(amount) || amount <= 0) {
-      setError('Please enter a valid number of event credits');
+      setError('Please enter a valid number of credits');
       return;
     }
     setLoading(true);
@@ -115,7 +114,7 @@ export default function ManageTenantPage() {
     if (res.ok) {
       setTenant({ ...tenant, credits: (tenant.credits || 0) + amount });
       setCreditAmount('');
-      setSuccess(`Added ${amount} event credits`);
+      setSuccess(`Added ${amount} credits`);
     } else {
       const err = await res.json();
       setError(err.error || 'Failed to add credits');
@@ -156,7 +155,7 @@ export default function ManageTenantPage() {
         <div className="mb-8">
           <div className="text-[11px] font-bold tracking-wider text-[#0D4F4F] uppercase mb-2">Super Admin</div>
           <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900">Manage <span className="text-[#0D4F4F]">{tenant.name}</span></h1>
-          <p className="text-gray-500 text-sm mt-2">Subscription, bypass payment, and event credits</p>
+          <p className="text-gray-500 text-sm mt-2">Subscription, bypass payment, and credits</p>
         </div>
 
         {error && (
@@ -251,12 +250,12 @@ export default function ManageTenantPage() {
           </motion.div>
         </div>
 
-        {/* Event Credits Card */}
+        {/* Credits Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><Calendar size={20} /></div>
-              <h2 className="font-serif text-xl font-bold text-gray-800">Event Credits</h2>
+              <h2 className="font-serif text-xl font-bold text-gray-800">Credits</h2>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -264,12 +263,24 @@ export default function ManageTenantPage() {
                 <span className="text-2xl font-bold text-[#0D4F4F]">{tenant.credits ?? 0}</span>
               </div>
               <div className="flex gap-2">
-                <input type="number" value={creditAmount} onChange={e => setCreditAmount(e.target.value)} placeholder="Number of credits" className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]/20 focus:border-[#0D4F4F]" />
-                <button onClick={addEventCredits} disabled={loading} className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2">
+                <input
+                  type="number"
+                  value={creditAmount}
+                  onChange={e => setCreditAmount(e.target.value)}
+                  placeholder="Number of credits"
+                  className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]/20 focus:border-[#0D4F4F]"
+                />
+                <button
+                  onClick={addCredits}
+                  disabled={loading}
+                  className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2"
+                >
                   {loading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <><PlusCircle size={16} /> Add</>}
                 </button>
               </div>
-              <p className="text-xs text-gray-400">Each credit allows one event (if bypass is disabled, credits are used). Credits are optional when bypass is enabled.</p>
+              <p className="text-xs text-gray-400">
+                Each credit represents one guest slot (300 TZS). Credits are used when adding guests beyond the initial event guest limit.
+              </p>
             </div>
           </div>
         </motion.div>
