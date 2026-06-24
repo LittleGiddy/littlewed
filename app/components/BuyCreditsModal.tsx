@@ -1,6 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -8,18 +7,18 @@ interface BuyCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentCredits?: number;
+  requiredCredits?: number; // new
 }
 
 const PRESET_AMOUNTS = [300, 600, 1000, 3000];
 
-export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0 }: BuyCreditsModalProps) {
-  const [amount, setAmount] = useState(300);
-  const [loading, setLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
+export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0, requiredCredits = 0 }: BuyCreditsModalProps) {
+  const initialAmount = requiredCredits > 0 && currentCredits !== undefined
+    ? Math.max(300, (requiredCredits - currentCredits) * 300)
+    : 300;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [amount, setAmount] = useState(initialAmount);
+  const [loading, setLoading] = useState(false);
 
   const handlePurchase = async () => {
     if (amount < 300) {
@@ -47,15 +46,12 @@ export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0 }:
     }
   };
 
-  if (!mounted || !isOpen) return null;
+  if (!isOpen) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
-        >
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
           <X size={20} />
         </button>
         <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Purchase Credits</h2>
@@ -64,6 +60,9 @@ export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0 }:
         </p>
         <p className="text-sm text-gray-500 mb-4">
           Current balance: <span className="font-bold text-[#0D4F4F]">{currentCredits} credits</span>
+          {requiredCredits > 0 && currentCredits < requiredCredits && (
+            <span className="block text-amber-600">You need {requiredCredits - currentCredits} more credits</span>
+          )}
         </p>
 
         <div className="mb-4">
@@ -111,7 +110,6 @@ export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0 }:
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }

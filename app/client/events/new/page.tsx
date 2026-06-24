@@ -1,8 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CreditCard, Coins } from 'lucide-react';
+import toast from 'react-hot-toast';
+import BuyCreditsModal from '@/app/components/BuyCreditsModal';
+
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -16,10 +19,25 @@ export default function NewEventPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [requiredCredits, setRequiredCredits] = useState(0);
 
   const guestCount = parseInt(form.guestCount, 10) || 0;
   const commissionPerGuest = 300;
   const totalCommission = guestCount * commissionPerGuest;
+
+  // Fetch tenant credits
+  useEffect(() => {
+    fetch('/api/tenant/billing', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.tenant?.credits !== undefined) {
+          setCredits(data.tenant.credits);
+        }
+      })
+      .catch(() => console.error('Failed to fetch credits'));
+  }, []);
 
   const isLabelUp = (fieldName: string) => {
     if (focused === fieldName) return true;
@@ -27,6 +45,7 @@ export default function NewEventPage() {
     return value !== undefined && value !== null && value !== '';
   };
 
+  // Standard payment flow (existing)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -46,12 +65,9 @@ export default function NewEventPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        // ✅ Bypass mode – event created immediately
         if (data.eventId) {
           router.push(`/client/events/${data.eventId}`);
-        }
-        // ✅ Normal payment flow – redirect to ClickPesa checkout
-        else if (data.checkoutUrl) {
+        } else if (data.checkoutUrl) {
           window.location.href = data.checkoutUrl;
         } else {
           setError('Unexpected response from server');
@@ -62,6 +78,43 @@ export default function NewEventPage() {
     } catch {
       setError('Network error. Please try again.');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // Credit-based creation
+  const handleCreateWithCredits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/events/create-with-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: form.name,
+          date: form.date,
+          venue: form.venue,
+          address: form.address,
+          guestCount: parseInt(form.guestCount, 10),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.eventId) {
+        toast.success(`Event created using ${data.creditsUsed} credits`);
+        router.push(`/client/events/${data.eventId}`);
+      } else if (res.status === 400 && data.error === 'Insufficient credits') {
+        // Show buy modal
+        setRequiredCredits(data.required);
+        setShowBuyModal(true);
+        setLoading(false);
+      } else {
+        setError(data.error || 'Failed to create event');
+        setLoading(false);
+      }
+    } catch {
+      setError('Network error. Please try again.');
       setLoading(false);
     }
   };
@@ -137,7 +190,6 @@ export default function NewEventPage() {
           padding: 28px;
         }
 
-        /* Form fields */
         .field-wrap {
           position: relative;
           margin-bottom: 20px;
@@ -360,11 +412,9 @@ export default function NewEventPage() {
 
       <div style={{ marginBottom: 28 }}>
         <div className="page-eyebrow">Create</div>
-        <h1 className="page-title">
-          New <span>Event</span>
-        </h1>
+        <h1 className="page-title">New <span>Event</span></h1>
         <p className="page-sub">
-          Set up your event details and proceed to payment. You'll be charged 300 TZS per guest as a service fee.
+          Set up your event details. You can pay with credits or via commission.
         </p>
       </div>
 
@@ -377,7 +427,15 @@ export default function NewEventPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          {/* Display current credits */}
+          <div className="mb-4 flex justify-between items-center bg-gray-50 p-3 rounded-xl">
+            <span className="text-sm font-medium">Available Credits</span>
+            <span className="font-bold text-[#0D4F4F]">
+              {credits !== null ? credits : 'Loading...'}
+            </span>
+          </div>
+
+          <form>
             <div className="field-wrap">
               <label className={`field-label ${isLabelUp('name') ? 'up' : ''}`}>Event Name</label>
               <input
@@ -468,19 +526,63 @@ export default function NewEventPage() {
               </div>
             )}
 
-            <button type="submit" className="submit-btn" disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="spinner" />
-                  Redirecting to payment...
-                </>
-              ) : (
-                'Continue to Payment'
-              )}
-            </button>
+            {/* Two buttons side by side */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleCreateWithCredits}
+                disabled={loading || guestCount === 0}
+                className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="spinner" /> Creating...
+                  </>
+                ) : (
+                  <>
+                    <Coins size={16} /> Create with Credits
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading || guestCount === 0}
+                className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="spinner" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard size={16} /> Pay Commission
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </div>
       </div>
+
+      {/* Buy Credits Modal */}
+      <BuyCreditsModal
+        isOpen={showBuyModal}
+        onClose={() => {
+          setShowBuyModal(false);
+          // Refresh credits after modal closes
+          fetch('/api/tenant/billing', { credentials: 'include' })
+            .then(res => res.json())
+            .then(data => {
+              if (data.tenant?.credits !== undefined) {
+                setCredits(data.tenant.credits);
+              }
+            })
+            .catch(() => {});
+        }}
+        currentCredits={credits || 0}
+        requiredCredits={requiredCredits}
+      />
     </div>
   );
 }

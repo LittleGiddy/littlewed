@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+const COST_PER_GUEST = 300;
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
@@ -12,42 +14,63 @@ export async function POST(req: NextRequest) {
   const tenantId = (session.user as any).tenantId;
   const { name, date, venue, address, guestCount } = await req.json();
 
-  if (!name || !date || !venue || !address) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  if (!name || !date || !venue || !address || !guestCount || guestCount < 1) {
+    return NextResponse.json({ error: 'Invalid guest count (minimum 1)' }, { status: 400 });
   }
 
-  // Check if tenant has at least 1 credit
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
-    select: { credits: true },
+    select: { credits: true, bypassPayment: true },
   });
 
-  if (!tenant || tenant.credits < 1) {
-    return NextResponse.json({ error: 'Insufficient event credits' }, { status: 400 });
+  if (!tenant) {
+    return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
 
-  // Create the event (no payment required, commission_paid = true)
-  const event = await prisma.$transaction(async (tx) => {
-    const newEvent = await tx.event.create({
+  // Bypass mode (admin override)
+  if (tenant.bypassPayment === true) {
+    const event = await prisma.event.create({
       data: {
         name,
         date: new Date(date),
         venue,
         address,
-        guestCount: guestCount ? parseInt(guestCount) : 0,
+        guestCount,
+        total_budget: 0,
         commission_paid: true,
         tenantId,
       },
     });
+    return NextResponse.json({ eventId: event.id, bypassed: true });
+  }
 
-    // Deduct one credit
-    await tx.tenant.update({
-      where: { id: tenantId },
-      data: { credits: { decrement: 1 } },
+  const requiredCredits = guestCount;
+  if (tenant.credits >= requiredCredits) {
+    const event = await prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: { credits: { decrement: requiredCredits } },
+      });
+      return tx.event.create({
+        data: {
+          name,
+          date: new Date(date),
+          venue,
+          address,
+          guestCount,
+          total_budget: requiredCredits * COST_PER_GUEST,
+          commission_paid: true,
+          tenantId,
+        },
+      });
     });
+    return NextResponse.json({ eventId: event.id, creditsUsed: requiredCredits });
+  }
 
-    return newEvent;
-  });
-
-  return NextResponse.json({ eventId: event.id });
+  // Insufficient credits
+  return NextResponse.json({
+    error: 'Insufficient credits',
+    available: tenant.credits,
+    required: requiredCredits,
+  }, { status: 400 });
 }
