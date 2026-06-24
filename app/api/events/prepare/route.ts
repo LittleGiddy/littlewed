@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-const COMMISSION_PER_GUEST = 300; // TZS per guest
+const CREDIT_COST = 300; // TZS per credit
 
 // ─── ClickPesa: exchange client-id + api-key for a short-lived JWT ───────────
 async function getClickPesaToken(clientId: string, apiKey: string): Promise<string> {
@@ -33,54 +33,22 @@ export async function POST(req: NextRequest) {
   }
 
   const tenantId = (session.user as any).tenantId;
-  const { name, date, venue, address, guestCount } = await req.json();
+  const { amount } = await req.json();
 
-  if (!name || !date || !venue || !address || !guestCount || guestCount < 1) {
-    return NextResponse.json({ error: 'Invalid guest count (minimum 1)' }, { status: 400 });
+  if (!amount || amount < 300) {
+    return NextResponse.json({ error: 'Minimum purchase is 300 TZS (1 credit)' }, { status: 400 });
   }
 
-  // Check tenant bypass setting
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: { bypassPayment: true, credits: true },
-  });
+  const credits = Math.floor(amount / CREDIT_COST);
+  const totalPrice = credits * CREDIT_COST;
 
-  // ─────────────────────────────────────────────────────────────────
-  // 1. BYPASS MODE (admin override) – create event instantly
-  // ─────────────────────────────────────────────────────────────────
-  if (tenant?.bypassPayment === true) {
-    const event = await prisma.event.create({
-      data: {
-        name,
-        date: new Date(date),
-        venue,
-        address,
-        guestCount,
-        total_budget: 0,
-        commission_paid: true,
-        tenantId,
-      },
-    });
-    return NextResponse.json({ eventId: event.id, bypassed: true });
-  }
-
-  // ─────────────────────────────────────────────────────────────────
-  // 2. NORMAL PAYMENT FLOW – ClickPesa hosted checkout
-  // ─────────────────────────────────────────────────────────────────
-  const commission = guestCount * COMMISSION_PER_GUEST;
-
-  // Create pending event first (so we have an ID for the order reference)
-  const pending = await prisma.pendingEvent.create({
+  // Create a pending transaction
+  const transaction = await prisma.transaction.create({
     data: {
-      name,
-      date: new Date(date),
-      venue,
-      address,
-      total_budget: commission,
-      commission,
-      guestCount,
       tenantId,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+      amount: totalPrice,
+      type: 'CREDIT_PURCHASE',
+      status: 'PENDING',
     },
   });
 
@@ -90,7 +58,10 @@ export async function POST(req: NextRequest) {
 
   if (!clientId || !apiKey) {
     console.error('Missing ClickPesa credentials (CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY)');
-    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { status: 'FAILED' },
+    });
     return NextResponse.json({ error: 'Payment gateway not configured' }, { status: 500 });
   }
 
@@ -100,7 +71,10 @@ export async function POST(req: NextRequest) {
     jwtToken = await getClickPesaToken(clientId, apiKey);
   } catch (err: any) {
     console.error('ClickPesa auth error:', err.message);
-    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { status: 'FAILED' },
+    });
     return NextResponse.json(
       { error: `Payment gateway auth failed: ${err.message}` },
       { status: 500 }
@@ -113,21 +87,21 @@ export async function POST(req: NextRequest) {
   const rawPhone: string = (user.phone || '255712345678').replace(/^\+/, '');
 
   // Order reference must be alphanumeric only (no underscores or hyphens)
-  const orderReference = `event${pending.id.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const orderReference = `credit${transaction.id.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   // Step 2: Generate checkout link using the JWT
   const payload = {
-    totalPrice: commission.toString(),
+    totalPrice: totalPrice.toString(),
     orderReference,
-    orderCurrency: 'TZS',                        // ← required field, was missing
-    customerName: user.name || 'Event Organizer',
-    customerEmail: user.email || 'customer@example.com',
-    customerPhone: rawPhone,                       // ← no '+' prefix
-    description: `Commission for event: ${name}`,
-    callbackUrl: `${process.env.NEXTAUTH_URL}/api/events/confirm?pendingId=${pending.id}`,
+    orderCurrency: 'TZS',
+    customerName: user.name || 'Client',
+    customerEmail: user.email || 'client@example.com',
+    customerPhone: rawPhone,
+    description: `Purchase ${credits} credits for LittleWed`,
+    callbackUrl: `${process.env.NEXTAUTH_URL}/api/webhooks/clickpesa`,
   };
 
-  console.log('ClickPesa checkout payload:', JSON.stringify(payload, null, 2));
+  console.log('ClickPesa credit purchase payload:', JSON.stringify(payload, null, 2));
 
   let checkoutUrl: string | null = null;
 
@@ -138,7 +112,6 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // JWT token from step 1 already contains "Bearer " prefix
           'Authorization': jwtToken,
         },
         body: JSON.stringify(payload),
@@ -147,37 +120,51 @@ export async function POST(req: NextRequest) {
 
     const data = await response.json();
 
-    console.log('ClickPesa checkout response status:', response.status);
-    console.log('ClickPesa checkout response body:', JSON.stringify(data, null, 2));
+    console.log('ClickPesa credit purchase response status:', response.status);
+    console.log('ClickPesa credit purchase response body:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       console.error('ClickPesa checkout error:', data);
-      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: { status: 'FAILED' },
+      });
       return NextResponse.json(
         { error: data.message || 'Payment initiation failed' },
         { status: response.status }
       );
     }
 
-    // Per ClickPesa docs the response field is `checkoutLink`
     checkoutUrl = data.checkoutLink ?? null;
 
     if (!checkoutUrl) {
       console.error('No checkoutLink in ClickPesa response:', data);
-      await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: { status: 'FAILED' },
+      });
       return NextResponse.json(
         { error: 'Payment gateway returned no checkout URL' },
         { status: 500 }
       );
     }
+
+    // Store the order reference on the transaction for webhook matching
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { stripeSessionId: orderReference },
+    });
+
+    return NextResponse.json({ checkoutUrl });
   } catch (err: any) {
     console.error('ClickPesa request failed:', err);
-    await prisma.pendingEvent.delete({ where: { id: pending.id } }).catch(() => {});
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { status: 'FAILED' },
+    });
     return NextResponse.json(
       { error: 'Network error contacting payment gateway' },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({ checkoutUrl });
 }
