@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   }
 
   const tenantId = (session.user as any).tenantId;
-  const { amount } = await req.json();
+  const { amount, returnUrl } = await req.json();
 
   if (!amount || amount < 300) {
     return NextResponse.json({ error: 'Minimum purchase is 300 TZS (1 credit)' }, { status: 400 });
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
     customerPhone: rawPhone,
     description: `Purchase ${credits} credits for LittleWed`,
     callbackUrl: `${process.env.NEXTAUTH_URL}/api/webhooks/clickpesa`,
+    redirectUrl: returnUrl || `${process.env.NEXTAUTH_URL}/client/dashboard`, // ← added
   };
 
   console.log('ClickPesa credit purchase payload:', JSON.stringify(payload, null, 2));

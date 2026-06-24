@@ -7,12 +7,19 @@ interface BuyCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentCredits?: number;
-  requiredCredits?: number; // new
+  requiredCredits?: number;
+  returnUrl?: string;
 }
 
 const PRESET_AMOUNTS = [300, 600, 1000, 3000];
 
-export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0, requiredCredits = 0 }: BuyCreditsModalProps) {
+export default function BuyCreditsModal({
+  isOpen,
+  onClose,
+  currentCredits = 0,
+  requiredCredits = 0,
+  returnUrl = '/client/dashboard',
+}: BuyCreditsModalProps) {
   const initialAmount = requiredCredits > 0 && currentCredits !== undefined
     ? Math.max(300, (requiredCredits - currentCredits) * 300)
     : 300;
@@ -30,7 +37,7 @@ export default function BuyCreditsModal({ isOpen, onClose, currentCredits = 0, r
       const res = await fetch('/api/tenant/purchase-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, returnUrl }),
         credentials: 'include',
       });
       const data = await res.json();

@@ -2,10 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft, CreditCard, Coins } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Coins, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import BuyCreditsModal from '@/app/components/BuyCreditsModal';
-
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -45,48 +44,13 @@ export default function NewEventPage() {
     return value !== undefined && value !== null && value !== '';
   };
 
-  // Standard payment flow (existing)
+  // Single submit handler – tries credits first, then falls back to payment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    try {
-      const res = await fetch('/api/events/prepare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: form.name,
-          date: form.date,
-          venue: form.venue,
-          address: form.address,
-          guestCount: parseInt(form.guestCount, 10),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        if (data.eventId) {
-          router.push(`/client/events/${data.eventId}`);
-        } else if (data.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-        } else {
-          setError('Unexpected response from server');
-        }
-      } else {
-        setError(data.error || 'Failed to prepare event');
-      }
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // Credit-based creation
-  const handleCreateWithCredits = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+    // 1. Try creating with credits
     try {
       const res = await fetch('/api/events/create-with-credits', {
         method: 'POST',
@@ -101,18 +65,24 @@ export default function NewEventPage() {
         }),
       });
       const data = await res.json();
+
       if (res.ok && data.eventId) {
-        toast.success(`Event created using ${data.creditsUsed} credits`);
+        toast.success(`Event created using ${data.creditsUsed || guestCount} credits`);
         router.push(`/client/events/${data.eventId}`);
-      } else if (res.status === 400 && data.error === 'Insufficient credits') {
-        // Show buy modal
-        setRequiredCredits(data.required);
+        return;
+      }
+
+      // Insufficient credits – show modal
+      if (res.status === 400 && data.error === 'Insufficient credits') {
+        setRequiredCredits(data.required || guestCount);
         setShowBuyModal(true);
         setLoading(false);
-      } else {
-        setError(data.error || 'Failed to create event');
-        setLoading(false);
+        return;
       }
+
+      // Other error from credit API
+      setError(data.error || 'Failed to create event');
+      setLoading(false);
     } catch {
       setError('Network error. Please try again.');
       setLoading(false);
@@ -337,6 +307,26 @@ export default function NewEventPage() {
           60% { transform: translateX(5px); }
         }
 
+        .credits-display {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #F7FAFA;
+          padding: 12px 16px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+        }
+
+        .credits-label {
+          font-size: 14px;
+          color: #5F6C7A;
+        }
+
+        .credits-value {
+          font-weight: 700;
+          color: #0D4F4F;
+        }
+
         .submit-btn {
           width: 100%;
           display: flex;
@@ -412,9 +402,11 @@ export default function NewEventPage() {
 
       <div style={{ marginBottom: 28 }}>
         <div className="page-eyebrow">Create</div>
-        <h1 className="page-title">New <span>Event</span></h1>
+        <h1 className="page-title">
+          New <span>Event</span>
+        </h1>
         <p className="page-sub">
-          Set up your event details. You can pay with credits or via commission.
+          Set up your event details. If you have enough credits, the event will be created instantly.
         </p>
       </div>
 
@@ -427,15 +419,13 @@ export default function NewEventPage() {
             </div>
           )}
 
-          {/* Display current credits */}
-          <div className="mb-4 flex justify-between items-center bg-gray-50 p-3 rounded-xl">
-            <span className="text-sm font-medium">Available Credits</span>
-            <span className="font-bold text-[#0D4F4F]">
-              {credits !== null ? credits : 'Loading...'}
-            </span>
+          {/* Credit display */}
+          <div className="credits-display">
+            <span className="credits-label">Available Credits</span>
+            <span className="credits-value">{credits !== null ? credits : 'Loading...'}</span>
           </div>
 
-          <form>
+          <form onSubmit={handleSubmit}>
             <div className="field-wrap">
               <label className={`field-label ${isLabelUp('name') ? 'up' : ''}`}>Event Name</label>
               <input
@@ -522,45 +512,21 @@ export default function NewEventPage() {
               <div className="total-section">
                 <div className="total-label">TOTAL COMMISSION</div>
                 <div className="total-value">{totalCommission.toLocaleString()} TZS</div>
-                <p className="total-hint">✓ You'll review this before confirming payment</p>
+                <p className="total-hint">✓ Credits are used if available</p>
               </div>
             )}
 
-            {/* Two buttons side by side */}
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleCreateWithCredits}
-                disabled={loading || guestCount === 0}
-                className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="spinner" /> Creating...
-                  </>
-                ) : (
-                  <>
-                    <Coins size={16} /> Create with Credits
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading || guestCount === 0}
-                className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="spinner" /> Processing...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard size={16} /> Pay Commission
-                  </>
-                )}
-              </button>
-            </div>
+            <button type="submit" className="submit-btn" disabled={loading || guestCount === 0}>
+              {loading ? (
+                <>
+                  <div className="spinner" /> Creating...
+                </>
+              ) : (
+                <>
+                  <Coins size={16} /> Create Event
+                </>
+              )}
+            </button>
           </form>
         </div>
       </div>
@@ -582,6 +548,7 @@ export default function NewEventPage() {
         }}
         currentCredits={credits || 0}
         requiredCredits={requiredCredits}
+        returnUrl={`/client/events/new?purchased=true`}
       />
     </div>
   );
