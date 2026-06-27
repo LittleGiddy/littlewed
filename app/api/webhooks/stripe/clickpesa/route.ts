@@ -1,104 +1,101 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/prisma';
 
 const CREDIT_COST = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    console.log('ClickPesa webhook payload:', JSON.stringify(body, null, 2));
+    // 1. Log the raw body
+    const rawBody = await req.text();
+    console.log('Raw webhook body:', rawBody);
 
-    const { orderReference, status } = body;
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (err) {
+      console.error('Failed to parse JSON:', err);
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
 
-    if (status !== 'COMPLETED' && status !== 'SUCCESS') {
+    console.log('Parsed webhook payload:', JSON.stringify(body, null, 2));
+
+    // 2. Try multiple possible field names
+    const orderReference = body.orderReference || body.order_ref || body.reference || body.orderId || body.transactionId;
+    const status = body.status || body.paymentStatus || body.transactionStatus;
+
+    if (!orderReference) {
+      console.warn('No orderReference found in payload');
+      return NextResponse.json({ received: true });
+    }
+
+    // 3. Check if payment was successful
+    const isSuccess = status?.toUpperCase() === 'COMPLETED' || 
+                     status?.toUpperCase() === 'SUCCESS' ||
+                     body.success === true ||
+                     body.completed === true;
+
+    if (!isSuccess) {
       console.log(`Payment not successful: ${status}`);
       return NextResponse.json({ received: true });
     }
 
-    let pendingEventId: string | null = null;
+    // 4. Extract transaction ID from reference
     let transactionId: string | null = null;
+    const ref = orderReference as string;
 
-    if (orderReference.startsWith('event')) {
-      pendingEventId = orderReference.replace('event', '');
-    } else if (orderReference.startsWith('credit')) {
-      transactionId = orderReference.replace('credit', '');
+    if (ref.startsWith('credit_')) {
+      transactionId = ref.replace('credit_', '');
+    } else if (ref.startsWith('credit')) {
+      transactionId = ref.replace('credit', '');
     } else {
-      console.warn(`Unknown orderReference format: ${orderReference}`);
-      return NextResponse.json({ received: true });
-    }
-
-    if (pendingEventId) {
-      const pendingEvent = await prisma.pendingEvent.findUnique({
-        where: { id: pendingEventId },
+      // Try to find by the reference in the database
+      const transaction = await prisma.transaction.findFirst({
+        where: { stripeSessionId: ref },
       });
-      if (!pendingEvent) {
-        console.warn(`Pending event not found: ${pendingEventId}`);
-        return NextResponse.json({ received: true });
+      if (transaction) {
+        transactionId = transaction.id;
       }
+    }
 
-      await prisma.$transaction([
-        prisma.event.create({
-          data: {
-            name: pendingEvent.name,
-            date: pendingEvent.date,
-            venue: pendingEvent.venue,
-            address: pendingEvent.address,
-            guestCount: pendingEvent.guestCount || 0,
-            total_budget: pendingEvent.total_budget,
-            commission_paid: true,
-            tenantId: pendingEvent.tenantId,
-          },
-        }),
-        prisma.pendingEvent.delete({ where: { id: pendingEventId } }),
-        prisma.transaction.create({
-          data: {
-            tenantId: pendingEvent.tenantId,
-            eventId: pendingEvent.id,
-            amount: pendingEvent.commission,
-            type: 'COMMISSION_PAYMENT',
-            status: 'COMPLETED',
-            stripeSessionId: orderReference,
-          },
-        }),
-      ]);
-      console.log(`✅ Event created from pendingEvent ${pendingEventId}`);
+    if (!transactionId) {
+      console.warn(`No transaction ID extracted from: ${ref}`);
       return NextResponse.json({ received: true });
     }
 
-    if (transactionId) {
-      const transaction = await prisma.transaction.findUnique({
+    // 5. Find and update the transaction
+    const transaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+    });
+
+    if (!transaction) {
+      console.warn(`Transaction not found: ${transactionId}`);
+      return NextResponse.json({ received: true });
+    }
+
+    if (transaction.status === 'COMPLETED') {
+      console.log(`Transaction ${transactionId} already completed.`);
+      return NextResponse.json({ received: true });
+    }
+
+    const creditsToAdd = Math.floor(transaction.amount / CREDIT_COST);
+    if (creditsToAdd <= 0) {
+      console.warn(`Amount too low for credits: ${transaction.amount} TZS`);
+      return NextResponse.json({ received: true });
+    }
+
+    // 6. Update credits and transaction
+    await prisma.$transaction([
+      prisma.transaction.update({
         where: { id: transactionId },
-      });
-      if (!transaction) {
-        console.warn(`Transaction not found: ${transactionId}`);
-        return NextResponse.json({ received: true });
-      }
-      if (transaction.status === 'COMPLETED') {
-        console.log(`Transaction ${transactionId} already completed.`);
-        return NextResponse.json({ received: true });
-      }
+        data: { status: 'COMPLETED' },
+      }),
+      prisma.tenant.update({
+        where: { id: transaction.tenantId },
+        data: { credits: { increment: creditsToAdd } },
+      }),
+    ]);
 
-      const creditsToAdd = Math.floor(transaction.amount / CREDIT_COST);
-      if (creditsToAdd <= 0) {
-        console.warn(`Amount too low for credits: ${transaction.amount} TZS`);
-        return NextResponse.json({ received: true });
-      }
-
-      await prisma.$transaction([
-        prisma.transaction.update({
-          where: { id: transactionId },
-          data: { status: 'COMPLETED' },
-        }),
-        prisma.tenant.update({
-          where: { id: transaction.tenantId },
-          data: { credits: { increment: creditsToAdd } },
-        }),
-      ]);
-      console.log(`✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
-      return NextResponse.json({ received: true });
-    }
-
-    console.warn(`Unhandled orderReference: ${orderReference}`);
+    console.log(`✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook error:', error);
