@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -20,12 +21,25 @@ export default function BuyCreditsModal({
   requiredCredits = 0,
   returnUrl = '/client/dashboard',
 }: BuyCreditsModalProps) {
-  const initialAmount = requiredCredits > 0 && currentCredits !== undefined
-    ? Math.max(300, (requiredCredits - currentCredits) * 300)
-    : 300;
-
-  const [amount, setAmount] = useState(initialAmount);
+  const [mounted, setMounted] = useState(false);
+  const [amount, setAmount] = useState(300);
   const [loading, setLoading] = useState(false);
+
+  // Calculate initial amount based on required credits
+  useEffect(() => {
+    if (requiredCredits > 0 && currentCredits !== undefined) {
+      const deficit = requiredCredits - currentCredits;
+      if (deficit > 0) {
+        setAmount(Math.max(300, deficit * 300));
+      }
+    }
+  }, [requiredCredits, currentCredits]);
+
+  // For portal: ensure it's mounted on client
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const handlePurchase = async () => {
     if (amount < 300) {
@@ -53,12 +67,16 @@ export default function BuyCreditsModal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+  // Render modal via portal to body to avoid clipping issues
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10"
+        >
           <X size={20} />
         </button>
         <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Purchase Credits</h2>
@@ -117,6 +135,7 @@ export default function BuyCreditsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
