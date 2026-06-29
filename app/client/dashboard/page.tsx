@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { Calendar, Users, QrCode, ArrowRight, Plus, Coins } from 'lucide-react';
+import { Calendar, Users, QrCode, Plus, Coins, MessageCircle, Upload, Palette, Send } from 'lucide-react';
 import Link from 'next/link';
 import DeleteEventButton from '@/components/DeleteEventButton';
 import Head from 'next/head';
@@ -40,7 +40,6 @@ export default async function ClientDashboard() {
     );
   }
 
-  // ✅ Fetch tenant with credits
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
     select: { name: true, simpleEventMode: true, credits: true },
@@ -64,6 +63,9 @@ export default async function ClientDashboard() {
   });
   const amountPaid = amountPaidResult._sum.total_budget ?? 0;
 
+  // For quick actions, we'll use the event ID of the first event (if any) or null.
+  const firstEventId = events.length > 0 ? events[0].id : null;
+
   const stats = [
     { label: 'Available Credits', value: tenant?.credits ?? 0, icon: Coins, bg: '#FEF9E6', color: '#C07A20' },
     { label: 'Total Guests', value: totalGuests, icon: Users, bg: '#EAF4F4', color: '#0D4F4F' },
@@ -78,7 +80,7 @@ export default async function ClientDashboard() {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
       </Head>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
 
@@ -142,7 +144,7 @@ export default async function ClientDashboard() {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
           }
 
           .stat-card {
@@ -152,10 +154,14 @@ export default async function ClientDashboard() {
             box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
             transition: transform 0.2s, box-shadow 0.2s;
             animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
+            cursor: default;
           }
           .stat-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+          }
+          .stat-card-clickable {
+            cursor: pointer;
           }
 
           @keyframes cardPop {
@@ -190,33 +196,123 @@ export default async function ClientDashboard() {
             letter-spacing: 0.2px;
           }
 
-          /* ✅ New credits action row */
-          .credits-action-row {
+          /* Two-column layout */
+          .dash-columns {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            align-items: start;
+          }
+
+          @media (max-width: 1024px) {
+            .dash-columns {
+              grid-template-columns: 1fr;
+            }
+          }
+
+          /* Credit card (left column) */
+          .credit-card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: white;
-            border-radius: 20px;
-            padding: 16px 24px;
-            margin-bottom: 32px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
+            flex-wrap: wrap;
+            gap: 16px;
             animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
           }
-
-          .credits-action-label {
+          .credit-card-label {
             font-size: 14px;
             color: #7A8FA6;
           }
-          .credits-action-value {
+          .credit-card-value {
             font-family: 'Playfair Display', serif;
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
             color: #0D4F4F;
           }
 
+          .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+          }
+          .quick-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: #F7FAFA;
+            border: 1.5px solid #E2EAF0;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #0D1B1B;
+            text-decoration: none;
+            transition: background 0.15s, border-color 0.15s;
+          }
+          .quick-action-btn:hover {
+            background: #EDF3F3;
+            border-color: #0D4F4F;
+          }
+          .quick-action-btn svg {
+            flex-shrink: 0;
+            color: #0D4F4F;
+          }
+
+          /* Right column: quick links */
+          .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+          }
+
+          .right-panel-card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
+            animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
+          }
+          .right-panel-card-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 16px;
+            font-weight: 800;
+            color: #0D1B1B;
+            margin-bottom: 16px;
+          }
+
+          .quick-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #F0F4F8;
+            font-size: 14px;
+            font-weight: 500;
+            color: #4A6072;
+            text-decoration: none;
+            transition: color 0.15s;
+          }
+          .quick-link:last-child {
+            border-bottom: none;
+          }
+          .quick-link:hover {
+            color: #0D4F4F;
+          }
+          .quick-link svg {
+            color: #9BAAB8;
+            flex-shrink: 0;
+          }
+
+          /* Upcoming events section */
           .section-card {
             background: white;
-            border-radius: 24px;
+            border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
             animation: cardPop 0.5s 0.25s cubic-bezier(0.16,1,0.3,1) both;
@@ -388,11 +484,12 @@ export default async function ClientDashboard() {
             .event-row { padding: 14px 20px; }
             .event-date-box { width: 42px; height: 42px; }
             .event-date-day { font-size: 16px; }
-            .credits-action-row { flex-direction: column; gap: 12px; align-items: stretch; text-align: center; }
-            .credits-action-value { font-size: 24px; }
+            .credit-card { flex-direction: column; align-items: stretch; text-align: center; }
+            .quick-actions { grid-template-columns: 1fr 1fr; }
           }
         `}</style>
 
+        {/* Header */}
         <div className="dash-header">
           <div>
             <div className="dash-greeting">Your Dashboard</div>
@@ -407,6 +504,7 @@ export default async function ClientDashboard() {
           </Link>
         </div>
 
+        {/* Stats */}
         <div className="stats-grid">
           {stats.map(({ label, value, icon: Icon, bg, color }) => (
             <div key={label} className="stat-card">
@@ -419,52 +517,122 @@ export default async function ClientDashboard() {
           ))}
         </div>
 
-        {/* ✅ Credits + Buy button */}
-        <div className="credits-action-row">
+        {/* Two-column layout */}
+        <div className="dash-columns">
+          {/* Left column */}
           <div>
-            <div className="credits-action-label">Available Credits</div>
-            <div className="credits-action-value">{tenant?.credits?.toLocaleString() ?? 0}</div>
-          </div>
-          <BuyCreditsButton currentCredits={tenant?.credits ?? 0} />
-        </div>
+            {/* Credit card + quick actions */}
+            <div className="credit-card">
+              <div>
+                <div className="credit-card-label">Available Credits</div>
+                <div className="credit-card-value">{tenant?.credits?.toLocaleString() ?? 0}</div>
+              </div>
+              <div className="flex flex-wrap gap-3 items-center">
+                <BuyCreditsButton currentCredits={tenant?.credits ?? 0} />
+                <Link
+                  href="/client/billing"
+                  className="text-sm font-semibold text-[#0D4F4F] hover:underline"
+                >
+                  Manage
+                </Link>
+              </div>
+            </div>
 
-        <div className="section-card">
-          <div className="section-header">
-            <div className="section-title">Upcoming Events</div>
-            <div className="section-badge">{events.length} event{events.length !== 1 ? 's' : ''}</div>
+            {/* Quick Actions */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <Link href={newEventUrl} className="quick-action-btn">
+                <Plus size={16} /> New Event
+              </Link>
+              {firstEventId && (
+                <>
+                  <Link href={`/client/guests/import/${firstEventId}`} className="quick-action-btn">
+                    <Upload size={16} /> Import
+                  </Link>
+                  <Link href={`/client/invitations/design/${firstEventId}`} className="quick-action-btn">
+                    <Palette size={16} /> Design
+                  </Link>
+                  <Link href={`/client/invitations/send/${firstEventId}`} className="quick-action-btn">
+                    <Send size={16} /> Send
+                  </Link>
+                </>
+              )}
+              {!firstEventId && (
+                <>
+                  <span className="quick-action-btn opacity-50 cursor-not-allowed">Import (no event)</span>
+                  <span className="quick-action-btn opacity-50 cursor-not-allowed">Design (no event)</span>
+                  <span className="quick-action-btn opacity-50 cursor-not-allowed">Send (no event)</span>
+                </>
+              )}
+            </div>
+
+            {/* Upcoming Events */}
+            <div className="section-card">
+              <div className="section-header">
+                <div className="section-title">Upcoming Events</div>
+                <div className="section-badge">{events.length} event{events.length !== 1 ? 's' : ''}</div>
+              </div>
+
+              {events.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🎊</div>
+                  <div className="empty-title">No events yet</div>
+                  <p className="empty-sub">Create your first event and start managing guests and invitations.</p>
+                  <Link href={newEventUrl} className="empty-btn">
+                    <Plus size={15} /> Create your first event
+                  </Link>
+                </div>
+              ) : (
+                events.map((event) => {
+                  const d = new Date(event.date);
+                  const day = d.getDate();
+                  const mon = d.toLocaleString('default', { month: 'short' });
+                  return (
+                    <Link key={event.id} href={`/client/events/${event.id}`} className="event-row">
+                      <div className="event-date-box">
+                        <div className="event-date-day">{day}</div>
+                        <div className="event-date-mon">{mon}</div>
+                      </div>
+                      <div className="event-info">
+                        <div className="event-name">{event.name}</div>
+                        <div className="event-meta">{event.venue}</div>
+                      </div>
+                      <div className="event-guests-badge">{event._count.guests} guests</div>
+                      <DeleteEventButton eventId={event.id} />
+                      <ArrowRight size={16} className="event-arrow" />
+                    </Link>
+                  );
+                })
+              )}
+            </div>
           </div>
 
-          {events.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎊</div>
-              <div className="empty-title">No events yet</div>
-              <p className="empty-sub">Create your first event and start managing guests and invitations.</p>
-              <Link href={newEventUrl} className="empty-btn">
-                <Plus size={15} /> Create your first event
+          {/* Right column – Quick links and tips */}
+          <div className="right-panel">
+            <div className="right-panel-card">
+              <div className="right-panel-card-title">Quick Links</div>
+              <Link href="/client/events" className="quick-link">
+                <Calendar size={16} /> My Events
+              </Link>
+              <Link href="/client/guests" className="quick-link">
+                <Users size={16} /> Guest List
+              </Link>
+              <Link href="/client/billing" className="quick-link">
+                <Coins size={16} /> Billing & Credits
+              </Link>
+              <Link href="/client/settings" className="quick-link">
+                <Settings size={16} /> Settings
               </Link>
             </div>
-          ) : (
-            events.map((event) => {
-              const d = new Date(event.date);
-              const day = d.getDate();
-              const mon = d.toLocaleString('default', { month: 'short' });
-              return (
-                <Link key={event.id} href={`/client/events/${event.id}`} className="event-row">
-                  <div className="event-date-box">
-                    <div className="event-date-day">{day}</div>
-                    <div className="event-date-mon">{mon}</div>
-                  </div>
-                  <div className="event-info">
-                    <div className="event-name">{event.name}</div>
-                    <div className="event-meta">{event.venue}</div>
-                  </div>
-                  <div className="event-guests-badge">{event._count.guests} guests</div>
-                  <DeleteEventButton eventId={event.id} />
-                  <ArrowRight size={16} className="event-arrow" />
-                </Link>
-              );
-            })
-          )}
+
+            <div className="right-panel-card">
+              <div className="right-panel-card-title">Need Help?</div>
+              <div className="text-sm text-gray-600 space-y-3">
+                <p>📖 Check the documentation for guides.</p>
+                <p>💬 Contact support via chat or email.</p>
+                <p>📱 Use the invitation card designer to create unique cards.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </>
