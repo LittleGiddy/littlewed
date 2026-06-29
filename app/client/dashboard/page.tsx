@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { Calendar, Users, QrCode, Plus, Coins, MessageCircle, Upload, Palette, Send } from 'lucide-react';
+import { Calendar, Users, QrCode, Plus, Coins, Upload, Palette, Send, ArrowRight, Settings } from 'lucide-react';
 import Link from 'next/link';
 import DeleteEventButton from '@/components/DeleteEventButton';
 import Head from 'next/head';
@@ -63,7 +63,6 @@ export default async function ClientDashboard() {
   });
   const amountPaid = amountPaidResult._sum.total_budget ?? 0;
 
-  // For quick actions, we'll use the event ID of the first event (if any) or null.
   const firstEventId = events.length > 0 ? events[0].id : null;
 
   const stats = [
@@ -160,9 +159,6 @@ export default async function ClientDashboard() {
             transform: translateY(-3px);
             box-shadow: 0 8px 24px rgba(0,0,0,0.1);
           }
-          .stat-card-clickable {
-            cursor: pointer;
-          }
 
           @keyframes cardPop {
             from { opacity: 0; transform: translateY(12px) scale(0.97); }
@@ -196,7 +192,6 @@ export default async function ClientDashboard() {
             letter-spacing: 0.2px;
           }
 
-          /* Two-column layout */
           .dash-columns {
             display: grid;
             grid-template-columns: 1fr 320px;
@@ -210,7 +205,6 @@ export default async function ClientDashboard() {
             }
           }
 
-          /* Credit card (left column) */
           .credit-card {
             background: white;
             border-radius: 20px;
@@ -264,7 +258,6 @@ export default async function ClientDashboard() {
             color: #0D4F4F;
           }
 
-          /* Right column: quick links */
           .right-panel {
             display: flex;
             flex-direction: column;
@@ -309,7 +302,6 @@ export default async function ClientDashboard() {
             flex-shrink: 0;
           }
 
-          /* Upcoming events section */
           .section-card {
             background: white;
             border-radius: 20px;
