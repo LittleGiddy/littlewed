@@ -1,92 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/prisma';
+import { prisma } from '@/lib/prisma';
 
 const CREDIT_COST = 300;
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Log the raw body
     const rawBody = await req.text();
-    console.log('Raw webhook body:', rawBody);
+    console.log('[ClickPesa Webhook] Raw body:', rawBody);
 
-    let body;
+    let body: any;
     try {
       body = JSON.parse(rawBody);
-    } catch (err) {
-      console.error('Failed to parse JSON:', err);
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    } catch {
+      console.error('[ClickPesa Webhook] Failed to parse JSON');
+      // Return 200 so ClickPesa doesn't retry with the same bad payload
+      return NextResponse.json({ received: true });
     }
 
-    console.log('Parsed webhook payload:', JSON.stringify(body, null, 2));
+    console.log('[ClickPesa Webhook] Parsed payload:', JSON.stringify(body, null, 2));
 
-    // 2. Try multiple possible field names
-    const orderReference = body.orderReference || body.order_ref || body.reference || body.orderId || body.transactionId;
-    const status = body.status || body.paymentStatus || body.transactionStatus;
+    // ── 1. Extract the order reference ────────────────────────────────────────
+    const orderReference: string | undefined =
+      body.orderReference ||
+      body.order_ref ||
+      body.reference ||
+      body.orderId ||
+      body.transactionId;
 
     if (!orderReference) {
-      console.warn('No orderReference found in payload');
+      console.warn('[ClickPesa Webhook] No orderReference in payload — ignoring');
       return NextResponse.json({ received: true });
     }
 
-    // 3. Check if payment was successful
-    const isSuccess = status?.toUpperCase() === 'COMPLETED' || 
-                     status?.toUpperCase() === 'SUCCESS' ||
-                     body.success === true ||
-                     body.completed === true;
+    // ── 2. Determine payment success ──────────────────────────────────────────
+    const statusRaw: string = (
+      body.status ||
+      body.paymentStatus ||
+      body.transactionStatus ||
+      ''
+    ).toUpperCase();
+
+    const isSuccess =
+      statusRaw === 'COMPLETED' ||
+      statusRaw === 'SUCCESS' ||
+      statusRaw === 'PAID' ||
+      body.success === true ||
+      body.completed === true;
 
     if (!isSuccess) {
-      console.log(`Payment not successful: ${status}`);
+      console.log(`[ClickPesa Webhook] Payment not successful (status: ${statusRaw}) — ignoring`);
       return NextResponse.json({ received: true });
     }
 
-    // 4. Extract transaction ID from reference
-    let transactionId: string | null = null;
-    const ref = orderReference as string;
-
-    if (ref.startsWith('credit_')) {
-      transactionId = ref.replace('credit_', '');
-    } else if (ref.startsWith('credit')) {
-      transactionId = ref.replace('credit', '');
-    } else {
-      // Try to find by the reference in the database
-      const transaction = await prisma.transaction.findFirst({
-        where: { stripeSessionId: ref },
-      });
-      if (transaction) {
-        transactionId = transaction.id;
-      }
-    }
-
-    if (!transactionId) {
-      console.warn(`No transaction ID extracted from: ${ref}`);
-      return NextResponse.json({ received: true });
-    }
-
-    // 5. Find and update the transaction
-    const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
+    // ── 3. Find the transaction by stripeSessionId (the stored orderReference) ─
+    //
+    // We store orderReference in stripeSessionId at purchase time.
+    // This is the only reliable lookup — never try to reconstruct the UUID
+    // from the reference string, because UUID hyphens get stripped.
+    //
+    const transaction = await prisma.transaction.findFirst({
+      where: { stripeSessionId: orderReference },
     });
 
     if (!transaction) {
-      console.warn(`Transaction not found: ${transactionId}`);
+      console.warn(`[ClickPesa Webhook] No transaction found for orderReference: ${orderReference}`);
       return NextResponse.json({ received: true });
     }
 
+    // ── 4. Idempotency guard ──────────────────────────────────────────────────
     if (transaction.status === 'COMPLETED') {
-      console.log(`Transaction ${transactionId} already completed.`);
+      console.log(`[ClickPesa Webhook] Transaction ${transaction.id} already completed — skipping`);
       return NextResponse.json({ received: true });
     }
 
+    // ── 5. Calculate credits ──────────────────────────────────────────────────
     const creditsToAdd = Math.floor(transaction.amount / CREDIT_COST);
     if (creditsToAdd <= 0) {
-      console.warn(`Amount too low for credits: ${transaction.amount} TZS`);
+      console.warn(`[ClickPesa Webhook] Amount too low for credits: ${transaction.amount} TZS`);
       return NextResponse.json({ received: true });
     }
 
-    // 6. Update credits and transaction
+    // ── 6. Atomically update transaction + tenant credits ─────────────────────
     await prisma.$transaction([
       prisma.transaction.update({
-        where: { id: transactionId },
+        where: { id: transaction.id },
         data: { status: 'COMPLETED' },
       }),
       prisma.tenant.update({
@@ -95,10 +92,16 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    console.log(`✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
+    console.log(
+      `[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId} ` +
+      `(transaction ${transaction.id})`
+    );
+
     return NextResponse.json({ received: true });
+
   } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[ClickPesa Webhook] Unhandled error:', error);
+    // Still return 200 — returning 500 causes ClickPesa to retry endlessly
+    return NextResponse.json({ received: true });
   }
 }
