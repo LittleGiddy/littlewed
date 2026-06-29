@@ -136,6 +136,7 @@ model Transaction {
   eventId         String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  userId          String?  // ✅ new: who initiated the transaction
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }

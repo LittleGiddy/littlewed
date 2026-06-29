@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Coins, TrendingUp, MessageCircle, Phone, Plus, ChevronRight, Minus, Sparkles, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,6 +14,8 @@ const PRESETS = [
 ];
 
 export default function BillingPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [balance, setBalance] = useState<number | null>(null);
   const [usage, setUsage] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -20,6 +23,21 @@ export default function BillingPage() {
   const [customMode, setCustomMode] = useState(false);
   const [customCredits, setCustomCredits] = useState('');
   const [purchasing, setPurchasing] = useState(false);
+
+  // Check for success query params
+  useEffect(() => {
+    const purchased = searchParams.get('purchased');
+    const credits = searchParams.get('credits');
+    if (purchased === 'true' && credits) {
+      const numCredits = parseInt(credits, 10);
+      if (!isNaN(numCredits) && numCredits > 0) {
+        // Show success toast
+        toast.success(`🎉 Congratulations! You've purchased ${numCredits} credit${numCredits > 1 ? 's' : ''}!`);
+        // Clear query params from URL
+        router.replace('/client/billing');
+      }
+    }
+  }, [searchParams, router]);
 
   const loadData = async () => {
     setLoadingData(true);
@@ -47,10 +65,12 @@ export default function BillingPage() {
     if (activeCredits < 1) { toast.error('Select at least 1 credit'); return; }
     setPurchasing(true);
     try {
+      // Pass credits count in redirect URL for success detection
+      const returnUrl = `/client/billing?purchased=true&credits=${activeCredits}`;
       const res = await fetch('/api/tenant/purchase-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: totalTZS, returnUrl: '/client/billing' }),
+        body: JSON.stringify({ amount: totalTZS, returnUrl }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -86,7 +106,6 @@ export default function BillingPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Page header ── */
         .bl-eyebrow {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
           color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
@@ -116,7 +135,6 @@ export default function BillingPage() {
         .bl-refresh-btn.spinning svg { animation: blSpin 0.8s linear infinite; }
         @keyframes blSpin { to { transform: rotate(360deg); } }
 
-        /* ── Card base ── */
         .bl-card {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 22px;
           overflow: hidden;
@@ -133,7 +151,6 @@ export default function BillingPage() {
         .bl-card-bar.green  { background: linear-gradient(90deg, #1A7A4A, #3AB795); }
         .bl-card-body { padding: 24px 28px; }
 
-        /* ── Balance hero ── */
         .bl-balance-row {
           display: flex; align-items: center; justify-content: space-between;
           gap: 16px; flex-wrap: wrap;
@@ -163,7 +180,6 @@ export default function BillingPage() {
           padding: 8px 14px; font-size: 12.5px; font-weight: 600; color: #4A6072;
         }
 
-        /* ── Purchase section ── */
         .bl-section-title {
           font-family: 'Playfair Display', serif;
           font-size: 17px; font-weight: 800; color: #0D1B1B; letter-spacing: -0.2px;
@@ -220,7 +236,6 @@ export default function BillingPage() {
           transform: rotate(45deg) translateY(-1px);
         }
 
-        /* Custom toggle */
         .bl-custom-toggle {
           display: flex; align-items: center; justify-content: space-between;
           padding: 12px 16px; border: 1.5px solid #E2EAF0; border-radius: 13px;
@@ -259,7 +274,6 @@ export default function BillingPage() {
         }
         .bl-custom-unit { font-size: 12px; font-weight: 700; color: #9BAAB8; flex-shrink: 0; }
 
-        /* Summary + CTA */
         .bl-purchase-bottom {
           display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
         }
@@ -297,7 +311,6 @@ export default function BillingPage() {
         .bl-rate-note { font-size: 11.5px; color: #B0BEC8; margin-top: 12px; line-height: 1.5; }
         .bl-rate-note strong { color: #7A8FA6; }
 
-        /* ── Usage section ── */
         .bl-usage-header {
           display: flex; align-items: center; justify-content: space-between;
           margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
@@ -345,7 +358,6 @@ export default function BillingPage() {
         }
         .bl-empty-sub { font-size: 13px; color: #9BAAB8; }
 
-        /* Skeleton */
         .bl-skeleton { background: #F0F4F8; border-radius: 8px; animation: blShimmer 1.4s ease-in-out infinite; }
         @keyframes blShimmer { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
 
@@ -363,7 +375,6 @@ export default function BillingPage() {
 
       <div className="bl-wrap">
 
-        {/* Page header */}
         <div className="bl-page-header">
           <div>
             <div className="bl-eyebrow"><div className="bl-eyebrow-dot" />Billing</div>
@@ -379,7 +390,6 @@ export default function BillingPage() {
           </button>
         </div>
 
-        {/* ── Balance card ── */}
         <div className="bl-card" style={{ animationDelay: '0ms' }}>
           <div className="bl-card-bar teal" />
           <div className="bl-card-body">
@@ -417,13 +427,11 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* ── Purchase card ── */}
         <div className="bl-card" style={{ animationDelay: '80ms' }}>
           <div className="bl-card-bar teal" />
           <div className="bl-card-body">
             <div className="bl-section-title">Purchase Credits</div>
 
-            {/* Preset grid */}
             <div className="bl-presets">
               {PRESETS.map(p => (
                 <button
@@ -442,7 +450,6 @@ export default function BillingPage() {
               ))}
             </div>
 
-            {/* Custom toggle */}
             <button
               className={`bl-custom-toggle${customMode ? ' active' : ''}`}
               onClick={() => setCustomMode(m => !m)}
@@ -451,7 +458,6 @@ export default function BillingPage() {
               <ChevronRight size={15} className="bl-custom-chevron" />
             </button>
 
-            {/* Custom stepper */}
             {customMode && (
               <div className="bl-custom-row">
                 <button className="bl-stepper" onClick={() => setCustomCredits(c => String(Math.max(1, (parseInt(c || '0') || 0) - 1)))}>
@@ -472,7 +478,6 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Summary + pay */}
             <div className="bl-purchase-bottom">
               <div className="bl-summary-pill">
                 <div className="bl-summary-col">
@@ -506,7 +511,6 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* ── Usage card ── */}
         <div className="bl-card" style={{ animationDelay: '160ms' }}>
           <div className="bl-card-bar green" />
           <div className="bl-card-body">

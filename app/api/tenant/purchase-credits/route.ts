@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     data: {
       tenantId,
       amount: totalPrice,
+      userId: session.user.id, //  store user who made the purchase
       type: 'CREDIT_PURCHASE',
       status: 'PENDING',
     },
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
     customerEmail: user.email || 'client@example.com',
     customerPhone: rawPhone,
     description: `Purchase ${credits} credit${credits !== 1 ? 's' : ''} for LittleWed`,
-    callbackUrl: `${appUrl}/api/webhooks/stripe/clickpesa/`,
+    callbackUrl: `${appUrl}/api/webhooks/stripe/clickpesa`,
     redirectUrl: returnUrl || `${appUrl}/client/dashboard`,
   };
 
