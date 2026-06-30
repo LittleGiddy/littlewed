@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Deduct credits and record usage
+    // Deduct credits, record usage, and mark invitation as sent
     await prisma.$transaction([
       prisma.tenant.update({
         where: { id: guest.event.tenantId },
@@ -123,6 +123,10 @@ export async function POST(req: NextRequest) {
           channel,
           cost,
         },
+      }),
+      prisma.guest.update({
+        where: { id: guest.id },
+        data: { invitationSentAt: new Date() },
       }),
     ]);
 

@@ -115,6 +115,9 @@ model Guest {
   eventId        String
   event          Event     @relation(fields: [eventId], references: [id])
   createdAt      DateTime  @default(now())
+  invitationSentAt   DateTime? // when we sent the invitation
+  invitationDeliveredAt DateTime? // optional: when Twilio confirms delivery
+  invitationOpenedAt DateTime?   // optional: when guest opens the card
 }
 
 model UsageRecord {
