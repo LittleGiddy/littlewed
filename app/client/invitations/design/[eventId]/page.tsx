@@ -4,8 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   Upload, Move, Maximize2, Save, Loader2, Image, Trash2, Check, Type, Palette,
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
-  Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Bold, Italic, Underline,
-  CornerDownRight
+  Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Eye, EyeOff, Undo, Redo
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -17,7 +16,7 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// ─── Google Fonts list (including elegant / signature) ──────────────────
+// ─── Google Fonts list ──────────────────────────────────────────────────
 const FONTS = [
   'Playfair Display',
   'DM Sans',
@@ -65,6 +64,7 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50) => ({
   color: '#ffffff',
   align: 'center',
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
+  visible: true,
 });
 
 const createRectLayer = (x = 30, y = 30, w = 40, h = 20) => ({
@@ -79,6 +79,7 @@ const createRectLayer = (x = 30, y = 30, w = 40, h = 20) => ({
   borderColor: '#ffffff',
   borderWidth: 2,
   shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 },
+  visible: true,
 });
 
 const createLineLayer = (x1 = 10, y1 = 50, x2 = 90, y2 = 50) => ({
@@ -97,6 +98,7 @@ const createLineLayer = (x1 = 10, y1 = 50, x2 = 90, y2 = 50) => ({
   dashArray: 'solid',
   arrowStart: 'none',
   arrowEnd: 'none',
+  visible: true,
 });
 
 export default function InvitationDesigner() {
@@ -120,13 +122,18 @@ export default function InvitationDesigner() {
   const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null);
 
+  // Undo/Redo
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const MAX_HISTORY = 30;
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
 
-  // Drag state
-  const [dragging, setDragging] = useState<{ type: string; index: number } | null>(null);
+  // Drag state (updated type to include `point`)
+  const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Resize state
@@ -135,6 +142,37 @@ export default function InvitationDesigner() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── History helpers ──────────────────────────────────────────────────
+
+  const pushHistory = (newLayers: any[]) => {
+    const snapshot = JSON.parse(JSON.stringify(newLayers));
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(snapshot);
+    if (newHistory.length > MAX_HISTORY) newHistory.shift();
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const undo = () => {
+    if (historyIndex > 0) {
+      const idx = historyIndex - 1;
+      setLayers(JSON.parse(JSON.stringify(history[idx])));
+      setHistoryIndex(idx);
+      setSelectedLayerIndex(null);
+      toast.success('Undo');
+    }
+  };
+
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const idx = historyIndex + 1;
+      setLayers(JSON.parse(JSON.stringify(history[idx])));
+      setHistoryIndex(idx);
+      setSelectedLayerIndex(null);
+      toast.success('Redo');
+    }
+  };
 
   // ─── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -157,17 +195,22 @@ export default function InvitationDesigner() {
           if (matched) setSelectedTemplateId(matched.id);
         }
 
+        let initialLayers = [];
         if (settings.designLayers && Array.isArray(settings.designLayers)) {
-          setLayers(settings.designLayers);
+          initialLayers = settings.designLayers;
         } else {
-          // Default layers
-          setLayers([
+          initialLayers = [
             createTextLayer('Welcome to our Wedding', 50, 18),
             createTextLayer('You are cordially invited', 50, 32),
             createTextLayer('Date: June 30, 2026', 50, 42),
             createTextLayer('Venue: The Grand Hall', 50, 50),
-          ]);
+          ];
         }
+        setLayers(initialLayers);
+        // Initialize history
+        const snapshot = JSON.parse(JSON.stringify(initialLayers));
+        setHistory([snapshot]);
+        setHistoryIndex(0);
 
         setOverlayColor(settings.overlayColor ?? '#000000');
         setOverlayOpacity(settings.overlayOpacity ?? 0.2);
@@ -241,30 +284,38 @@ export default function InvitationDesigner() {
     setSaving(false);
   };
 
-  // ─── Layer operations ──────────────────────────────────────────────────
+  // ─── Layer operations with history ──────────────────────────────────
+
+  const setLayersWithHistory = (newLayers: any[]) => {
+    setLayers(newLayers);
+    pushHistory(newLayers);
+  };
 
   const addTextLayer = () => {
     const newLayer = createTextLayer('New Text', 50, 50);
-    setLayers([...layers, newLayer]);
-    setSelectedLayerIndex(layers.length);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
   };
 
   const addRectLayer = () => {
     const newLayer = createRectLayer();
-    setLayers([...layers, newLayer]);
-    setSelectedLayerIndex(layers.length);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
   };
 
   const addLineLayer = () => {
     const newLayer = createLineLayer();
-    setLayers([...layers, newLayer]);
-    setSelectedLayerIndex(layers.length);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
   };
 
   const deleteLayer = (index: number) => {
     const newLayers = [...layers];
     newLayers.splice(index, 1);
-    setLayers(newLayers);
+    setLayersWithHistory(newLayers);
     if (selectedLayerIndex === index) setSelectedLayerIndex(null);
     else if (selectedLayerIndex !== null && selectedLayerIndex > index) setSelectedLayerIndex(selectedLayerIndex - 1);
   };
@@ -275,7 +326,7 @@ export default function InvitationDesigner() {
     if (newLayer.type === 'text') newLayer.text = `${newLayer.text} (copy)`;
     const newLayers = [...layers];
     newLayers.splice(index + 1, 0, newLayer);
-    setLayers(newLayers);
+    setLayersWithHistory(newLayers);
     setSelectedLayerIndex(index + 1);
   };
 
@@ -283,7 +334,7 @@ export default function InvitationDesigner() {
     if (index === 0) return;
     const newLayers = [...layers];
     [newLayers[index - 1], newLayers[index]] = [newLayers[index], newLayers[index - 1]];
-    setLayers(newLayers);
+    setLayersWithHistory(newLayers);
     setSelectedLayerIndex(index - 1);
   };
 
@@ -291,14 +342,21 @@ export default function InvitationDesigner() {
     if (index === layers.length - 1) return;
     const newLayers = [...layers];
     [newLayers[index], newLayers[index + 1]] = [newLayers[index + 1], newLayers[index]];
-    setLayers(newLayers);
+    setLayersWithHistory(newLayers);
     setSelectedLayerIndex(index + 1);
+  };
+
+  const toggleLayerVisibility = (index: number) => {
+    const layer = layers[index];
+    const newLayers = [...layers];
+    newLayers[index] = { ...layer, visible: !layer.visible };
+    setLayersWithHistory(newLayers);
   };
 
   const updateLayer = (index: number, updates: any) => {
     const newLayers = [...layers];
     newLayers[index] = { ...newLayers[index], ...updates };
-    setLayers(newLayers);
+    setLayersWithHistory(newLayers);
   };
 
   // ─── Drag handlers ────────────────────────────────────────────────────
@@ -319,6 +377,12 @@ export default function InvitationDesigner() {
     e.preventDefault();
   };
 
+  const startDragLinePoint = (index: number, point: 'start' | 'end') => (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setDragging({ type: 'linePoint', index, point });
+    e.preventDefault();
+  };
+
   const moveDrag = (e: React.MouseEvent | React.TouchEvent) => {
     if (!dragging || !canvasRef.current) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -328,8 +392,30 @@ export default function InvitationDesigner() {
     let newY = (clientY - rect.top - dragOffset.y) / rect.height * 100;
     newX = Math.min(Math.max(0, newX), 100);
     newY = Math.min(Math.max(0, newY), 100);
+
+    if (dragging.type === 'qr') {
+      setQrX(newX);
+      setQrY(newY);
+      e.preventDefault();
+      return;
+    }
+
     const idx = dragging.index;
     const layer = layers[idx];
+    if (!layer) return;
+
+    if (dragging.type === 'linePoint') {
+      const point = dragging.point;
+      if (point === 'start') {
+        updateLayer(idx, { startX: newX, startY: newY });
+      } else {
+        updateLayer(idx, { endX: newX, endY: newY });
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // move whole layer
     if (layer.type === 'line') {
       const deltaX = newX - (layer.x ?? 50);
       const deltaY = newY - (layer.y ?? 50);
@@ -402,6 +488,7 @@ export default function InvitationDesigner() {
   // ─── Render layer ─────────────────────────────────────────────────────
 
   const renderLayer = (layer: any, index: number) => {
+    if (!layer.visible) return null;
     const isSelected = index === selectedLayerIndex;
     const commonStyle = {
       position: 'absolute' as const,
@@ -498,7 +585,6 @@ export default function InvitationDesigner() {
         ? `drop-shadow(${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.1)'})`
         : 'none';
 
-      // Simple arrow markers (just drawing lines; for full arrows we'd use SVG markers, but we keep it simple)
       return (
         <svg
           key={layer.id}
@@ -521,18 +607,21 @@ export default function InvitationDesigner() {
               <circle
                 cx={`${x1}%`}
                 cy={`${y1}%`}
-                r="6"
+                r="8"
                 fill="#0D4F4F"
                 className="pointer-events-auto cursor-grab"
-                onMouseDown={(e) => {
-                  // drag start point
-                  const rect = canvasRef.current!.getBoundingClientRect();
-                  const clientX = e.clientX;
-                  const clientY = e.clientY;
-                  // We can implement point dragging, but for simplicity we'll use generic drag
-                }}
+                onMouseDown={startDragLinePoint(index, 'start')}
+                onTouchStart={startDragLinePoint(index, 'start')}
               />
-              <circle cx={`${x2}%`} cy={`${y2}%`} r="6" fill="#0D4F4F" className="pointer-events-auto cursor-grab" />
+              <circle
+                cx={`${x2}%`}
+                cy={`${y2}%`}
+                r="8"
+                fill="#0D4F4F"
+                className="pointer-events-auto cursor-grab"
+                onMouseDown={startDragLinePoint(index, 'end')}
+                onTouchStart={startDragLinePoint(index, 'end')}
+              />
             </>
           )}
           {/* Invisible center handle for moving the whole line */}
@@ -561,7 +650,13 @@ export default function InvitationDesigner() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      <h1 className="font-serif text-3xl font-black text-gray-900 mb-2">Invitation Designer</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="font-serif text-3xl font-black text-gray-900">Invitation Designer</h1>
+        <div className="flex gap-2">
+          <button onClick={undo} disabled={historyIndex <= 0} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-40"><Undo size={18} /></button>
+          <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-40"><Redo size={18} /></button>
+        </div>
+      </div>
       <p className="text-gray-500 mb-6">Design your card with text, shapes, and QR code. Drag to position, click to edit.</p>
 
       {/* Template Gallery */}
@@ -696,6 +791,9 @@ export default function InvitationDesigner() {
                   {layer.type === 'text' ? `📝 ${layer.text.substring(0, 20)}` : layer.type === 'rect' ? '⬛ Rectangle' : '━ Line'}
                 </span>
                 <div className="flex gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded">
+                    {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                  </button>
                   <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded"><Copy size={12} /></button>
                   <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded"><ArrowUp size={12} /></button>
                   <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded"><ArrowDown size={12} /></button>
@@ -905,8 +1003,6 @@ export default function InvitationDesigner() {
                     >
                       <option value="none">None</option>
                       <option value="arrow">Arrow</option>
-                      <option value="circle">Circle</option>
-                      <option value="square">Square</option>
                     </select>
                   </div>
                   <div>
@@ -918,25 +1014,7 @@ export default function InvitationDesigner() {
                     >
                       <option value="none">None</option>
                       <option value="arrow">Arrow</option>
-                      <option value="circle">Circle</option>
-                      <option value="square">Square</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="flex justify-between text-sm">Start X <span>{Math.round(selectedLayer.startX || 10)}%</span></label>
-                    <input type="range" min="0" max="100" value={selectedLayer.startX || 10} onChange={e => updateLayer(selectedLayerIndex!, { startX: Number(e.target.value) })} className="w-full accent-[#0D4F4F]" />
-                  </div>
-                  <div>
-                    <label className="flex justify-between text-sm">Start Y <span>{Math.round(selectedLayer.startY || 50)}%</span></label>
-                    <input type="range" min="0" max="100" value={selectedLayer.startY || 50} onChange={e => updateLayer(selectedLayerIndex!, { startY: Number(e.target.value) })} className="w-full accent-[#0D4F4F]" />
-                  </div>
-                  <div>
-                    <label className="flex justify-between text-sm">End X <span>{Math.round(selectedLayer.endX || 90)}%</span></label>
-                    <input type="range" min="0" max="100" value={selectedLayer.endX || 90} onChange={e => updateLayer(selectedLayerIndex!, { endX: Number(e.target.value) })} className="w-full accent-[#0D4F4F]" />
-                  </div>
-                  <div>
-                    <label className="flex justify-between text-sm">End Y <span>{Math.round(selectedLayer.endY || 50)}%</span></label>
-                    <input type="range" min="0" max="100" value={selectedLayer.endY || 50} onChange={e => updateLayer(selectedLayerIndex!, { endY: Number(e.target.value) })} className="w-full accent-[#0D4F4F]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-3">
