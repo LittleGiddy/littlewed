@@ -53,6 +53,7 @@ export async function GET(
       overlayOpacity: true,
       // Custom message
       customMessage: true,
+      designLayers: true,
     },
   });
 
@@ -119,7 +120,7 @@ export async function PUT(
 
   // Custom message
   if (body.customMessage !== undefined) updateData.customMessage = body.customMessage;
-
+  if (body.designLayers !== undefined) updateData.designLayers = body.designLayers;
   await prisma.event.updateMany({
     where: { id: eventId, tenantId },
     data: updateData,
