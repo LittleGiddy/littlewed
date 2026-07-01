@@ -293,7 +293,6 @@ export default function InvitationDesigner() {
     setSelectedLayerIndex(newLayers.length - 1);
   };
 
-  // Quick add guest name layer (pre‑filled text)
   const addGuestNameLayer = () => {
     const newLayer = createTextLayer('Guest Name', 50, 60);
     const newLayers = [...layers, newLayer];
@@ -386,7 +385,7 @@ export default function InvitationDesigner() {
     setLayersWithHistory(newLayers);
   };
 
-  // ─── Drag handlers (unchanged) ──────────────────────────────────────
+  // ─── Drag handlers ──────────────────────────────────────────────────
 
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
@@ -472,7 +471,7 @@ export default function InvitationDesigner() {
 
   const endDrag = () => setDragging(null);
 
-  // ─── Resize handlers (unchanged) ────────────────────────────────────
+  // ─── Resize handlers ──────────────────────────────────────────────────
 
   const startResize = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
@@ -684,7 +683,6 @@ export default function InvitationDesigner() {
 
   const selectedLayer = selectedLayerIndex !== null ? layers[selectedLayerIndex] : null;
 
-  // Helper to toggle collapsible sections
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
@@ -770,10 +768,12 @@ export default function InvitationDesigner() {
 
       {/* Main Content: Preview + Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-        {/* Preview */}
-        <div className="lg:col-span-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sticky top-6">
-            <h2 className="font-semibold mb-3 flex items-center gap-2"><Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview</h2>
+        {/* ─── Preview (sticky on mobile) ─── */}
+        <div className="lg:col-span-4 sticky top-0 z-10 bg-white lg:static lg:bg-transparent lg:z-auto max-h-[50vh] lg:max-h-none overflow-hidden border-b lg:border-b-0 border-gray-200 shadow-sm lg:shadow-none">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
+              <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
+            </h2>
             <div
               ref={canvasRef}
               className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
@@ -837,7 +837,7 @@ export default function InvitationDesigner() {
           </div>
         </div>
 
-        {/* Controls (Mobile-friendly accordion) */}
+        {/* ─── Controls ─── */}
         <div className="lg:col-span-2 space-y-4">
           {/* Quick Add Guest Name (always visible) */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex items-center justify-between">
