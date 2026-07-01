@@ -82,6 +82,34 @@ model Event {
   qrColor         String?  @default("#000000")
   qrDotStyle      String?  @default("square") // square, circle, rounded
   guestCount   Int?    // number of guests entered by organiser
+
+   // Text overlays
+  showEventName   Boolean @default(true)
+  eventNameX      Float   @default(50)
+  eventNameY      Float   @default(15)
+  eventNameSize   Int     @default(28)
+  eventNameColor  String  @default("#ffffff")
+
+  showDate        Boolean @default(true)
+  dateX           Float   @default(50)
+  dateY           Float   @default(25)
+  dateSize        Int     @default(18)
+  dateColor       String  @default("#ffffff")
+
+  showVenue       Boolean @default(true)
+  venueX          Float   @default(50)
+  venueY          Float   @default(32)
+  venueSize       Int     @default(16)
+  venueColor      String  @default("#ffffff")
+
+    // Artistic overlay
+  overlayColor    String  @default("#000000")
+  overlayOpacity  Float   @default(0.2)
+
+  eventNameFontFamily String? @default("Playfair Display")
+  dateFontFamily      String? @default("DM Sans")
+  venueFontFamily     String? @default("DM Sans")
+  nameFontFamily      String? @default("Playfair Display")
 }
 
 model PendingEvent {
@@ -167,4 +195,14 @@ model Notification {
   isRead    Boolean  @default(false)
   link      String?  // optional URL to navigate to
   createdAt DateTime @default(now())
+}
+
+// New Template model
+model Template {
+  id        String   @id @default(cuid())
+  name      String
+  imageUrl  String   // URL to the template image
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
