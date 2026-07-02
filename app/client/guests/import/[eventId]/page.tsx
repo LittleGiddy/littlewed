@@ -1,7 +1,8 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, Users, Download, Check, ChevronDown, AlertTriangle, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { Upload, FileSpreadsheet, X, AlertCircle, Loader2, Users, Download, Check, ChevronDown, AlertTriangle, CheckCircle, Eye, EyeOff, Phone, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
@@ -29,6 +30,7 @@ export default function ImportGuestsPage() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({});
   const [uploading, setUploading] = useState(false);
+  const [importStatus, setImportStatus] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
@@ -131,6 +133,47 @@ export default function ImportGuestsPage() {
     setError('');
     setLimitWarning(null);
     parseFile(file);
+  };
+
+  // ─── Import from Phone Contacts ──────────────────────────────────────
+
+  const importFromPhone = async () => {
+    if (!('contacts' in navigator)) {
+      toast.error('Your browser does not support contact import');
+      return;
+    }
+    try {
+      setUploading(true);
+      setImportStatus('Loading contacts...');
+      const contacts = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: true });
+      setImportStatus('Formatting contacts...');
+      const guests: ParsedGuest[] = contacts
+        .map((c: any) => {
+          const name = c.name?.[0] || '';
+          const phone = c.tel?.[0] || '';
+          const email = c.email?.[0] || '';
+          const norm = normalizePhone(phone);
+          return {
+            name,
+            phone,
+            normalizedPhone: norm.normalized,
+            isValid: norm.isValid,
+            statusMessage: norm.message,
+            email,
+          };
+        })
+        .filter((g: ParsedGuest) => g.name && g.phone); // ✅ explicit type
+      setParsedGuests(guests);
+      checkLimit(guests.filter(g => g.isValid).length);
+      setStep('preview');
+      setImportStatus('');
+      toast.success(`Imported ${guests.length} contacts`);
+    } catch (err) {
+      toast.error('Failed to import contacts');
+    } finally {
+      setUploading(false);
+      setImportStatus('');
+    }
   };
 
   // ─── Parsing ────────────────────────────────────────────────────────────
@@ -335,6 +378,7 @@ export default function ImportGuestsPage() {
       email: g.email,
     }));
     setUploading(true);
+    setImportStatus('Importing guests...');
     try {
       const res = await fetch('/api/guests/import', {
         method: 'POST',
@@ -356,6 +400,7 @@ export default function ImportGuestsPage() {
       toast.error('Network error');
     } finally {
       setUploading(false);
+      setImportStatus('');
     }
   };
 
@@ -378,7 +423,6 @@ export default function ImportGuestsPage() {
   const downloadInvalid = () => {
     const invalid = parsedGuests.filter(g => !g.isValid);
     if (invalid.length === 0) {
-      // ✅ fix: use toast() with icon
       toast('No invalid guests to export', { icon: 'ℹ️' });
       return;
     }
@@ -403,6 +447,14 @@ export default function ImportGuestsPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-4 pb-20">
+      {/* Back button */}
+      <Link
+        href={`/client/events/${eventId}`}
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
+      >
+        <ArrowLeft size={14} /> Back to Event
+      </Link>
+
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Import Guests</h1>
         <button
@@ -413,9 +465,20 @@ export default function ImportGuestsPage() {
         </button>
       </div>
       <p className="text-gray-500 mb-6">
-        Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, or <strong>vCard (.vcf)</strong> file.
+        Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, or <strong>vCard (.vcf)</strong> file, or import from your phone contacts.
         For CSV/Excel, you'll be able to map columns to our fields. Phone numbers will be auto‑formatted to international format.
       </p>
+
+      {/* Import from Phone Contacts (mobile) */}
+      {'contacts' in navigator && step === 'upload' && (
+        <button
+          onClick={importFromPhone}
+          disabled={uploading}
+          className="w-full mb-4 py-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-100 transition disabled:opacity-50"
+        >
+          <Phone size={18} /> Import from Phone Contacts
+        </button>
+      )}
 
       {/* Drag & Drop Area */}
       {step === 'upload' && (
@@ -615,7 +678,10 @@ export default function ImportGuestsPage() {
               className="px-6 py-2 bg-[#0D4F4F] text-white rounded-lg hover:bg-[#0A3D3D] disabled:opacity-50 flex items-center gap-2"
             >
               {uploading ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Importing...</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {importStatus || 'Importing...'}
+                </>
               ) : (
                 <>Import {skipInvalid ? validCount : parsedGuests.length} guests</>
               )}
