@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Upload, FileSpreadsheet, X, AlertCircle, Loader2, Download, 
-  AlertTriangle, CheckCircle, Phone, ArrowLeft 
+  AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
@@ -42,6 +42,10 @@ export default function ImportGuestsPage() {
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [showValidOnly, setShowValidOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Editing state – index in parsedGuests array
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   useEffect(() => {
     fetch(`/api/events/${eventId}/guests/count`, { credentials: 'include' })
@@ -343,6 +347,25 @@ export default function ImportGuestsPage() {
     toast.success(`Mapped ${guests.length} guests (${guests.filter(g => g.isValid).length} valid)`);
   };
 
+  const startEditing = (index: number, currentName: string) => {
+    setEditingIndex(index);
+    setEditValue(currentName);
+  };
+
+  const saveEdit = (index: number) => {
+    const updated = [...parsedGuests];
+    updated[index].name = editValue.trim() || updated[index].name;
+    setParsedGuests(updated);
+    setEditingIndex(null);
+    setEditValue('');
+    toast.success('Name updated');
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditValue('');
+  };
+
   const handleImport = async () => {
     const validGuests = parsedGuests.filter(g => g.isValid);
     if (validGuests.length === 0) {
@@ -419,6 +442,94 @@ export default function ImportGuestsPage() {
 
   const validCount = parsedGuests.filter(g => g.isValid).length;
   const invalidCount = parsedGuests.filter(g => !g.isValid).length;
+
+  // ─── Render guests table ──────────────────────────────────────────────
+  const renderGuestRows = () => {
+    // Filter guests based on showValidOnly
+    const displayGuests = showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests;
+    // Truncate to 50 for performance
+    const shown = displayGuests.slice(0, 50);
+    const remaining = displayGuests.length - 50;
+
+    return (
+      <>
+        {shown.map((guest, idx) => {
+          // Find the original index in parsedGuests to use for editing
+          const originalIndex = parsedGuests.indexOf(guest);
+          const isEditing = editingIndex === originalIndex;
+          return (
+            <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
+              <td className="px-4 py-2">
+                {isEditing ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <span className="break-words">{guest.name}</span>
+                )}
+              </td>
+              <td className="px-4 py-2 font-mono text-xs break-all">
+                {guest.normalizedPhone || guest.phone}
+              </td>
+              <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
+              <td className="px-4 py-2">
+                {guest.isValid ? (
+                  <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                    <CheckCircle size={12} /> Valid
+                  </span>
+                ) : (
+                  <span className="text-amber-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                    <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
+                  </span>
+                )}
+              </td>
+              <td className="px-4 py-2">
+                {isEditing ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => saveEdit(originalIndex)}
+                      className="text-green-600 hover:text-green-800 transition"
+                      title="Save"
+                    >
+                      <Save size={16} />
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="text-red-500 hover:text-red-700 transition"
+                      title="Cancel"
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startEditing(originalIndex, guest.name)}
+                    className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
+                    title="Edit name"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+        {remaining > 0 && (
+          <tr>
+            <td colSpan={5} className="px-4 py-2 text-gray-400 text-center">
+              + {remaining} more
+            </td>
+          </tr>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
@@ -585,43 +696,18 @@ export default function ImportGuestsPage() {
                 </label>
               </h2>
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <table className="min-w-full text-sm">
+                <table className="min-w-full text-sm table-auto">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
-                      <th className="px-4 py-2 text-left">Name</th>
-                      <th className="px-4 py-2 text-left">Phone (normalized)</th>
-                      <th className="px-4 py-2 text-left">Email</th>
-                      <th className="px-4 py-2 text-left">Status</th>
+                      <th className="px-4 py-2 text-left min-w-[120px]">Name</th>
+                      <th className="px-4 py-2 text-left min-w-[140px]">Phone</th>
+                      <th className="px-4 py-2 text-left min-w-[120px]">Email</th>
+                      <th className="px-4 py-2 text-left min-w-[100px]">Status</th>
+                      <th className="px-4 py-2 text-left min-w-[80px]">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {(showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests).slice(0, 20).map((guest, idx) => (
-                      <tr key={idx} className={guest.isValid ? '' : 'bg-amber-50/50'}>
-                        <td className="px-4 py-2">{guest.name}</td>
-                        <td className="px-4 py-2 font-mono text-sm">
-                          {guest.normalizedPhone || guest.phone}
-                        </td>
-                        <td className="px-4 py-2">{guest.email || '—'}</td>
-                        <td className="px-4 py-2">
-                          {guest.isValid ? (
-                            <span className="text-green-600 text-xs font-medium flex items-center gap-1">
-                              <CheckCircle size={12} /> Valid
-                            </span>
-                          ) : (
-                            <span className="text-amber-600 text-xs font-medium flex items-center gap-1">
-                              <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {parsedGuests.length > 20 && (
-                      <tr>
-                        <td colSpan={4} className="px-4 py-2 text-gray-400 text-center">
-                          + {parsedGuests.length - 20} more
-                        </td>
-                      </tr>
-                    )}
+                    {renderGuestRows()}
                   </tbody>
                 </table>
               </div>
