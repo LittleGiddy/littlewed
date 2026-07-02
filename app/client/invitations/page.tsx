@@ -69,7 +69,7 @@ export default function InvitationsPage() {
       });
       if (res.ok) {
         toast.success('Invitation resent');
-        fetchData(); // refresh
+        fetchData();
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to resend');
@@ -82,9 +82,9 @@ export default function InvitationsPage() {
   };
 
   const getStatus = (guest: Guest) => {
-    if (guest.checkedIn) return { label: 'Checked In', icon: <CheckCircle size={16} className="text-green-600" /> };
-    if (guest.invitationSentAt) return { label: 'Sent', icon: <Send size={16} className="text-blue-600" /> };
-    return { label: 'Pending', icon: <Clock size={16} className="text-amber-600" /> };
+    if (guest.checkedIn) return { label: 'Checked In', icon: <CheckCircle size={16} className="text-[#1A7A4A]" /> };
+    if (guest.invitationSentAt) return { label: 'Sent', icon: <Send size={16} className="text-[#0D4F4F]" /> };
+    return { label: 'Pending', icon: <Clock size={16} className="text-[#C07A20]" /> };
   };
 
   const stats = {
@@ -137,15 +137,15 @@ export default function InvitationsPage() {
 
         .inv-stats {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+          gap: 12px;
           margin-bottom: 32px;
         }
 
         .inv-stat {
           background: white;
           border-radius: 16px;
-          padding: 16px;
+          padding: 16px 12px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
           text-align: center;
         }
@@ -210,41 +210,6 @@ export default function InvitationsPage() {
           box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
-        .inv-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 14px;
-        }
-        .inv-table th {
-          text-align: left;
-          padding: 14px 16px;
-          background: #F7F9FB;
-          font-weight: 600;
-          color: #4A6072;
-          border-bottom: 1.5px solid #EEF2F6;
-        }
-        .inv-table td {
-          padding: 14px 16px;
-          border-bottom: 1px solid #F7F9FB;
-          vertical-align: middle;
-        }
-        .inv-table tr:hover td {
-          background: #F9FCFE;
-        }
-        .inv-table .status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 12px;
-          font-weight: 600;
-          padding: 3px 8px;
-          border-radius: 20px;
-          background: #F0F4F8;
-        }
-        .inv-table .status-pending { background: #FFF3E0; color: #C07A20; }
-        .inv-table .status-sent { background: #E3F2FD; color: #0D4F4F; }
-        .inv-table .status-checked { background: #E8F5E9; color: #1A7A4A; }
-
         .inv-resend-btn {
           background: none;
           border: 1.5px solid #E2EAF0;
@@ -256,6 +221,7 @@ export default function InvitationsPage() {
           cursor: pointer;
           color: #0D4F4F;
           transition: background 0.15s, border-color 0.15s;
+          white-space: nowrap;
         }
         .inv-resend-btn:hover {
           background: rgba(13,79,79,0.06);
@@ -275,6 +241,97 @@ export default function InvitationsPage() {
         .inv-empty-icon {
           font-size: 40px;
           margin-bottom: 12px;
+        }
+
+        /* Card view (mobile) */
+        .guest-card {
+          background: white;
+          border-radius: 12px;
+          padding: 14px 16px;
+          border: 1px solid #E2EAF0;
+          margin-bottom: 10px;
+          transition: border-color 0.15s;
+        }
+        .guest-card:hover {
+          border-color: #0D4F4F;
+        }
+        .guest-card .top-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        .guest-card .guest-name {
+          font-weight: 700;
+          color: #0D1B1B;
+          font-size: 15px;
+        }
+        .guest-card .guest-phone {
+          font-size: 12px;
+          color: #9BAAB8;
+          font-family: monospace;
+        }
+        .guest-card .event-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: #4A6072;
+        }
+        .guest-card .event-date {
+          font-size: 11px;
+          color: #9BAAB8;
+        }
+        .guest-card .channel-badge {
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 20px;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .guest-card .channel-whatsapp {
+          background: rgba(13,79,79,0.08);
+          color: #0D4F4F;
+        }
+        .guest-card .channel-sms {
+          background: #F0F4F8;
+          color: #4A6072;
+        }
+        .guest-card .status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 20px;
+        }
+        .guest-card .status-pending { background: #FFF3E0; color: #C07A20; }
+        .guest-card .status-sent { background: #E3F2FD; color: #0D4F4F; }
+        .guest-card .status-checked { background: #E8F5E9; color: #1A7A4A; }
+        .guest-card .sent-date {
+          font-size: 11px;
+          color: #9BAAB8;
+        }
+        .guest-card .action-btn {
+          background: none;
+          border: 1.5px solid #E2EAF0;
+          border-radius: 8px;
+          padding: 4px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          color: #0D4F4F;
+          transition: background 0.15s, border-color 0.15s;
+          white-space: nowrap;
+        }
+        .guest-card .action-btn:hover {
+          background: rgba(13,79,79,0.06);
+          border-color: #0D4F4F;
+        }
+        .guest-card .action-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         @media (max-width: 640px) {
@@ -344,74 +401,111 @@ export default function InvitationsPage() {
             <p className="text-sm">Send invitations from an event to see them here.</p>
           </div>
         ) : (
-          <table className="inv-table">
-            <thead>
-              <tr>
-                <th>Guest</th>
-                <th>Event</th>
-                <th>Channel</th>
-                <th>Sent Date</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Mobile card view */}
+            <div className="sm:hidden p-3 max-h-[500px] overflow-y-auto">
               {guests.map(g => {
                 const status = getStatus(g);
                 const statusClass = g.checkedIn ? 'status-checked' : (g.invitationSentAt ? 'status-sent' : 'status-pending');
+                const channelClass = g.routingChannel === 'whatsapp' ? 'channel-whatsapp' : 'channel-sms';
                 return (
-                  <tr key={g.id}>
-                    <td>
-                      <div className="font-semibold">{g.name}</div>
-                      <div className="text-xs text-gray-500">{g.phone}</div>
-                    </td>
-                    <td>
-                      <div className="text-sm font-medium">{g.event.name}</div>
-                      <div className="text-xs text-gray-400">{new Date(g.event.date).toLocaleDateString()}</div>
-                    </td>
-                    <td>
-                      {g.routingChannel === 'whatsapp' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2 py-0.5 rounded-full">
-                          <MessageCircle size={12} /> WhatsApp
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
-                          <Phone size={12} /> SMS
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-sm text-gray-500">
-                      {g.invitationSentAt ? new Date(g.invitationSentAt).toLocaleString() : '—'}
-                    </td>
-                    <td>
+                  <div key={g.id} className="guest-card">
+                    <div className="top-row">
+                      <div>
+                        <div className="guest-name">{g.name}</div>
+                        <div className="guest-phone">{g.phone}</div>
+                      </div>
+                      <button
+                        className="action-btn"
+                        onClick={() => resendInvitation(g.id)}
+                        disabled={resending === g.id}
+                      >
+                        {resending === g.id ? '...' : (g.invitationSentAt ? 'Resend' : 'Send Now')}
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className={`channel-badge ${channelClass}`}>
+                        {g.routingChannel === 'whatsapp' ? <MessageCircle size={12} /> : <Phone size={12} />}
+                        {g.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                      </span>
                       <span className={`status-badge ${statusClass}`}>
                         {status.icon} {status.label}
                       </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {g.invitationSentAt ? (
-                        <button
-                          className="inv-resend-btn"
-                          onClick={() => resendInvitation(g.id)}
-                          disabled={resending === g.id}
-                        >
-                          {resending === g.id ? '...' : 'Resend'}
-                        </button>
-                      ) : (
-                        <button
-                          className="inv-resend-btn"
-                          onClick={() => resendInvitation(g.id)}
-                          disabled={resending === g.id}
-                        >
-                          {resending === g.id ? '...' : 'Send Now'}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                      <span className="sent-date">
+                        {g.invitationSentAt ? new Date(g.invitationSentAt).toLocaleString() : 'Not sent'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500">
+                      <span className="event-name">{g.event.name}</span>
+                      <span className="event-date ml-2">{new Date(g.event.date).toLocaleDateString()}</span>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Desktop table view */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">Guest</th>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">Event</th>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">Channel</th>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">Sent Date</th>
+                    <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
+                    <th className="px-4 py-2 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {guests.map(g => {
+                    const status = getStatus(g);
+                    const statusClass = g.checkedIn ? 'status-checked' : (g.invitationSentAt ? 'status-sent' : 'status-pending');
+                    return (
+                      <tr key={g.id} className="hover:bg-gray-50/50">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold">{g.name}</div>
+                          <div className="text-xs text-gray-500 font-mono">{g.phone}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium">{g.event.name}</div>
+                          <div className="text-xs text-gray-400">{new Date(g.event.date).toLocaleDateString()}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {g.routingChannel === 'whatsapp' ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2 py-0.5 rounded-full">
+                              <MessageCircle size={12} /> WhatsApp
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                              <Phone size={12} /> SMS
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {g.invitationSentAt ? new Date(g.invitationSentAt).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass === 'status-checked' ? 'bg-green-50 text-green-700' : statusClass === 'status-sent' ? 'bg-blue-50 text-[#0D4F4F]' : 'bg-amber-50 text-amber-700'}`}>
+                            {status.icon} {status.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            className="inv-resend-btn"
+                            onClick={() => resendInvitation(g.id)}
+                            disabled={resending === g.id}
+                          >
+                            {resending === g.id ? '...' : (g.invitationSentAt ? 'Resend' : 'Send Now')}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
