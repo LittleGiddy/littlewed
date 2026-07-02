@@ -331,23 +331,14 @@ export default async function ClientDashboard() {
             <Link href={newEventUrl} className="db-quick-btn">
               <Plus size={15} /> New Event
             </Link>
-            <Link
-              href={firstEventId ? `/client/guests/import/${firstEventId}` : '#'}
-              className={`db-quick-btn${!firstEventId ? ' disabled' : ''}`}
-            >
-              <Upload size={15} /> Import
+            <Link href="/client/guests/import/select-event" className="db-quick-btn">
+              <Upload size={15} /> Import Guests
             </Link>
-            <Link
-              href={firstEventId ? `/client/invitations/design/${firstEventId}` : '#'}
-              className={`db-quick-btn${!firstEventId ? ' disabled' : ''}`}
-            >
-              <Palette size={15} /> Design
+            <Link href="/client/invitations/design/select-event" className="db-quick-btn">
+              <Palette size={15} /> Design Card
             </Link>
-            <Link
-              href={firstEventId ? `/client/invitations/send/${firstEventId}` : '#'}
-              className={`db-quick-btn${!firstEventId ? ' disabled' : ''}`}
-            >
-              <Send size={15} /> Send
+            <Link href="/client/invitations/send/select-event" className="db-quick-btn">
+              <Send size={15} /> Send Invites
             </Link>
           </div>
 
