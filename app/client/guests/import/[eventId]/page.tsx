@@ -43,7 +43,7 @@ export default function ImportGuestsPage() {
   const [showValidOnly, setShowValidOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Editing state – index in parsedGuests array
+  // Editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -443,93 +443,9 @@ export default function ImportGuestsPage() {
   const validCount = parsedGuests.filter(g => g.isValid).length;
   const invalidCount = parsedGuests.filter(g => !g.isValid).length;
 
-  // ─── Render guests table ──────────────────────────────────────────────
-  const renderGuestRows = () => {
-    // Filter guests based on showValidOnly
-    const displayGuests = showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests;
-    // Truncate to 50 for performance
-    const shown = displayGuests.slice(0, 50);
-    const remaining = displayGuests.length - 50;
-
-    return (
-      <>
-        {shown.map((guest, idx) => {
-          // Find the original index in parsedGuests to use for editing
-          const originalIndex = parsedGuests.indexOf(guest);
-          const isEditing = editingIndex === originalIndex;
-          return (
-            <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
-              <td className="px-4 py-2">
-                {isEditing ? (
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
-                      autoFocus
-                    />
-                  </div>
-                ) : (
-                  <span className="break-words">{guest.name}</span>
-                )}
-              </td>
-              <td className="px-4 py-2 font-mono text-xs break-all">
-                {guest.normalizedPhone || guest.phone}
-              </td>
-              <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
-              <td className="px-4 py-2">
-                {guest.isValid ? (
-                  <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
-                    <CheckCircle size={12} /> Valid
-                  </span>
-                ) : (
-                  <span className="text-amber-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
-                    <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
-                  </span>
-                )}
-              </td>
-              <td className="px-4 py-2">
-                {isEditing ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => saveEdit(originalIndex)}
-                      className="text-green-600 hover:text-green-800 transition"
-                      title="Save"
-                    >
-                      <Save size={16} />
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="text-red-500 hover:text-red-700 transition"
-                      title="Cancel"
-                    >
-                      <XCircle size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => startEditing(originalIndex, guest.name)}
-                    className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
-                    title="Edit name"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-        {remaining > 0 && (
-          <tr>
-            <td colSpan={5} className="px-4 py-2 text-gray-400 text-center">
-              + {remaining} more
-            </td>
-          </tr>
-        )}
-      </>
-    );
-  };
+  // ─── Render guest list (table on desktop, cards on mobile) ──────────────
+  const displayGuests = showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests;
+  const shown = displayGuests.slice(0, 50);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
@@ -560,7 +476,7 @@ export default function ImportGuestsPage() {
             <button
               onClick={importFromPhone}
               disabled={uploading}
-              className="w-full mb-4 py-3 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-blue-100 transition disabled:opacity-50"
+              className="w-full mb-4 py-3 bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.2)] rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[rgba(13,79,79,0.14)] transition disabled:opacity-50"
             >
               <Phone size={18} /> Import from Phone Contacts
             </button>
@@ -647,17 +563,17 @@ export default function ImportGuestsPage() {
           </div>
 
           <div className="flex flex-wrap gap-3 mb-4">
-            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-medium text-green-700">{validCount} valid</span>
+            <div className="bg-[#EDFAF4] border border-[#A8D5C4] rounded-xl px-4 py-2 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-[#1A7A4A]" />
+              <span className="text-sm font-medium text-[#1A7A4A]">{validCount} valid</span>
             </div>
             {invalidCount > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-medium text-amber-700">{invalidCount} invalid</span>
+              <div className="bg-[#FEF6EC] border border-[#F5D6B8] rounded-xl px-4 py-2 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#C07A20]" />
+                <span className="text-sm font-medium text-[#C07A20]">{invalidCount} invalid</span>
                 <button
                   onClick={downloadInvalid}
-                  className="text-xs text-amber-700 underline hover:no-underline"
+                  className="text-xs text-[#0D4F4F] underline hover:no-underline"
                 >
                   Export invalid
                 </button>
@@ -683,7 +599,7 @@ export default function ImportGuestsPage() {
           )}
 
           {parsedGuests.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <h2 className="font-semibold px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span>Preview ({parsedGuests.length} guests)</span>
                 <label className="flex items-center gap-2 text-sm font-normal">
@@ -695,22 +611,164 @@ export default function ImportGuestsPage() {
                   Skip invalid
                 </label>
               </h2>
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <table className="min-w-full text-sm table-auto">
-                  <thead className="bg-gray-50 sticky top-0">
+
+              {/* Mobile card view (hidden on sm and up) */}
+              <div className="sm:hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                {shown.map((guest) => {
+                  const originalIndex = parsedGuests.indexOf(guest);
+                  const isEditing = editingIndex === originalIndex;
+                  return (
+                    <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-amber-50/50'}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                autoFocus
+                              />
+                            </div>
+                          ) : (
+                            <p className="font-medium text-gray-800 break-words">{guest.name}</p>
+                          )}
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">{guest.normalizedPhone || guest.phone}</p>
+                          {guest.email && <p className="text-xs text-gray-400 mt-0.5 truncate">{guest.email}</p>}
+                          <div className="mt-1">
+                            {guest.isValid ? (
+                              <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+                                <CheckCircle size={12} /> Valid
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 text-xs font-medium flex items-center gap-1">
+                                <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-3 flex-shrink-0">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => saveEdit(originalIndex)}
+                                className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                title="Save"
+                              >
+                                <Save size={18} />
+                              </button>
+                              <button
+                                onClick={cancelEdit}
+                                className="text-red-500 hover:text-red-700 transition"
+                                title="Cancel"
+                              >
+                                <XCircle size={18} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => startEditing(originalIndex, guest.name)}
+                              className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
+                              title="Edit name"
+                            >
+                              <Pencil size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table view (hidden on mobile) */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left min-w-[120px]">Name</th>
-                      <th className="px-4 py-2 text-left min-w-[140px]">Phone</th>
-                      <th className="px-4 py-2 text-left min-w-[120px]">Email</th>
-                      <th className="px-4 py-2 text-left min-w-[100px]">Status</th>
-                      <th className="px-4 py-2 text-left min-w-[80px]">Action</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Name</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Phone</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Email</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {renderGuestRows()}
+                    {shown.map((guest) => {
+                      const originalIndex = parsedGuests.indexOf(guest);
+                      const isEditing = editingIndex === originalIndex;
+                      return (
+                        <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
+                          <td className="px-4 py-2">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  autoFocus
+                                />
+                              </div>
+                            ) : (
+                              <span className="break-words">{guest.name}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 font-mono text-xs break-all">{guest.normalizedPhone || guest.phone}</td>
+                          <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
+                          <td className="px-4 py-2">
+                            {guest.isValid ? (
+                              <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                                <CheckCircle size={12} /> Valid
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                                <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  title="Save"
+                                >
+                                  <Save size={16} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-red-500 hover:text-red-700 transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => startEditing(originalIndex, guest.name)}
+                                className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
+                                title="Edit name"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
+
+              {displayGuests.length > 50 && (
+                <div className="px-4 py-2 text-center text-gray-400 text-sm border-t">
+                  + {displayGuests.length - 50} more guests
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:justify-between items-center px-4 py-2 border-t gap-2">
                 <button
                   onClick={() => setShowValidOnly(!showValidOnly)}
