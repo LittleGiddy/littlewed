@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Filter, ChevronDown, RefreshCw, MessageCircle, Phone, CheckCircle, Clock, XCircle, Trash2, Edit2, Check, X, Square, CheckSquare } from 'lucide-react';
+import { Send, RefreshCw, MessageCircle, Phone, CheckCircle, Clock, XCircle, Trash2, Edit2, Check, X, Square, CheckSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -23,7 +23,7 @@ interface Event {
   name: string;
 }
 
-export default function InvitationsPage() {
+export default function GuestsPage() {
   const router = useRouter();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -50,7 +50,6 @@ export default function InvitationsPage() {
       const eventsData = await eventsRes.json();
       setGuests(guestsData);
       setEvents(eventsData);
-      // Clear selection when filters change
       setSelected(new Set());
     } catch {
       toast.error('Failed to load data');
@@ -63,7 +62,6 @@ export default function InvitationsPage() {
     fetchData();
   }, [filterEvent, filterStatus, filterChannel]);
 
-  // ─── Selection ──────────────────────────────────────────────────────────
   const toggleSelect = (id: string) => {
     const newSet = new Set(selected);
     if (newSet.has(id)) newSet.delete(id);
@@ -79,7 +77,6 @@ export default function InvitationsPage() {
     }
   };
 
-  // ─── Bulk actions ──────────────────────────────────────────────────────
   const bulkSend = async () => {
     if (selected.size === 0) {
       toast.error('Select at least one guest');
@@ -142,7 +139,6 @@ export default function InvitationsPage() {
     }
   };
 
-  // ─── Single resend ─────────────────────────────────────────────────────
   const resendInvitation = async (guestId: string) => {
     if (!confirm('Resend invitation to this guest?')) return;
     setResending(new Set([guestId]));
@@ -167,7 +163,6 @@ export default function InvitationsPage() {
     }
   };
 
-  // ─── Edit ──────────────────────────────────────────────────────────────
   const startEditing = (guest: Guest, field: 'name' | 'phone') => {
     setEditing({ id: guest.id, field });
     setEditValue(field === 'name' ? guest.name : guest.phone);
@@ -204,7 +199,6 @@ export default function InvitationsPage() {
     setEditValue('');
   };
 
-  // ─── Single delete ─────────────────────────────────────────────────────
   const deleteGuest = async (guestId: string) => {
     if (!confirm('Delete this guest?')) return;
     try {
@@ -221,7 +215,6 @@ export default function InvitationsPage() {
     }
   };
 
-  // ─── Status helpers ────────────────────────────────────────────────────
   const getStatus = (guest: Guest) => {
     if (guest.checkedIn) return { label: 'Checked In', icon: <CheckCircle size={16} className="text-[#1A7A4A]" /> };
     if (guest.invitationSentAt) return { label: 'Sent', icon: <Send size={16} className="text-[#0D4F4F]" /> };
@@ -244,8 +237,6 @@ export default function InvitationsPage() {
     const isEditingName = editing?.id === guest.id && editing?.field === 'name';
     const isEditingPhone = editing?.id === guest.id && editing?.field === 'phone';
 
-    // Card layout (mobile) and table row (desktop) share the same data.
-    // We'll render both and use responsive classes.
     return (
       <div key={guest.id}>
         {/* Mobile Card */}
@@ -415,7 +406,7 @@ export default function InvitationsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
 
-        .inv-header {
+        .page-header {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
@@ -424,7 +415,7 @@ export default function InvitationsPage() {
           flex-wrap: wrap;
         }
 
-        .inv-eyebrow {
+        .page-eyebrow {
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 1.5px;
@@ -433,7 +424,7 @@ export default function InvitationsPage() {
           margin-bottom: 6px;
         }
 
-        .inv-title {
+        .page-title {
           font-family: 'Playfair Display', serif;
           font-size: 32px;
           font-weight: 900;
@@ -442,50 +433,50 @@ export default function InvitationsPage() {
           letter-spacing: -0.5px;
         }
 
-        .inv-title span { color: #E8A598; }
+        .page-title span { color: #E8A598; }
 
-        .inv-sub {
+        .page-sub {
           color: #7A8FA6;
           font-size: 14px;
           margin-top: 6px;
           font-weight: 400;
         }
 
-        .inv-stats {
+        .stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
           gap: 12px;
           margin-bottom: 32px;
         }
 
-        .inv-stat {
+        .stat-card {
           background: white;
           border-radius: 16px;
           padding: 16px 12px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
           text-align: center;
         }
-        .inv-stat-value {
+        .stat-value {
           font-family: 'Playfair Display', serif;
           font-size: 28px;
           font-weight: 900;
           color: #0D1B1B;
         }
-        .inv-stat-label {
+        .stat-label {
           font-size: 12px;
           color: #9BAAB8;
           font-weight: 600;
           margin-top: 4px;
         }
 
-        .inv-filters {
+        .filters {
           display: flex;
           flex-wrap: wrap;
           gap: 12px;
           margin-bottom: 24px;
         }
 
-        .inv-filter-select {
+        .filter-select {
           padding: 8px 12px;
           border: 1.5px solid #E2EAF0;
           border-radius: 10px;
@@ -495,11 +486,11 @@ export default function InvitationsPage() {
           outline: none;
           transition: border-color 0.15s;
         }
-        .inv-filter-select:focus {
+        .filter-select:focus {
           border-color: #0D4F4F;
         }
 
-        .inv-refresh-btn {
+        .refresh-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
@@ -513,12 +504,12 @@ export default function InvitationsPage() {
           cursor: pointer;
           transition: border-color 0.15s, color 0.15s;
         }
-        .inv-refresh-btn:hover {
+        .refresh-btn:hover {
           border-color: #0D4F4F;
           color: #0D4F4F;
         }
 
-        .inv-table-wrap {
+        .table-wrap {
           background: white;
           border-radius: 20px;
           border: 1.5px solid #E2EAF0;
@@ -548,17 +539,16 @@ export default function InvitationsPage() {
           cursor: not-allowed;
         }
 
-        .inv-empty {
+        .empty-state {
           padding: 48px 24px;
           text-align: center;
           color: #9BAAB8;
         }
-        .inv-empty-icon {
+        .empty-icon {
           font-size: 40px;
           margin-bottom: 12px;
         }
 
-        /* Card view (mobile) */
         .guest-card {
           background: white;
           border-radius: 12px;
@@ -644,7 +634,6 @@ export default function InvitationsPage() {
           cursor: not-allowed;
         }
 
-        /* Bulk actions bar */
         .bulk-bar {
           background: white;
           padding: 10px 16px;
@@ -697,59 +686,59 @@ export default function InvitationsPage() {
         }
 
         @media (max-width: 640px) {
-          .inv-title { font-size: 28px; }
-          .inv-stats { grid-template-columns: repeat(2, 1fr); }
-          .inv-filter-select { flex: 1; min-width: 120px; }
+          .page-title { font-size: 28px; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .filter-select { flex: 1; min-width: 120px; }
           .bulk-bar { flex-direction: column; align-items: stretch; gap: 8px; }
           .bulk-bar .selected-info { text-align: center; }
           .bulk-bar button { justify-content: center; }
         }
       `}</style>
 
-      <div className="inv-header">
+      <div className="page-header">
         <div>
-          <div className="inv-eyebrow">Communications</div>
-          <h1 className="inv-title">Invitations</h1>
-          <p className="inv-sub">Track all invitations sent across your events.</p>
+          <div className="page-eyebrow">Guest Management</div>
+          <h1 className="page-title">All <span>Guests</span></h1>
+          <p className="page-sub">View and manage all your guests across events.</p>
         </div>
-        <button className="inv-refresh-btn" onClick={fetchData}>
+        <button className="refresh-btn" onClick={fetchData}>
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
 
-      <div className="inv-stats">
-        <div className="inv-stat">
-          <div className="inv-stat-value">{stats.total}</div>
-          <div className="inv-stat-label">Total Guests</div>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-value">{stats.total}</div>
+          <div className="stat-label">Total Guests</div>
         </div>
-        <div className="inv-stat">
-          <div className="inv-stat-value">{stats.pending}</div>
-          <div className="inv-stat-label">Pending</div>
+        <div className="stat-card">
+          <div className="stat-value">{stats.pending}</div>
+          <div className="stat-label">Pending</div>
         </div>
-        <div className="inv-stat">
-          <div className="inv-stat-value">{stats.sent}</div>
-          <div className="inv-stat-label">Sent</div>
+        <div className="stat-card">
+          <div className="stat-value">{stats.sent}</div>
+          <div className="stat-label">Sent</div>
         </div>
-        <div className="inv-stat">
-          <div className="inv-stat-value">{stats.checkedIn}</div>
-          <div className="inv-stat-label">Checked In</div>
+        <div className="stat-card">
+          <div className="stat-value">{stats.checkedIn}</div>
+          <div className="stat-label">Checked In</div>
         </div>
       </div>
 
-      <div className="inv-filters">
-        <select className="inv-filter-select" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
+      <div className="filters">
+        <select className="filter-select" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
           <option value="">All Events</option>
           {events.map(e => (
             <option key={e.id} value={e.id}>{e.name}</option>
           ))}
         </select>
-        <select className="inv-filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+        <select className="filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">All Status</option>
           <option value="pending">Pending</option>
           <option value="sent">Sent</option>
           <option value="checked_in">Checked In</option>
         </select>
-        <select className="inv-filter-select" value={filterChannel} onChange={e => setFilterChannel(e.target.value)}>
+        <select className="filter-select" value={filterChannel} onChange={e => setFilterChannel(e.target.value)}>
           <option value="">All Channels</option>
           <option value="whatsapp">WhatsApp</option>
           <option value="sms">SMS</option>
@@ -769,23 +758,21 @@ export default function InvitationsPage() {
         </div>
       )}
 
-      <div className="inv-table-wrap">
+      <div className="table-wrap">
         {loading ? (
           <div className="p-6 text-center">Loading...</div>
         ) : guests.length === 0 ? (
-          <div className="inv-empty">
-            <div className="inv-empty-icon">📨</div>
-            <p className="font-semibold text-gray-700">No invitations found</p>
-            <p className="text-sm">Send invitations from an event to see them here.</p>
+          <div className="empty-state">
+            <div className="empty-icon">👥</div>
+            <p className="font-semibold text-gray-700">No guests found</p>
+            <p className="text-sm">Add guests to your events to see them here.</p>
           </div>
         ) : (
           <>
-            {/* Mobile card view */}
             <div className="sm:hidden p-3 max-h-[500px] overflow-y-auto">
               {guests.map(renderGuestItem)}
             </div>
 
-            {/* Desktop table view */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
