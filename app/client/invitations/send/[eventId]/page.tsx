@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, CheckSquare, Square, Trash2 } from 'lucide-react';
+import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, CheckSquare, Square, Trash2, Image, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -12,6 +12,7 @@ interface Guest {
   routingChannel: string;
   invitationCard: string | null;
   smsCode: string | null;
+  invitationSentAt: string | null;
 }
 
 interface BroadcastResult {
@@ -24,6 +25,7 @@ interface BroadcastResult {
 
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
+  const router = useRouter();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -38,7 +40,6 @@ export default function SendInvitationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Cost per guest = 300 TZS (commission amount)
   const COST_PER_GUEST = 300;
 
   useEffect(() => {
@@ -78,9 +79,6 @@ export default function SendInvitationsPage() {
   const whatsappGuests = guests.filter(g => g.routingChannel === 'whatsapp' && g.phone);
   const smsGuests = guests.filter(g => g.routingChannel === 'sms' && g.phone);
   const allGuests = guests.filter(g => g.phone);
-
-  // Total cost for all guests (for display only, no longer shown in UI)
-  const totalAllGuestsCost = allGuests.length * COST_PER_GUEST;
 
   const toggleSelectAll = () => {
     const currentList = activeFilter === 'whatsapp' ? whatsappGuests : smsGuests;
@@ -218,6 +216,9 @@ export default function SendInvitationsPage() {
         icon: result.success ? <CheckCircle size={14} className="text-green-600" /> : <XCircle size={14} className="text-red-600" />
       };
     }
+    if (guest.invitationSentAt) {
+      return { text: 'Sent', icon: <CheckCircle size={14} className="text-green-600" /> };
+    }
     if (guest.routingChannel === 'whatsapp') {
       return guest.invitationCard
         ? { text: 'QR ready', icon: null }
@@ -264,7 +265,6 @@ export default function SendInvitationsPage() {
         {savingMessage && <p className="text-xs text-gray-400 mt-1">Saving...</p>}
       </div>
 
-      {/* Credits display – only remaining credits, no cost summary */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -303,16 +303,21 @@ export default function SendInvitationsPage() {
         </div>
       )}
 
+      {/* Chat-like guest list */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto p-4 space-y-4">
           {paginatedGuests.map(guest => {
             const status = getGuestStatus(guest);
             const isSending = sendingGuestId === guest.id;
             const isDeleting = deletingGuestId === guest.id;
             const isSelected = selectedGuests.has(guest.id);
             const showActions = activeFilter !== 'all';
+            const isSent = guest.invitationSentAt !== null || status.text === 'Sent';
+            const channelIcon = guest.routingChannel === 'whatsapp' ? <MessageCircle size={12} className="text-[#0D4F4F]" /> : <Phone size={12} className="text-gray-500" />;
+
             return (
-              <div key={guest.id} className="px-5 py-3 flex justify-between items-center">
+              <div key={guest.id} className="flex flex-col gap-2">
+                {/* Guest header with avatar, name, channel, and selection checkbox */}
                 <div className="flex items-center gap-3">
                   {showActions && (
                     <input
@@ -332,42 +337,63 @@ export default function SendInvitationsPage() {
                       className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
                     />
                   )}
-                  <div>
-                    <p className="font-semibold text-gray-800">{guest.name}</p>
-                    {guest.phone && <p className="text-xs text-gray-500">{guest.phone}</p>}
-                    <div className="flex items-center gap-1 mt-1">
-                      {guest.routingChannel === 'whatsapp' ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full"><MessageCircle size={10} /> WhatsApp</span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full"><Phone size={10} /> SMS</span>
-                      )}
+                  <div className="w-8 h-8 rounded-full bg-[#0D4F4F] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                    {guest.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-gray-800 truncate">{guest.name}</div>
+                    <div className="text-xs text-gray-500 flex items-center gap-1">
+                      {channelIcon} {guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                      {guest.phone && <span className="text-gray-400 ml-1">· {guest.phone}</span>}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    {status.icon}
-                    <span className="text-sm text-gray-600">{status.text}</span>
+                    {status.icon && <div className="flex-shrink-0">{status.icon}</div>}
+                    <span className="text-xs font-medium text-gray-600">{status.text}</span>
                   </div>
-                  {showActions && (
-                    <>
-                      <button
-                        onClick={() => sendToGuest(guest)}
-                        disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < COST_PER_GUEST)}
-                        className="px-3 py-1 bg-[#0D4F4F] text-white text-sm rounded-lg hover:bg-[#0A3D3D] disabled:opacity-50 transition flex items-center gap-1"
-                      >
-                        {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send
-                      </button>
-                      <button
-                        onClick={() => deleteGuest(guest.id)}
-                        disabled={isDeleting}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50 transition"
-                      >
-                        {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={16} />}
-                      </button>
-                    </>
-                  )}
                 </div>
+
+                {/* Message bubble */}
+                <div className={`relative ml-11 max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${isSent ? 'bg-[#DCF8C6] self-start' : 'bg-gray-100 self-start'}`}>
+                  <div className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                    {customMessage || "You're invited! Scan the QR code at the entrance."}
+                  </div>
+                  {guest.invitationCard && (
+                    <div className="mt-2">
+                      <img
+                        src={guest.invitationCard}
+                        alt="Invitation Card"
+                        className="rounded-lg max-w-[180px] w-full border border-gray-200 shadow-sm"
+                      />
+                    </div>
+                  )}
+                  <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
+                    {isSent ? <CheckCircle size={12} className="text-green-600" /> : <Clock size={12} className="text-amber-500" />}
+                    {isSent ? 'Delivered' : 'Queued'}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                {showActions && (
+                  <div className="flex items-center gap-2 ml-11 mt-1">
+                    <button
+                      onClick={() => sendToGuest(guest)}
+                      disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < COST_PER_GUEST)}
+                      className="text-xs font-medium text-[#0D4F4F] hover:underline disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                      {isSending ? 'Sending...' : (guest.invitationSentAt ? 'Resend' : 'Send')}
+                    </button>
+                    <button
+                      onClick={() => deleteGuest(guest.id)}
+                      disabled={isDeleting}
+                      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isDeleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
