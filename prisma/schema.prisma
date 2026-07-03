@@ -148,6 +148,7 @@ model Guest {
   invitationSentAt   DateTime? // when we sent the invitation
   invitationDeliveredAt DateTime? // optional: when Twilio confirms delivery
   invitationOpenedAt DateTime?   // optional: when guest opens the card
+  thanksSentAt DateTime? // when the thank‑you was sent
 }
 
 model UsageRecord {

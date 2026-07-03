@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, Square, ArrowUp } from 'lucide-react';
+import { 
+  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, 
+  Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
+  Square, ArrowUp, Heart, X 
+} from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -14,6 +18,8 @@ interface Guest {
   routingChannel: string;
   checkedIn: boolean;
   attending: string;
+  invitationSentAt: string | null;
+  thanksSentAt: string | null;
 }
 
 interface EventData {
@@ -37,11 +43,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+
+  // Thanks modal state
+  const [showThanksModal, setShowThanksModal] = useState(false);
+  const [thanksMessage, setThanksMessage] = useState('');
+  const [sendingThanks, setSendingThanks] = useState(false);
 
   useEffect(() => {
     params.then(({ id }) => {
       setEventId(id);
       fetchData(id);
+      fetchCredits();
     });
   }, [params]);
 
@@ -56,6 +69,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       toast.error('Could not load event details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCredits = async () => {
+    try {
+      const res = await fetch('/api/tenant/billing', { credentials: 'include' });
+      const data = await res.json();
+      setCredits(data.tenant?.credits ?? 0);
+    } catch {
+      // silent fail
     }
   };
 
@@ -139,6 +162,60 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // ─── Send Thanks ────────────────────────────────────────────────────
+
+  const checkedInGuests = guests.filter(g => g.checkedIn);
+  const checkedInCount = checkedInGuests.length;
+
+  const openThanksModal = () => {
+    if (checkedInCount === 0) {
+      toast.error('No guests have checked in yet.');
+      return;
+    }
+    setThanksMessage(`Thank you for attending ${event?.name}! We hope you enjoyed the event.`);
+    setShowThanksModal(true);
+  };
+
+  const sendThanks = async () => {
+    if (!thanksMessage.trim()) {
+      toast.error('Please enter a thank‑you message.');
+      return;
+    }
+    const totalCost = checkedInCount * 300;
+    if (credits !== null && credits < totalCost) {
+      toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
+      return;
+    }
+    if (!confirm(`Send thank‑you to ${checkedInCount} guest${checkedInCount > 1 ? 's' : ''}? This will cost ${totalCost} TZS.`)) return;
+
+    setSendingThanks(true);
+    let successCount = 0;
+    for (const guest of checkedInGuests) {
+      try {
+        const res = await fetch('/api/invitations/send-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            guestId: guest.id,
+            eventId,
+            message: thanksMessage,
+            type: 'thanks',
+          }),
+          credentials: 'include',
+        });
+        if (res.ok) successCount++;
+      } catch {
+        // ignore errors per guest
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    toast.success(`Thank‑you sent to ${successCount} of ${checkedInCount} guests.`);
+    setSendingThanks(false);
+    setShowThanksModal(false);
+    fetchCredits();
+    fetchData(eventId!);
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
   }
@@ -158,7 +235,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const checkedInCount = guests.filter(g => g.checkedIn).length;
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
   const attendingCount = guests.filter(g => g.attending === 'yes').length;
@@ -263,9 +339,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
           <QrCode size={14} /> Check-In
         </Link>
+        {/* Send Thanks button */}
+        {checkedInCount > 0 && (
+          <button
+            onClick={openThanksModal}
+            className="col-span-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+          >
+            <Heart size={15} /> Send Thanks ({checkedInCount} checked‑in)
+          </button>
+        )}
       </div>
 
-      {/* Guest List with scroll, selection, and delete */}
+      {/* Guest List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -329,6 +414,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                             <Phone size={10} /> SMS
                           </span>
                         )}
+                        {guest.thanksSentAt && (
+                          <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                            ❤️ Thanks sent
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -340,7 +430,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
                       )}
                     </div>
-                    {/* ✅ Preview Card link (only when test mode is enabled) */}
                     {event.tenant?.testMode && (
                       <Link
                         href={`/invite/preview/${guest.id}`}
@@ -361,7 +450,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               ))}
             </div>
 
-            {/* Back to Top button */}
             {showBackToTop && (
               <button
                 onClick={scrollToTop}
@@ -373,6 +461,51 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </>
         )}
       </div>
+
+      {/* ─── Thanks Modal ─── */}
+      {showThanksModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
+            <button
+              onClick={() => setShowThanksModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Send Thanks</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Send a thank‑you message to <strong>{checkedInCount}</strong> checked‑in guest{checkedInCount > 1 ? 's' : ''}.
+              {credits !== null && ` This will cost ${checkedInCount * 300} TZS (${credits} credits available).`}
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Thank‑you message</label>
+              <textarea
+                rows={4}
+                value={thanksMessage}
+                onChange={(e) => setThanksMessage(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none"
+                placeholder="Write your thank‑you message..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowThanksModal(false)}
+                className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendThanks}
+                disabled={sendingThanks || !thanksMessage.trim() || (credits !== null && credits < checkedInCount * 300)}
+                className="flex-1 bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {sendingThanks ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Heart size={18} />}
+                {sendingThanks ? 'Sending...' : 'Send Thanks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
     const host = req.headers.get('host') || '';
     const isCloudflareTunnel = host.includes('trycloudflare.com') || host.includes('loca.lt');
 
-    const { guestId, eventId } = await req.json();
+    // Accept optional `message` and `type` (default: 'invitation')
+    const { guestId, eventId, message, type = 'invitation' } = await req.json();
+
     if (!guestId || !eventId) {
       return NextResponse.json({ error: 'Missing guestId or eventId' }, { status: 400 });
     }
@@ -64,13 +66,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const customMessage = guest.event.customMessage || "You're invited!";
+    // Use the provided message, or fallback to event customMessage, or default.
+    const customMessage = message || guest.event.customMessage || "You're invited!";
 
     if (channel === 'whatsapp') {
       if (!guest.invitationCard) {
         return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
       }
-      const messageText = `${customMessage} Scan the QR code at the entrance.`;
+      // For thanks, we may not want to include the QR instruction; we'll keep it for invitations only.
+      const messageText = type === 'invitation'
+        ? `${customMessage} Scan the QR code at the entrance.`
+        : customMessage;
       const imageUrl = guest.invitationCard;
       let phone = guest.phone;
       if (!phone.startsWith('+')) phone = '+' + phone;
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
           body: messageText,
           from: `whatsapp:${fromWhatsApp}`,
           to: `whatsapp:${phone}`,
-          mediaUrl: [imageUrl],
+          mediaUrl: [imageUrl], // include the card image for both types
         });
       } else {
         console.log(`[MOCK] WhatsApp to ${phone}: ${messageText}, image ${imageUrl}`);
@@ -93,7 +99,9 @@ export async function POST(req: NextRequest) {
         code = Math.floor(100000 + Math.random() * 900000).toString();
         await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
       }
-      const messageText = `${customMessage} Your check-in code is: ${code}`;
+      const messageText = type === 'invitation'
+        ? `${customMessage} Your check-in code is: ${code}`
+        : customMessage;
       let phone = guest.phone;
       if (!phone.startsWith('+')) phone = '+' + phone;
 
@@ -110,7 +118,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Deduct credits, record usage, and mark invitation as sent
+    // Deduct credits, record usage, and update the appropriate timestamp
+    const updateData: any = {};
+    if (type === 'invitation') {
+      updateData.invitationSentAt = new Date();
+    } else if (type === 'thanks') {
+      updateData.thanksSentAt = new Date();
+    }
+
     await prisma.$transaction([
       prisma.tenant.update({
         where: { id: guest.event.tenantId },
@@ -126,11 +141,11 @@ export async function POST(req: NextRequest) {
       }),
       prisma.guest.update({
         where: { id: guest.id },
-        data: { invitationSentAt: new Date() },
+        data: updateData,
       }),
     ]);
 
-    return NextResponse.json({ success: true, channel, cost });
+    return NextResponse.json({ success: true, channel, cost, type });
   } catch (error: any) {
     console.error('POST /api/invitations/send-whatsapp error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
