@@ -24,29 +24,33 @@ export default function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   // ─── Handle profile update ────────────────────────────────────
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingProfile(true);
-    try {
-      const res = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone }),
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Profile updated successfully');
-        await update(); // Refresh session
-      } else {
-        toast.error(data.error || 'Update failed');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setSavingProfile(false);
+const handleProfileUpdate = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setSavingProfile(true);
+  try {
+    const res = await fetch('/api/client/profile', {   // ✅ corrected endpoint
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone }),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (res.ok) {
+      // ✅ Update local state with the fresh data from the server
+      setName(data.name);
+      setEmail(data.email);
+      setPhone(data.phone || '');
+      toast.success('Profile updated successfully');
+      await update(); // Refresh the session (optional but good)
+    } else {
+      toast.error(data.error || 'Update failed');
     }
-  };
+  } catch {
+    toast.error('Network error');
+  } finally {
+    setSavingProfile(false);
+  }
+};
 
   // ─── Handle password change ────────────────────────────────────
   const handlePasswordChange = async (e: React.FormEvent) => {
