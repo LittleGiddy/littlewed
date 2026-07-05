@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, CheckSquare, Square, Trash2, Image, Clock } from 'lucide-react';
+import { ArrowLeft, Send, Copy, CheckCircle, XCircle, Loader2, AlertTriangle, MessageCircle, Phone, CheckSquare, Square, Trash2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -30,7 +30,7 @@ export default function SendInvitationsPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<BroadcastResult[]>([]);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [eventCredits, setEventCredits] = useState<number | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [savingMessage, setSavingMessage] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'whatsapp' | 'sms' | 'all'>('whatsapp');
@@ -43,20 +43,40 @@ export default function SendInvitationsPage() {
   const COST_PER_GUEST = 300;
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }).then(res => res.json()),
-      fetch('/api/tenant/billing', { credentials: 'include' }).then(res => res.json()),
-      fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }).then(res => res.json()),
-    ]).then(([guestsData, billingData, eventSettings]) => {
-      const fixedGuests = guestsData.map((g: any) => ({ ...g, routingChannel: g.routingChannel || 'sms' }));
-      setGuests(fixedGuests);
-      setCredits(billingData.tenant?.credits ?? 0);
-      setCustomMessage(eventSettings.customMessage || '');
-      setLoading(false);
-    }).catch(() => {
-      toast.error('Failed to load data');
-      setLoading(false);
-    });
+    const loadData = async () => {
+      try {
+        // Fetch guests, event details, settings, and usage records
+        const [guestsRes, eventRes, settingsRes, usageRes] = await Promise.all([
+          fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }),
+          fetch(`/api/events/${eventId}`, { credentials: 'include' }),
+          fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }),
+          fetch(`/api/events/${eventId}/usage`, { credentials: 'include' }),
+        ]);
+
+        const guestsData = await guestsRes.json();
+        const eventData = await eventRes.json();
+        const settingsData = await settingsRes.json();
+        const usageData = await usageRes.json();
+
+        const fixedGuests = guestsData.map((g: any) => ({ ...g, routingChannel: g.routingChannel || 'sms' }));
+        setGuests(fixedGuests);
+        setCustomMessage(settingsData.customMessage || '');
+
+        // Calculate event credits
+        const guestCount = eventData.event?.guestCount || 0;
+        const allocatedCredits = guestCount * COST_PER_GUEST;
+        const usedCredits = usageData.totalCost || 0;
+        const remaining = allocatedCredits - usedCredits;
+        setEventCredits(Math.max(0, remaining));
+
+        setLoading(false);
+      } catch {
+        toast.error('Failed to load data');
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [eventId]);
 
   const saveCustomMessage = async () => {
@@ -106,8 +126,8 @@ export default function SendInvitationsPage() {
       return;
     }
     const totalCost = selected.length * COST_PER_GUEST;
-    if (credits !== null && credits < totalCost) {
-      toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
+    if (eventCredits !== null && eventCredits < totalCost) {
+      toast.error(`Insufficient event credits. Need ${totalCost} TZS, you have ${eventCredits} TZS.`);
       return;
     }
     await saveCustomMessage();
@@ -135,9 +155,14 @@ export default function SendInvitationsPage() {
       }
       await new Promise(r => setTimeout(r, 500));
     }
-    const billingRes = await fetch('/api/tenant/billing', { credentials: 'include' });
-    const billingData = await billingRes.json();
-    setCredits(billingData.tenant?.credits ?? 0);
+    // Refresh credits after sending
+    const usageRes = await fetch(`/api/events/${eventId}/usage`, { credentials: 'include' });
+    const usageData = await usageRes.json();
+    const guestCount = (await fetch(`/api/events/${eventId}`, { credentials: 'include' }).then(r => r.json())).event?.guestCount || 0;
+    const allocated = guestCount * COST_PER_GUEST;
+    const remaining = allocated - (usageData.totalCost || 0);
+    setEventCredits(Math.max(0, remaining));
+
     toast.success(`Sent to ${successCount} of ${selected.length} guests.`);
     setSending(false);
     setSelectedGuests(new Set());
@@ -145,8 +170,8 @@ export default function SendInvitationsPage() {
 
   const sendToGuest = async (guest: Guest) => {
     const cost = COST_PER_GUEST;
-    if (credits !== null && credits < cost) {
-      toast.error(`Insufficient credits. Need ${cost} TZS, you have ${credits} TZS.`);
+    if (eventCredits !== null && eventCredits < cost) {
+      toast.error(`Insufficient event credits. Need ${cost} TZS, you have ${eventCredits} TZS.`);
       return;
     }
     if (guest.routingChannel === 'whatsapp' && !guest.invitationCard) {
@@ -170,9 +195,13 @@ export default function SendInvitationsPage() {
       if (res.ok) {
         toast.success(`Invitation sent to ${guest.name}`);
         setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: guest.routingChannel, success: true }]);
-        const billingRes = await fetch('/api/tenant/billing', { credentials: 'include' });
-        const billingData = await billingRes.json();
-        setCredits(billingData.tenant?.credits ?? 0);
+        // Refresh credits
+        const usageRes = await fetch(`/api/events/${eventId}/usage`, { credentials: 'include' });
+        const usageData = await usageRes.json();
+        const guestCount = (await fetch(`/api/events/${eventId}`, { credentials: 'include' }).then(r => r.json())).event?.guestCount || 0;
+        const allocated = guestCount * COST_PER_GUEST;
+        const remaining = allocated - (usageData.totalCost || 0);
+        setEventCredits(Math.max(0, remaining));
       } else {
         toast.error(`Failed to send to ${guest.name}: ${data.error}`);
         setResults(prev => [...prev, { guestId: guest.id, name: guest.name, channel: guest.routingChannel, success: false, error: data.error }]);
@@ -265,11 +294,12 @@ export default function SendInvitationsPage() {
         {savingMessage && <p className="text-xs text-gray-400 mt-1">Saving...</p>}
       </div>
 
+      {/* Display event-specific credits */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-500">Available Credits</p>
-            <p className="font-serif text-3xl font-black text-[#0D4F4F]">{credits?.toLocaleString() ?? '?'} TZS</p>
+            <p className="text-sm text-gray-500">Event Credits Available</p>
+            <p className="font-serif text-3xl font-black text-[#0D4F4F]">{eventCredits?.toLocaleString() ?? '0'} TZS</p>
           </div>
           <div className="text-sm text-gray-400 text-right">
             <p>Each guest costs <span className="font-semibold text-[#0D4F4F]">{COST_PER_GUEST}</span> TZS</p>
@@ -303,7 +333,7 @@ export default function SendInvitationsPage() {
         </div>
       )}
 
-      {/* Chat-like guest list */}
+      {/* Guest list with chat bubbles */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto p-4 space-y-4">
           {paginatedGuests.map(guest => {
@@ -317,7 +347,7 @@ export default function SendInvitationsPage() {
 
             return (
               <div key={guest.id} className="flex flex-col gap-2">
-                {/* Guest header with avatar, name, channel, and selection checkbox */}
+                {/* Guest header */}
                 <div className="flex items-center gap-3">
                   {showActions && (
                     <input
@@ -378,7 +408,7 @@ export default function SendInvitationsPage() {
                   <div className="flex items-center gap-2 ml-11 mt-1">
                     <button
                       onClick={() => sendToGuest(guest)}
-                      disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (credits !== null && credits < COST_PER_GUEST)}
+                      disabled={isSending || (guest.routingChannel === 'whatsapp' && !guest.invitationCard) || (guest.routingChannel === 'sms' && !guest.smsCode) || (eventCredits !== null && eventCredits < COST_PER_GUEST)}
                       className="text-xs font-medium text-[#0D4F4F] hover:underline disabled:opacity-50 flex items-center gap-1"
                     >
                       {isSending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}

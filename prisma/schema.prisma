@@ -54,6 +54,7 @@ model Tenant {
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]
+  thanksCardUrl String? // fallback for thanks card (admin uploaded)
 }
 
 model Event {
@@ -112,6 +113,14 @@ model Event {
   dateFontFamily      String? @default("DM Sans")
   venueFontFamily     String? @default("DM Sans")
   nameFontFamily      String? @default("Playfair Display")
+
+  // Thank you card
+  thankYouCardUrl       String?
+  thankYouMessage       String?
+  thankYouMessageX      Float?   @default(50)
+  thankYouMessageY      Float?   @default(50)
+  thankYouMessageSize   Int?     @default(32)
+  thankYouMessageColor  String?  @default("#ffffff")
 }
 
 model PendingEvent {

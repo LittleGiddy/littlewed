@@ -54,6 +54,8 @@ export async function GET(
       // Custom message
       customMessage: true,
       designLayers: true,
+      // ✅ Thanks Card — corrected field name
+      thankYouCardUrl: true,
     },
   });
 
@@ -121,6 +123,10 @@ export async function PUT(
   // Custom message
   if (body.customMessage !== undefined) updateData.customMessage = body.customMessage;
   if (body.designLayers !== undefined) updateData.designLayers = body.designLayers;
+
+  // ✅ Thanks Card — corrected field name
+  if (body.thankYouCardUrl !== undefined) updateData.thankYouCardUrl = body.thankYouCardUrl;
+
   await prisma.event.updateMany({
     where: { id: eventId, tenantId },
     data: updateData,

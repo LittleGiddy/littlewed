@@ -26,12 +26,15 @@ export async function GET(
           routingChannel: true,
           checkedIn: true,
           attending: true,
+          invitationSentAt: true,
+          thanksSentAt: true,
         },
         orderBy: { name: 'asc' },
       },
       tenant: {
         select: {
-          testMode: true, // ✅ include testMode
+          testMode: true,
+          thanksCardUrl: true, // fallback from tenant
         },
       },
     },
@@ -41,8 +44,18 @@ export async function GET(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const { guests, ...eventData } = event;
-  return NextResponse.json({ event: eventData, guests });
+  const { guests, tenant, ...eventData } = event;
+
+  // Use event's thankYouCardUrl, fallback to tenant's thanksCardUrl
+  const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
+
+  return NextResponse.json({
+    event: {
+      ...eventData,
+      thankYouCardUrl, // frontend uses this consistently
+    },
+    guests,
+  });
 }
 
 export async function DELETE(

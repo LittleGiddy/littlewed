@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
     const host = req.headers.get('host') || '';
     const isCloudflareTunnel = host.includes('trycloudflare.com') || host.includes('loca.lt');
 
-    // Accept optional `message` and `type` (default: 'invitation')
     const { guestId, eventId, message, type = 'invitation' } = await req.json();
 
     if (!guestId || !eventId) {
@@ -41,7 +40,13 @@ export async function POST(req: NextRequest) {
 
     const guest = await prisma.guest.findFirst({
       where: { id: guestId },
-      include: { event: true },
+      include: {
+        event: {
+          include: {
+            tenant: true,
+          },
+        },
+      },
     });
     if (!guest) return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     if (!isCloudflareTunnel && tenantId && guest.event.tenantId !== tenantId) {
@@ -49,6 +54,16 @@ export async function POST(req: NextRequest) {
     }
 
     if (!guest.phone) return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
+
+    // For thanks, only send to WhatsApp and checked-in guests
+    if (type === 'thanks') {
+      if (guest.routingChannel !== 'whatsapp') {
+        return NextResponse.json({ error: 'Thanks can only be sent via WhatsApp' }, { status: 400 });
+      }
+      if (!guest.checkedIn) {
+        return NextResponse.json({ error: 'Guest is not checked in' }, { status: 400 });
+      }
+    }
 
     const channel = guest.routingChannel || 'sms';
     const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
@@ -66,18 +81,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use the provided message, or fallback to event customMessage, or default.
+    // Determine the card URL to use
+    let cardUrl: string | null = null;
+    if (type === 'thanks') {
+      // Use event's thankYouCardUrl, fallback to tenant's thanksCardUrl
+      cardUrl = guest.event.thankYouCardUrl || guest.event.tenant?.thanksCardUrl || null;
+      if (!cardUrl) {
+        return NextResponse.json({ error: 'No thanks card uploaded for this event or tenant.' }, { status: 400 });
+      }
+    } else {
+      cardUrl = guest.invitationCard;
+      if (!cardUrl) {
+        return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
+      }
+    }
+
+    // Custom message
     const customMessage = message || guest.event.customMessage || "You're invited!";
 
     if (channel === 'whatsapp') {
-      if (!guest.invitationCard) {
-        return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
-      }
-      // For thanks, we may not want to include the QR instruction; we'll keep it for invitations only.
       const messageText = type === 'invitation'
         ? `${customMessage} Scan the QR code at the entrance.`
         : customMessage;
-      const imageUrl = guest.invitationCard;
+      const imageUrl = cardUrl;
       let phone = guest.phone;
       if (!phone.startsWith('+')) phone = '+' + phone;
 
@@ -87,21 +113,19 @@ export async function POST(req: NextRequest) {
           body: messageText,
           from: `whatsapp:${fromWhatsApp}`,
           to: `whatsapp:${phone}`,
-          mediaUrl: [imageUrl], // include the card image for both types
+          mediaUrl: [imageUrl],
         });
       } else {
         console.log(`[MOCK] WhatsApp to ${phone}: ${messageText}, image ${imageUrl}`);
       }
     } else {
-      // SMS
+      // SMS (only for invitations)
       let code = guest.smsCode;
       if (!code) {
         code = Math.floor(100000 + Math.random() * 900000).toString();
         await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
       }
-      const messageText = type === 'invitation'
-        ? `${customMessage} Your check-in code is: ${code}`
-        : customMessage;
+      const messageText = `${customMessage} Your check-in code is: ${code}`;
       let phone = guest.phone;
       if (!phone.startsWith('+')) phone = '+' + phone;
 
@@ -118,7 +142,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Deduct credits, record usage, and update the appropriate timestamp
+    // Deduct credits, record usage, update timestamp
     const updateData: any = {};
     if (type === 'invitation') {
       updateData.invitationSentAt = new Date();

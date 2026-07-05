@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, 
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
-  Square, ArrowUp, Heart, X 
+  Square, ArrowUp, Heart, X, Image as ImageIcon 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -29,6 +29,7 @@ interface EventData {
   venue: string;
   address: string;
   commission_paid: boolean;
+  thankYouCardUrl: string | null;
   tenant: {
     testMode: boolean;
   };
@@ -164,12 +165,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ─── Send Thanks ────────────────────────────────────────────────────
 
-  const checkedInGuests = guests.filter(g => g.checkedIn);
-  const checkedInCount = checkedInGuests.length;
+  const whatsappCheckedInGuests = guests.filter(g => g.checkedIn && g.routingChannel === 'whatsapp');
+  const checkedInCount = whatsappCheckedInGuests.length;
 
   const openThanksModal = () => {
     if (checkedInCount === 0) {
-      toast.error('No guests have checked in yet.');
+      toast.error('No WhatsApp‑checked‑in guests to thank.');
       return;
     }
     setThanksMessage(`Thank you for attending ${event?.name}! We hope you enjoyed the event.`);
@@ -186,11 +187,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
       return;
     }
-    if (!confirm(`Send thank‑you to ${checkedInCount} guest${checkedInCount > 1 ? 's' : ''}? This will cost ${totalCost} TZS.`)) return;
+    if (!confirm(`Send thank‑you to ${checkedInCount} WhatsApp guest${checkedInCount > 1 ? 's' : ''}? This will cost ${totalCost} TZS.`)) return;
 
     setSendingThanks(true);
     let successCount = 0;
-    for (const guest of checkedInGuests) {
+    for (const guest of whatsappCheckedInGuests) {
       try {
         const res = await fetch('/api/invitations/send-whatsapp', {
           method: 'POST',
@@ -238,10 +239,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
   const attendingCount = guests.filter(g => g.attending === 'yes').length;
+  const checkedInAll = guests.filter(g => g.checkedIn).length;
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header with back link and delete event button */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <Link
           href="/client/dashboard"
@@ -303,7 +305,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <div className="w-9 h-9 rounded-xl bg-[#EDFAF4] flex items-center justify-center mx-auto mb-2 text-[#1A7A4A]">
             <Smartphone size={18} />
           </div>
-          <div className="font-serif text-2xl font-black text-gray-800">{checkedInCount}</div>
+          <div className="font-serif text-2xl font-black text-gray-800">{checkedInAll}</div>
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Checked In</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
@@ -345,7 +347,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             onClick={openThanksModal}
             className="col-span-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
           >
-            <Heart size={15} /> Send Thanks ({checkedInCount} checked‑in)
+            <Heart size={15} /> Send Thanks ({checkedInCount} WhatsApp checked‑in)
           </button>
         )}
       </div>
@@ -474,9 +476,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </button>
             <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Send Thanks</h2>
             <p className="text-gray-600 text-sm mb-4">
-              Send a thank‑you message to <strong>{checkedInCount}</strong> checked‑in guest{checkedInCount > 1 ? 's' : ''}.
+              Send a thank‑you message to <strong>{checkedInCount}</strong> WhatsApp checked‑in guest{checkedInCount > 1 ? 's' : ''}.
               {credits !== null && ` This will cost ${checkedInCount * 300} TZS (${credits} credits available).`}
             </p>
+
+            {/* Preview the thanks card if available */}
+            <div className="mb-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Thanks Card</p>
+              {event.thankYouCardUrl ? (
+                <img
+                  src={event.thankYouCardUrl}
+                  alt="Thanks Card"
+                  className="w-full rounded-lg border border-gray-200 max-h-48 object-contain"
+                />
+              ) : (
+                <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-400 text-sm">
+                  <ImageIcon size={24} className="mx-auto mb-1" />
+                  No thanks card uploaded. Contact your administrator.
+                </div>
+              )}
+            </div>
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Thank‑you message</label>
               <textarea
@@ -496,7 +516,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </button>
               <button
                 onClick={sendThanks}
-                disabled={sendingThanks || !thanksMessage.trim() || (credits !== null && credits < checkedInCount * 300)}
+                disabled={sendingThanks || !thanksMessage.trim() || (credits !== null && credits < checkedInCount * 300) || !event.thankYouCardUrl}
                 className="flex-1 bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {sendingThanks ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Heart size={18} />}
