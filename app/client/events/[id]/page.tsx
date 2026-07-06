@@ -20,7 +20,7 @@ interface Guest {
   attending: string;
   invitationSentAt: string | null;
   thanksSentAt: string | null;
-  reminderCount: number;   // ✅ added
+  reminderCount: number;
 }
 
 interface EventData {
@@ -87,7 +87,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       const data = await res.json();
       setCredits(data.tenant?.credits ?? 0);
     } catch {
-      // silent fail
+      // silent
     }
   };
 
@@ -101,11 +101,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const toggleSelectGuest = (id: string) => {
     const newSet = new Set(selectedGuests);
-    if (newSet.has(id)) {
-      newSet.delete(id);
-    } else {
-      newSet.add(id);
-    }
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
     setSelectedGuests(newSet);
   };
 
@@ -214,7 +211,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         });
         if (res.ok) successCount++;
       } catch {
-        // ignore errors per guest
+        // ignore
       }
       await new Promise(r => setTimeout(r, 300));
     }
@@ -225,7 +222,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     fetchData(eventId!);
   };
 
-  // ─── Send Reminder (Kumbusha) ──────────────────────────────────────
+  // ─── Send Reminder ──────────────────────────────────────────────────
 
   const prepareReminder = () => {
     const selected = guests.filter(g => selectedGuests.has(g.id));
@@ -239,7 +236,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
     setReminderGuestCount(selected.length);
     setReminderCost(totalCost);
-    setReminderMessage(`Habari {name}, tunakumbusha kuhusu michango yako kwa ${event?.name}. Asante.`);
+    setReminderMessage(`Habari {name}, tunakumbusha kuhusu michango yako kwa {event}. Asante.`);
     setShowReminderModal(true);
   };
 
@@ -267,7 +264,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
+        let msg = `Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`;
+        if (data.errors && data.errors.length > 0) {
+          msg += ` (${data.errors.length} failed)`;
+          toast.error(msg);
+        } else {
+          toast.success(msg);
+        }
         setSelectedGuests(new Set());
         setShowReminderModal(false);
         fetchData(eventId!);
@@ -281,8 +284,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setSendingReminder(false);
     }
   };
-
-  // ─── Render ─────────────────────────────────────────────────────────
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
@@ -305,7 +306,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
-  const attendingCount = guests.filter(g => g.attending === 'yes').length;
   const checkedInAll = guests.filter(g => g.checkedIn).length;
 
   return (
@@ -396,6 +396,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <Link href={`/client/invitations/send/${event.id}`} className="col-span-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
           <Send size={15} /> Send Invitations
         </Link>
+
+        {/* 👇 NEW ROW: Kumbusha (Reminder) button – full width, distinct style */}
+        <button
+          onClick={prepareReminder}
+          className="col-span-full bg-amber-50 text-amber-700 border-2 border-amber-200 text-center py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2"
+        >
+          <MessageCircle size={15} /> Kumbusha Michango (Remind)
+          <span className="text-xs font-normal bg-amber-200/50 px-2 py-0.5 rounded-full">SMS</span>
+        </button>
+
         <Link href={`/client/guests/import/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
           <Upload size={14} /> Import Guests
         </Link>
@@ -408,7 +418,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
           <QrCode size={14} /> Check-In
         </Link>
-        {/* Send Thanks button */}
         {checkedInCount > 0 && (
           <button
             onClick={openThanksModal}
@@ -421,7 +430,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Guest List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <h2 className="font-serif text-lg font-extrabold text-gray-800">Guest List</h2>
             <span className="text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2.5 py-1 rounded-full">
@@ -429,20 +438,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </span>
           </div>
           {guests.length > 0 && (
-            <div className="flex items-center gap-3">
-              <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
                 {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
               </button>
-
-              {/* ✅ Kumbusha button */}
-              <button
-                onClick={prepareReminder}
-                className="text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] hover:bg-[rgba(13,79,79,0.16)] px-3 py-1 rounded-lg transition flex items-center gap-1"
-              >
-                <MessageCircle size={14} /> Kumbusha
-              </button>
-
               {selectedGuests.size > 0 && (
                 <button
                   onClick={deleteSelected}
@@ -471,18 +471,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               onScroll={handleScroll}
             >
               {guests.map((guest) => (
-                <div key={guest.id} className="px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition">
-                  <div className="flex items-center gap-3 flex-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedGuests.has(guest.id)}
-                      onChange={() => toggleSelectGuest(guest.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
-                    />
-                    <div>
-                      <p className="font-semibold text-gray-800">{guest.name}</p>
-                      {guest.phone && <p className="text-xs text-gray-500">{guest.phone}</p>}
-                      <div className="flex items-center gap-1 mt-1">
+                <div key={guest.id} className="px-4 py-3 hover:bg-gray-50 transition">
+                  <div className="flex flex-wrap items-start gap-2">
+                    {/* Checkbox */}
+                    <div className="flex items-center pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedGuests.has(guest.id)}
+                        onChange={() => toggleSelectGuest(guest.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+                      />
+                    </div>
+
+                    {/* Main info – name, phone, badges */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm sm:text-base truncate">{guest.name}</p>
+                      {guest.phone && <p className="text-xs text-gray-500 truncate">{guest.phone}</p>}
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
                         {guest.routingChannel === 'whatsapp' ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full">
                             <MessageCircle size={10} /> WhatsApp
@@ -497,7 +502,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                             ❤️ Thanks sent
                           </span>
                         )}
-                        {/* ✅ Reminder count badge */}
                         {guest.reminderCount > 0 && (
                           <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
                             🔁 {guest.reminderCount} reminder{guest.reminderCount > 1 ? 's' : ''}
@@ -505,30 +509,32 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div>
-                      {guest.checkedIn ? (
-                        <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">✓ Checked in</span>
-                      ) : (
-                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
+
+                    {/* Status and actions */}
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                      <div>
+                        {guest.checkedIn ? (
+                          <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">✓ Checked in</span>
+                        ) : (
+                          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
+                        )}
+                      </div>
+                      {event.tenant?.testMode && (
+                        <Link
+                          href={`/invite/preview/${guest.id}`}
+                          target="_blank"
+                          className="text-xs text-[#0D4F4F] hover:underline font-medium"
+                        >
+                          Preview
+                        </Link>
                       )}
-                    </div>
-                    {event.tenant?.testMode && (
-                      <Link
-                        href={`/invite/preview/${guest.id}`}
-                        target="_blank"
-                        className="text-xs text-[#0D4F4F] hover:underline font-medium ml-2"
+                      <button
+                        onClick={() => deleteGuest(guest.id)}
+                        className="text-gray-400 hover:text-red-500 transition"
                       >
-                        Preview Card
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => deleteGuest(guest.id)}
-                      className="text-gray-400 hover:text-red-500 transition"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -561,7 +567,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               Send a thank‑you message to <strong>{checkedInCount}</strong> WhatsApp checked‑in guest{checkedInCount > 1 ? 's' : ''}.
               {credits !== null && ` This will cost ${checkedInCount * 300} TZS (${credits} credits available).`}
             </p>
-
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Thanks Card</p>
               {event.thankYouCardUrl ? (
@@ -577,7 +582,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
             </div>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Thank‑you message</label>
               <textarea
@@ -633,7 +637,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </span>
               )}
             </p>
-
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">SMS Message</label>
               <textarea
@@ -643,9 +646,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none"
                 placeholder="Write your reminder message... Use {name} for guest's name."
               />
-              <p className="text-xs text-gray-400 mt-1">Use {'{name}'} to insert guest's name.</p>
+              <p className="text-xs text-gray-400 mt-1">Use {'{name}'} and {'{event}'} as placeholders.</p>
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setShowReminderModal(false)}
