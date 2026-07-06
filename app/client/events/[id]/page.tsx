@@ -52,11 +52,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [thanksMessage, setThanksMessage] = useState('');
   const [sendingThanks, setSendingThanks] = useState(false);
 
-  // Kumbusha modal state
-  const [showKumbushaModal, setShowKumbushaModal] = useState(false);
-  const [kumbushaMessage, setKumbushaMessage] = useState('');
-  const [sendingKumbusha, setSendingKumbusha] = useState(false);
-
   useEffect(() => {
     params.then(({ id }) => {
       setEventId(id);
@@ -220,60 +215,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     fetchData(eventId!);
   };
 
-  // ─── Kumbusha Michango ───────────────────────────────────────────────
-
-  const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
-  const kumbushaCount = kumbushaGuests.length;
-
-  const openKumbushaModal = () => {
-    if (kumbushaCount === 0) {
-      toast.error('No SMS guests pending check-in.');
-      return;
-    }
-    setKumbushaMessage(`Karibu ${event?.name}! Tafadhali kumbuka kuleta mchango wako.`);
-    setShowKumbushaModal(true);
-  };
-
-  const sendKumbusha = async () => {
-    if (!kumbushaMessage.trim()) {
-      toast.error('Andika ujumbe wa kukumbusha.');
-      return;
-    }
-    const totalCost = kumbushaCount * 300;
-    if (credits !== null && credits < totalCost) {
-      toast.error(`Mikopo haitoshi. Unahitaji ${totalCost} TZS, una ${credits} TZS.`);
-      return;
-    }
-    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${totalCost} TZS.`)) return;
-
-    setSendingKumbusha(true);
-    let successCount = 0;
-    for (const guest of kumbushaGuests) {
-      try {
-        const res = await fetch('/api/invitations/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestId: guest.id,
-            eventId,
-            message: kumbushaMessage,
-            type: 'reminder',
-          }),
-          credentials: 'include',
-        });
-        if (res.ok) successCount++;
-      } catch {
-        // ignore
-      }
-      await new Promise(r => setTimeout(r, 300));
-    }
-    toast.success(`Ukumbusho ulitumwa kwa ${successCount} kati ya ${kumbushaCount}.`);
-    setSendingKumbusha(false);
-    setShowKumbushaModal(false);
-    fetchCredits();
-    fetchData(eventId!);
-  };
-
   // ─── Render ──────────────────────────────────────────────────────────
 
   if (loading) {
@@ -388,13 +329,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <Send size={15} /> Send Invitations
         </Link>
 
-        <button
-          onClick={openKumbushaModal}
-          className="col-span-full bg-amber-50 text-amber-700 border-2 border-amber-200 text-center py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2"
+        {/* 👇 Kumbusha – redirects to dedicated page */}
+        <Link
+          href={`/client/events/${event.id}/reminder-message`}
+          className="col-span-full bg-amber-50 text-amber-700 border-2 border-amber-200 text-center py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2 text-sm sm:text-base"
         >
-          <MessageCircle size={15} /> Kumbusha Michango ({kumbushaCount} SMS pending)
+          <MessageCircle size={15} />
+          <span className="hidden sm:inline">Kumbusha Michango</span>
+          <span className="sm:hidden">Kumbusha</span>
           <span className="text-xs font-normal bg-amber-200/50 px-2 py-0.5 rounded-full">SMS</span>
-        </button>
+        </Link>
 
         <Link href={`/client/guests/import/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
           <Upload size={14} /> Import Guests
@@ -418,7 +362,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {/* Guest List */}
+      {/* Guest List – responsive (unchanged) */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -538,53 +482,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </>
         )}
       </div>
-
-      {/* ─── Kumbusha Modal ─── */}
-      {showKumbushaModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
-            <button
-              onClick={() => setShowKumbushaModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              <X size={20} />
-            </button>
-            <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Kumbusha Michango</h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Tuma ukumbusho kwa <strong>{kumbushaCount}</strong> mgeni{kumbushaCount !== 1 ? 's' : ''} (SMS, bado hawajafika).
-              {credits !== null && ` Gharama: ${kumbushaCount * 300} TZS (una ${credits} TZS).`}
-            </p>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ujumbe wa kukumbusha</label>
-              <textarea
-                rows={4}
-                value={kumbushaMessage}
-                onChange={(e) => setKumbushaMessage(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-                placeholder="Andika ujumbe hapa..."
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowKumbushaModal(false)}
-                className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition"
-              >
-                Ghairi
-              </button>
-              <button
-                onClick={sendKumbusha}
-                disabled={sendingKumbusha || !kumbushaMessage.trim() || (credits !== null && credits < kumbushaCount * 300)}
-                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {sendingKumbusha
-                  ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  : <MessageCircle size={18} />}
-                {sendingKumbusha ? 'Inatuma...' : 'Tuma Ukumbusho'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── Thanks Modal ─── */}
       {showThanksModal && (
