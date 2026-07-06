@@ -28,6 +28,7 @@ export async function GET(
           attending: true,
           invitationSentAt: true,
           thanksSentAt: true,
+          reminderCount: true,
         },
         orderBy: { name: 'asc' },
       },

@@ -20,6 +20,7 @@ interface Guest {
   attending: string;
   invitationSentAt: string | null;
   thanksSentAt: string | null;
+  reminderCount: number;   // ✅ added
 }
 
 interface EventData {
@@ -50,6 +51,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [showThanksModal, setShowThanksModal] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
   const [sendingThanks, setSendingThanks] = useState(false);
+
+  // Reminder modal state
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState('');
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [reminderCost, setReminderCost] = useState(0);
+  const [reminderGuestCount, setReminderGuestCount] = useState(0);
 
   useEffect(() => {
     params.then(({ id }) => {
@@ -217,6 +225,65 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     fetchData(eventId!);
   };
 
+  // ─── Send Reminder (Kumbusha) ──────────────────────────────────────
+
+  const prepareReminder = () => {
+    const selected = guests.filter(g => selectedGuests.has(g.id));
+    if (selected.length === 0) {
+      toast.error('Please select at least one guest.');
+      return;
+    }
+    let totalCost = 0;
+    for (const g of selected) {
+      totalCost += (g.reminderCount || 0) === 0 ? 0 : 50;
+    }
+    setReminderGuestCount(selected.length);
+    setReminderCost(totalCost);
+    setReminderMessage(`Habari {name}, tunakumbusha kuhusu michango yako kwa ${event?.name}. Asante.`);
+    setShowReminderModal(true);
+  };
+
+  const sendReminder = async () => {
+    if (!reminderMessage.trim()) {
+      toast.error('Please enter a message.');
+      return;
+    }
+    if (reminderCost > 0 && credits !== null && credits < reminderCost) {
+      toast.error(`Insufficient credits. Need ${reminderCost} TZS, you have ${credits} TZS.`);
+      return;
+    }
+    if (!confirm(`Send reminder to ${reminderGuestCount} guest${reminderGuestCount > 1 ? 's' : ''}?`)) return;
+
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/send-reminders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          guestIds: Array.from(selectedGuests),
+          message: reminderMessage,
+        }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
+        setSelectedGuests(new Set());
+        setShowReminderModal(false);
+        fetchData(eventId!);
+        fetchCredits();
+      } else {
+        toast.error(data.error || 'Failed to send reminders');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
+  // ─── Render ─────────────────────────────────────────────────────────
+
   if (loading) {
     return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
   }
@@ -367,6 +434,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
                 {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
               </button>
+
+              {/* ✅ Kumbusha button */}
+              <button
+                onClick={prepareReminder}
+                className="text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] hover:bg-[rgba(13,79,79,0.16)] px-3 py-1 rounded-lg transition flex items-center gap-1"
+              >
+                <MessageCircle size={14} /> Kumbusha
+              </button>
+
               {selectedGuests.size > 0 && (
                 <button
                   onClick={deleteSelected}
@@ -419,6 +495,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {guest.thanksSentAt && (
                           <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
                             ❤️ Thanks sent
+                          </span>
+                        )}
+                        {/* ✅ Reminder count badge */}
+                        {guest.reminderCount > 0 && (
+                          <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                            🔁 {guest.reminderCount} reminder{guest.reminderCount > 1 ? 's' : ''}
                           </span>
                         )}
                       </div>
@@ -480,7 +562,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {credits !== null && ` This will cost ${checkedInCount * 300} TZS (${credits} credits available).`}
             </p>
 
-            {/* Preview the thanks card if available */}
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Thanks Card</p>
               {event.thankYouCardUrl ? (
@@ -521,6 +602,64 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               >
                 {sendingThanks ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Heart size={18} />}
                 {sendingThanks ? 'Sending...' : 'Send Thanks'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Reminder Modal ─── */}
+      {showReminderModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
+            <button
+              onClick={() => setShowReminderModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            >
+              <X size={20} />
+            </button>
+            <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Kumbusha Michango</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Send a contribution reminder to <strong>{reminderGuestCount}</strong> selected guest{reminderGuestCount > 1 ? 's' : ''}.
+              <br />
+              <span className="font-medium">
+                {reminderCost === 0
+                  ? '✅ First reminder is free!'
+                  : `💰 Cost: ${reminderCost} TZS (50 TZS per guest after first free reminder)`}
+              </span>
+              {credits !== null && (
+                <span className="block text-xs text-gray-400 mt-1">
+                  Available credits: {credits} TZS
+                </span>
+              )}
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">SMS Message</label>
+              <textarea
+                rows={4}
+                value={reminderMessage}
+                onChange={(e) => setReminderMessage(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none"
+                placeholder="Write your reminder message... Use {name} for guest's name."
+              />
+              <p className="text-xs text-gray-400 mt-1">Use {'{name}'} to insert guest's name.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowReminderModal(false)}
+                className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendReminder}
+                disabled={sendingReminder || !reminderMessage.trim() || (reminderCost > 0 && credits !== null && credits < reminderCost)}
+                className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {sendingReminder ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Send size={18} />}
+                {sendingReminder ? 'Sending...' : 'Send Reminder'}
               </button>
             </div>
           </div>

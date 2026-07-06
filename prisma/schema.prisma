@@ -158,6 +158,7 @@ model Guest {
   invitationDeliveredAt DateTime? // optional: when Twilio confirms delivery
   invitationOpenedAt DateTime?   // optional: when guest opens the card
   thanksSentAt DateTime? // when the thank‑you was sent
+  reminderCount   Int      @default(0)   // number of reminders sent
 }
 
 model UsageRecord {
