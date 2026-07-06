@@ -7,56 +7,62 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const tenantId = (session.user as any).tenantId;
-  const { eventId } = await params;
+    const tenantId = (session.user as any).tenantId;
+    const { eventId } = await params;
 
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, tenantId },
-    include: {
-      guests: {
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          routingChannel: true,
-          checkedIn: true,
-          attending: true,
-          invitationSentAt: true,
-          thanksSentAt: true,
-          reminderCount: true,
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, tenantId },
+      include: {
+        guests: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            routingChannel: true,
+            checkedIn: true,
+            attending: true,
+            invitationSentAt: true,
+            thanksSentAt: true,
+            reminderCount: true,
+          },
+          orderBy: { name: 'asc' },
         },
-        orderBy: { name: 'asc' },
-      },
-      tenant: {
-        select: {
-          testMode: true,
-          thanksCardUrl: true, // fallback from tenant
+        tenant: {
+          select: {
+            testMode: true,
+            thanksCardUrl: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  if (!event) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    const { guests, tenant, ...eventData } = event;
+    const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
+
+    return NextResponse.json({
+      event: {
+        ...eventData,
+        thankYouCardUrl,
+        tenant: {
+          testMode: tenant.testMode,
+        },
+      },
+      guests,
+    });
+  } catch (error) {
+    console.error('Error fetching event:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  const { guests, tenant, ...eventData } = event;
-
-  // Use event's thankYouCardUrl, fallback to tenant's thanksCardUrl
-  const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
-
-  return NextResponse.json({
-    event: {
-      ...eventData,
-      thankYouCardUrl, // frontend uses this consistently
-    },
-    guests,
-  });
 }
 
 export async function DELETE(
