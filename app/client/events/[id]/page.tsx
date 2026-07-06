@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowRight, ArrowLeft, 
+  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft, 
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
   Square, ArrowUp, Heart, X, Image as ImageIcon 
 } from 'lucide-react';
@@ -46,29 +46,65 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [deleting, setDeleting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Thanks modal state
   const [showThanksModal, setShowThanksModal] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
   const [sendingThanks, setSendingThanks] = useState(false);
 
+  // Kumbusha modal state
+  const [showKumbushaModal, setShowKumbushaModal] = useState(false);
+  const [kumbushaMessage, setKumbushaMessage] = useState('');
+  const [sendingKumbusha, setSendingKumbusha] = useState(false);
+
   useEffect(() => {
-    params.then(({ id }) => {
-      setEventId(id);
-      fetchData(id);
-      fetchCredits();
-    });
+    let cancelled = false;
+    params
+      .then(({ id }) => {
+        if (cancelled) return;
+        setEventId(id);
+        fetchData(id);
+        fetchCredits();
+      })
+      .catch((err) => {
+        console.error('Failed to resolve params:', err);
+        setFetchError('Could not read event ID from URL.');
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [params]);
 
   const fetchData = async (id: string) => {
+    setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to load event');
+
+      // surface non-ok HTTP status clearly
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const errBody = await res.json();
+          detail = errBody?.error || errBody?.message || detail;
+        } catch { /* response wasn't JSON */ }
+        throw new Error(detail);
+      }
+
       const data = await res.json();
+
+      // guard against unexpected shapes
+      if (!data?.event) {
+        throw new Error('Unexpected response format from server.');
+      }
+
       setEvent(data.event);
-      setGuests(data.guests || []);
-    } catch (err) {
-      toast.error('Could not load event details');
+      setGuests(Array.isArray(data.guests) ? data.guests : []);
+    } catch (err: any) {
+      const msg = err?.message ?? 'Unknown error';
+      console.error('fetchData error:', msg);
+      setFetchError(msg);
+      toast.error(`Could not load event: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -77,10 +113,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const fetchCredits = async () => {
     try {
       const res = await fetch('/api/tenant/billing', { credentials: 'include' });
+      if (!res.ok) return;
       const data = await res.json();
       setCredits(data.tenant?.credits ?? 0);
     } catch {
-      // silent
+      // silent — credits display is non-critical
     }
   };
 
@@ -100,10 +137,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const deleteSelected = async () => {
-    if (selectedGuests.size === 0) {
-      toast.error('No guests selected');
-      return;
-    }
+    if (selectedGuests.size === 0) { toast.error('No guests selected'); return; }
     if (!confirm(`Delete ${selectedGuests.size} selected guest${selectedGuests.size > 1 ? 's' : ''}? This action cannot be undone.`)) return;
 
     setDeleting(true);
@@ -137,11 +171,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         toast.success('Guest deleted');
         setGuests(prev => prev.filter(g => g.id !== guestId));
-        setSelectedGuests(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(guestId);
-          return newSet;
-        });
+        setSelectedGuests(prev => { const s = new Set(prev); s.delete(guestId); return s; });
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to delete');
@@ -152,34 +182,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLDivElement;
-    setShowBackToTop(target.scrollTop > 300);
+    setShowBackToTop((e.target as HTMLDivElement).scrollTop > 300);
   };
 
   const scrollToTop = () => {
-    const container = document.getElementById('guest-list-container');
-    if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('guest-list-container')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // ─── Send Thanks ────────────────────────────────────────────────────
+  // ─── Send Thanks ─────────────────────────────────────────────────────
 
   const whatsappCheckedInGuests = guests.filter(g => g.checkedIn && g.routingChannel === 'whatsapp');
   const checkedInCount = whatsappCheckedInGuests.length;
 
   const openThanksModal = () => {
-    if (checkedInCount === 0) {
-      toast.error('No WhatsApp‑checked‑in guests to thank.');
-      return;
-    }
+    if (checkedInCount === 0) { toast.error('No WhatsApp‑checked‑in guests to thank.'); return; }
     setThanksMessage(`Thank you for attending ${event?.name}! We hope you enjoyed the event.`);
     setShowThanksModal(true);
   };
 
   const sendThanks = async () => {
-    if (!thanksMessage.trim()) {
-      toast.error('Please enter a thank‑you message.');
-      return;
-    }
+    if (!thanksMessage.trim()) { toast.error('Please enter a thank‑you message.'); return; }
     const totalCost = checkedInCount * 300;
     if (credits !== null && credits < totalCost) {
       toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
@@ -194,18 +216,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         const res = await fetch('/api/invitations/send-whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestId: guest.id,
-            eventId,
-            message: thanksMessage,
-            type: 'thanks',
-          }),
+          body: JSON.stringify({ guestId: guest.id, eventId, message: thanksMessage, type: 'thanks' }),
           credentials: 'include',
         });
         if (res.ok) successCount++;
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore per-guest failures */ }
       await new Promise(r => setTimeout(r, 300));
     }
     toast.success(`Thank‑you sent to ${successCount} of ${checkedInCount} guests.`);
@@ -215,22 +230,86 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     fetchData(eventId!);
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────
+  // ─── Kumbusha Michango ────────────────────────────────────────────────
+
+  const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
+  const kumbushaCount = kumbushaGuests.length;
+
+  const openKumbushaModal = () => {
+    if (kumbushaCount === 0) { toast.error('No SMS guests pending check-in.'); return; }
+    setKumbushaMessage(`Karibu ${event?.name}! Tafadhali kumbuka kuleta mchango wako.`);
+    setShowKumbushaModal(true);
+  };
+
+  const sendKumbusha = async () => {
+    if (!kumbushaMessage.trim()) { toast.error('Andika ujumbe wa kukumbusha.'); return; }
+    const totalCost = kumbushaCount * 300;
+    if (credits !== null && credits < totalCost) {
+      toast.error(`Mikopo haitoshi. Unahitaji ${totalCost} TZS, una ${credits} TZS.`);
+      return;
+    }
+    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${totalCost} TZS.`)) return;
+
+    setSendingKumbusha(true);
+    let successCount = 0;
+    for (const guest of kumbushaGuests) {
+      try {
+        const res = await fetch('/api/invitations/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guestId: guest.id, eventId, message: kumbushaMessage, type: 'reminder' }),
+          credentials: 'include',
+        });
+        if (res.ok) successCount++;
+      } catch { /* ignore per-guest failures */ }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    toast.success(`Ukumbusho ulitumwa kwa ${successCount} kati ya ${kumbushaCount}.`);
+    setSendingKumbusha(false);
+    setShowKumbushaModal(false);
+    fetchCredits();
+    fetchData(eventId!);
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
+    return (
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+        <p className="text-sm text-gray-400">Loading event…</p>
+      </div>
+    );
   }
 
-  if (!event) {
+  // Show a clear error state with retry instead of a blank screen
+  if (fetchError || !event) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <div className="text-5xl mb-3">🔍</div>
-          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">Event Not Found</h1>
-          <p className="text-gray-500 text-sm mb-5">This event doesn't exist or you don't have access to it.</p>
-          <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
-            <ArrowLeft size={14} /> Back to Dashboard
-          </Link>
+          <div className="text-5xl mb-3">⚠️</div>
+          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">
+            {fetchError ? 'Failed to Load Event' : 'Event Not Found'}
+          </h1>
+          <p className="text-gray-500 text-sm mb-5">
+            {fetchError ?? "This event doesn't exist or you don't have access to it."}
+          </p>
+          <div className="flex gap-3 justify-center">
+            {fetchError && eventId && (
+              <button
+                onClick={() => fetchData(eventId)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition"
+              >
+                Retry
+              </button>
+            )}
+            <Link
+              href="/client/dashboard"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition"
+            >
+              <ArrowLeft size={14} /> Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -242,7 +321,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
+
+      {/* Top nav */}
       <div className="flex items-center justify-between mb-6">
         <Link
           href="/client/dashboard"
@@ -293,34 +373,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
-          <div className="w-9 h-9 rounded-xl bg-[rgba(13,79,79,0.08)] flex items-center justify-center mx-auto mb-2 text-[#0D4F4F]">
-            <Users size={18} />
+        {[
+          { icon: <Users size={18} />, value: guests.length, label: 'Total Guests', bg: 'bg-[rgba(13,79,79,0.08)]', color: 'text-[#0D4F4F]' },
+          { icon: <Smartphone size={18} />, value: checkedInAll, label: 'Checked In', bg: 'bg-[#EDFAF4]', color: 'text-[#1A7A4A]' },
+          { icon: <MessageCircle size={18} />, value: whatsappCount, label: 'WhatsApp', bg: 'bg-[#EAF4F4]', color: 'text-[#0D4F4F]' },
+          { icon: <Phone size={18} />, value: smsCount, label: 'SMS', bg: 'bg-[#FEF6EC]', color: 'text-[#C07A20]' },
+        ].map(({ icon, value, label, bg, color }) => (
+          <div key={label} className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
+            <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center mx-auto mb-2 ${color}`}>{icon}</div>
+            <div className="font-serif text-2xl font-black text-gray-800">{value}</div>
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</div>
           </div>
-          <div className="font-serif text-2xl font-black text-gray-800">{guests.length}</div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Guests</div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
-          <div className="w-9 h-9 rounded-xl bg-[#EDFAF4] flex items-center justify-center mx-auto mb-2 text-[#1A7A4A]">
-            <Smartphone size={18} />
-          </div>
-          <div className="font-serif text-2xl font-black text-gray-800">{checkedInAll}</div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Checked In</div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
-          <div className="w-9 h-9 rounded-xl bg-[#EAF4F4] flex items-center justify-center mx-auto mb-2 text-[#0D4F4F]">
-            <MessageCircle size={18} />
-          </div>
-          <div className="font-serif text-2xl font-black text-gray-800">{whatsappCount}</div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">WhatsApp</div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition">
-          <div className="w-9 h-9 rounded-xl bg-[#FEF6EC] flex items-center justify-center mx-auto mb-2 text-[#C07A20]">
-            <Phone size={18} />
-          </div>
-          <div className="font-serif text-2xl font-black text-gray-800">{smsCount}</div>
-          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">SMS</div>
-        </div>
+        ))}
       </div>
 
       {/* Action buttons */}
@@ -329,16 +393,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <Send size={15} /> Send Invitations
         </Link>
 
-        {/* 👇 Kumbusha – redirects to dedicated page */}
-        <Link
-          href={`/client/events/${event.id}/reminder-message`}
-          className="col-span-full bg-amber-50 text-amber-700 border-2 border-amber-200 text-center py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+        <button
+          onClick={openKumbushaModal}
+          className="col-span-full bg-amber-50 text-amber-700 border-2 border-amber-200 text-center py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2"
         >
-          <MessageCircle size={15} />
-          <span className="hidden sm:inline">Kumbusha Michango</span>
-          <span className="sm:hidden">Kumbusha</span>
+          <MessageCircle size={15} /> Kumbusha Michango ({kumbushaCount} SMS pending)
           <span className="text-xs font-normal bg-amber-200/50 px-2 py-0.5 rounded-full">SMS</span>
-        </Link>
+        </button>
 
         <Link href={`/client/guests/import/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
           <Upload size={14} /> Import Guests
@@ -362,7 +423,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         )}
       </div>
 
-      {/* Guest List – responsive (unchanged) */}
+      {/* Guest List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
           <div className="flex items-center gap-3">
@@ -398,7 +459,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <p className="text-sm text-gray-400">Import a guest list or add guests manually to get started.</p>
           </div>
         ) : (
-          <>
+          <div className="relative">
             <div
               id="guest-list-container"
               className="divide-y divide-gray-100 max-h-96 overflow-y-auto scroll-smooth"
@@ -415,7 +476,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
                       />
                     </div>
-
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-800 text-sm sm:text-base truncate">{guest.name}</p>
                       {guest.phone && <p className="text-xs text-gray-500 truncate">{guest.phone}</p>}
@@ -430,9 +490,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           </span>
                         )}
                         {guest.thanksSentAt && (
-                          <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
-                            ❤️ Thanks sent
-                          </span>
+                          <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">❤️ Thanks sent</span>
                         )}
                         {guest.reminderCount > 0 && (
                           <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
@@ -441,28 +499,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         )}
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2 ml-auto flex-wrap">
-                      <div>
-                        {guest.checkedIn ? (
-                          <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">✓ Checked in</span>
-                        ) : (
-                          <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
-                        )}
-                      </div>
+                      {guest.checkedIn ? (
+                        <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">✓ Checked in</span>
+                      ) : (
+                        <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
+                      )}
                       {event.tenant?.testMode && (
-                        <Link
-                          href={`/invite/preview/${guest.id}`}
-                          target="_blank"
-                          className="text-xs text-[#0D4F4F] hover:underline font-medium"
-                        >
+                        <Link href={`/invite/preview/${guest.id}`} target="_blank" className="text-xs text-[#0D4F4F] hover:underline font-medium">
                           Preview
                         </Link>
                       )}
-                      <button
-                        onClick={() => deleteGuest(guest.id)}
-                        className="text-gray-400 hover:text-red-500 transition"
-                      >
+                      <button onClick={() => deleteGuest(guest.id)} className="text-gray-400 hover:text-red-500 transition">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -479,18 +527,54 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <ArrowUp size={20} />
               </button>
             )}
-          </>
+          </div>
         )}
       </div>
+
+      {/* ─── Kumbusha Modal ─── */}
+      {showKumbushaModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
+            <button onClick={() => setShowKumbushaModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+              <X size={20} />
+            </button>
+            <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Kumbusha Michango</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Tuma ukumbusho kwa <strong>{kumbushaCount}</strong> mgeni{kumbushaCount !== 1 ? 's' : ''} (SMS, bado hawajafika).
+              {credits !== null && ` Gharama: ${kumbushaCount * 300} TZS (una ${credits} TZS).`}
+            </p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ujumbe wa kukumbusha</label>
+              <textarea
+                rows={4}
+                value={kumbushaMessage}
+                onChange={(e) => setKumbushaMessage(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                placeholder="Andika ujumbe hapa..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowKumbushaModal(false)} className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition">
+                Ghairi
+              </button>
+              <button
+                onClick={sendKumbusha}
+                disabled={sendingKumbusha || !kumbushaMessage.trim() || (credits !== null && credits < kumbushaCount * 300)}
+                className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {sendingKumbusha ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MessageCircle size={18} />}
+                {sendingKumbusha ? 'Inatuma...' : 'Tuma Ukumbusho'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Thanks Modal ─── */}
       {showThanksModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 relative">
-            <button
-              onClick={() => setShowThanksModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={() => setShowThanksModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
               <X size={20} />
             </button>
             <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Send Thanks</h2>
@@ -501,11 +585,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="mb-4">
               <p className="text-sm font-medium text-gray-700 mb-2">Thanks Card</p>
               {event.thankYouCardUrl ? (
-                <img
-                  src={event.thankYouCardUrl}
-                  alt="Thanks Card"
-                  className="w-full rounded-lg border border-gray-200 max-h-48 object-contain"
-                />
+                <img src={event.thankYouCardUrl} alt="Thanks Card" className="w-full rounded-lg border border-gray-200 max-h-48 object-contain" />
               ) : (
                 <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-400 text-sm">
                   <ImageIcon size={24} className="mx-auto mb-1" />
@@ -524,10 +604,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowThanksModal(false)}
-                className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition"
-              >
+              <button onClick={() => setShowThanksModal(false)} className="flex-1 border border-gray-300 rounded-xl py-2 font-medium hover:bg-gray-50 transition">
                 Cancel
               </button>
               <button

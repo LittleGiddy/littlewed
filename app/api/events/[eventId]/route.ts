@@ -29,7 +29,7 @@ export async function GET(
             attending: true,
             invitationSentAt: true,
             thanksSentAt: true,
-            reminderCount: true,
+            reminderCount: true,   // ✅ critical
           },
           orderBy: { name: 'asc' },
         },
@@ -50,13 +50,7 @@ export async function GET(
     const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
 
     return NextResponse.json({
-      event: {
-        ...eventData,
-        thankYouCardUrl,
-        tenant: {
-          testMode: tenant.testMode,
-        },
-      },
+      event: { ...eventData, thankYouCardUrl },
       guests,
     });
   } catch (error) {
@@ -65,6 +59,7 @@ export async function GET(
   }
 }
 
+// DELETE handler unchanged...
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
