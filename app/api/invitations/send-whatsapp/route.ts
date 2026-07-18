@@ -11,8 +11,9 @@ const twilioClient = isMock ? null : twilio(process.env.TWILIO_ACCOUNT_SID, proc
 const fromWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
 const fromSms = process.env.TWILIO_SMS_NUMBER;
 
-const COST_WHATSAPP = 50;
-const COST_SMS = 25;
+// ─── Cost Constants ────────────────────────────────────────────────
+const COST_INVITATION = 300;   // per guest, from event budget
+const COST_THANKS = 300;       // per thank‑you, from tenant credits
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,55 +56,130 @@ export async function POST(req: NextRequest) {
 
     if (!guest.phone) return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
 
-    // For thanks, only send to WhatsApp and checked-in guests
+    const channel = guest.routingChannel || 'sms';
+    const event = guest.event;
+
+    // ─── Invitation ──────────────────────────────────────────────────
+    if (type === 'invitation') {
+      // 1. Check event budget (guestCount * 300 - total usage)
+      const totalUsage = await prisma.usageRecord.aggregate({
+        where: { eventId: event.id },
+        _sum: { cost: true },
+      });
+      const used = totalUsage._sum.cost || 0;
+      const allocated = event.guestCount ? event.guestCount * COST_INVITATION : 0;
+      const remaining = allocated - used;
+      if (remaining < COST_INVITATION) {
+        return NextResponse.json(
+          { error: `Insufficient event budget. Need ${COST_INVITATION} TZS, remaining ${remaining} TZS.` },
+          { status: 402 }
+        );
+      }
+
+      // 2. Ensure the required asset exists
+      let cardUrl = guest.invitationCard;
+      if (channel === 'whatsapp' && !cardUrl) {
+        return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
+      }
+      if (channel === 'sms') {
+        let code = guest.smsCode;
+        if (!code) {
+          code = Math.floor(100000 + Math.random() * 900000).toString();
+          await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
+        }
+      }
+
+      // 3. Compose message
+      const baseMessage = message || guest.event.customMessage || "You're invited!";
+      let messageText: string;
+      let imageUrl: string | null = null;
+
+      if (channel === 'whatsapp') {
+        messageText = `${baseMessage} Scan the QR code at the entrance.`;
+        imageUrl = cardUrl;
+      } else {
+        // SMS
+        const code = guest.smsCode!;
+        messageText = `${baseMessage} Your check-in code is: ${code}`;
+      }
+
+      // 4. Send via Twilio (or mock)
+      let phone = guest.phone;
+      if (!phone.startsWith('+')) phone = '+' + phone;
+
+      if (!isMock) {
+        if (channel === 'whatsapp') {
+          if (!fromWhatsApp) return NextResponse.json({ error: 'WhatsApp number not configured' }, { status: 500 });
+          await twilioClient!.messages.create({
+            body: messageText,
+            from: `whatsapp:${fromWhatsApp}`,
+            to: `whatsapp:${phone}`,
+            mediaUrl: imageUrl ? [imageUrl] : undefined,
+          });
+        } else {
+          // SMS
+          const smsFrom = fromSms || fromWhatsApp;
+          if (!smsFrom) return NextResponse.json({ error: 'SMS number not configured' }, { status: 500 });
+          await twilioClient!.messages.create({
+            body: messageText,
+            from: smsFrom,
+            to: phone,
+          });
+        }
+      } else {
+        console.log(`[MOCK] ${channel} to ${phone}: ${messageText}`, imageUrl ? `image ${imageUrl}` : '');
+      }
+
+      // 5. Record usage and update guest
+      await prisma.$transaction([
+        prisma.usageRecord.create({
+          data: {
+            tenantId: event.tenantId,
+            eventId: event.id,
+            channel,
+            cost: COST_INVITATION,
+          },
+        }),
+        prisma.guest.update({
+          where: { id: guest.id },
+          data: { invitationSentAt: new Date() },
+        }),
+      ]);
+
+      return NextResponse.json({ success: true, channel, cost: COST_INVITATION, type });
+    }
+
+    // ─── Thanks ──────────────────────────────────────────────────────
     if (type === 'thanks') {
-      if (guest.routingChannel !== 'whatsapp') {
+      // Thanks only via WhatsApp and for checked‑in guests
+      if (channel !== 'whatsapp') {
         return NextResponse.json({ error: 'Thanks can only be sent via WhatsApp' }, { status: 400 });
       }
       if (!guest.checkedIn) {
         return NextResponse.json({ error: 'Guest is not checked in' }, { status: 400 });
       }
-    }
 
-    const channel = guest.routingChannel || 'sms';
-    const cost = channel === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
+      // Check tenant credits
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: event.tenantId },
+        select: { credits: true },
+      });
+      if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      if (tenant.credits < COST_THANKS) {
+        return NextResponse.json(
+          { error: `Insufficient tenant credits. Need ${COST_THANKS} TZS, have ${tenant.credits} TZS.` },
+          { status: 402 }
+        );
+      }
 
-    // Fetch tenant credits
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: guest.event.tenantId },
-      select: { credits: true },
-    });
-    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
-    if (tenant.credits < cost) {
-      return NextResponse.json(
-        { error: `Insufficient credits. Need ${cost} TZS, have ${tenant.credits} TZS.` },
-        { status: 402 }
-      );
-    }
-
-    // Determine the card URL to use
-    let cardUrl: string | null = null;
-    if (type === 'thanks') {
-      // Use event's thankYouCardUrl, fallback to tenant's thanksCardUrl
-      cardUrl = guest.event.thankYouCardUrl || guest.event.tenant?.thanksCardUrl || null;
+      // Thanks card URL
+      const cardUrl = event.thankYouCardUrl || event.tenant?.thanksCardUrl || null;
       if (!cardUrl) {
         return NextResponse.json({ error: 'No thanks card uploaded for this event or tenant.' }, { status: 400 });
       }
-    } else {
-      cardUrl = guest.invitationCard;
-      if (!cardUrl) {
-        return NextResponse.json({ error: 'No invitation card generated yet' }, { status: 400 });
-      }
-    }
 
-    // Custom message
-    const customMessage = message || guest.event.customMessage || "You're invited!";
-
-    if (channel === 'whatsapp') {
-      const messageText = type === 'invitation'
-        ? `${customMessage} Scan the QR code at the entrance.`
-        : customMessage;
-      const imageUrl = cardUrl;
+      const baseMessage = message || event.customMessage || "Thank you for attending!";
+      const messageText = baseMessage;
       let phone = guest.phone;
       if (!phone.startsWith('+')) phone = '+' + phone;
 
@@ -113,63 +189,28 @@ export async function POST(req: NextRequest) {
           body: messageText,
           from: `whatsapp:${fromWhatsApp}`,
           to: `whatsapp:${phone}`,
-          mediaUrl: [imageUrl],
+          mediaUrl: [cardUrl],
         });
       } else {
-        console.log(`[MOCK] WhatsApp to ${phone}: ${messageText}, image ${imageUrl}`);
+        console.log(`[MOCK] WhatsApp thanks to ${phone}: ${messageText}, image ${cardUrl}`);
       }
-    } else {
-      // SMS (only for invitations)
-      let code = guest.smsCode;
-      if (!code) {
-        code = Math.floor(100000 + Math.random() * 900000).toString();
-        await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
-      }
-      const messageText = `${customMessage} Your check-in code is: ${code}`;
-      let phone = guest.phone;
-      if (!phone.startsWith('+')) phone = '+' + phone;
 
-      if (!isMock) {
-        const smsFrom = fromSms || fromWhatsApp;
-        if (!smsFrom) return NextResponse.json({ error: 'SMS number not configured' }, { status: 500 });
-        await twilioClient!.messages.create({
-          body: messageText,
-          from: smsFrom,
-          to: phone,
-        });
-      } else {
-        console.log(`[MOCK] SMS to ${phone}: ${messageText}`);
-      }
+      // Deduct tenant credits, update guest (no usage record)
+      await prisma.$transaction([
+        prisma.tenant.update({
+          where: { id: event.tenantId },
+          data: { credits: { decrement: COST_THANKS } },
+        }),
+        prisma.guest.update({
+          where: { id: guest.id },
+          data: { thanksSentAt: new Date() },
+        }),
+      ]);
+
+      return NextResponse.json({ success: true, channel: 'whatsapp', cost: COST_THANKS, type });
     }
 
-    // Deduct credits, record usage, update timestamp
-    const updateData: any = {};
-    if (type === 'invitation') {
-      updateData.invitationSentAt = new Date();
-    } else if (type === 'thanks') {
-      updateData.thanksSentAt = new Date();
-    }
-
-    await prisma.$transaction([
-      prisma.tenant.update({
-        where: { id: guest.event.tenantId },
-        data: { credits: { decrement: cost } },
-      }),
-      prisma.usageRecord.create({
-        data: {
-          tenantId: guest.event.tenantId,
-          eventId: guest.event.id,
-          channel,
-          cost,
-        },
-      }),
-      prisma.guest.update({
-        where: { id: guest.id },
-        data: updateData,
-      }),
-    ]);
-
-    return NextResponse.json({ success: true, channel, cost, type });
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
   } catch (error: any) {
     console.error('POST /api/invitations/send-whatsapp error:', error);
     return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
