@@ -205,6 +205,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
     setSendingThanks(true);
     let successCount = 0;
+    const errors: string[] = [];
     for (const guest of whatsappCheckedInGuests) {
       try {
         const res = await fetch('/api/invitations/send-whatsapp', {
@@ -213,11 +214,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           body: JSON.stringify({ guestId: guest.id, eventId, message: thanksMessage, type: 'thanks' }),
           credentials: 'include',
         });
-        if (res.ok) successCount++;
-      } catch { /* ignore per-guest failures */ }
+        const data = await res.json();
+        if (res.ok) {
+          successCount++;
+        } else {
+          errors.push(`${guest.name}: ${data.error || 'Unknown error'}`);
+        }
+      } catch {
+        errors.push(`${guest.name}: Network error`);
+      }
       await new Promise(r => setTimeout(r, 300));
     }
-    toast.success(`Thank‑you sent to ${successCount} of ${checkedInCount} guests.`);
+    if (errors.length === 0) {
+      toast.success(`Thank‑you sent to ${successCount} of ${checkedInCount} guests.`);
+    } else {
+      toast.error(`Sent ${successCount}/${checkedInCount}. Errors: ${errors.join(', ')}`);
+    }
     setSendingThanks(false);
     setShowThanksModal(false);
     fetchCredits();
@@ -225,8 +237,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   // ─── Kumbusha Michango ────────────────────────────────────────────────
+
   // Filter: guests who are not checked in and have SMS as routing channel.
-  // (You can change this to include all guests if desired.)
   const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
   const kumbushaCount = kumbushaGuests.length;
 
@@ -241,7 +253,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const sendKumbusha = async () => {
     if (!kumbushaMessage.trim()) { toast.error('Andika ujumbe wa kukumbusha.'); return; }
-    // Check credits against the calculated total cost
     if (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost) {
       toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`);
       return;
@@ -249,24 +260,37 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${kumbushaTotalCost} TZS.`)) return;
 
     setSendingKumbusha(true);
-    let successCount = 0;
-    for (const guest of kumbushaGuests) {
-      try {
-        const res = await fetch('/api/invitations/send-sms', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestId: guest.id, eventId, message: kumbushaMessage, type: 'reminder' }),
-          credentials: 'include',
-        });
-        if (res.ok) successCount++;
-      } catch { /* ignore per-guest failures */ }
-      await new Promise(r => setTimeout(r, 300));
+    try {
+      const guestIds = kumbushaGuests.map(g => g.id);
+      const res = await fetch(`/api/events/${eventId}/send-reminders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestIds, message: kumbushaMessage }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.successCount === kumbushaGuests.length) {
+          toast.success(`Ukumbusho ulitumwa kwa wageni ${data.successCount} wote.`);
+        } else {
+          toast.success(`Ukumbusho ulitumwa kwa ${data.successCount} kati ya ${kumbushaGuests.length} wageni.`);
+          if (data.errors && data.errors.length > 0) {
+            data.errors.forEach((err: any) => {
+              toast.error(`Imeshindwa kwa mgeni: ${err.error}`);
+            });
+          }
+        }
+        fetchCredits();
+        fetchData(eventId!);
+        setShowKumbushaModal(false);
+      } else {
+        toast.error(data.error || 'Imeshindwa kutuma ukumbusho.');
+      }
+    } catch (error) {
+      toast.error('Tatizo la mtandao. Tafadhali jaribu tena.');
+    } finally {
+      setSendingKumbusha(false);
     }
-    toast.success(`Ukumbusho ulitumwa kwa ${successCount} kati ya ${kumbushaCount}.`);
-    setSendingKumbusha(false);
-    setShowKumbushaModal(false);
-    fetchCredits();
-    fetchData(eventId!);
   };
 
   // ─── Render ───────────────────────────────────────────────────────────
@@ -540,8 +564,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <br />
               <span className="font-medium">
                 {kumbushaTotalCost === 0
-                  ? '✅ Free (first 2 reminders per guest)'
-                  : `💰 Gharama: ${kumbushaTotalCost} TZS (50 TZS/guest after 2 free reminders)`}
+                  ? '✅ Bure (kumbusho 2 za kwanza bure kwa kila mgeni)'
+                  : `💰 Gharama: ${kumbushaTotalCost} TZS (50 TZS/mgeni baada ya 2 za bure)`}
               </span>
               {credits !== null && (
                 <span className="block text-xs text-gray-400 mt-1">

@@ -78,9 +78,10 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   };
 
   const selectedCount = selectedGuests.size;
+  // Cost: first 2 reminders free, then 50 TZS each
   const totalCost = guests
     .filter(g => selectedGuests.has(g.id))
-    .reduce((sum, g) => sum + (g.reminderCount === 0 ? 0 : 50), 0);
+    .reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
 
   const sendReminders = async () => {
     if (selectedCount === 0) {
@@ -110,19 +111,22 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       });
       const data = await res.json();
       if (res.ok) {
-        let msg = `Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`;
-        if (data.errors && data.errors.length > 0) {
-          msg += ` (${data.errors.length} failed)`;
-          toast.error(msg);
+        if (data.successCount === selectedCount) {
+          toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
         } else {
-          toast.success(msg);
+          toast.success(`Reminder sent to ${data.successCount}/${selectedCount} guest${selectedCount > 1 ? 's' : ''}.`);
+          if (data.errors && data.errors.length > 0) {
+            data.errors.forEach((err: any) => {
+              toast.error(`Failed for guest: ${err.error}`);
+            });
+          }
         }
         router.push(`/client/events/${eventId}`);
       } else {
         toast.error(data.error || 'Failed to send reminders');
       }
     } catch {
-      toast.error('Network error');
+      toast.error('Network error. Please try again.');
     } finally {
       setSending(false);
     }
@@ -179,6 +183,9 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             <div className="text-sm">
               <span className="font-medium">
                 Cost: {totalCost === 0 ? 'Free' : `${totalCost} TZS`}
+                <span className="text-xs text-gray-400 block">
+                  First 2 reminders per guest are free
+                </span>
               </span>
               {credits !== null && (
                 <span className="text-gray-400 ml-2">(Available: {credits} TZS)</span>
@@ -234,7 +241,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                     <p className="text-xs text-gray-500">{guest.phone}</p>
                   </div>
                   <div className="text-xs text-gray-400">
-                    {guest.reminderCount === 0 ? (
+                    {guest.reminderCount < 2 ? (
                       <span className="text-[#0D4F4F]">Free</span>
                     ) : (
                       <span>50 TZS</span>
