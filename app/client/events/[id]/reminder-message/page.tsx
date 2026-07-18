@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, MessageCircle, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -11,6 +11,7 @@ interface Guest {
   name: string;
   phone: string;
   reminderCount: number;
+  routingChannel: string;
 }
 
 interface Event {
@@ -30,7 +31,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
-    params.then(({ eventId }) => {   // ✅ fixed: use eventId, not id
+    params.then(({ eventId }) => {
       setEventId(eventId);
       fetchEvent(eventId);
       fetchCredits();
@@ -109,7 +110,13 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
+        let msg = `Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`;
+        if (data.errors && data.errors.length > 0) {
+          msg += ` (${data.errors.length} failed)`;
+          toast.error(msg);
+        } else {
+          toast.success(msg);
+        }
         router.push(`/client/events/${eventId}`);
       } else {
         toast.error(data.error || 'Failed to send reminders');
@@ -178,6 +185,9 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               )}
             </div>
           </div>
+          <p className="text-xs text-gray-400 mt-2">
+            💬 Reminders are sent via SMS to all selected guests with a phone number.
+          </p>
         </div>
 
         <div className="p-5">
@@ -195,33 +205,47 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           </div>
 
           <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
-            {guests.map((guest) => (
-              <div
-                key={guest.id}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedGuests.has(guest.id)}
-                  onChange={() => toggleSelectGuest(guest.id)}
-                  className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-800">{guest.name}</p>
-                  <p className="text-xs text-gray-500">{guest.phone}</p>
+            {guests.map((guest) => {
+              const isWhatsApp = guest.routingChannel === 'whatsapp';
+              return (
+                <div
+                  key={guest.id}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedGuests.has(guest.id)}
+                    onChange={() => toggleSelectGuest(guest.id)}
+                    className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-800">{guest.name}</p>
+                      {isWhatsApp ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full">
+                          <MessageCircle size={10} /> WhatsApp
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">
+                          <Phone size={10} /> SMS
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500">{guest.phone}</p>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {guest.reminderCount === 0 ? (
+                      <span className="text-[#0D4F4F]">Free</span>
+                    ) : (
+                      <span>50 TZS</span>
+                    )}
+                    <span className="ml-2 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {guest.reminderCount} sent
+                    </span>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400">
-                  {guest.reminderCount === 0 ? (
-                    <span className="text-[#0D4F4F]">Free</span>
-                  ) : (
-                    <span>50 TZS</span>
-                  )}
-                  <span className="ml-2 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {guest.reminderCount} sent
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-6 flex gap-3">
