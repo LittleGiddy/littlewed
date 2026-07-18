@@ -245,19 +245,7 @@ export default function LoginPage() {
           margin-bottom: 22px;
         }
 
-        .mobile-features {
-          position: relative; z-index: 1;
-          display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
-        }
-
-        .mobile-feat-pill {
-          display: flex; align-items: center; gap: 6px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-          border-radius: 20px; padding: 5px 12px;
-          color: rgba(255,255,255,0.8); font-size: 12px; font-weight: 500;
-        }
-        .mobile-feat-pill svg { color: #E8A598; flex-shrink: 0; }
-
+        /* ── Form ── */
         .form-body { padding: 36px 36px 32px; }
 
         .eyebrow {
@@ -343,19 +331,79 @@ export default function LoginPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .divider {
-          display: flex; align-items: center; gap: 10px;
-          margin: 20px 0 0; color: #C8D4DE; font-size: 11.5px; font-weight: 600;
-        }
-        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #EEF2F6; }
-
+        /* ── Unified Footer (features + divider + sign‑up) ── */
         .card-footer {
-          text-align: center; font-size: 13px; color: #7A8FA6;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           padding: 16px 36px 28px;
+          text-align: center;
+          border-top: 1px solid #EEF2F6;
         }
-        .card-footer a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
-        .card-footer a:hover { text-decoration: underline; }
 
+        .footer-features-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          justify-content: center;
+          margin-bottom: 16px;
+          width: 100%;
+        }
+
+        .footer-feat {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: #F5F8FA;
+          border: 1px solid #E2EAF0;
+          border-radius: 20px;
+          padding: 5px 14px;
+          color: #1A2B3C;
+          font-size: 12.5px;
+          font-weight: 500;
+          transition: background 0.15s;
+        }
+        .footer-feat:hover {
+          background: #EEF2F6;
+        }
+        .footer-feat-icon {
+          color: #0D4F4F;
+          display: flex;
+          align-items: center;
+        }
+
+        .divider {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: 100%;
+          color: #C8D4DE;
+          font-size: 11.5px;
+          font-weight: 600;
+          margin: 0 0 16px;
+        }
+        .divider::before,
+        .divider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: #EEF2F6;
+        }
+
+        .footer-signup {
+          font-size: 13px;
+          color: #7A8FA6;
+        }
+        .footer-signup a {
+          color: #0D4F4F;
+          font-weight: 700;
+          text-decoration: none;
+        }
+        .footer-signup a:hover {
+          text-decoration: underline;
+        }
+
+        /* ── Responsive ── */
         @media (max-width: 768px) {
           .left { display: none; }
           .right { padding: 0; background: #F0F4F8; align-items: flex-start; }
@@ -369,24 +417,17 @@ export default function LoginPage() {
           .card-bar { display: none; }
           .form-body { padding: 28px 24px 24px; }
           .form-title { font-size: 22px; }
-          .card-footer { padding: 12px 24px 24px; }
-          .mobile-bottom {
-            padding: 24px 20px 32px;
-            display: flex; flex-direction: column; gap: 10px;
+          .card-footer {
+            padding: 16px 24px 24px;
           }
-          .mobile-bottom-feat {
-            display: flex; align-items: center; gap: 10px;
-            color: #4A6072; font-size: 13px; font-weight: 500;
-          }
-          .mobile-bottom-dot {
-            width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-            background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-            display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          .footer-feat {
+            font-size: 12px;
+            padding: 4px 12px;
           }
         }
 
         @media (min-width: 769px) {
-          .mobile-bottom { display: none; }
+          .mobile-hero { display: none !important; }
         }
       `}</style>
 
@@ -411,18 +452,11 @@ export default function LoginPage() {
         <div className="right">
           <div className="right-inner">
             <div className="card">
-              {/* Mobile hero */}
+              {/* Mobile hero (no features pills) */}
               <div className="mobile-hero">
                 <div className="mobile-logo"><Logo size="mobile" /></div>
                 <div className="mobile-tagline">Welcome <span>back.</span></div>
                 <p className="mobile-sub">Sign in to manage your events, guests, and invitations.</p>
-                <div className="mobile-features">
-                  {features.map(({ icon, label }) => (
-                    <div className="mobile-feat-pill" key={label}>
-                      {icon}<span>{label}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
 
               <div className="card-bar" />
@@ -436,7 +470,6 @@ export default function LoginPage() {
                   <div className="err-box"><span>⚠️</span><span>{error}</span></div>
                 )}
 
-                {/* ✅ FIXED: Use onSubmit on form, button type="submit" */}
                 <form onSubmit={handleSubmit} noValidate>
                   <div className="field">
                     <label className={`flabel ${emailFocused || email ? 'up' : ''}`} htmlFor="email">
@@ -473,9 +506,7 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  <Link href="/forgot-password" className="text-sm text-[#0D4F4F] hover:underline mt-2 block text-right">
-                    Forgot password?
-                  </Link>
+                  <Link href="/forgot-password" className="forgot">Forgot password?</Link>
 
                   <button type="submit" className="btn" disabled={loading}>
                     {loading
@@ -484,21 +515,23 @@ export default function LoginPage() {
                     }
                   </button>
                 </form>
-
-                <div className="divider">or</div>
               </div>
 
+              {/* Unified footer with features, divider, sign-up */}
               <div className="card-footer">
-                Don't have an account? <a href="/signup">Create one</a>
-              </div>
-            </div>
-
-            <div className="mobile-bottom">
-              {features.map(({ icon, label }) => (
-                <div className="mobile-bottom-feat" key={label}>
-                  <div className="mobile-bottom-dot">{icon}</div><span>{label}</span>
+                <div className="footer-features-grid">
+                  {features.map(({ icon, label }) => (
+                    <div className="footer-feat" key={label}>
+                      <span className="footer-feat-icon">{icon}</span>
+                      <span>{label}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+                <div className="divider">or</div>
+                <div className="footer-signup">
+                  Don't have an account? <a href="/signup">Create one</a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
