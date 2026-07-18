@@ -96,7 +96,8 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
       return;
     }
-    if (!confirm(`Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}?`)) return;
+    const costText = totalCost === 0 ? 'bure' : `${totalCost} TZS`;
+    if (!confirm(`Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}? Cost: ${costText}.`)) return;
 
     setSending(true);
     try {
@@ -115,17 +116,19 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
         } else {
           toast.success(`Reminder sent to ${data.successCount}/${selectedCount} guest${selectedCount > 1 ? 's' : ''}.`);
+          // Log errors but show generic message
           if (data.errors && data.errors.length > 0) {
-            data.errors.forEach((err: any) => {
-              toast.error(`Failed for guest: ${err.error}`);
-            });
+            console.error('Reminder errors:', data.errors);
+            toast.error('Some messages did not send. Please try again or contact support.');
           }
         }
         router.push(`/client/events/${eventId}`);
       } else {
-        toast.error(data.error || 'Failed to send reminders');
+        console.error('Reminder API error:', data.error);
+        toast.error('Failed to send reminders. Please contact support.');
       }
-    } catch {
+    } catch (error) {
+      console.error('Network error:', error);
       toast.error('Network error. Please try again.');
     } finally {
       setSending(false);

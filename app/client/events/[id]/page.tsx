@@ -257,7 +257,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`);
       return;
     }
-    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${kumbushaTotalCost} TZS.`)) return;
+    // Friendly confirmation
+    const costText = kumbushaTotalCost === 0 ? 'bure' : `${kumbushaTotalCost} TZS`;
+    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${costText}.`)) return;
 
     setSendingKumbusha(true);
     try {
@@ -274,19 +276,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           toast.success(`Ukumbusho ulitumwa kwa wageni ${data.successCount} wote.`);
         } else {
           toast.success(`Ukumbusho ulitumwa kwa ${data.successCount} kati ya ${kumbushaGuests.length} wageni.`);
+          // Log detailed errors to console but don't show to user
           if (data.errors && data.errors.length > 0) {
-            data.errors.forEach((err: any) => {
-              toast.error(`Imeshindwa kwa mgeni: ${err.error}`);
-            });
+            console.error('Reminder errors:', data.errors);
+            // Optionally show a single generic error
+            toast.error('Baadhi ya ujumbe haukutuma. Tafadhali jaribu tena au wasiliana na msimamizi.');
           }
         }
         fetchCredits();
         fetchData(eventId!);
         setShowKumbushaModal(false);
       } else {
-        toast.error(data.error || 'Imeshindwa kutuma ukumbusho.');
+        // Show generic error to user, log the real one
+        console.error('Reminder API error:', data.error);
+        toast.error('Imeshindwa kutuma ukumbusho. Tafadhali wasiliana na msimamizi.');
       }
     } catch (error) {
+      console.error('Network error:', error);
       toast.error('Tatizo la mtandao. Tafadhali jaribu tena.');
     } finally {
       setSendingKumbusha(false);
