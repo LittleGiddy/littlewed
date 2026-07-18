@@ -238,7 +238,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ─── Kumbusha Michango ────────────────────────────────────────────────
 
-  // Filter: guests who are not checked in and have SMS as routing channel.
   const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
   const kumbushaCount = kumbushaGuests.length;
 
@@ -257,7 +256,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`);
       return;
     }
-    // Friendly confirmation
+    // ✅ Show cost as "bure" if free, otherwise show amount
     const costText = kumbushaTotalCost === 0 ? 'bure' : `${kumbushaTotalCost} TZS`;
     if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${costText}.`)) return;
 
@@ -276,10 +275,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           toast.success(`Ukumbusho ulitumwa kwa wageni ${data.successCount} wote.`);
         } else {
           toast.success(`Ukumbusho ulitumwa kwa ${data.successCount} kati ya ${kumbushaGuests.length} wageni.`);
-          // Log detailed errors to console but don't show to user
           if (data.errors && data.errors.length > 0) {
             console.error('Reminder errors:', data.errors);
-            // Optionally show a single generic error
             toast.error('Baadhi ya ujumbe haukutuma. Tafadhali jaribu tena au wasiliana na msimamizi.');
           }
         }
@@ -287,7 +284,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         fetchData(eventId!);
         setShowKumbushaModal(false);
       } else {
-        // Show generic error to user, log the real one
         console.error('Reminder API error:', data.error);
         toast.error('Imeshindwa kutuma ukumbusho. Tafadhali wasiliana na msimamizi.');
       }

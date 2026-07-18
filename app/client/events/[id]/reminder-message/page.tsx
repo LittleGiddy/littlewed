@@ -116,7 +116,6 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
         } else {
           toast.success(`Reminder sent to ${data.successCount}/${selectedCount} guest${selectedCount > 1 ? 's' : ''}.`);
-          // Log errors but show generic message
           if (data.errors && data.errors.length > 0) {
             console.error('Reminder errors:', data.errors);
             toast.error('Some messages did not send. Please try again or contact support.');
