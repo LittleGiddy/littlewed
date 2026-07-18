@@ -80,8 +80,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     setFetchError(null);
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
-
-      // surface non-ok HTTP status clearly
       if (!res.ok) {
         let detail = `HTTP ${res.status}`;
         try {
@@ -90,14 +88,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         } catch { /* response wasn't JSON */ }
         throw new Error(detail);
       }
-
       const data = await res.json();
-
-      // guard against unexpected shapes
       if (!data?.event) {
         throw new Error('Unexpected response format from server.');
       }
-
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
     } catch (err: any) {
@@ -117,7 +111,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       const data = await res.json();
       setCredits(data.tenant?.credits ?? 0);
     } catch {
-      // silent — credits display is non-critical
+      // silent
     }
   };
 
@@ -231,9 +225,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   // ─── Kumbusha Michango ────────────────────────────────────────────────
-
+  // Filter: guests who are not checked in and have SMS as routing channel.
+  // (You can change this to include all guests if desired.)
   const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
   const kumbushaCount = kumbushaGuests.length;
+
+  // Calculate total cost: first 2 reminders are free, then 50 TZS each
+  const kumbushaTotalCost = kumbushaGuests.reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
 
   const openKumbushaModal = () => {
     if (kumbushaCount === 0) { toast.error('No SMS guests pending check-in.'); return; }
@@ -243,12 +241,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const sendKumbusha = async () => {
     if (!kumbushaMessage.trim()) { toast.error('Andika ujumbe wa kukumbusha.'); return; }
-    const totalCost = kumbushaCount * 300;
-    if (credits !== null && credits < totalCost) {
-      toast.error(`Mikopo haitoshi. Unahitaji ${totalCost} TZS, una ${credits} TZS.`);
+    // Check credits against the calculated total cost
+    if (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost) {
+      toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`);
       return;
     }
-    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${totalCost} TZS.`)) return;
+    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${kumbushaTotalCost} TZS.`)) return;
 
     setSendingKumbusha(true);
     let successCount = 0;
@@ -282,7 +280,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  // Show a clear error state with retry instead of a blank screen
   if (fetchError || !event) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
@@ -321,7 +318,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="max-w-4xl mx-auto">
-
       {/* Top nav */}
       <div className="flex items-center justify-between mb-6">
         <Link
@@ -540,8 +536,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </button>
             <h2 className="font-serif text-xl font-bold text-gray-800 mb-2">Kumbusha Michango</h2>
             <p className="text-gray-600 text-sm mb-4">
-              Tuma ukumbusho kwa <strong>{kumbushaCount}</strong> mgeni{kumbushaCount !== 1 ? 's' : ''} (SMS, bado hawajafika).
-              {credits !== null && ` Gharama: ${kumbushaCount * 300} TZS (una ${credits} TZS).`}
+              Tuma ukumbusho kwa wageni <strong>{kumbushaCount}</strong>{kumbushaCount !== 1 ? 's' : ''} (SMS, bado hawajafika).
+              <br />
+              <span className="font-medium">
+                {kumbushaTotalCost === 0
+                  ? '✅ Free (first 2 reminders per guest)'
+                  : `💰 Gharama: ${kumbushaTotalCost} TZS (50 TZS/guest after 2 free reminders)`}
+              </span>
+              {credits !== null && (
+                <span className="block text-xs text-gray-400 mt-1">
+                  Mikopo iliyobaki: {credits} TZS
+                </span>
+              )}
             </p>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Ujumbe wa kukumbusha</label>
@@ -559,7 +565,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </button>
               <button
                 onClick={sendKumbusha}
-                disabled={sendingKumbusha || !kumbushaMessage.trim() || (credits !== null && credits < kumbushaCount * 300)}
+                disabled={sendingKumbusha || !kumbushaMessage.trim() || (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost)}
                 className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-xl py-2 font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {sendingKumbusha ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <MessageCircle size={18} />}
