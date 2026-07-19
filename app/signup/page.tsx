@@ -30,14 +30,9 @@ export default function SignupPage() {
     }));
   };
 
-  // Send OTP via Resend
   const sendVerification = async () => {
-    if (!form.email) {
-      setError('Email is required');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (!form.email) { setError('Email is required'); return; }
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/auth/send-verification', {
         method: 'POST',
@@ -46,7 +41,6 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      // Move to OTP input step
       setStep(3);
     } catch (err: any) {
       setError(err.message);
@@ -55,14 +49,9 @@ export default function SignupPage() {
     }
   };
 
-  // Verify OTP and then create account
   const verifyEmail = async () => {
-    if (otp.length !== 6) {
-      setError('Please enter the 6-digit code');
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (otp.length !== 6) { setError('Please enter the 6-digit code'); return; }
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/auth/verify-email', {
         method: 'POST',
@@ -71,7 +60,6 @@ export default function SignupPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      // OTP is correct → proceed with account creation
       await handleSubmit();
     } catch (err: any) {
       setError(err.message);
@@ -79,10 +67,8 @@ export default function SignupPage() {
     }
   };
 
-  // Final account creation
   const handleSubmit = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -106,19 +92,24 @@ export default function SignupPage() {
   const isStep2Valid = form.name.trim() && form.email.trim() && form.password.length >= 8;
   const isStep3Valid = otp.length === 6 && !loading;
 
-  const Logo = () => (
+  const Logo = ({ size = 'default' }: { size?: 'default' | 'mobile' }) => (
     <img
       src="/Little Wed Logo.svg"
       alt="Little Wed"
-      style={{ display: 'block', width: '180px', height: 'auto' }}
+      style={{
+        display: 'block',
+        width: size === 'mobile' ? '160px' : '100%',
+        maxWidth: size === 'mobile' ? '160px' : '220px',
+        height: 'auto',
+      }}
     />
   );
 
   const features = [
-    { icon: <Mail size={13} />, label: 'WhatsApp & SMS invitations' },
-    { icon: <CheckCircle size={13} />, label: 'QR code check-in system' },
-    { icon: <Globe size={13} />, label: 'Real-time guest dashboard' },
-    { icon: <Building size={13} />, label: 'Custom invitation cards' },
+    { icon: <Mail size={14} />, label: 'WhatsApp & SMS invitations' },
+    { icon: <CheckCircle size={14} />, label: 'QR code check-in system' },
+    { icon: <Globe size={14} />, label: 'Real-time guest dashboard' },
+    { icon: <Building size={14} />, label: 'Custom invitation cards' },
   ];
 
   return (
@@ -134,7 +125,7 @@ export default function SignupPage() {
           width: 420px; flex-shrink: 0;
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
           display: flex; flex-direction: column; justify-content: space-between;
-          padding: 48px 40px; position: relative; overflow: hidden;
+          padding: 52px 44px; position: relative; overflow: hidden;
           animation: panelIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
         }
 
@@ -165,7 +156,13 @@ export default function SignupPage() {
           50%      { transform: translate(-15px,15px) scale(1.08); }
         }
 
-        .left-logo { position: relative; z-index: 2; animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both; }
+        /* Logo wrapper — flex-isolated so it never pushes siblings */
+        .left-logo {
+          position: relative; z-index: 2;
+          display: flex; align-items: flex-start;
+          animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+        }
+
         .left-copy { position: relative; z-index: 2; animation: fadeDown 0.6s 0.35s cubic-bezier(0.16,1,0.3,1) both; }
 
         @keyframes fadeDown {
@@ -183,7 +180,7 @@ export default function SignupPage() {
 
         .features-left {
           position: relative; z-index: 2;
-          display: flex; flex-direction: column; gap: 11px;
+          display: flex; flex-direction: column; gap: 12px;
           animation: fadeUp 0.6s 0.5s cubic-bezier(0.16,1,0.3,1) both;
         }
 
@@ -192,9 +189,9 @@ export default function SignupPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        .feat { display: flex; align-items: center; gap: 11px; color: rgba(255,255,255,0.72); font-size: 13.5px; font-weight: 500; }
+        .feat { display: flex; align-items: center; gap: 12px; color: rgba(255,255,255,0.72); font-size: 13.5px; font-weight: 500; }
         .feat-dot {
-          width: 27px; height: 27px; border-radius: 8px; flex-shrink: 0;
+          width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
           background: rgba(232,165,152,0.18); border: 1px solid rgba(232,165,152,0.28);
           display: flex; align-items: center; justify-content: center; color: #E8A598;
         }
@@ -223,9 +220,7 @@ export default function SignupPage() {
 
         /* Mobile hero */
         .mobile-hero {
-          display: none;
-          flex-direction: column;
-          align-items: center;
+          display: none; flex-direction: column; align-items: center;
           padding: 40px 28px 32px;
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
           position: relative; overflow: hidden; text-align: center;
@@ -242,7 +237,15 @@ export default function SignupPage() {
           background: rgba(232,165,152,0.07);
           animation: floatB 10s ease-in-out infinite;
         }
-        .mobile-logo-wrap { position: relative; z-index: 2; margin-bottom: 20px; animation: fadeDown 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
+
+        /* Mobile logo wrapper — centered, flex-isolated */
+        .mobile-logo-wrap {
+          position: relative; z-index: 2;
+          display: flex; justify-content: center;
+          margin-bottom: 24px;
+          animation: fadeDown 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+        }
+
         .mobile-tagline {
           position: relative; z-index: 2;
           font-family: 'Playfair Display', serif;
@@ -390,7 +393,7 @@ export default function SignupPage() {
         .dot { width: 6px; height: 6px; border-radius: 50%; background: #E2EAF0; transition: all 0.3s; }
         .dot.active { width: 20px; border-radius: 3px; background: #0D4F4F; }
 
-        .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 28px; }
+        .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 18px; }
         .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
         .footer-link a:hover { text-decoration: underline; }
 
@@ -399,15 +402,18 @@ export default function SignupPage() {
           display: flex; flex-direction: column; gap: 10px;
           animation: fadeUp 0.5s 0.4s cubic-bezier(0.16,1,0.3,1) both;
         }
-        .mobile-bottom-feat {
-          display: flex; align-items: center; gap: 10px;
-          color: #4A6072; font-size: 13px; font-weight: 500;
-        }
+        .mobile-bottom-feat { display: flex; align-items: center; gap: 10px; color: #4A6072; font-size: 13px; font-weight: 500; }
         .mobile-bottom-dot {
           width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
           background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
           display: flex; align-items: center; justify-content: center; color: #0D4F4F;
         }
+
+        .page-footer {
+          text-align: center; padding: 18px 24px 28px;
+          font-size: 11px; color: #B0BEC8; line-height: 1.8; font-weight: 500;
+        }
+        .page-footer strong { color: #9BAAB8; font-weight: 700; }
 
         @media (max-width: 768px) {
           .left { display: none; }
@@ -457,7 +463,7 @@ export default function SignupPage() {
             <div className="card">
               {/* Mobile hero */}
               <div className="mobile-hero">
-                <div className="mobile-logo-wrap"><Logo /></div>
+                <div className="mobile-logo-wrap"><Logo size="mobile" /></div>
                 <div className="mobile-tagline">
                   Beautiful weddings,<br /><span>perfectly managed.</span>
                 </div>
@@ -525,9 +531,7 @@ export default function SignupPage() {
                     <p className="form-subtitle">Create your login credentials.</p>
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
                     <div className="field-wrap">
-                      <label className={`field-label ${focused === 'name' || form.name ? 'up' : ''}`}>
-                        Full Name
-                      </label>
+                      <label className={`field-label ${focused === 'name' || form.name ? 'up' : ''}`}>Full Name</label>
                       <input
                         className="field-input"
                         value={form.name}
@@ -537,9 +541,7 @@ export default function SignupPage() {
                       />
                     </div>
                     <div className="field-wrap">
-                      <label className={`field-label ${focused === 'email' || form.email ? 'up' : ''}`}>
-                        Email Address
-                      </label>
+                      <label className={`field-label ${focused === 'email' || form.email ? 'up' : ''}`}>Email Address</label>
                       <input
                         type="email"
                         className="field-input"
@@ -565,9 +567,7 @@ export default function SignupPage() {
                       <div className="hint">Only used for administrative records – no verification.</div>
                     </div>
                     <div className="field-wrap">
-                      <label className={`field-label ${focused === 'password' || form.password ? 'up' : ''}`}>
-                        Password
-                      </label>
+                      <label className={`field-label ${focused === 'password' || form.password ? 'up' : ''}`}>Password</label>
                       <input
                         type={showPassword ? 'text' : 'password'}
                         className="field-input"
@@ -577,12 +577,7 @@ export default function SignupPage() {
                         onFocus={() => setFocused('password')}
                         onBlur={() => setFocused(null)}
                       />
-                      <button
-                        type="button"
-                        className="pw-eye"
-                        onClick={() => setShowPassword(s => !s)}
-                        tabIndex={-1}
-                      >
+                      <button type="button" className="pw-eye" onClick={() => setShowPassword(s => !s)} tabIndex={-1}>
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </button>
                       {form.password && (
@@ -599,16 +594,10 @@ export default function SignupPage() {
                         </div>
                       )}
                     </div>
-                    <button
-                      className="btn-primary"
-                      disabled={!isStep2Valid || loading}
-                      onClick={sendVerification}
-                    >
+                    <button className="btn-primary" disabled={!isStep2Valid || loading} onClick={sendVerification}>
                       {loading ? <><div className="spinner" /> Sending code…</> : 'Verify Email →'}
                     </button>
-                    <button className="btn-secondary" onClick={() => setStep(1)}>
-                      ← Back
-                    </button>
+                    <button className="btn-secondary" onClick={() => setStep(1)}>← Back</button>
                   </>
                 )}
 
@@ -621,9 +610,7 @@ export default function SignupPage() {
                     </p>
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
                     <div className="field-wrap">
-                      <label className={`field-label ${focused === 'otp' || otp ? 'up' : ''}`}>
-                        Verification Code
-                      </label>
+                      <label className={`field-label ${focused === 'otp' || otp ? 'up' : ''}`}>Verification Code</label>
                       <input
                         className="field-input"
                         value={otp}
@@ -634,16 +621,10 @@ export default function SignupPage() {
                         placeholder="000000"
                       />
                     </div>
-                    <button
-                      className="btn-primary"
-                      disabled={!isStep3Valid}
-                      onClick={verifyEmail}
-                    >
+                    <button className="btn-primary" disabled={!isStep3Valid} onClick={verifyEmail}>
                       {loading ? <><div className="spinner" /> Verifying…</> : 'Verify & Create Account'}
                     </button>
-                    <button className="btn-secondary" onClick={() => setStep(2)}>
-                      ← Back to edit
-                    </button>
+                    <button className="btn-secondary" onClick={() => setStep(2)}>← Back to edit</button>
                     <div className="hint" style={{ textAlign: 'center', marginTop: 12 }}>
                       Didn't receive the code?{' '}
                       <button
@@ -674,6 +655,11 @@ export default function SignupPage() {
                   <span>{label}</span>
                 </div>
               ))}
+            </div>
+
+            <div className="page-footer">
+              <div>© 2026 <strong>LittleWed</strong>. All rights reserved.</div>
+              <div>Managed by <strong>MAHIRI GLOBAL LTD</strong></div>
             </div>
           </div>
         </div>
