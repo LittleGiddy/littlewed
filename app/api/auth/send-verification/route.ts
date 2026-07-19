@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { data, error } = await resend.emails.send({
-      from: 'LittleWed <onboarding@resend.dev>',
+      from: 'LittleWed <noreply@littlewed.co.tz>',
       to: [email],
       subject: 'Verify your email address',
       html: `
