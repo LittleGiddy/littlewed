@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await resend.emails.send({
-      from: 'LittleWed <onboarding@resend.dev>', // replace with verified domain
+      from: 'LittleWed <noreply@littlewed.co.tz>', // replace with verified domain
       to: [email],
       subject: 'Reset your password',
       html: `
