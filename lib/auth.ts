@@ -1,9 +1,13 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
+import { PrismaAdapter } from '@auth/prisma-adapter';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 
 export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma) as any, // ✅ Type bypass for adapter
+
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -13,17 +17,24 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
           include: { tenant: true },
         });
+
         if (!user) return null;
+        if (!user.password) return null; // OAuth users have no password
+
         const isValid = await bcrypt.compare(credentials.password, user.password);
         if (!isValid) return null;
+
+        // Cast to any to bypass strict type checking – all fields are used in JWT callback
         return {
           id: user.id,
           email: user.email,
           name: user.name,
+          image: user.image,
           role: user.role,
           tenantId: user.tenantId,
           tenant: user.tenant,
@@ -32,9 +43,16 @@ export const authOptions: NextAuthOptions = {
         } as any;
       },
     }),
+
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
+      // On initial sign-in, `user` contains the custom fields we returned from authorize
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
@@ -45,6 +63,7 @@ export const authOptions: NextAuthOptions = {
       }
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
@@ -56,14 +75,24 @@ export const authOptions: NextAuthOptions = {
       }
       return session;
     },
+
     async redirect({ url, baseUrl }) {
       if (url.startsWith('/')) return `${baseUrl}${url}`;
       return baseUrl;
     },
   },
-  pages: { signIn: '/login' },
-  session: { strategy: 'jwt', maxAge: 30 * 24 * 60 * 60 },
+
+  pages: {
+    signIn: '/login',
+  },
+
+  session: {
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60,
+  },
+
   secret: process.env.NEXTAUTH_SECRET,
+
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,
@@ -71,14 +100,13 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        // ✅ For ngrok (HTTPS), we need secure: true
         secure: process.env.NEXTAUTH_URL?.startsWith('https://') || false,
-        // ✅ Explicitly set the domain to the current host (without scheme)
         domain: process.env.NEXTAUTH_URL
           ? new URL(process.env.NEXTAUTH_URL).hostname
           : undefined,
       },
     },
   },
+
   debug: process.env.NODE_ENV === 'development',
 };

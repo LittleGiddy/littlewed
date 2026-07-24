@@ -24,12 +24,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Delete any previous OTP for this email
-  await prisma.verificationToken.deleteMany({ where: { email } });
+  await prisma.emailVerificationToken.deleteMany({ where: { email } });
 
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  await prisma.verificationToken.create({
+  await prisma.emailVerificationToken.create({
     data: { email, otp, expiresAt },
   });
 

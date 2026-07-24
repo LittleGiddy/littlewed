@@ -7,22 +7,70 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Users & Authentication ────────────────────────────────────────────────
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
-  tenantId  String?
-  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  phone          String?   // optional, for admin use
-  emailVerified  DateTime? // null = not verified
-  isActive      Boolean  @default(false) // 🔒 new field
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String?   // Nullable for OAuth users
+  name          String
+  role          String    @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
+  tenantId      String?
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  createdAt     DateTime  @default(now())
+  phone         String?   // optional, for admin use
+  emailVerified DateTime? // null = not verified (for email/password users)
+  isActive      Boolean   @default(false)
+  image         String?   // profile picture from Google OAuth
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
   notifications Notification[]
 }
 
+// ─── NextAuth Models ──────────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Your Existing Models ────────────────────────────────────────────────
+
+// Renamed from "VerificationToken" to avoid conflict with NextAuth
+model EmailVerificationToken {
   id         String   @id @default(cuid())
   email      String
   otp        String   // 6-digit code
@@ -39,22 +87,20 @@ model Tenant {
   subscriptionStatus String   @default("inactive") // "active" | "inactive" | "cancelled"
   maxGuests          Int      @default(200)
   createdAt          DateTime @default(now())
-  credits            Int      @default(0)          // unified credit balance
+  credits            Int      @default(0)
   transactions       Transaction[]
   simpleEventMode    Boolean  @default(false)
-  bypassPayment Boolean @default(false)  // admin bypass for free events
-
-  // Invitation template fields (tenant‑level – optional, can be overridden per event)
+  bypassPayment      Boolean  @default(false)
   templateCardUrl    String?
   qrPlacementX       Float?
   qrPlacementY       Float?
   qrSize             Int?
-  testMode Boolean @default(false)
+  testMode           Boolean  @default(false)
+  thanksCardUrl      String?
 
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]
-  thanksCardUrl String? // fallback for thanks card (admin uploaded)
 }
 
 model Event {
@@ -69,24 +115,24 @@ model Event {
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   guests          Guest[]
   createdAt       DateTime @default(now())
-  // Per‑event invitation card (overrides tenant‑level if present)
-  templateCardUrl String?
-  qrPlacementX    Float?
-  qrPlacementY    Float?
-  qrSize          Int?
-  includeName         Boolean? @default(false)
-  namePlacementX      Float?
-  namePlacementY      Float?
-  nameFontSize        Int?
-  nameFontColor       String? @default("#000000")
-  customMessage   String?   // custom invitation message (optional)
-  qrColor         String?  @default("#000000")
-  qrDotStyle      String?  @default("square") // square, circle, rounded
-  guestCount   Int?    // number of guests entered by organiser
 
-  designLayers Json? // array of layer objects
+  // Invitation card fields
+  templateCardUrl  String?
+  qrPlacementX     Float?
+  qrPlacementY     Float?
+  qrSize           Int?
+  includeName      Boolean? @default(false)
+  namePlacementX   Float?
+  namePlacementY   Float?
+  nameFontSize     Int?
+  nameFontColor    String?  @default("#000000")
+  customMessage    String?
+  qrColor          String?  @default("#000000")
+  qrDotStyle       String?  @default("square")
+  guestCount       Int?
+  designLayers     Json?    // array of layer objects
 
-   // Text overlays
+  // Text overlays
   showEventName   Boolean @default(true)
   eventNameX      Float   @default(50)
   eventNameY      Float   @default(15)
@@ -105,7 +151,6 @@ model Event {
   venueSize       Int     @default(16)
   venueColor      String  @default("#ffffff")
 
-    // Artistic overlay
   overlayColor    String  @default("#000000")
   overlayOpacity  Float   @default(0.2)
 
@@ -135,7 +180,7 @@ model PendingEvent {
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
   createdAt    DateTime @default(now())
   expiresAt    DateTime
-  guestCount   Int?    // optional, for reporting
+  guestCount   Int?
 }
 
 model Guest {
@@ -154,11 +199,11 @@ model Guest {
   eventId        String
   event          Event     @relation(fields: [eventId], references: [id])
   createdAt      DateTime  @default(now())
-  invitationSentAt   DateTime? // when we sent the invitation
-  invitationDeliveredAt DateTime? // optional: when Twilio confirms delivery
-  invitationOpenedAt DateTime?   // optional: when guest opens the card
-  thanksSentAt DateTime? // when the thank‑you was sent
-  reminderCount   Int      @default(0)   // number of reminders sent
+  invitationSentAt   DateTime?
+  invitationDeliveredAt DateTime?
+  invitationOpenedAt   DateTime?
+  thanksSentAt DateTime?
+  reminderCount   Int      @default(0)
 }
 
 model UsageRecord {
@@ -180,12 +225,10 @@ model Transaction {
   eventId         String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  userId          String?  //  new: who initiated the transaction
+  userId          String?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
-
-// prisma/schema.prisma
 
 model PasswordResetToken {
   id        String   @id @default(cuid())
@@ -195,9 +238,6 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 }
 
-
-// prisma/schema.prisma
-
 model Notification {
   id        String   @id @default(cuid())
   userId    String
@@ -206,11 +246,10 @@ model Notification {
   message   String?
   type      String   // "info", "warning", "success", "alert"
   isRead    Boolean  @default(false)
-  link      String?  // optional URL to navigate to
+  link      String?
   createdAt DateTime @default(now())
 }
 
-// New Template model
 model Template {
   id        String   @id @default(cuid())
   name      String

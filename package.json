@@ -12,6 +12,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
     "@prisma/client": "^6.19.3",
     "@react-email/components": "^1.0.11",
     "@vercel/blob": "^2.4.0",
@@ -28,7 +29,7 @@
     "jsqr": "^1.4.0",
     "lucide-react": "^1.16.0",
     "next": "^16.2.6",
-    "next-auth": "^4.24.14",
+    "next-auth": "^4.24.15",
     "papaparse": "^5.5.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
