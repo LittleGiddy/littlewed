@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setSuccess('OTP sent to your email');
       setStep(2);
     } catch (err: any) {
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email, otp, newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Reset failed');
       setSuccess('Password reset successful! Redirecting to login...');
       setTimeout(() => router.push('/login'), 2000);
     } catch (err: any) {
@@ -287,6 +287,18 @@ export default function ForgotPasswordPage() {
         .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 28px; }
         .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
 
+        .google-note {
+          background: #F0F4F8;
+          border-left: 4px solid #E8A598;
+          padding: 12px 14px;
+          border-radius: 8px;
+          margin-bottom: 18px;
+          font-size: 13px;
+          color: #4A6072;
+          line-height: 1.5;
+        }
+        .google-note strong { color: #0D4F4F; }
+
         @media (max-width: 768px) {
           .left { display: none; }
           .right { padding: 0; background: #F0F4F8; align-items: flex-start; }
@@ -360,6 +372,12 @@ export default function ForgotPasswordPage() {
                   <>
                     <div className="form-title">Reset Password</div>
                     <p className="form-subtitle">Enter the code sent to <strong>{email}</strong> and choose a new password.</p>
+
+                    {/* ── Google user note ── */}
+                    <div className="google-note">
+                      💡 <strong>Did you sign up with Google?</strong> You can still use this form to set a password for your account – after that, you'll be able to sign in with either method.
+                    </div>
+
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
                     {success && <div className="success-box"><span>✓</span><span>{success}</span></div>}
                     <div className="field-wrap">
@@ -367,7 +385,7 @@ export default function ForgotPasswordPage() {
                       <input
                         className="field-input"
                         value={otp}
-                        onChange={e => setOtp(e.target.value.slice(0,6))}
+                        onChange={e => setOtp(e.target.value.slice(0, 6))}
                         onFocus={() => setFocused('otp')}
                         onBlur={() => setFocused(null)}
                         maxLength={6}

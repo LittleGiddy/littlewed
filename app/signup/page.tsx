@@ -531,7 +531,7 @@ export default function SignupPage() {
                         />
                       </div>
                       {form.subdomain && (
-                        <div className="hint">Your URL: <strong>{form.subdomain}.littlewed.com</strong></div>
+                        <div className="hint">Your URL: <strong>{form.subdomain}.littlewed.co.tz</strong></div>
                       )}
                     </div>
                     <button
