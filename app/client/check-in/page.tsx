@@ -2,9 +2,48 @@
 import { useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { QrCode, Key, Loader2, CheckCircle } from 'lucide-react';
+import { QrCode, Key, Loader2, CheckCircle, XCircle, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
+
+// ─── Sound effects using Web Audio API ────────────────────────────────
+const playSound = (type: 'success' | 'fail') => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  if (type === 'success') {
+    oscillator.frequency.value = 880;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.4);
+
+    // Second beep for success
+    setTimeout(() => {
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.frequency.value = 1108;
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc2.start(audioCtx.currentTime);
+      osc2.stop(audioCtx.currentTime + 0.3);
+    }, 150);
+  } else {
+    oscillator.frequency.value = 440;
+    oscillator.type = 'sawtooth';
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.5);
+  }
+};
 
 export default function CheckInPage() {
   const searchParams = useSearchParams();
@@ -14,6 +53,8 @@ export default function CheckInPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [guestName, setGuestName] = useState('');
+  const [guestType, setGuestType] = useState('');
+  const [checkedIn, setCheckedIn] = useState(false);
   const [scanning, setScanning] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,15 +133,27 @@ export default function CheckInPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage('✅ Checked in');
+        playSound('success');
+        setCheckedIn(true);
         setGuestName(data.guest.name);
+        setGuestType(data.guest.guestType || '—');
+        setMessage('✅ Checked in');
         toast.success(`Welcome, ${data.guest.name}!`);
-        setTimeout(() => window.location.reload(), 2000);
+        setTimeout(() => {
+          setCheckedIn(false);
+          setMessage('');
+          setGuestName('');
+          setGuestType('');
+        }, 5000);
       } else {
+        playSound('fail');
         setMessage(`❌ ${data.error}`);
+        toast.error(data.error);
       }
     } catch {
+      playSound('fail');
       setMessage('❌ Network error');
+      toast.error('Network error');
     } finally {
       setLoading(false);
     }
@@ -120,16 +173,28 @@ export default function CheckInPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage('✅ Checked in');
+        playSound('success');
+        setCheckedIn(true);
         setGuestName(data.guest.name);
+        setGuestType(data.guest.guestType || '—');
+        setMessage('✅ Checked in');
         toast.success(`Welcome, ${data.guest.name}!`);
         setCode('');
-        setTimeout(() => window.location.reload(), 2000);
+        setTimeout(() => {
+          setCheckedIn(false);
+          setMessage('');
+          setGuestName('');
+          setGuestType('');
+        }, 5000);
       } else {
+        playSound('fail');
         setMessage(`❌ ${data.error}`);
+        toast.error(data.error);
       }
     } catch {
+      playSound('fail');
       setMessage('❌ Network error');
+      toast.error('Network error');
     } finally {
       setLoading(false);
     }
@@ -138,7 +203,7 @@ export default function CheckInPage() {
   if (!eventId) return <div className="p-4 text-center">Missing event ID</div>;
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto px-4 py-6">
       <Link
         href={`/client/events/${eventId}`}
         className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
@@ -153,13 +218,17 @@ export default function CheckInPage() {
       <div className="flex gap-2 mb-6">
         <button
           onClick={() => setMode('qr')}
-          className={`flex-1 py-2 rounded-xl font-semibold transition ${mode === 'qr' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          className={`flex-1 py-2 rounded-xl font-semibold transition ${
+            mode === 'qr' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
         >
           <QrCode size={16} className="inline mr-1" /> QR Scanner
         </button>
         <button
           onClick={() => setMode('manual')}
-          className={`flex-1 py-2 rounded-xl font-semibold transition ${mode === 'manual' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+          className={`flex-1 py-2 rounded-xl font-semibold transition ${
+            mode === 'manual' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
         >
           <Key size={16} className="inline mr-1" /> Manual Code
         </button>
@@ -167,10 +236,15 @@ export default function CheckInPage() {
 
       {/* QR Scanner */}
       {mode === 'qr' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 overflow-hidden">
+          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
             <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
             <canvas ref={canvasRef} className="hidden" />
+            {!scanning && !loading && (
+              <div className="absolute inset-0 flex items-center justify-center text-white bg-black/40">
+                <Loader2 size={32} className="animate-spin" />
+              </div>
+            )}
           </div>
           {scanning && (
             <p className="text-center text-sm text-gray-500 mt-2">Position QR code in the frame</p>
@@ -180,15 +254,15 @@ export default function CheckInPage() {
 
       {/* Manual Code Entry */}
       {mode === 'manual' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
           <form onSubmit={handleManualCheckIn} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">6‑digit code</label>
               <input
                 type="text"
                 value={code}
-                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="w-full p-3 text-center text-2xl tracking-widest font-mono border rounded-lg focus:ring-2 focus:ring-[#0D4F4F]"
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="w-full p-3 text-center text-2xl tracking-widest font-mono border rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                 placeholder="000000"
                 maxLength={6}
                 required
@@ -208,15 +282,56 @@ export default function CheckInPage() {
 
       {/* Result Message */}
       {message && (
-        <div className={`mt-6 p-4 rounded-xl text-center font-medium ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+        <div
+          className={`mt-6 p-4 rounded-2xl text-center font-medium transition-all duration-500 ${
+            message.includes('✅')
+              ? 'bg-green-100 text-green-800 border border-green-300'
+              : 'bg-red-100 text-red-800 border border-red-300'
+          }`}
+        >
           {message}
         </div>
       )}
-      {guestName && (
-        <div className="mt-4 text-center text-gray-600">
-          Welcome, <span className="font-semibold">{guestName}</span>!
+
+      {/* Guest Details on Check‑in Success */}
+      {checkedIn && (
+        <div className="mt-6 bg-white rounded-2xl shadow-lg border border-gray-100 p-6 animate-fadeInUp">
+          <div className="flex items-center gap-3 mb-2">
+            <CheckCircle size={28} className="text-green-600" />
+            <h2 className="text-xl font-bold text-gray-800">Welcome!</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+              <User size={20} className="text-[#0D4F4F]" />
+              <span className="font-medium">{guestName}</span>
+            </div>
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+              <Users size={20} className="text-[#0D4F4F]" />
+              <span className="font-medium">
+                {guestType === 'single' ? 'Single' : guestType === 'double' ? 'Double' : guestType || '—'}
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-3">Checked in successfully – enjoy the event!</p>
         </div>
       )}
+
+      {/* CSS Animation */}
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.4s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }

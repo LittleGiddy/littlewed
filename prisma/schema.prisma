@@ -204,6 +204,7 @@ model Guest {
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
+  guestType  String?  // 'single', 'double', or any custom value
 }
 
 model UsageRecord {

@@ -11,7 +11,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ✅ Accept JSON body instead of form-data
     const { guests, eventId } = await req.json();
 
     if (!guests || !Array.isArray(guests) || guests.length === 0 || !eventId) {
@@ -27,8 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // ─── Validate phone numbers (they are already normalized by frontend) ──
-    // But we can still check for basic validity
+    // ─── Validate phone numbers ──────────────────────────────────────
     const validGuests = guests.filter((g: any) => g.phone && g.phone.startsWith('+'));
     const invalidCount = guests.length - validGuests.length;
 
@@ -39,7 +37,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check guest limit ──────────────────────────────────────────────
+    // ─── Check guest limit ──────────────────────────────────────────
     if (!event.tenant?.bypassPayment && event.guestCount) {
       const currentGuests = await prisma.guest.count({ where: { eventId } });
       if (currentGuests + validGuests.length > event.guestCount) {
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Duplicate detection using phone ──────────────────────────────
+    // ─── Duplicate detection using phone ──────────────────────────
     const phoneNumbers = validGuests.map((g: any) => g.phone);
     const existingGuests = await prisma.guest.findMany({
       where: {
@@ -80,11 +78,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ─── Insert unique guests ──────────────────────────────────────────
+    // ─── Insert unique guests ──────────────────────────────────────
+    // ✅ Include guestType if provided
     const guestsToInsert = uniqueGuests.map((g: any) => ({
       name: g.name,
-      phone: g.phone, // already normalized by frontend
+      phone: g.phone,
       email: g.email || null,
+      guestType: g.guestType || null, // NEW: store the guest type
       eventId,
       routingChannel: 'sms',
       smsCode: randomBytes(4).toString('hex').toUpperCase(),

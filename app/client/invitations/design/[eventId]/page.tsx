@@ -2,10 +2,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  Upload, Move, Maximize2, Save, Loader2, Image, Trash2, Check, Type, Palette,
+  Upload, Move, Maximize2, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Eye, EyeOff, Undo, Redo,
-  Lock, Unlock, BringToFront, SendToBack, Grid, ChevronDown, ChevronRight
+  Lock, Unlock, BringToFront, SendToBack, Grid, ChevronDown, ChevronRight,
+  Settings, QrCode, User, Users // new icons
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -38,7 +39,7 @@ const ALIGN_V = [
 ];
 
 // ─── Layer creators ──────────────────────────────────────────────────────
-const createTextLayer = (text = 'New Text', x = 50, y = 50) => ({
+const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false) => ({
   id: generateId(),
   type: 'text',
   x, y, rotation: 0,
@@ -46,6 +47,8 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50) => ({
   color: '#ffffff', align: 'center',
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
   visible: true, locked: false,
+  isGuestName, // flag for guest name placeholder
+  isGuestType, // flag for guest type placeholder
 });
 
 const createRectLayer = (x = 30, y = 30, w = 40, h = 20) => ({
@@ -294,11 +297,19 @@ export default function InvitationDesigner() {
   };
 
   const addGuestNameLayer = () => {
-    const newLayer = createTextLayer('Guest Name', 50, 60);
+    const newLayer = createTextLayer('Guest Name', 50, 60, true, false);
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
     toast.success('Guest name layer added!');
+  };
+
+  const addGuestTypeLayer = () => {
+    const newLayer = createTextLayer('Single/Double', 50, 70, false, true);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
+    toast.success('Guest type layer added!');
   };
 
   const addRectLayer = () => {
@@ -687,7 +698,7 @@ export default function InvitationDesigner() {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const Section = ({ title, section, children }: any) => {
+  const Section = ({ title, icon, section, children }: any) => {
     const isCollapsed = collapsedSections[section];
     return (
       <div className="border-b border-gray-100 last:border-0">
@@ -695,7 +706,7 @@ export default function InvitationDesigner() {
           onClick={() => toggleSection(section)}
           className="w-full flex items-center justify-between p-3 text-left font-semibold text-gray-700 hover:bg-gray-50 transition"
         >
-          <span>{title}</span>
+          <span className="flex items-center gap-2">{icon && <span className="text-[#0D4F4F]">{icon}</span>}{title}</span>
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         </button>
         {!isCollapsed && <div className="p-3 pt-0">{children}</div>}
@@ -731,7 +742,7 @@ export default function InvitationDesigner() {
       {/* Template Gallery */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-800 flex items-center gap-2"><Image size={18} className="text-[#0D4F4F]" /> Choose a Template</h2>
+          <h2 className="font-semibold text-gray-800 flex items-center gap-2"><ImageIcon size={18} className="text-[#0D4F4F]" /> Choose a Template</h2>
           <div className="flex gap-2">
             <label className="cursor-pointer bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1">
               <Upload size={14} /> Upload
@@ -768,7 +779,7 @@ export default function InvitationDesigner() {
 
       {/* Main Content: Preview + Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-        {/* ─── Preview (sticky on mobile) ─── */}
+        {/* ─── Preview ─── */}
         <div className="lg:col-span-4 sticky top-0 z-10 bg-white lg:static lg:bg-transparent lg:z-auto max-h-[50vh] lg:max-h-none overflow-hidden border-b lg:border-b-0 border-gray-200 shadow-sm lg:shadow-none">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
             <h2 className="font-semibold mb-3 flex items-center gap-2">
@@ -829,7 +840,7 @@ export default function InvitationDesigner() {
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                  <div className="text-center"><Image size={40} className="mx-auto mb-2" /><p>Select a template or upload your own</p></div>
+                  <div className="text-center"><ImageIcon size={40} className="mx-auto mb-2" /><p>Select a template or upload your own</p></div>
                 </div>
               )}
             </div>
@@ -839,19 +850,30 @@ export default function InvitationDesigner() {
 
         {/* ─── Controls ─── */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Quick Add Guest Name (always visible) */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 flex items-center justify-between">
-            <span className="font-semibold text-sm">Guest Name</span>
-            <button
-              onClick={addGuestNameLayer}
-              className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
-            >
-              <Plus size={14} /> Add Guest Name
-            </button>
+          {/* Quick Add Guest Name & Type */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-sm flex items-center gap-1"><User size={14} className="text-[#0D4F4F]" /> Guest Name</span>
+              <button
+                onClick={addGuestNameLayer}
+                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-sm flex items-center gap-1"><Users size={14} className="text-[#0D4F4F]" /> Guest Type (Single/Double)</span>
+              <button
+                onClick={addGuestTypeLayer}
+                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <Section title="➕ Add Layer" section="addLayer">
+            <Section title="Add Layer" section="addLayer" icon={<Plus size={16} />}>
               <div className="flex flex-wrap gap-2">
                 <button onClick={addTextLayer} className="flex-1 bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"><Type size={14} /> Text</button>
                 <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-800 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1"><Square size={14} /> Rectangle</button>
@@ -859,7 +881,7 @@ export default function InvitationDesigner() {
               </div>
             </Section>
 
-            <Section title="📋 Layers" section="layers">
+            <Section title="Layers" section="layers" icon={<Layers size={16} />}>
               {layers.length === 0 && <p className="text-gray-400 text-sm">No layers. Add one!</p>}
               {layers.map((layer, idx) => (
                 <div
@@ -869,6 +891,8 @@ export default function InvitationDesigner() {
                 >
                   <span className="text-sm truncate">
                     {layer.type === 'text' ? `📝 ${layer.text.substring(0, 20)}` : layer.type === 'rect' ? '⬛ Rectangle' : '━ Line'}
+                    {layer.isGuestName && ' ✨'}
+                    {layer.isGuestType && ' 🏷️'}
                   </span>
                   <div className="flex gap-1">
                     <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded">
@@ -888,7 +912,7 @@ export default function InvitationDesigner() {
               ))}
             </Section>
 
-            <Section title="⚙️ Properties" section="properties">
+            <Section title="Properties" section="properties" icon={<Settings size={16} />}>
               {selectedLayer ? (
                 <div className="space-y-3">
                   {selectedLayer.type === 'text' && (
@@ -1178,7 +1202,7 @@ export default function InvitationDesigner() {
               )}
             </Section>
 
-            <Section title="🎨 Overlay" section="overlay">
+            <Section title="Overlay" section="overlay" icon={<Palette size={16} />}>
               <div className="space-y-3">
                 <div>
                   <label className="flex justify-between text-sm">Color</label>
@@ -1191,7 +1215,7 @@ export default function InvitationDesigner() {
               </div>
             </Section>
 
-            <Section title="📲 QR Code" section="qr">
+            <Section title="QR Code" section="qr" icon={<QrCode size={16} />}>
               <div className="space-y-3">
                 <div>
                   <label className="flex justify-between text-sm">Horizontal <span>{Math.round(qrX)}%</span></label>
@@ -1213,7 +1237,7 @@ export default function InvitationDesigner() {
             </Section>
           </div>
 
-          {/* Save button (always visible) */}
+          {/* Save button */}
           <button
             onClick={handleSave}
             disabled={saving || !templateUrl}

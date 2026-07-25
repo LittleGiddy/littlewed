@@ -16,12 +16,13 @@ interface ParsedGuest {
   phone: string;
   normalizedPhone: string;
   email?: string;
+  guestType?: string; // 'single', 'double', or custom
   isValid: boolean;
   statusMessage?: string;
 }
 
 interface ColumnMapping {
-  [key: string]: 'name' | 'phone' | 'email' | 'skip';
+  [key: string]: 'name' | 'phone' | 'email' | 'guestType' | 'skip';
 }
 
 export default function ImportGuestsPage() {
@@ -89,10 +90,10 @@ export default function ImportGuestsPage() {
   };
 
   const downloadSampleCSV = () => {
-    const headers = ['name', 'phone', 'email'];
+    const headers = ['name', 'phone', 'email', 'guestType'];
     const sampleData = [
-      ['John Doe', '+255712345678', 'john@example.com'],
-      ['Jane Smith', '+255755123456', 'jane@example.com'],
+      ['John Doe', '+255712345678', 'john@example.com', 'single'],
+      ['Jane Smith', '+255755123456', 'jane@example.com', 'double'],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -161,6 +162,7 @@ export default function ImportGuestsPage() {
             isValid: norm.isValid,
             statusMessage: norm.message,
             email,
+            // guestType: not available from phone contacts
           };
         })
         .filter((g: ParsedGuest) => g.name && g.phone);
@@ -199,6 +201,7 @@ export default function ImportGuestsPage() {
             if (['name', 'full name', 'fullname', 'guest name', 'names'].includes(lower)) autoMap[h] = 'name';
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
+            else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -230,6 +233,7 @@ export default function ImportGuestsPage() {
             if (['name', 'full name', 'fullname', 'guest name', 'names'].includes(lower)) autoMap[h] = 'name';
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
+            else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -267,8 +271,8 @@ export default function ImportGuestsPage() {
     }
   };
 
-  const parseVCard = (vcfData: string): { name: string; phone: string; email?: string }[] => {
-    const guests: { name: string; phone: string; email?: string }[] = [];
+  const parseVCard = (vcfData: string): { name: string; phone: string; email?: string; guestType?: string }[] => {
+    const guests: { name: string; phone: string; email?: string; guestType?: string }[] = [];
     const cards = vcfData.split(/BEGIN:VCARD/i).filter(card => card.trim());
 
     for (const card of cards) {
@@ -276,6 +280,7 @@ export default function ImportGuestsPage() {
       let name = '';
       let phone = '';
       let email = '';
+      let guestType = '';
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -298,9 +303,12 @@ export default function ImportGuestsPage() {
         } else if (trimmed.startsWith('EMAIL') && !email) {
           const emailParts = trimmed.split(':');
           if (emailParts.length > 1) email = emailParts.slice(1).join(':').trim();
+        } else if (trimmed.startsWith('X-GUEST-TYPE:')) {
+          const parts = trimmed.split(':');
+          if (parts.length > 1) guestType = parts.slice(1).join(':').trim();
         }
       }
-      if (name && phone) guests.push({ name, phone, email: email || undefined });
+      if (name && phone) guests.push({ name, phone, email: email || undefined, guestType: guestType || undefined });
     }
     return guests;
   };
@@ -323,6 +331,7 @@ export default function ImportGuestsPage() {
     const nameCol = Object.keys(mapping).find(k => mapping[k] === 'name');
     const phoneCol = Object.keys(mapping).find(k => mapping[k] === 'phone');
     const emailCol = Object.keys(mapping).find(k => mapping[k] === 'email');
+    const guestTypeCol = Object.keys(mapping).find(k => mapping[k] === 'guestType');
     if (!nameCol || !phoneCol) {
       setError('Please map the "name" and "phone" columns.');
       return;
@@ -331,6 +340,7 @@ export default function ImportGuestsPage() {
       const name = row[nameCol]?.toString().trim() || '';
       const phone = row[phoneCol]?.toString().trim() || '';
       const email = emailCol ? row[emailCol]?.toString().trim() : undefined;
+      const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() : undefined;
       const norm = normalizePhone(phone);
       return {
         name,
@@ -339,6 +349,7 @@ export default function ImportGuestsPage() {
         isValid: norm.isValid,
         statusMessage: norm.message,
         email,
+        guestType,
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -380,6 +391,7 @@ export default function ImportGuestsPage() {
       name: g.name,
       phone: g.normalizedPhone,
       email: g.email,
+      guestType: g.guestType, // add this
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
@@ -443,7 +455,7 @@ export default function ImportGuestsPage() {
   const validCount = parsedGuests.filter(g => g.isValid).length;
   const invalidCount = parsedGuests.filter(g => !g.isValid).length;
 
-  // ─── Render guest list (table on desktop, cards on mobile) ──────────────
+  // ─── Render ──────────────────────────────────────────────
   const displayGuests = showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests;
   const shown = displayGuests.slice(0, 50);
 
@@ -533,6 +545,7 @@ export default function ImportGuestsPage() {
                       <option value="name">Name</option>
                       <option value="phone">Phone</option>
                       <option value="email">Email</option>
+                      <option value="guestType">Guest Type (Single/Double)</option>
                     </select>
                   </div>
                 ))}
@@ -612,7 +625,7 @@ export default function ImportGuestsPage() {
                 </label>
               </h2>
 
-              {/* Mobile card view (hidden on sm and up) */}
+              {/* Mobile card view */}
               <div className="sm:hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
                 {shown.map((guest) => {
                   const originalIndex = parsedGuests.indexOf(guest);
@@ -636,6 +649,9 @@ export default function ImportGuestsPage() {
                           )}
                           <p className="text-xs text-gray-500 font-mono mt-0.5">{guest.normalizedPhone || guest.phone}</p>
                           {guest.email && <p className="text-xs text-gray-400 mt-0.5 truncate">{guest.email}</p>}
+                          {guest.guestType && (
+                            <p className="text-xs text-gray-600 mt-0.5">Type: {guest.guestType}</p>
+                          )}
                           <div className="mt-1">
                             {guest.isValid ? (
                               <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -682,7 +698,7 @@ export default function ImportGuestsPage() {
                 })}
               </div>
 
-              {/* Desktop table view (hidden on mobile) */}
+              {/* Desktop table view */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
@@ -690,6 +706,7 @@ export default function ImportGuestsPage() {
                       <th className="px-4 py-2 text-left whitespace-nowrap">Name</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Phone</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Email</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                     </tr>
@@ -717,6 +734,17 @@ export default function ImportGuestsPage() {
                           </td>
                           <td className="px-4 py-2 font-mono text-xs break-all">{guest.normalizedPhone || guest.phone}</td>
                           <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
+                          <td className="px-4 py-2">
+                            {guest.guestType ? (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                guest.guestType.toLowerCase() === 'double' ? 'bg-purple-100 text-purple-700' :
+                                guest.guestType.toLowerCase() === 'single' ? 'bg-blue-100 text-blue-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {guest.guestType}
+                              </span>
+                            ) : '—'}
+                          </td>
                           <td className="px-4 py-2">
                             {guest.isValid ? (
                               <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">

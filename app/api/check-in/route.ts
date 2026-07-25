@@ -98,13 +98,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return the updated guest with a no-cache header
+    // ✅ Return full guest details including guestType
     return NextResponse.json(
       {
         success: true,
         guest: {
           id: guest.id,
           name: guest.name,
+          guestType: guest.guestType || null, // ✅ Include guest type
+          email: guest.email || null,
+          phone: guest.phone || null,
           checkedIn: true,
         },
       },
