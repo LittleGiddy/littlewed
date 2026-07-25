@@ -522,7 +522,7 @@ export default function SignupPage() {
                     </div>
                     <div className="field-wrap">
                       <div className="subdomain-wrap">
-                        <div className="subdomain-prefix">littlewed.com /</div>
+                        <div className="subdomain-prefix">littlewed.co.tz /</div>
                         <input
                           className="subdomain-input"
                           placeholder="your-name"
