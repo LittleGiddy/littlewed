@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft, 
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
-  Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell
+  Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
+  Search, Download, User, Clock, AlertCircle // new icons
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+// ─── Guest type ──────────────────────────────────────────────────────────
 interface Guest {
   id: string;
   name: string;
@@ -46,6 +48,19 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [credits, setCredits] = useState<number | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // ── Pagination & search ────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // ── Backup modal ──────────────────────────────────────────────────────
+  const [showBackupModal, setShowBackupModal] = useState(false);
+  const [allGuests, setAllGuests] = useState<Guest[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupSearch, setBackupSearch] = useState('');
+  const [backupPage, setBackupPage] = useState(1);
+
+  // ── Existing modal states ─────────────────────────────────────────────
   const [showThanksModal, setShowThanksModal] = useState(false);
   const [thanksMessage, setThanksMessage] = useState('');
   const [sendingThanks, setSendingThanks] = useState(false);
@@ -54,6 +69,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [kumbushaMessage, setKumbushaMessage] = useState('');
   const [sendingKumbusha, setSendingKumbusha] = useState(false);
 
+  // ─── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     params.then(({ id }) => {
@@ -82,6 +98,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (!data?.event) throw new Error('Unexpected response format from server.');
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
+      setCurrentPage(1); // reset pagination on new data
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
@@ -100,6 +117,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } catch {}
   };
 
+  // ─── Guest selection ──────────────────────────────────────────────────
   const toggleSelectAll = () => {
     if (selectedGuests.size === guests.length) setSelectedGuests(new Set());
     else setSelectedGuests(new Set(guests.map(g => g.id)));
@@ -136,9 +154,68 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } catch { toast.error('Network error'); }
   };
 
+  // ─── Scroll to top ──────────────────────────────────────────────────
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => setShowBackToTop((e.target as HTMLDivElement).scrollTop > 300);
   const scrollToTop = () => document.getElementById('guest-list-container')?.scrollTo({ top: 0, behavior: 'smooth' });
 
+  // ─── Filtered & paginated guests ──────────────────────────────────
+  const filteredGuests = useMemo(() => {
+    if (!searchTerm.trim()) return guests;
+    const term = searchTerm.trim().toLowerCase();
+    return guests.filter(g => 
+      g.name.toLowerCase().includes(term) || 
+      (g.phone && g.phone.includes(term))
+    );
+  }, [guests, searchTerm]);
+
+  const totalPages = Math.ceil(filteredGuests.length / pageSize);
+  const paginatedGuests = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredGuests.slice(start, start + pageSize);
+  }, [filteredGuests, currentPage, pageSize]);
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    // scroll to top of list
+    const container = document.getElementById('guest-list-container');
+    if (container) container.scrollTop = 0;
+  };
+
+  // ─── Backup guests modal ────────────────────────────────────────────
+  const openBackupModal = async () => {
+    setShowBackupModal(true);
+    if (allGuests.length === 0 && !backupLoading) {
+      setBackupLoading(true);
+      try {
+        const res = await fetch('/api/guests/all', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setAllGuests(data.guests || []);
+        } else {
+          toast.error('Failed to load all guests');
+        }
+      } catch {
+        toast.error('Network error');
+      } finally {
+        setBackupLoading(false);
+      }
+    }
+  };
+
+  const filteredBackup = useMemo(() => {
+    if (!backupSearch.trim()) return allGuests;
+    const term = backupSearch.trim().toLowerCase();
+    return allGuests.filter(g => g.name.toLowerCase().includes(term) || (g.phone && g.phone.includes(term)));
+  }, [allGuests, backupSearch]);
+
+  const backupTotalPages = Math.ceil(filteredBackup.length / pageSize);
+  const backupPaginated = useMemo(() => {
+    const start = (backupPage - 1) * pageSize;
+    return filteredBackup.slice(start, start + pageSize);
+  }, [filteredBackup, backupPage, pageSize]);
+
+  // ─── Kumbusha / Thanks logic (unchanged) ──────────────────────────
   const whatsappCheckedInGuests = guests.filter(g => g.checkedIn && g.routingChannel === 'whatsapp');
   const checkedInCount = whatsappCheckedInGuests.length;
 
@@ -204,6 +281,86 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     finally { setSendingKumbusha(false); }
   };
 
+  // ─── Render helpers ────────────────────────────────────────────────
+
+  const renderGuestCard = (guest: Guest) => {
+    const isSelected = selectedGuests.has(guest.id);
+    const isWhatsApp = guest.routingChannel === 'whatsapp';
+    const isCheckedIn = guest.checkedIn;
+    const hasThanks = guest.thanksSentAt;
+    const reminderCount = guest.reminderCount;
+
+    return (
+      <div
+        key={guest.id}
+        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
+        style={{ transition: 'all 0.15s' }}
+      >
+        <div className="flex items-center p-3 gap-3">
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleSelectGuest(guest.id)}
+            className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
+          />
+
+          {/* Avatar / Icon */}
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {guest.name.charAt(0).toUpperCase()}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-gray-800 text-sm truncate">{guest.name}</p>
+              {isCheckedIn && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                  <CheckCircle size={12} /> Checked In
+                </span>
+              )}
+              {hasThanks && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                  <Heart size={12} /> Thanks
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
+                {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
+                {isWhatsApp ? 'WhatsApp' : 'SMS'}
+              </span>
+              {guest.phone && (
+                <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
+              )}
+              {reminderCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                  <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {event?.tenant?.testMode && (
+              <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
+                <ExternalLink size={15} />
+              </Link>
+            )}
+            <button
+              onClick={() => deleteGuest(guest.id)}
+              className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ─── Loading state ──────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-3">
@@ -217,12 +374,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <div className="text-5xl mb-3">⚠️</div>
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">{fetchError ? 'Failed to Load Event' : 'Event Not Found'}</h1>
           <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
           <div className="flex gap-3 justify-center">
             {fetchError && eventId && (
-              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">Retry</button>
+              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
+                <ArrowLeft size={14} /> Retry
+              </button>
             )}
             <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition">
               <ArrowLeft size={14} /> Dashboard
@@ -233,6 +392,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  // ─── Stats ──────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
   const checkedInAll = guests.filter(g => g.checkedIn).length;
@@ -240,188 +400,66 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-
-        /* ── Themed Modal ── */
-        .tm-overlay {
-          position: fixed; inset: 0; background: rgba(13,27,27,0.5);
-          backdrop-filter: blur(4px);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 50; padding: 16px;
-          animation: tmOverlayIn 0.18s ease both;
-        }
+        /* ── Themed Modal styles (unchanged) ── */
+        .tm-overlay { position: fixed; inset: 0; background: rgba(13,27,27,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; animation: tmOverlayIn 0.18s ease both; }
         @keyframes tmOverlayIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .tm-modal {
-          background: white; border-radius: 24px;
-          width: 100%; max-width: 460px; max-height: 92vh;
-          overflow-y: auto; scrollbar-width: none;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 40px 80px rgba(0,0,0,0.1);
-          font-family: 'DM Sans', 'Segoe UI', sans-serif;
-          animation: tmModalIn 0.32s cubic-bezier(0.16,1,0.3,1) both;
-        }
+        .tm-modal { background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; scrollbar-width: none; box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 40px 80px rgba(0,0,0,0.1); font-family: 'DM Sans', 'Segoe UI', sans-serif; animation: tmModalIn 0.32s cubic-bezier(0.16,1,0.3,1) both; }
         .tm-modal::-webkit-scrollbar { display: none; }
-        @keyframes tmModalIn {
-          from { opacity: 0; transform: translateY(24px) scale(0.96); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
+        @keyframes tmModalIn { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
         .tm-bar { height: 4px; border-radius: 24px 24px 0 0; }
-        .tm-bar.teal   { background: linear-gradient(90deg, #0D4F4F, #E8A598); }
-        .tm-bar.amber  { background: linear-gradient(90deg, #C07A20, #E8A598); }
+        .tm-bar.teal { background: linear-gradient(90deg, #0D4F4F, #E8A598); }
+        .tm-bar.amber { background: linear-gradient(90deg, #C07A20, #E8A598); }
         .tm-bar.salmon { background: linear-gradient(90deg, #E8A598, #D4857A); }
-
-        .tm-head {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          padding: 20px 24px 16px;
-        }
-        .tm-eyebrow {
-          font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px;
-          text-transform: uppercase; margin-bottom: 4px;
-          display: flex; align-items: center; gap: 6px;
-        }
+        .tm-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 24px 16px; }
+        .tm-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
         .tm-eyebrow-dot { width: 4px; height: 4px; border-radius: 50%; background: #E8A598; }
-        .tm-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.15; letter-spacing: -0.3px; margin: 0;
-        }
+        .tm-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 900; color: #0D1B1B; line-height: 1.15; letter-spacing: -0.3px; margin: 0; }
         .tm-title span { color: #E8A598; }
-        .tm-close {
-          width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
-          background: white; cursor: pointer; display: flex; align-items: center;
-          justify-content: center; color: #9BAAB8; flex-shrink: 0; margin-top: 2px;
-          transition: border-color 0.15s, color 0.15s;
-        }
+        .tm-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #9BAAB8; flex-shrink: 0; margin-top: 2px; transition: border-color 0.15s, color 0.15s; }
         .tm-close:hover { border-color: #C0392B; color: #C0392B; }
-
         .tm-body { padding: 0 24px 24px; }
-
-        /* Info rows */
-        .tm-info-row {
-          display: flex; align-items: center; gap: 10px;
-          background: rgba(13,79,79,0.04); border: 1.5px solid rgba(13,79,79,0.1);
-          border-radius: 13px; padding: 12px 14px; margin-bottom: 10px;
-        }
-        .tm-info-icon {
-          width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
-          background: rgba(13,79,79,0.1);
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
-        }
+        .tm-info-row { display: flex; align-items: center; gap: 10px; background: rgba(13,79,79,0.04); border: 1.5px solid rgba(13,79,79,0.1); border-radius: 13px; padding: 12px 14px; margin-bottom: 10px; }
+        .tm-info-icon { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; background: rgba(13,79,79,0.1); display: flex; align-items: center; justify-content: center; color: #0D4F4F; }
         .tm-info-label { font-size: 11px; color: #9BAAB8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
         .tm-info-value { font-size: 14px; font-weight: 700; color: #0D1B1B; }
-
-        .tm-cost-row {
-          display: flex; align-items: center; gap: 10px;
-          border-radius: 13px; padding: 12px 14px; margin-bottom: 16px;
-        }
+        .tm-cost-row { display: flex; align-items: center; gap: 10px; border-radius: 13px; padding: 12px 14px; margin-bottom: 16px; }
         .tm-cost-row.free { background: rgba(26,122,74,0.06); border: 1.5px solid rgba(26,122,74,0.18); }
         .tm-cost-row.paid { background: rgba(192,122,32,0.06); border: 1.5px solid rgba(192,122,32,0.2); }
-        .tm-cost-icon {
-          width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center; font-size: 16px;
-        }
+        .tm-cost-icon { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         .tm-cost-text { font-size: 13px; font-weight: 600; line-height: 1.5; }
         .tm-cost-row.free .tm-cost-text { color: #1A7A4A; }
         .tm-cost-row.paid .tm-cost-text { color: #92580A; }
         .tm-cost-balance { font-size: 11px; color: #9BAAB8; margin-top: 2px; }
-
-        /* Textarea */
-        .tm-field-label {
-          font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-          color: #9BAAB8; margin-bottom: 8px; display: block;
-        }
-        .tm-textarea {
-          width: 100%; padding: 14px 16px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          font-size: 14px; font-family: inherit; color: #0D1B1B; font-weight: 500;
-          resize: none; outline: none; line-height: 1.6;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
+        .tm-field-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9BAAB8; margin-bottom: 8px; display: block; }
+        .tm-textarea { width: 100%; padding: 14px 16px; border: 1.5px solid #E2EAF0; border-radius: 13px; font-size: 14px; font-family: inherit; color: #0D1B1B; font-weight: 500; resize: none; outline: none; line-height: 1.6; transition: border-color 0.2s, box-shadow 0.2s; }
         .tm-textarea:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
         .tm-char-count { font-size: 11px; color: #C8D4DE; text-align: right; margin-top: 5px; }
-
-        /* Thanks card preview */
-        .tm-card-preview {
-          border: 1.5px solid #E2EAF0; border-radius: 13px; overflow: hidden; margin-bottom: 16px;
-        }
+        .tm-card-preview { border: 1.5px solid #E2EAF0; border-radius: 13px; overflow: hidden; margin-bottom: 16px; }
         .tm-card-preview img { width: 100%; max-height: 180px; object-fit: contain; display: block; background: #F7F9FB; }
-        .tm-card-empty {
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          padding: 28px; text-align: center; background: #F7F9FB;
-          color: #9BAAB8; gap: 8px; font-size: 13px; font-weight: 600;
-        }
-
-        /* Divider */
+        .tm-card-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; background: #F7F9FB; color: #9BAAB8; gap: 8px; font-size: 13px; font-weight: 600; }
         .tm-divider { height: 1px; background: #F0F4F8; margin: 18px 0; }
-
-        /* Actions */
         .tm-actions { display: flex; gap: 10px; }
-        .tm-cancel-btn {
-          padding: 13px 18px; border-radius: 13px; border: 1.5px solid #E2EAF0;
-          background: white; color: #4A6072; font-size: 14px; font-weight: 700;
-          font-family: inherit; cursor: pointer; white-space: nowrap;
-          transition: border-color 0.15s, color 0.15s;
-        }
+        .tm-cancel-btn { padding: 13px 18px; border-radius: 13px; border: 1.5px solid #E2EAF0; background: white; color: #4A6072; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap; transition: border-color 0.15s, color 0.15s; }
         .tm-cancel-btn:hover { border-color: #0D4F4F; color: #0D4F4F; }
-
-        .tm-send-btn {
-          flex: 1; padding: 13px; border-radius: 13px; border: none;
-          color: white; font-size: 14.5px; font-weight: 700; font-family: inherit;
-          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-          transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-          position: relative; overflow: hidden;
-        }
-        .tm-send-btn::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
-          opacity: 0; transition: opacity 0.2s;
-        }
+        .tm-send-btn { flex: 1; padding: 13px; border-radius: 13px; border: none; color: white; font-size: 14.5px; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s; position: relative; overflow: hidden; }
+        .tm-send-btn::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent); opacity: 0; transition: opacity 0.2s; }
         .tm-send-btn:hover:not(:disabled)::after { opacity: 1; }
         .tm-send-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.22); }
         .tm-send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .tm-send-btn.teal   { background: linear-gradient(135deg, #0D4F4F, #0A3D3D); }
-        .tm-send-btn.amber  { background: linear-gradient(135deg, #C07A20, #A86418); }
+        .tm-send-btn.teal { background: linear-gradient(135deg, #0D4F4F, #0A3D3D); }
+        .tm-send-btn.amber { background: linear-gradient(135deg, #C07A20, #A86418); }
         .tm-send-btn.salmon { background: linear-gradient(135deg, #E8A598, #D4857A); }
-
-        .tm-spinner {
-          width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white; border-radius: 50%;
-          animation: tmSpin 0.7s linear infinite; flex-shrink: 0;
-        }
+        .tm-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: tmSpin 0.7s linear infinite; flex-shrink: 0; }
         @keyframes tmSpin { to { transform: rotate(360deg); } }
 
-        /* ── Kumbusha trigger button ── */
-        .kumbusha-btn {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 12px; padding: 14px 18px;
-          background: white; border: 1.5px solid rgba(192,122,32,0.3);
-          border-radius: 14px; cursor: pointer; font-family: inherit; width: 100%;
-          transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
-          text-align: left;
-        }
-        .kumbusha-btn:hover {
-          border-color: #C07A20; background: rgba(192,122,32,0.03);
-          transform: translateY(-1px); box-shadow: 0 4px 12px rgba(192,122,32,0.1);
-        }
+        .kumbusha-btn { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; background: white; border: 1.5px solid rgba(192,122,32,0.3); border-radius: 14px; cursor: pointer; font-family: inherit; width: 100%; transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s; text-align: left; }
+        .kumbusha-btn:hover { border-color: #C07A20; background: rgba(192,122,32,0.03); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(192,122,32,0.1); }
         .kumbusha-btn-left { display: flex; align-items: center; gap: 12px; }
-        .kumbusha-btn-icon {
-          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: rgba(192,122,32,0.1); border: 1px solid rgba(192,122,32,0.2);
-          display: flex; align-items: center; justify-content: center; color: #C07A20;
-        }
+        .kumbusha-btn-icon { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; background: rgba(192,122,32,0.1); border: 1px solid rgba(192,122,32,0.2); display: flex; align-items: center; justify-content: center; color: #C07A20; }
         .kumbusha-btn-title { font-size: 14px; font-weight: 700; color: #0D1B1B; }
         .kumbusha-btn-sub { font-size: 12px; color: #9BAAB8; font-weight: 500; margin-top: 1px; }
-        .kumbusha-btn-badge {
-          font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
-          white-space: nowrap; flex-shrink: 0;
-          background: rgba(192,122,32,0.1); color: #C07A20;
-          border: 1px solid rgba(192,122,32,0.2);
-        }
-        .kumbusha-btn-badge.free {
-          background: rgba(26,122,74,0.08); color: #1A7A4A;
-          border-color: rgba(26,122,74,0.18);
-        }
+        .kumbusha-btn-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; background: rgba(192,122,32,0.1); color: #C07A20; border: 1px solid rgba(192,122,32,0.2); }
+        .kumbusha-btn-badge.free { background: rgba(26,122,74,0.08); color: #1A7A4A; border-color: rgba(26,122,74,0.18); }
       `}</style>
 
       <div className="max-w-4xl mx-auto">
@@ -482,7 +520,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <Send size={15} /> Send Invitations
           </Link>
 
-          {/* ── Redesigned Kumbusha button ── */}
+          {/* Kumbusha button */}
           <div className="col-span-full">
             <button className="kumbusha-btn" onClick={openKumbushaModal}>
               <div className="kumbusha-btn-left">
@@ -518,7 +556,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           )}
         </div>
 
-        {/* Guest list */}
+        {/* ─── Guest List ─── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-3">
@@ -527,62 +565,83 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 {guests.length} guest{guests.length !== 1 ? 's' : ''}
               </span>
             </div>
-            {guests.length > 0 && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
-                  {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
-                  {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
-                </button>
-                {selectedGuests.size > 0 && (
-                  <button onClick={deleteSelected} disabled={deleting} className="text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition disabled:opacity-50 flex items-center gap-1">
-                    {deleting ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
-                    Delete ({selectedGuests.size})
-                  </button>
-                )}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Search */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  placeholder="Search guests…"
+                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent w-40 md:w-56"
+                />
               </div>
-            )}
+
+              {/* Backup button */}
+              <button
+                onClick={openBackupModal}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
+              >
+                <Download size={14} /> Backup
+              </button>
+
+              <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
+                {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
+              </button>
+              {selectedGuests.size > 0 && (
+                <button onClick={deleteSelected} disabled={deleting} className="text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition disabled:opacity-50 flex items-center gap-1">
+                  {deleting ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
+                  Delete ({selectedGuests.size})
+                </button>
+              )}
+            </div>
           </div>
 
           {guests.length === 0 ? (
             <div className="py-12 text-center">
-              <div className="text-4xl mb-3">👥</div>
+              <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
               <p className="text-sm text-gray-400">Import a guest list or add guests manually to get started.</p>
             </div>
           ) : (
-            <div className="relative">
-              <div id="guest-list-container" className="divide-y divide-gray-100 max-h-96 overflow-y-auto scroll-smooth" onScroll={handleScroll}>
-                {guests.map((guest) => (
-                  <div key={guest.id} className="px-4 py-3 hover:bg-gray-50 transition">
-                    <div className="flex items-center gap-3">
-                      <input type="checkbox" checked={selectedGuests.has(guest.id)} onChange={() => toggleSelectGuest(guest.id)} className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-800 text-sm truncate">{guest.name}</p>
-                        {guest.phone && <p className="text-xs text-gray-500 truncate">{guest.phone}</p>}
-                        <div className="flex flex-wrap items-center gap-1 mt-1">
-                          {guest.routingChannel === 'whatsapp' ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full"><MessageCircle size={10} /> WhatsApp</span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full"><Phone size={10} /> SMS</span>
-                          )}
-                          {guest.thanksSentAt && <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">❤️ Thanks sent</span>}
-                          {guest.reminderCount > 0 && <span className="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">🔁 {guest.reminderCount} reminder{guest.reminderCount > 1 ? 's' : ''}</span>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {guest.checkedIn
-                          ? <span className="text-xs font-bold text-green-700 bg-green-50 px-2.5 py-1 rounded-full whitespace-nowrap">✓ Checked in</span>
-                          : <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">Pending</span>
-                        }
-                        {event.tenant?.testMode && (
-                          <Link href={`/invite/preview/${guest.id}`} target="_blank" className="text-xs text-[#0D4F4F] hover:underline font-medium">Preview</Link>
-                        )}
-                        <button onClick={() => deleteGuest(guest.id)} className="text-gray-400 hover:text-red-500 transition p-1"><Trash2 size={15} /></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <div>
+              {/* Guest cards grid */}
+              <div id="guest-list-container" className="divide-y divide-gray-100 max-h-96 overflow-y-auto scroll-smooth p-2" onScroll={handleScroll}>
+                <div className="grid grid-cols-1 gap-2">
+                  {paginatedGuests.map(renderGuestCard)}
+                </div>
               </div>
+
+              {/* Pagination controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                  <div className="text-sm text-gray-500">
+                    Showing {(currentPage - 1) * pageSize + 1} – {Math.min(currentPage * pageSize, filteredGuests.length)} of {filteredGuests.length}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => goToPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                    >
+                      Previous
+                    </button>
+                    <span className="px-3 py-1 text-sm font-semibold text-gray-700">
+                      {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => goToPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {showBackToTop && (
                 <button onClick={scrollToTop} className="absolute bottom-3 right-3 bg-[#0D4F4F] text-white p-2 rounded-full shadow-lg hover:bg-[#0A3D3D] transition z-10">
                   <ArrowUp size={16} />
@@ -593,6 +652,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
+      
       {/* ─── Kumbusha Modal ─── */}
       {showKumbushaModal && (
         <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowKumbushaModal(false); }}>
@@ -611,7 +671,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="tm-info-row">
                 <div className="tm-info-icon"><Users size={16} /></div>
                 <div>
-                  <div className="tm-info-label">Wageni wa kutumia</div>
+                  <div className="tm-info-label">Wageni waliopo</div>
                   <div className="tm-info-value">{kumbushaCount} SMS guest{kumbushaCount !== 1 ? 's' : ''} (hawajafika)</div>
                 </div>
               </div>
@@ -621,10 +681,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div>
                   <div className="tm-cost-text">
                     {isFree
-                      ? 'Bure — kumbusho 2 za kwanza hazina gharama kwa kila mgeni'
+                      ? 'Kumbusho 2 za kwanza hazina gharama kwa kila mgeni'
                       : `Gharama: ${kumbushaTotalCost} TZS (50 TZS/mgeni baada ya 2 za bure)`}
                   </div>
-                  {credits !== null && <div className="tm-cost-balance">Mikopo iliyobaki: {credits} TZS</div>}
+                  {credits !== null && <div className="tm-cost-balance">Salio liililobaki: {credits} TZS</div>}
                 </div>
               </div>
 
@@ -715,6 +775,102 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {sendingThanks ? <><div className="tm-spinner" /> Inatuma…</> : <><Heart size={15} /> Tuma Shukrani</>}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* ─── Backup Guests Modal ────────────────────────────────────── */}
+      {showBackupModal && (
+        <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowBackupModal(false); }}>
+          <div className="tm-modal" style={{ maxWidth: '640px' }}>
+            <div className="tm-bar teal" />
+            <div className="tm-head">
+              <div>
+                <div className="tm-eyebrow">
+                  <div className="tm-eyebrow-dot" /> Backup
+                </div>
+                <h2 className="tm-title">All Guests <span>Across All Events</span></h2>
+              </div>
+              <button className="tm-close" onClick={() => setShowBackupModal(false)}><X size={15} /></button>
+            </div>
+            <div className="tm-body">
+              {backupLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+                </div>
+              ) : (
+                <>
+                  {/* Search */}
+                  <div className="relative mb-4">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={backupSearch}
+                      onChange={(e) => { setBackupSearch(e.target.value); setBackupPage(1); }}
+                      placeholder="Search all guests…"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                    />
+                  </div>
+
+                  {backupPaginated.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400">
+                      <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p>No guests found</p>
+                    </div>
+                  ) : (
+                    <div className="max-h-96 overflow-y-auto divide-y divide-gray-100">
+                      {backupPaginated.map(g => (
+                        <div key={g.id} className="py-2 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-[#0D4F4F]/10 flex items-center justify-center text-[#0D4F4F] font-bold text-sm flex-shrink-0">
+                            {g.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-800">{g.name}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <span>{g.phone || 'No phone'}</span>
+                              <span>•</span>
+                              <span className={`inline-flex items-center gap-1 ${g.checkedIn ? 'text-green-600' : 'text-amber-600'}`}>
+                                {g.checkedIn ? <CheckCircle size={12} /> : <Clock size={12} />}
+                                {g.checkedIn ? 'Checked in' : 'Pending'}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-24">
+                            {g.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pagination for backup */}
+                  {backupTotalPages > 1 && (
+                    <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
+                      <span className="text-xs text-gray-400">
+                        {filteredBackup.length} guest{filteredBackup.length !== 1 ? 's' : ''}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setBackupPage(p => Math.max(1, p - 1))}
+                          disabled={backupPage === 1}
+                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                        >
+                          Previous
+                        </button>
+                        <span className="px-3 py-1 text-sm font-semibold text-gray-700">{backupPage} / {backupTotalPages}</span>
+                        <button
+                          onClick={() => setBackupPage(p => Math.min(backupTotalPages, p + 1))}
+                          disabled={backupPage === backupTotalPages}
+                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
