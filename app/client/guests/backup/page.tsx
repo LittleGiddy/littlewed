@@ -25,7 +25,6 @@ export default function BackupGuestsPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 25;
-  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     fetchGuests();
@@ -93,16 +92,32 @@ export default function BackupGuestsPage() {
     toast.success(`Exported ${filtered.length} guests`);
   };
 
-  // ─── Share (copy page URL) ──────────────────────────────────────
+  // ─── Share (native share sheet or copy link) ──────────────────
   const sharePage = async () => {
     const url = window.location.href;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopySuccess(true);
-      toast.success('Link copied to clipboard!');
-      setTimeout(() => setCopySuccess(false), 3000);
-    } catch {
-      toast.error('Failed to copy link');
+    const shareData = {
+      title: 'Guest Database',
+      text: 'Check out the guest database for all events.',
+      url: url,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        toast.success('Shared successfully!');
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          toast.error('Share cancelled or failed');
+        }
+      }
+    } else {
+      // Fallback: copy link to clipboard
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard!');
+      } catch {
+        toast.error('Failed to copy link');
+      }
     }
   };
 
@@ -139,8 +154,7 @@ export default function BackupGuestsPage() {
             onClick={sharePage}
             className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl font-semibold hover:bg-gray-200 transition"
           >
-            {copySuccess ? <Check size={16} className="text-green-600" /> : <Share2 size={16} />}
-            {copySuccess ? 'Copied!' : 'Share'}
+            <Share2 size={16} /> Share
           </button>
         </div>
       </div>
