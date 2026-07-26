@@ -6,30 +6,20 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Get the tenant from the session (adjust based on your auth)
   const tenantId = (session.user as any).tenantId;
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Tenant not found' }, { status: 400 });
-  }
+  if (!tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 400 });
 
   const guests = await prisma.guest.findMany({
-    where: {
-      event: {
-        tenantId: tenantId,
-      },
-    },
+    where: { event: { tenantId } },
     select: {
       id: true,
       name: true,
       phone: true,
       checkedIn: true,
       routingChannel: true,
-      eventId: true,
-      // we could also include event name
+      event: { select: { name: true } },
     },
     orderBy: { name: 'asc' },
   });

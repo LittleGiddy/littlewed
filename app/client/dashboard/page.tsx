@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { Calendar, Users, QrCode, Plus, Coins, Upload, Palette, Send, ArrowRight, Settings, LifeBuoy, BookOpen, MessageSquare } from 'lucide-react';
+import { Calendar, Users, QrCode, Plus, Coins, Upload, Palette, Send, ArrowRight, Settings, LifeBuoy, BookOpen, MessageSquare, Download } from 'lucide-react';
 import Link from 'next/link';
 import DeleteEventButton from '@/components/DeleteEventButton';
 import BuyCreditsButton from '@/app/components/BuyCreditsButton';
@@ -109,7 +109,7 @@ export default async function ClientDashboard() {
         }
         .db-create-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.36); }
 
-        /* ── Stats grid (now includes credits + a Buy button) ── */
+        /* ── Stats grid ── */
         .db-stats {
           display: grid; grid-template-columns: repeat(4, 1fr);
           gap: 14px; margin-bottom: 24px;
@@ -157,7 +157,7 @@ export default async function ClientDashboard() {
 
         /* ── Quick actions ── */
         .db-quick-actions {
-          display: grid; grid-template-columns: repeat(4, 1fr);
+          display: grid; grid-template-columns: repeat(5, 1fr);
           gap: 10px; margin-bottom: 20px;
         }
         .db-quick-btn {
@@ -306,7 +306,7 @@ export default async function ClientDashboard() {
         </Link>
       </div>
 
-      {/* Stats — credits card now includes its own Buy link, no duplicate block below */}
+      {/* Stats — credits card now includes its own Buy link */}
       <div className="db-stats">
         {stats.map(({ label, value, icon: Icon, bg, color }) => (
           <div key={label} className="db-stat-card">
@@ -326,7 +326,7 @@ export default async function ClientDashboard() {
       <div className="db-columns">
         {/* Left column */}
         <div>
-          {/* Quick actions — single source of truth, no duplication with right panel */}
+          {/* Quick actions */}
           <div className="db-quick-actions">
             <Link href={newEventUrl} className="db-quick-btn">
               <Plus size={15} /> New Event
@@ -339,6 +339,10 @@ export default async function ClientDashboard() {
             </Link>
             <Link href="/client/invitations/send/select-event" className="db-quick-btn">
               <Send size={15} /> Send Invites
+            </Link>
+            {/* 👇 NEW: Backup Guests button */}
+            <Link href="/client/guests/backup" className="db-quick-btn">
+              <Download size={15} /> Backup Guests
             </Link>
           </div>
 
@@ -395,6 +399,7 @@ export default async function ClientDashboard() {
             <div className="db-panel-title">Quick Links</div>
             <Link href="/client/events" className="db-quick-link"><Calendar size={15} /> My Events</Link>
             <Link href="/client/guests" className="db-quick-link"><Users size={15} /> Guest List</Link>
+            <Link href="/client/guests/backup" className="db-quick-link"><Download size={15} /> Backup Guests</Link>
             <Link href="/client/billing" className="db-quick-link"><Coins size={15} /> Billing &amp; Credits</Link>
             <Link href="/client/settings" className="db-quick-link"><Settings size={15} /> Settings</Link>
           </div>

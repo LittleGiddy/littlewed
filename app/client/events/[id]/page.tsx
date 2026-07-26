@@ -579,12 +579,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
 
               {/* Backup button */}
-              <button
-                onClick={openBackupModal}
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
-              >
-                <Download size={14} /> Backup
-              </button>
+              <Link href="/client/guests/backup" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition">
+  <Download size={14} /> Backup
+</Link>
 
               <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
@@ -779,7 +776,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       )}
-      
+
       {/* ─── Backup Guests Modal ────────────────────────────────────── */}
       {showBackupModal && (
         <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowBackupModal(false); }}>
