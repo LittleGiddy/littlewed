@@ -7,9 +7,10 @@ import {
   Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft, 
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
   Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
-  Search, Download, User, Clock, AlertCircle // new icons
+  Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
+  AlarmClock, AlarmClockOff, RotateCw, Pencil // ← added Pencil
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 
 // ─── Guest type ──────────────────────────────────────────────────────────
@@ -34,6 +35,79 @@ interface EventData {
   commission_paid: boolean;
   thankYouCardUrl: string | null;
   tenant: { testMode: boolean };
+  status: string;
+  pausedAt: string | null;
+  expiresAt: string | null;
+  resumedAt: string | null;
+  reminderSent: boolean;
+  expiredNotified: boolean;
+  resumedBy: string | null;
+}
+
+// ─── Countdown timer component ──────────────────────────────────────────
+function EventCountdown({ targetDate, onStatusChange }: { targetDate: Date; onStatusChange?: (status: string) => void }) {
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [status, setStatus] = useState('');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = targetDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        setStatus('LIVE');
+        if (onStatusChange) onStatusChange('LIVE');
+        clearInterval(interval);
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft({ hours, minutes, seconds });
+
+      if (hours <= 24 && hours > 0) {
+        setStatus('REMINDER');
+      } else {
+        setStatus('ACTIVE');
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [targetDate, onStatusChange]);
+
+  if (status === 'LIVE') {
+    return (
+      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
+        <AlarmClock size={16} className="animate-pulse" />
+        <span className="font-bold text-sm">Event is happening now!</span>
+      </div>
+    );
+  }
+
+  if (status === 'REMINDER') {
+    return (
+      <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
+        <Timer size={16} />
+        <span className="font-bold text-sm">
+          {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+        </span>
+        <span className="text-xs font-medium">— Coming in 24 hours</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-full border border-[rgba(13,79,79,0.15)]">
+      <CalendarClock size={16} />
+      <span className="font-bold text-sm">
+        {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
+      </span>
+      <span className="text-xs font-medium text-gray-500">until event</span>
+    </div>
+  );
 }
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,6 +121,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [countdownKey, setCountdownKey] = useState(0);
 
   // ── Pagination & search ────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,6 +143,41 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [showKumbushaModal, setShowKumbushaModal] = useState(false);
   const [kumbushaMessage, setKumbushaMessage] = useState('');
   const [sendingKumbusha, setSendingKumbusha] = useState(false);
+
+  // ─── Edit Event Modal ─────────────────────────────────────────────────
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    venue: '',
+    address: '',
+    date: '',
+  });
+  const [editing, setEditing] = useState(false);
+
+  // ─── Resume event ──────────────────────────────────────────────────────
+  const handleResumeEvent = async () => {
+    if (!eventId) return;
+    if (!confirm('Resume this event? It will become active again for 7 days.')) return;
+
+    try {
+      const res = await fetch(`/api/events/${eventId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Event resumed successfully!');
+        fetchData(eventId);
+        setCountdownKey(prev => prev + 1);
+      } else {
+        toast.error(data.error || 'Failed to resume event');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
 
   // ─── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -98,7 +208,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (!data?.event) throw new Error('Unexpected response format from server.');
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
-      setCurrentPage(1); // reset pagination on new data
+      setCurrentPage(1);
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
@@ -177,7 +287,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
-    // scroll to top of list
     const container = document.getElementById('guest-list-container');
     if (container) container.scrollTop = 0;
   };
@@ -215,7 +324,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return filteredBackup.slice(start, start + pageSize);
   }, [filteredBackup, backupPage, pageSize]);
 
-  // ─── Kumbusha / Thanks logic (unchanged) ──────────────────────────
+  // ─── Kumbusha / Thanks logic ──────────────────────────────────────────
   const whatsappCheckedInGuests = guests.filter(g => g.checkedIn && g.routingChannel === 'whatsapp');
   const checkedInCount = whatsappCheckedInGuests.length;
 
@@ -281,8 +390,54 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     finally { setSendingKumbusha(false); }
   };
 
-  // ─── Render helpers ────────────────────────────────────────────────
+  // ─── Edit Event handlers ──────────────────────────────────────────────
+  const openEditModal = () => {
+    if (!event) return;
+    setEditForm({
+      name: event.name,
+      venue: event.venue,
+      address: event.address || '',
+      date: format(new Date(event.date), "yyyy-MM-dd'T'HH:mm"),
+    });
+    setShowEditModal(true);
+  };
 
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditing(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          venue: editForm.venue,
+          address: editForm.address,
+          date: editForm.date,
+        }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Event updated successfully!');
+        setShowEditModal(false);
+        fetchData(eventId!);
+        setCountdownKey(prev => prev + 1);
+      } else {
+        toast.error(data.error || 'Failed to update event');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  // ─── Render helpers ────────────────────────────────────────────────
   const renderGuestCard = (guest: Guest) => {
     const isSelected = selectedGuests.has(guest.id);
     const isWhatsApp = guest.routingChannel === 'whatsapp';
@@ -297,20 +452,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         style={{ transition: 'all 0.15s' }}
       >
         <div className="flex items-center p-3 gap-3">
-          {/* Checkbox */}
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => toggleSelectGuest(guest.id)}
             className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
           />
-
-          {/* Avatar / Icon */}
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             {guest.name.charAt(0).toUpperCase()}
           </div>
-
-          {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-semibold text-gray-800 text-sm truncate">{guest.name}</p>
@@ -340,8 +490,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           </div>
-
-          {/* Actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
             {event?.tenant?.testMode && (
               <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
@@ -397,10 +545,85 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
   const checkedInAll = guests.filter(g => g.checkedIn).length;
 
+  // ─── Event Status Helpers ──────────────────────────────────────────
+  const isExpired = event.status === 'EXPIRED';
+  const isArchived = event.status === 'ARCHIVED';
+  const isLive = event.status === 'LIVE';
+  const isActive = event.status === 'ACTIVE' || event.status === 'LIVE';
+  const isDraft = event.status === 'DRAFT';
+
+  const canResume = isExpired && event.pausedAt && differenceInHours(new Date(), new Date(event.pausedAt)) < 168;
+  const daysRemainingToResume = isExpired && event.pausedAt
+    ? Math.max(0, 7 - differenceInHours(new Date(), new Date(event.pausedAt)) / 24)
+    : 0;
+
+  const getStatusBadge = () => {
+    if (isArchived) {
+      return {
+        icon: <AlarmClockOff size={16} />,
+        label: 'Archived',
+        className: 'bg-gray-100 text-gray-600 border-gray-200'
+      };
+    }
+    if (isExpired) {
+      if (canResume) {
+        return {
+          icon: <Timer size={16} />,
+          label: `Paused (${daysRemainingToResume.toFixed(0)} days left to resume)`,
+          className: 'bg-amber-50 text-amber-700 border-amber-200'
+        };
+      }
+      return {
+        icon: <AlarmClockOff size={16} />,
+        label: 'Expired (cannot resume)',
+        className: 'bg-red-50 text-red-700 border-red-200'
+      };
+    }
+    if (isLive) {
+      return {
+        icon: <AlarmClock size={16} className="animate-pulse" />,
+        label: 'Live Now!',
+        className: 'bg-green-50 text-green-700 border-green-200'
+      };
+    }
+    if (isActive) {
+      const hoursUntil = differenceInHours(new Date(event.date), new Date());
+      if (hoursUntil <= 24 && hoursUntil > 0) {
+        return {
+          icon: <Timer size={16} className="animate-pulse" />,
+          label: 'Coming in 24 hours',
+          className: 'bg-amber-50 text-amber-700 border-amber-200'
+        };
+      }
+      return {
+        icon: <CalendarClock size={16} />,
+        label: `Active (${formatDistanceToNow(new Date(event.date), { addSuffix: true })})`,
+        className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]'
+      };
+    }
+    if (isDraft) {
+      return {
+        icon: <AlertCircle size={16} />,
+        label: 'Draft',
+        className: 'bg-gray-100 text-gray-500 border-gray-200'
+      };
+    }
+    return {
+      icon: <AlertCircle size={16} />,
+      label: event.status || 'Unknown',
+      className: 'bg-gray-100 text-gray-500 border-gray-200'
+    };
+  };
+
+  const statusBadge = getStatusBadge();
+
+  // ─── Check if event is disabled ────────────────────────────────────
+  const isEventDisabled = isExpired || isArchived;
+
   return (
     <>
       <style>{`
-        /* ── Themed Modal styles (unchanged) ── */
+        /* ── Themed Modal styles ── */
         .tm-overlay { position: fixed; inset: 0; background: rgba(13,27,27,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; animation: tmOverlayIn 0.18s ease both; }
         @keyframes tmOverlayIn { from { opacity: 0; } to { opacity: 1; } }
         .tm-modal { background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; scrollbar-width: none; box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 40px 80px rgba(0,0,0,0.1); font-family: 'DM Sans', 'Segoe UI', sans-serif; animation: tmModalIn 0.32s cubic-bezier(0.16,1,0.3,1) both; }
@@ -460,45 +683,105 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         .kumbusha-btn-sub { font-size: 12px; color: #9BAAB8; font-weight: 500; margin-top: 1px; }
         .kumbusha-btn-badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; background: rgba(192,122,32,0.1); color: #C07A20; border: 1px solid rgba(192,122,32,0.2); }
         .kumbusha-btn-badge.free { background: rgba(26,122,74,0.08); color: #1A7A4A; border-color: rgba(26,122,74,0.18); }
+
+        .field-wrap { margin-bottom: 16px; }
+        .field-input { width: 100%; padding: 12px 14px; border: 1.5px solid #E2EAF0; border-radius: 11px; font-size: 14px; font-family: inherit; outline: none; color: #0D1B1B; background: white; font-weight: 500; transition: border-color 0.2s, box-shadow 0.2s; }
+        .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .field-label { display: block; font-size: 13px; font-weight: 600; color: #4A6072; margin-bottom: 5px; }
       `}</style>
 
       <div className="max-w-4xl mx-auto">
-        {/* Top nav */}
-        <div className="flex items-center justify-between mb-6">
+        {/* ─── Top nav ────────────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)]">
             <ArrowLeft size={14} /> Back to Dashboard
           </Link>
-          <button
-            onClick={async () => {
-              if (!confirm('Delete this event and ALL its guests? This action cannot be undone.')) return;
-              const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
-              if (res.ok) { toast.success('Event deleted'); router.push('/client/events'); }
-              else { const data = await res.json(); toast.error(data.error || 'Failed to delete event'); }
-            }}
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-1.5 transition hover:bg-red-100"
-          >
-            <Trash2 size={14} /> Delete Event
-          </button>
+          <div className="flex items-center gap-2">
+            {!isArchived && (
+              <button
+                onClick={openEditModal}
+                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.15)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.15)]"
+              >
+                <Pencil size={14} /> Edit Event
+              </button>
+            )}
+            {isEventDisabled && canResume && (
+              <button
+                onClick={handleResumeEvent}
+                className="inline-flex items-center gap-1.5 text-sm font-bold text-green-700 bg-green-50 border border-green-200 rounded-xl px-3.5 py-1.5 transition hover:bg-green-100"
+              >
+                <RotateCw size={14} /> Resume Event
+              </button>
+            )}
+            <button
+              onClick={async () => {
+                if (!confirm('Delete this event and ALL its guests? This action cannot be undone.')) return;
+                const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
+                if (res.ok) { toast.success('Event deleted'); router.push('/client/events'); }
+                else { const data = await res.json(); toast.error(data.error || 'Failed to delete event'); }
+              }}
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl px-3.5 py-1.5 transition hover:bg-red-100"
+            >
+              <Trash2 size={14} /> Delete Event
+            </button>
+          </div>
         </div>
 
-        {/* Event header */}
+        {/* ─── Event header ────────────────────────────────────────────── */}
         <div className="mb-7">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">{event.name}</h1>
-            {event.commission_paid && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <CheckCircle size={12} /> Active
-              </span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">
+                  {event.name}
+                </h1>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold border ${statusBadge.className}`}>
+                  {statusBadge.icon}
+                  {statusBadge.label}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-4 text-sm text-gray-500 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={16} className="text-[#0D4F4F]" />
+                  {format(new Date(event.date), 'PPP')}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={16} className="text-[#0D4F4F]" />
+                  {event.venue}
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 mt-1">{event.address}</p>
+            </div>
+
+            {!isEventDisabled && (
+              <div className="flex-shrink-0">
+                <EventCountdown 
+                  key={countdownKey} 
+                  targetDate={new Date(event.date)} 
+                  onStatusChange={(newStatus) => {
+                    if (newStatus === 'LIVE' && event?.status !== 'LIVE') {
+                      fetchData(eventId!);
+                    }
+                  }}
+                />
+              </div>
+            )}
+
+            {isExpired && (
+              <div className="flex-shrink-0 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
+                <p className="text-sm font-bold text-red-700 flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  {canResume 
+                    ? `This event is paused. You have ${daysRemainingToResume.toFixed(0)} days left to resume it.`
+                    : 'This event has been permanently archived and cannot be resumed.'
+                  }
+                </p>
+              </div>
             )}
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-gray-500 mt-2">
-            <div className="flex items-center gap-1.5"><Calendar size={16} className="text-[#0D4F4F]" />{format(new Date(event.date), 'PPP')}</div>
-            <div className="flex items-center gap-1.5"><MapPin size={16} className="text-[#0D4F4F]" />{event.venue}</div>
-          </div>
-          <p className="text-sm text-gray-400 mt-1">{event.address}</p>
         </div>
 
-        {/* Stats */}
+        {/* ─── Stats ────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
           {[
             { icon: <Users size={18} />, value: guests.length, label: 'Total Guests', bg: 'rgba(13,79,79,0.08)', color: '#0D4F4F' },
@@ -506,7 +789,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             { icon: <MessageCircle size={18} />, value: whatsappCount, label: 'WhatsApp', bg: '#EAF4F4', color: '#0D4F4F' },
             { icon: <Phone size={18} />, value: smsCount, label: 'SMS', bg: '#FEF6EC', color: '#C07A20' },
           ].map(({ icon, value, label, bg, color }) => (
-            <div key={label} className="bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition border border-[#F0F4F8]">
+            <div key={label} className={`bg-white rounded-xl shadow-sm p-4 text-center hover:shadow-md transition border border-[#F0F4F8] ${isEventDisabled ? 'opacity-60' : ''}`}>
               <div className="w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ background: bg, color }}>{icon}</div>
               <div className="font-serif text-2xl font-black text-gray-800">{value}</div>
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</div>
@@ -514,47 +797,56 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-7">
-          <Link href={`/client/invitations/send/${event.id}`} className="col-span-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
-            <Send size={15} /> Send Invitations
-          </Link>
-
-          {/* Kumbusha button */}
-          <div className="col-span-full">
-            <button className="kumbusha-btn" onClick={openKumbushaModal}>
-              <div className="kumbusha-btn-left">
-                <div className="kumbusha-btn-icon"><Bell size={18} /></div>
-                <div>
-                  <div className="kumbusha-btn-title">Kumbusha Michango</div>
-                  <div className="kumbusha-btn-sub">{kumbushaCount} SMS guest{kumbushaCount !== 1 ? 's' : ''} pending check-in</div>
-                </div>
-              </div>
-              <span className={`kumbusha-btn-badge${isFree ? ' free' : ''}`}>
-                {isFree ? '✓ Free' : `${kumbushaTotalCost} TZS`}
-              </span>
-            </button>
+        {/* ─── Action buttons ────────────────────────────────────────────── */}
+        {isEventDisabled ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center mb-7">
+            <AlertCircle size={24} className="text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-500 font-medium">
+              This event is {event.status === 'ARCHIVED' ? 'archived' : 'paused'}. All actions are disabled.
+              {canResume && ' You can resume it using the Resume button above.'}
+            </p>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-7">
+            <Link href={`/client/invitations/send/${event.id}`} className="col-span-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+              <Send size={15} /> Send Invitations
+            </Link>
 
-          <Link href={`/client/guests/import/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
-            <Upload size={14} /> Import Guests
-          </Link>
-          <Link href={`/client/guests/add/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
-            <Plus size={14} /> Add Guest
-          </Link>
-          <Link href={`/client/invitations/design/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
-            <Palette size={14} /> Design Card
-          </Link>
-          <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
-            <QrCode size={14} /> Check-In
-          </Link>
+            <div className="col-span-full">
+              <button className="kumbusha-btn" onClick={openKumbushaModal}>
+                <div className="kumbusha-btn-left">
+                  <div className="kumbusha-btn-icon"><Bell size={18} /></div>
+                  <div>
+                    <div className="kumbusha-btn-title">Kumbusha Michango</div>
+                    <div className="kumbusha-btn-sub">{kumbushaCount} SMS guest{kumbushaCount !== 1 ? 's' : ''} pending check-in</div>
+                  </div>
+                </div>
+                <span className={`kumbusha-btn-badge${isFree ? ' free' : ''}`}>
+                  {isFree ? '✓ Free' : `${kumbushaTotalCost} TZS`}
+                </span>
+              </button>
+            </div>
 
-          {checkedInCount > 0 && (
-            <button onClick={openThanksModal} className="col-span-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
-              <Heart size={15} /> Send Thanks ({checkedInCount} WhatsApp checked‑in)
-            </button>
-          )}
-        </div>
+            <Link href={`/client/guests/import/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
+              <Upload size={14} /> Import Guests
+            </Link>
+            <Link href={`/client/guests/add/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
+              <Plus size={14} /> Add Guest
+            </Link>
+            <Link href={`/client/invitations/design/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
+              <Palette size={14} /> Design Card
+            </Link>
+            <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
+              <QrCode size={14} /> Check-In
+            </Link>
+
+            {checkedInCount > 0 && (
+              <button onClick={openThanksModal} className="col-span-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white text-center py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+                <Heart size={15} /> Send Thanks ({checkedInCount} WhatsApp checked‑in)
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ─── Guest List ─── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -566,7 +858,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </span>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Search */}
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -578,20 +869,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 />
               </div>
 
-              {/* Backup button */}
               <Link href="/client/guests/backup" className="inline-flex items-center gap-1.5 text-sm font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition">
-  <Download size={14} /> Backup
-</Link>
+                <Download size={14} /> Backup
+              </Link>
 
-              <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
-                {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
-                {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
-              </button>
-              {selectedGuests.size > 0 && (
-                <button onClick={deleteSelected} disabled={deleting} className="text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition disabled:opacity-50 flex items-center gap-1">
-                  {deleting ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
-                  Delete ({selectedGuests.size})
-                </button>
+              {!isEventDisabled && (
+                <>
+                  <button onClick={toggleSelectAll} className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1 whitespace-nowrap">
+                    {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                    {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                  {selectedGuests.size > 0 && (
+                    <button onClick={deleteSelected} disabled={deleting} className="text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition disabled:opacity-50 flex items-center gap-1">
+                      {deleting ? <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={14} />}
+                      Delete ({selectedGuests.size})
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -604,14 +898,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           ) : (
             <div>
-              {/* Guest cards grid */}
-              <div id="guest-list-container" className="divide-y divide-gray-100 max-h-96 overflow-y-auto scroll-smooth p-2" onScroll={handleScroll}>
+              <div id="guest-list-container" className={`divide-y divide-gray-100 max-h-96 overflow-y-auto scroll-smooth p-2 ${isEventDisabled ? 'opacity-60' : ''}`} onScroll={handleScroll}>
                 <div className="grid grid-cols-1 gap-2">
                   {paginatedGuests.map(renderGuestCard)}
                 </div>
               </div>
 
-              {/* Pagination controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                   <div className="text-sm text-gray-500">
@@ -649,7 +941,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
-      
       {/* ─── Kumbusha Modal ─── */}
       {showKumbushaModal && (
         <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowKumbushaModal(false); }}>
@@ -742,7 +1033,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
-              {/* Thanks card preview */}
               <label className="tm-field-label" style={{ marginBottom: 8 }}>Kadi ya Shukrani</label>
               <div className="tm-card-preview" style={{ marginBottom: 16 }}>
                 {event.thankYouCardUrl
@@ -798,7 +1088,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               ) : (
                 <>
-                  {/* Search */}
                   <div className="relative mb-4">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
@@ -841,7 +1130,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                   )}
 
-                  {/* Pagination for backup */}
                   {backupTotalPages > 1 && (
                     <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
                       <span className="text-xs text-gray-400">
@@ -868,6 +1156,79 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   )}
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Edit Event Modal ──────────────────────────────────────────── */}
+      {showEditModal && (
+        <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowEditModal(false); }}>
+          <div className="tm-modal" style={{ maxWidth: '520px' }}>
+            <div className="tm-bar teal" />
+            <div className="tm-head">
+              <div>
+                <div className="tm-eyebrow"><div className="tm-eyebrow-dot" /> Edit Event</div>
+                <h2 className="tm-title">Update <span>Event Details</span></h2>
+              </div>
+              <button className="tm-close" onClick={() => setShowEditModal(false)}><X size={15} /></button>
+            </div>
+            <div className="tm-body">
+              <form onSubmit={handleEditSubmit}>
+                <div className="field-wrap">
+                  <label className="field-label">Event Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={editForm.name}
+                    onChange={handleEditChange}
+                    className="field-input"
+                    required
+                  />
+                </div>
+                <div className="field-wrap">
+                  <label className="field-label">Venue</label>
+                  <input
+                    type="text"
+                    name="venue"
+                    value={editForm.venue}
+                    onChange={handleEditChange}
+                    className="field-input"
+                    required
+                  />
+                </div>
+                <div className="field-wrap">
+                  <label className="field-label">Address</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={editForm.address}
+                    onChange={handleEditChange}
+                    className="field-input"
+                  />
+                </div>
+                <div className="field-wrap">
+                  <label className="field-label">Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    name="date"
+                    value={editForm.date}
+                    onChange={handleEditChange}
+                    className="field-input"
+                    required
+                  />
+                </div>
+                <div className="tm-actions" style={{ marginTop: '8px' }}>
+                  <button type="button" className="tm-cancel-btn" onClick={() => setShowEditModal(false)}>Cancel</button>
+                  <button
+                    type="submit"
+                    className="tm-send-btn teal"
+                    disabled={editing}
+                  >
+                    {editing ? <><div className="tm-spinner" /> Saving…</> : <>Save Changes</>}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

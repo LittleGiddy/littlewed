@@ -115,6 +115,12 @@ model Event {
   tenant          Tenant   @relation(fields: [tenantId], references: [id])
   guests          Guest[]
   createdAt       DateTime @default(now())
+  status        String   @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
+  pausedAt      DateTime? // when the event was paused/expired
+  expiresAt     DateTime? // when the event will be permanently archived
+  resumedAt     DateTime? // when the event was last resumed (for tracking)
+  reminderSent  Boolean  @default(false) // track if 24h reminder was sent
+  expiredNotified Boolean @default(false) // track if expiration email was sent
 
   // Invitation card fields
   templateCardUrl  String?
