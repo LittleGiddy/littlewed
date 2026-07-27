@@ -2,14 +2,17 @@ import { Queue, Worker } from 'bullmq';
 import { prisma } from '@/lib/prisma';
 import { sendEventReminderEmail, sendEventExpiredEmail } from '@/lib/email';
 
-const eventQueue = new Queue('event-status', { connection: { host: 'localhost', port: 6379 } });
+// ── Queue setup (reuse your existing connection) ──
+const eventQueue = new Queue('event-status', {
+  connection: { host: 'localhost', port: 6379 },
+});
 
-// ── Add a recurring job ──
+// ── Add recurring job (every 6 hours) ──
 await eventQueue.add(
   'check-events',
   {},
   {
-    repeat: { pattern: '0 */6 * * *' }, // every 6 hours
+    repeat: { pattern: '0 */6 * * *' },
     jobId: 'check-events',
   }
 );
@@ -21,10 +24,35 @@ const worker = new Worker(
     const now = new Date();
     const sixHoursFromNow = new Date(now.getTime() + 6 * 60 * 60 * 1000);
 
-    // 1️⃣ Events happening in the next 24 hours
+    // ──────────────────────────────────────────────
+    // 1️⃣ Promote DRAFT events to ACTIVE (24h before)
+    // ──────────────────────────────────────────────
+    const draftsToPublish = await prisma.event.findMany({
+      where: {
+        status: 'DRAFT',
+        date: {
+          gte: now,
+          lte: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+        },
+        reminderSent: false, // only if we haven't already sent the reminder (optional)
+      },
+    });
+
+    for (const draft of draftsToPublish) {
+      // Promote to ACTIVE
+      await prisma.event.update({
+        where: { id: draft.id },
+        data: { status: 'ACTIVE' },
+      });
+      // The reminder email will be sent in the next step (step 2)
+    }
+
+    // ──────────────────────────────────────────────
+    // 2️⃣ Send 24‑hour reminder (for ACTIVE events)
+    // ──────────────────────────────────────────────
     const events24h = await prisma.event.findMany({
       where: {
-        status: { in: ['ACTIVE', 'DRAFT'] },
+        status: 'ACTIVE', // now only ACTIVE events are considered
         date: {
           gte: now,
           lte: new Date(now.getTime() + 24 * 60 * 60 * 1000),
@@ -45,12 +73,14 @@ const worker = new Worker(
       }
     }
 
-    // 2️⃣ Events that have expired (1 hour after event date)
+    // ──────────────────────────────────────────────
+    // 3️⃣ Expire ACTIVE events (1 hour after event date)
+    // ──────────────────────────────────────────────
     const expiredEvents = await prisma.event.findMany({
       where: {
         status: 'ACTIVE',
         date: {
-          lt: new Date(now.getTime() - 60 * 60 * 1000), // 1 hour ago or more
+          lt: new Date(now.getTime() - 60 * 60 * 1000), // 1 hour ago
         },
         expiredNotified: false,
       },
@@ -63,7 +93,8 @@ const worker = new Worker(
         data: {
           status: 'EXPIRED',
           pausedAt: now,
-          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          expiredNotified: true,
         },
       });
       const email = event.tenant?.users?.[0]?.email;
@@ -72,7 +103,9 @@ const worker = new Worker(
       }
     }
 
-    // 3️⃣ Permanently archive events that are 7+ days expired
+    // ──────────────────────────────────────────────
+    // 4️⃣ Archive permanently (7 days after expiry)
+    // ──────────────────────────────────────────────
     await prisma.event.updateMany({
       where: {
         status: 'EXPIRED',
