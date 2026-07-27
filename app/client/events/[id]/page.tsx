@@ -46,10 +46,10 @@ interface EventData {
 
 // ─── Countdown timer component ──────────────────────────────────────────
 function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [status, setStatus] = useState('');
 
-  // Memoize the target date so it doesn't change on every render
+  // Memoize the target date
   const target = useMemo(() => new Date(targetDate), [targetDate]);
 
   useEffect(() => {
@@ -58,20 +58,21 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
         setStatus('LIVE');
         if (onStatusChange) onStatusChange('LIVE');
         clearInterval(interval);
         return;
       }
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      setTimeLeft({ hours, minutes, seconds });
+      setTimeLeft({ days, hours, minutes, seconds });
 
-      if (hours <= 24 && hours > 0) {
+      if (hours <= 24 && days === 0 && hours > 0) {
         setStatus('REMINDER');
       } else {
         setStatus('ACTIVE');
@@ -80,6 +81,9 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
 
     return () => clearInterval(interval);
   }, [target, onStatusChange]);
+
+  // Format the time as DDd HHh MMm SSs
+  const formattedTime = `${String(timeLeft.days).padStart(2, '0')}d ${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
   if (status === 'LIVE') {
     return (
@@ -94,9 +98,7 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
     return (
       <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
         <Timer size={16} />
-        <span className="font-bold text-sm">
-          {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
-        </span>
+        <span className="font-bold text-sm">{formattedTime}</span>
         <span className="text-xs font-medium">— Coming in 24 hours</span>
       </div>
     );
@@ -105,9 +107,7 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
   return (
     <div className="flex items-center gap-2 text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-full border border-[rgba(13,79,79,0.15)]">
       <CalendarClock size={16} />
-      <span className="font-bold text-sm">
-        {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s
-      </span>
+      <span className="font-bold text-sm">{formattedTime}</span>
       <span className="text-xs font-medium text-gray-500">until event</span>
     </div>
   );
@@ -397,11 +397,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Edit Event handlers ──────────────────────────────────────────────
   const openEditModal = () => {
     if (!event) return;
+    
+    // Create a date from the stored string
+    const eventDate = new Date(event.date);
+    
+    // Format as local datetime-local string
+    const year = eventDate.getFullYear();
+    const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+    const day = String(eventDate.getDate()).padStart(2, '0');
+    const hours = String(eventDate.getHours()).padStart(2, '0');
+    const minutes = String(eventDate.getMinutes()).padStart(2, '0');
+    const localDateStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+
     setEditForm({
       name: event.name,
       venue: event.venue,
       address: event.address || '',
-      date: format(new Date(event.date), "yyyy-MM-dd'T'HH:mm"),
+      date: localDateStr,
     });
     setShowEditModal(true);
   };
