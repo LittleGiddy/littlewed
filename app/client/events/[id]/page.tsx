@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -8,7 +8,7 @@ import {
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
   Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
   Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
-  AlarmClock, AlarmClockOff, RotateCw, Pencil // ← added Pencil
+  AlarmClock, AlarmClockOff, RotateCw, Pencil
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -45,14 +45,17 @@ interface EventData {
 }
 
 // ─── Countdown timer component ──────────────────────────────────────────
-function EventCountdown({ targetDate, onStatusChange }: { targetDate: Date; onStatusChange?: (status: string) => void }) {
+function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) {
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
   const [status, setStatus] = useState('');
+
+  // Memoize the target date so it doesn't change on every render
+  const target = useMemo(() => new Date(targetDate), [targetDate]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
-      const diff = targetDate.getTime() - now.getTime();
+      const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
@@ -76,7 +79,7 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: Date; onSt
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, onStatusChange]);
+  }, [target, onStatusChange]);
 
   if (status === 'LIVE') {
     return (
@@ -195,7 +198,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return () => { cancelled = true; };
   }, [params]);
 
-  const fetchData = async (id: string) => {
+  // ─── Fetch data (stable via useCallback) ─────────────────────────────
+  const fetchData = useCallback(async (id: string) => {
     setLoading(true); setFetchError(null);
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
@@ -216,7 +220,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchCredits = async () => {
     try {
@@ -437,7 +441,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // ─── Render helpers ────────────────────────────────────────────────
+  // ─── Stable status change handler ─────────────────────────────────────
+  const handleStatusChange = useCallback((newStatus: string) => {
+    if (newStatus === 'LIVE' && event?.status !== 'LIVE') {
+      fetchData(eventId!);
+    }
+  }, [event, fetchData, eventId]);
+
+  // ─── Memoize event date ──────────────────────────────────────────────
+  const eventDate = useMemo(() => event ? new Date(event.date) : null, [event?.date]);
+
+  // ─── Render helpers ──────────────────────────────────────────────────
   const renderGuestCard = (guest: Guest) => {
     const isSelected = selectedGuests.has(guest.id);
     const isWhatsApp = guest.routingChannel === 'whatsapp';
@@ -753,16 +767,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-sm text-gray-400 mt-1">{event.address}</p>
             </div>
 
-            {!isEventDisabled && (
+            {!isEventDisabled && eventDate && (
               <div className="flex-shrink-0">
                 <EventCountdown 
                   key={countdownKey} 
-                  targetDate={new Date(event.date)} 
-                  onStatusChange={(newStatus) => {
-                    if (newStatus === 'LIVE' && event?.status !== 'LIVE') {
-                      fetchData(eventId!);
-                    }
-                  }}
+                  targetDate={event.date}
+                  onStatusChange={handleStatusChange}
                 />
               </div>
             )}

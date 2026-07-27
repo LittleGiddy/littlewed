@@ -91,15 +91,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Update the event
+    // Prepare update data
+    const newDate = new Date(date);
+    const updateData: any = {
+      name,
+      venue,
+      address,
+      date: newDate,
+    };
+
+    // If the date changed, reset reminder flags so they trigger again
+    if (existingEvent.date.getTime() !== newDate.getTime()) {
+      updateData.reminderSent = false;
+      updateData.expiredNotified = false;
+    }
+
     const updatedEvent = await prisma.event.update({
       where: { id: eventId },
-      data: {
-        name,
-        venue,
-        address,
-        date: new Date(date),
-      },
+      data: updateData,
     });
 
     return NextResponse.json({ success: true, event: updatedEvent });
