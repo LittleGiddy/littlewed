@@ -1,289 +1,203 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, PlusCircle, TrendingUp, Calendar, Users, ArrowLeft, Trash2, RefreshCw, Shield } from 'lucide-react';
 import Link from 'next/link';
+import { Building2, Search, Filter, Plus, ChevronDown, ChevronUp, MoreVertical, ArrowUpDown } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-export default function ManageTenantPage() {
-  const { id } = useParams();
-  const router = useRouter();
-  const [tenant, setTenant] = useState<any>(null);
-  const [creditAmount, setCreditAmount] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [bypassLoading, setBypassLoading] = useState(false);
-  const [testModeLoading, setTestModeLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+interface Tenant {
+  id: string;
+  name: string;
+  subdomain: string;
+  plan: string;
+  subscriptionStatus: string;
+  credits: number;
+  users: { id: string }[];
+  createdAt: string;
+  bypassPayment: boolean;
+  testMode: boolean;
+}
 
-  const fetchTenant = async () => {
-    try {
-      const res = await fetch(`/api/admin/tenants/${id}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch');
-      const data = await res.json();
-      setTenant(data);
-      setError('');
-    } catch (err) {
-      setError('Could not load tenant data');
-    }
-  };
+export default function AdminTenantsPage() {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortField, setSortField] = useState('createdAt');
+  const [sortDirection, setSortDirection] = useState('desc');
 
-  useEffect(() => {
-    fetchTenant();
-  }, [id]);
-
-  const toggleStatus = async () => {
-    setStatusLoading(true);
-    setError('');
-    setSuccess('');
-    const newStatus = tenant.subscriptionStatus === 'active' ? 'inactive' : 'active';
-    const res = await fetch(`/api/admin/tenants/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-      credentials: 'include',
-    });
-    if (res.ok) {
-      setTenant({ ...tenant, subscriptionStatus: newStatus });
-      setSuccess(`Tenant ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
-    } else {
-      const err = await res.json();
-      setError(err.error || 'Failed to update status');
-    }
-    setStatusLoading(false);
-  };
-
-  const toggleBypassPayment = async () => {
-    setBypassLoading(true);
-    setError('');
-    setSuccess('');
-    const newBypass = !tenant.bypassPayment;
-    const res = await fetch(`/api/admin/tenants/${id}/bypass-payment`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bypassPayment: newBypass }),
-      credentials: 'include',
-    });
-    if (res.ok) {
-      setTenant({ ...tenant, bypassPayment: newBypass });
-      setSuccess(`Payment bypass ${newBypass ? 'enabled' : 'disabled'} for this tenant`);
-    } else {
-      const err = await res.json();
-      setError(err.error || 'Failed to update bypass setting');
-    }
-    setBypassLoading(false);
-  };
-
-  const toggleTestMode = async () => {
-    setTestModeLoading(true);
-    setError('');
-    setSuccess('');
-    const newTestMode = !tenant.testMode;
-    const res = await fetch(`/api/admin/tenants/${id}/test-mode`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ testMode: newTestMode }),
-      credentials: 'include',
-    });
-    if (res.ok) {
-      setTenant({ ...tenant, testMode: newTestMode });
-      setSuccess(`Test mode ${newTestMode ? 'enabled' : 'disabled'} for this tenant`);
-    } else {
-      const err = await res.json();
-      setError(err.error || 'Failed to update test mode');
-    }
-    setTestModeLoading(false);
-  };
-
-  const addCredits = async () => {
-    const amount = parseInt(creditAmount);
-    if (isNaN(amount) || amount <= 0) {
-      setError('Please enter a valid number of credits');
-      return;
-    }
+  const fetchTenants = async () => {
     setLoading(true);
-    setError('');
-    setSuccess('');
-    const res = await fetch(`/api/admin/tenants/${id}/event-credits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
-      credentials: 'include',
-    });
-    if (res.ok) {
-      setTenant({ ...tenant, credits: (tenant.credits || 0) + amount });
-      setCreditAmount('');
-      setSuccess(`Added ${amount} credits`);
-    } else {
-      const err = await res.json();
-      setError(err.error || 'Failed to add credits');
+    try {
+      const res = await fetch('/api/admin/tenants', { credentials: 'include' });
+      const data = await res.json();
+      setTenants(data);
+    } catch {
+      toast.error('Failed to load tenants');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  if (!tenant) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-[#0D4F4F] border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading tenant information...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => { fetchTenants(); }, []);
+
+  const filteredTenants = tenants
+    .filter(t => {
+      const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
+                           t.subdomain.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = filterStatus === 'all' || t.subscriptionStatus === filterStatus;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const fieldA = a[sortField as keyof Tenant];
+      const fieldB = b[sortField as keyof Tenant];
+      if (typeof fieldA === 'string' && typeof fieldB === 'string') {
+        return sortDirection === 'asc' ? fieldA.localeCompare(fieldB) : fieldB.localeCompare(fieldA);
+      }
+      return sortDirection === 'asc' ? (fieldA as number) - (fieldB as number) : (fieldB as number) - (fieldA as number);
+    });
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-      `}</style>
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex justify-between items-center mb-6">
+    <div>
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-bold tracking-wider text-[#0D4F4F] uppercase mb-2">Management</div>
+            <h1 className="font-serif text-3xl font-black text-gray-900">Tenants</h1>
+            <p className="text-gray-500 text-sm mt-1">Manage all organisations on the platform.</p>
+          </div>
           <Link
-            href="/admin/dashboard"
-            className="inline-flex items-center gap-2 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-4 py-2 hover:bg-[rgba(13,79,79,0.14)] transition"
+            href="/admin/tenants/new"
+            className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2"
           >
-            <ArrowLeft size={14} /> Back to Dashboard
+            <Plus size={16} /> New Tenant
           </Link>
-          <button onClick={fetchTenant} className="inline-flex items-center gap-2 text-sm font-bold text-gray-600 bg-white border border-gray-200 rounded-xl px-4 py-2 hover:bg-gray-50 transition">
-            <RefreshCw size={14} /> Refresh
-          </button>
         </div>
+      </div>
 
-        <div className="mb-8">
-          <div className="text-[11px] font-bold tracking-wider text-[#0D4F4F] uppercase mb-2">Super Admin</div>
-          <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900">Manage <span className="text-[#0D4F4F]">{tenant.name}</span></h1>
-          <p className="text-gray-500 text-sm mt-2">Subscription, bypass payment, and credits</p>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search tenants..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]/20 focus:border-[#0D4F4F]"
+          />
         </div>
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]/20"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <button
+          onClick={fetchTenants}
+          className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
+        >
+          Refresh
+        </button>
+      </div>
 
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-            <XCircle size={16} /> {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
-            <CheckCircle size={16} /> {success}
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Subscription Status Card */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><TrendingUp size={20} /></div>
-                <h2 className="font-serif text-xl font-bold text-gray-800">Subscription</h2>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <span className="text-gray-500 text-sm">Current status</span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {tenant.subscriptionStatus === 'active' ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                    {tenant.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <button onClick={toggleStatus} disabled={statusLoading} className={`w-full py-2.5 rounded-xl font-semibold text-sm transition ${tenant.subscriptionStatus === 'active' ? 'bg-red-500 hover:bg-red-600 text-white shadow-md' : 'bg-[#0D4F4F] hover:bg-[#0A3D3D] text-white shadow-md'}`}>
-                  {statusLoading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto" /> : tenant.subscriptionStatus === 'active' ? 'Deactivate Tenant' : 'Activate Tenant'}
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-2">Inactive tenants cannot create new events or access the platform.</p>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Test Mode Card */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]">
-                  <Shield size={20} />
-                </div>
-                <h2 className="font-serif text-xl font-bold text-gray-800">Test Mode</h2>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <span className="text-gray-500 text-sm">Card preview & test check‑in</span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.testMode ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {tenant.testMode ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                    {tenant.testMode ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <button
-                  onClick={toggleTestMode}
-                  disabled={testModeLoading}
-                  className="w-full py-2.5 rounded-xl font-semibold text-sm transition bg-[#0D4F4F] hover:bg-[#0A3D3D] text-white shadow-md"
-                >
-                  {testModeLoading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto" /> : tenant.testMode ? 'Disable Test Mode' : 'Enable Test Mode'}
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-2">
-                  When enabled, tenants can preview guest cards and test check‑in without sending real invitations.
-                </p>
-              </div>
-            </div>
-          </motion.div>
+      {/* Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#FAFBFD] border-b border-gray-100">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-gray-700">
+                    Tenant <ArrowUpDown size={12} />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subdomain</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <button onClick={() => handleSort('plan')} className="flex items-center gap-1 hover:text-gray-700">
+                    Plan <ArrowUpDown size={12} />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Credits</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Users</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={7} className="px-4 py-4 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    </td>
+                  </tr>
+                ))
+              ) : filteredTenants.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                    No tenants found matching your filters.
+                  </td>
+                </tr>
+              ) : (
+                filteredTenants.map((tenant) => (
+                  <tr key={tenant.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-[rgba(13,79,79,0.08)] flex items-center justify-center text-[#0D4F4F]">
+                          <Building2 size={16} />
+                        </div>
+                        <span className="font-semibold text-sm">{tenant.name}</span>
+                        {tenant.bypassPayment && (
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Bypass</span>
+                        )}
+                        {tenant.testMode && (
+                          <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Test</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{tenant.subdomain}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{tenant.plan}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        tenant.subscriptionStatus === 'active' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {tenant.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium">{tenant.credits}</td>
+                    <td className="px-4 py-3 text-sm">{tenant.users.length}</td>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/admin/tenants/${tenant.id}/manage`}
+                        className="text-sm font-bold text-[#0D4F4F] hover:underline"
+                      >
+                        Manage →
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-
-        {/* Bypass Payment Card */}
-        <div className="grid md:grid-cols-2 gap-6 mt-6">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><Shield size={20} /></div>
-                <h2 className="font-serif text-xl font-bold text-gray-800">Payment Bypass</h2>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                  <span className="text-gray-500 text-sm">Bypass payment restrictions</span>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${tenant.bypassPayment ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {tenant.bypassPayment ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                    {tenant.bypassPayment ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <button onClick={toggleBypassPayment} disabled={bypassLoading} className="w-full py-2.5 rounded-xl font-semibold text-sm transition bg-[#0D4F4F] hover:bg-[#0A3D3D] text-white shadow-md">
-                  {bypassLoading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto" /> : tenant.bypassPayment ? 'Disable Bypass' : 'Enable Bypass'}
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-2">When enabled, the tenant can create events without any payment (no Stripe/ClickPesa). Perfect for testing or free plans.</p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Credits Card */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }} className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><Calendar size={20} /></div>
-              <h2 className="font-serif text-xl font-bold text-gray-800">Credits</h2>
-            </div>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                <span className="text-gray-500 text-sm">Available credits</span>
-                <span className="text-2xl font-bold text-[#0D4F4F]">{tenant.credits ?? 0}</span>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={creditAmount}
-                  onChange={e => setCreditAmount(e.target.value)}
-                  placeholder="Number of credits"
-                  className="flex-1 p-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]/20 focus:border-[#0D4F4F]"
-                />
-                <button
-                  onClick={addCredits}
-                  disabled={loading}
-                  className="bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-md hover:shadow-lg transition flex items-center gap-2"
-                >
-                  {loading ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <><PlusCircle size={16} /> Add</>}
-                </button>
-              </div>
-              <p className="text-xs text-gray-400">
-                Each credit represents one guest slot (300 TZS). Credits are used when adding guests beyond the initial event guest limit.
-              </p>
-            </div>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
