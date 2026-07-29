@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   }
 
   const tenantId = (session.user as any).tenantId;
+  console.log('🔑 Tenant ID from session:', tenantId);
   const { name, date, venue, address, guestCount } = await req.json();
 
   if (!name || !date || !venue || !address || !guestCount || guestCount < 1) {

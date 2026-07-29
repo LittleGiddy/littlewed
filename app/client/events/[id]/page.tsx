@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft, 
-  Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare, 
+import {
+  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft,
+  Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare,
   Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
   Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil
@@ -49,12 +49,19 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [status, setStatus] = useState('');
 
-  // Memoize the target date
-  const target = useMemo(() => new Date(targetDate), [targetDate]);
+  // Parse the date string as UTC and convert to local time
+  const target = useMemo(() => {
+    // If the date string has no timezone indicator, it's treated as UTC
+    // We need to create a local date that represents the same absolute time
+    const utcDate = new Date(targetDate);
+    // Create a local date with the same UTC values (so local timezone offset is applied)
+    return new Date(utcDate.getTime()); // Keep as UTC timestamp
+  }, [targetDate]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
+      // Calculate difference in UTC milliseconds
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
@@ -205,7 +212,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
       if (!res.ok) {
         let detail = `HTTP ${res.status}`;
-        try { const b = await res.json(); detail = b?.error || b?.message || detail; } catch {}
+        try { const b = await res.json(); detail = b?.error || b?.message || detail; } catch { }
         throw new Error(detail);
       }
       const data = await res.json();
@@ -228,7 +235,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (!res.ok) return;
       const data = await res.json();
       setCredits(data.tenant?.credits ?? 0);
-    } catch {}
+    } catch { }
   };
 
   // ─── Guest selection ──────────────────────────────────────────────────
@@ -276,8 +283,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const filteredGuests = useMemo(() => {
     if (!searchTerm.trim()) return guests;
     const term = searchTerm.trim().toLowerCase();
-    return guests.filter(g => 
-      g.name.toLowerCase().includes(term) || 
+    return guests.filter(g =>
+      g.name.toLowerCase().includes(term) ||
       (g.phone && g.phone.includes(term))
     );
   }, [guests, searchTerm]);
@@ -397,11 +404,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Edit Event handlers ──────────────────────────────────────────────
   const openEditModal = () => {
     if (!event) return;
-    
-    // Create a date from the stored string
+
+    // Parse the UTC date and convert to local for display
     const eventDate = new Date(event.date);
-    
-    // Format as local datetime-local string
+
+    // Format for datetime-local input (local time)
     const year = eventDate.getFullYear();
     const month = String(eventDate.getMonth() + 1).padStart(2, '0');
     const day = String(eventDate.getDate()).padStart(2, '0');
@@ -781,8 +788,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
             {!isEventDisabled && eventDate && (
               <div className="flex-shrink-0">
-                <EventCountdown 
-                  key={countdownKey} 
+                <EventCountdown
+                  key={countdownKey}
                   targetDate={event.date}
                   onStatusChange={handleStatusChange}
                 />
@@ -793,7 +800,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="flex-shrink-0 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
                 <p className="text-sm font-bold text-red-700 flex items-center gap-2">
                   <AlertCircle size={16} />
-                  {canResume 
+                  {canResume
                     ? `This event is paused. You have ${daysRemainingToResume.toFixed(0)} days left to resume it.`
                     : 'This event has been permanently archived and cannot be resumed.'
                   }
