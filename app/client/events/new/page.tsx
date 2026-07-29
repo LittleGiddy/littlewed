@@ -50,6 +50,23 @@ export default function NewEventPage() {
     setError('');
     setLoading(true);
 
+    // ─── Convert local datetime to UTC ISO string ───────────────────────
+    const localDate = new Date(form.date);
+    if (isNaN(localDate.getTime())) {
+      setError('Please select a valid date and time.');
+      setLoading(false);
+      return;
+    }
+    const utcDateString = localDate.toISOString(); // e.g., "2026-07-29T15:00:00.000Z"
+
+    // ─── Validate guest count ────────────────────────────────────────────
+    const parsedGuestCount = parseInt(form.guestCount, 10);
+    if (!parsedGuestCount || parsedGuestCount < 1) {
+      setError('Please enter a valid number of guests (minimum 1).');
+      setLoading(false);
+      return;
+    }
+
     // 1. Try creating with credits
     try {
       const res = await fetch('/api/events/create-with-credits', {
@@ -58,23 +75,23 @@ export default function NewEventPage() {
         credentials: 'include',
         body: JSON.stringify({
           name: form.name,
-          date: form.date,
+          date: utcDateString,          // ✅ Send UTC ISO string
           venue: form.venue,
           address: form.address,
-          guestCount: parseInt(form.guestCount, 10),
+          guestCount: parsedGuestCount,
         }),
       });
       const data = await res.json();
 
       if (res.ok && data.eventId) {
-        toast.success(`Event created using ${data.creditsUsed || guestCount} credits`);
+        toast.success(`Event created using ${data.creditsUsed || parsedGuestCount} credits`);
         router.push(`/client/events/${data.eventId}`);
         return;
       }
 
       // Insufficient credits – show modal
       if (res.status === 400 && data.error === 'Insufficient credits') {
-        setRequiredCredits(data.required || guestCount);
+        setRequiredCredits(data.required || parsedGuestCount);
         setShowBuyModal(true);
         setLoading(false);
         return;
