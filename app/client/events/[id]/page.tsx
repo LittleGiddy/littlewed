@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -44,31 +44,30 @@ interface EventData {
   resumedBy: string | null;
 }
 
-// ─── Countdown timer component ──────────────────────────────────────────
-function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) {
+// ─── Countdown timer component (memoized) ──────────────────────────────
+const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [status, setStatus] = useState('');
-
-  // Parse the date string as UTC and convert to local time
-  const target = useMemo(() => {
-    // If the date string has no timezone indicator, it's treated as UTC
-    // We need to create a local date that represents the same absolute time
-    const utcDate = new Date(targetDate);
-    // Create a local date with the same UTC values (so local timezone offset is applied)
-    return new Date(utcDate.getTime()); // Keep as UTC timestamp
-  }, [targetDate]);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const target = useMemo(() => new Date(targetDate), [targetDate]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    const update = () => {
       const now = new Date();
-      // Calculate difference in UTC milliseconds
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        setStatus('LIVE');
-        if (onStatusChange) onStatusChange('LIVE');
-        clearInterval(interval);
+        if (status !== 'LIVE') {
+          setStatus('LIVE');
+          if (onStatusChange) onStatusChange('LIVE');
+        }
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
         return;
       }
 
@@ -78,18 +77,20 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       setTimeLeft({ days, hours, minutes, seconds });
+      setStatus(prev => {
+        if (hours <= 24 && days === 0 && hours > 0) return 'REMINDER';
+        return prev === 'LIVE' ? 'LIVE' : 'ACTIVE';
+      });
+    };
 
-      if (hours <= 24 && days === 0 && hours > 0) {
-        setStatus('REMINDER');
-      } else {
-        setStatus('ACTIVE');
-      }
-    }, 1000);
+    update();
+    intervalRef.current = setInterval(update, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [target, onStatusChange]);
 
-  // Format the time as DDd HHh MMm SSs
   const formattedTime = `${String(timeLeft.days).padStart(2, '0')}d ${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
   if (status === 'LIVE') {
@@ -118,7 +119,9 @@ function EventCountdown({ targetDate, onStatusChange }: { targetDate: string; on
       <span className="text-xs font-medium text-gray-500">until event</span>
     </div>
   );
-}
+});
+
+EventCountdown.displayName = 'EventCountdown';
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -132,6 +135,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [credits, setCredits] = useState<number | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [countdownKey, setCountdownKey] = useState(0);
+
+  // ── Ref to prevent duplicate LIVE reports ──────────────────────────────
+  const hasReportedLive = useRef(false);
 
   // ── Pagination & search ────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -195,6 +201,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     params.then(({ id }) => {
       if (cancelled) return;
       setEventId(id);
+      // Reset the live flag when event ID changes
+      hasReportedLive.current = false;
       fetchData(id);
       fetchCredits();
     }).catch((err) => {
@@ -220,6 +228,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
       setCurrentPage(1);
+      // Reset the live flag if the event is not LIVE
+      if (data.event.status !== 'LIVE') {
+        hasReportedLive.current = false;
+      }
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
@@ -462,10 +474,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ─── Stable status change handler ─────────────────────────────────────
   const handleStatusChange = useCallback((newStatus: string) => {
-    if (newStatus === 'LIVE' && event?.status !== 'LIVE') {
+    if (newStatus === 'LIVE' && !hasReportedLive.current) {
+      hasReportedLive.current = true;
       fetchData(eventId!);
     }
-  }, [event, fetchData, eventId]);
+  }, [fetchData, eventId]);
 
   // ─── Memoize event date ──────────────────────────────────────────────
   const eventDate = useMemo(() => event ? new Date(event.date) : null, [event?.date]);
