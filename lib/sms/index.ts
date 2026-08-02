@@ -2,14 +2,14 @@
 
 const API_KEY = process.env.NEXT_SMS_API_KEY!;
 const SENDER_ID = process.env.NEXT_SMS_SENDER_ID!;
-const BASE_URL = process.env.NEXT_SMS_BASE_URL!; // e.g., https://api.nextsms.co.tz/api/v1
+const BASE_URL = process.env.NEXT_SMS_BASE_URL! || 'https://messaging-service.co.tz/api/sms/v2';
 
 export interface SendSMSOptions {
-  to: string;          // phone number without + (e.g., 255769999902)
+  to: string;
   message: string;
-  sender?: string;     // optional, falls back to SENDER_ID
-  flash?: 0 | 1;       // 0 = normal, 1 = flash message
-  reference?: string;  // optional reference ID
+  sender?: string;
+  flash?: 0 | 1;
+  reference?: string;
 }
 
 export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, reference }: SendSMSOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
@@ -17,35 +17,40 @@ export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, refe
     throw new Error('NEXT_SMS_API_KEY is not set');
   }
 
-  // Generate a random reference if not provided
+  const endpoint = `${BASE_URL}/text/single`;
   const ref = reference || `ref_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+  // Remove leading '+' from phone number
+  const cleanTo = to.replace(/^\+/, '');
+
+  console.log('[NextSMS] Sending to:', endpoint);
+  console.log('[NextSMS] Payload:', { from: sender, to: cleanTo, text: message, flash, reference: ref });
+
   try {
-    const response = await fetch(`${BASE_URL}/sms/send`, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`, // ✅ as used in Postman
+        'Authorization': `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
         from: sender,
-        to: to,
+        to: cleanTo,
         text: message,
-        flash: flash,
+        flash,
         reference: ref,
       }),
     });
 
-    // Handle non‑JSON responses (unlikely with correct headers)
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
       console.error('[NextSMS] Non-JSON response:', {
         status: response.status,
-        body: text.slice(0, 200),
+        body: text.slice(0, 500),
       });
-      throw new Error(`Server returned non-JSON (${response.status})`);
+      throw new Error(`Server returned non-JSON (${response.status}).`);
     }
 
     const data = await response.json();
@@ -55,18 +60,11 @@ export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, refe
       throw new Error(errorMsg);
     }
 
-    // Extract message ID from response – adapt to your API's structure
     const messageId = data.data?.messageId || data.messageId || data.id || ref;
 
-    return {
-      success: true,
-      messageId: messageId,
-    };
+    return { success: true, messageId };
   } catch (error: any) {
     console.error('[NextSMS] Error sending SMS:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error',
-    };
+    return { success: false, error: error.message || 'Unknown error' };
   }
 }
