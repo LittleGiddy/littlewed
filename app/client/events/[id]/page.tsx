@@ -60,10 +60,23 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
 
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        if (status !== 'LIVE') {
-          setStatus('LIVE');
-          if (onStatusChange) onStatusChange('LIVE');
-        }
+        setStatus(prev => {
+          if (prev !== 'LIVE') {
+            if (onStatusChange) {
+              // Defer to the next tick. onStatusChange updates the PARENT
+              // (EventDetailPage's state), and calling it synchronously here
+              // — in the same call stack as this component's own setStatus —
+              // makes React think we're updating EventDetailPage while
+              // EventCountdown is still mid render/commit cycle, which triggers:
+              // "Cannot update a component while rendering a different component".
+              // setTimeout(…, 0) breaks the synchronous chain so the parent
+              // update happens cleanly after this component settles.
+              setTimeout(() => onStatusChange('LIVE'), 0);
+            }
+            return 'LIVE';
+          }
+          return prev;
+        });
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
@@ -89,7 +102,11 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [target, onStatusChange]);
+    // NOTE: onStatusChange intentionally excluded from deps below (see handleStatusChange,
+    // which is now stable and safe to omit) to avoid re-running this effect on every
+    // parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
 
   const formattedTime = `${String(timeLeft.days).padStart(2, '0')}d ${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
@@ -128,7 +145,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  // `loading` now controls ONLY the initial full-page spinner (first load / event switch).
   const [loading, setLoading] = useState(true);
+  // `refreshing` covers background refetches (e.g. after "going live", edit, resume)
+  // WITHOUT unmounting the page, which is what caused the flicker loop.
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -185,6 +206,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       const data = await res.json();
       if (res.ok) {
         toast.success('Event resumed successfully!');
+        hasReportedLive.current = false; // event is active again, allow future LIVE detection
         fetchData(eventId);
         setCountdownKey(prev => prev + 1);
       } else {
@@ -203,7 +225,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEventId(id);
       // Reset the live flag when event ID changes
       hasReportedLive.current = false;
-      fetchData(id);
+      fetchData(id, { initial: true });
       fetchCredits();
     }).catch((err) => {
       console.error('Failed to resolve params:', err);
@@ -214,8 +236,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   }, [params]);
 
   // ─── Fetch data (stable via useCallback) ─────────────────────────────
-  const fetchData = useCallback(async (id: string) => {
-    setLoading(true); setFetchError(null);
+  // `initial: true` shows the full-page spinner (event/id not yet loaded).
+  // Any other call (background refresh triggered by the countdown going live,
+  // an edit, or a resume) uses a lightweight `refreshing` flag instead, so the
+  // page — and crucially the mounted <EventCountdown> — never unmounts.
+  const fetchData = useCallback(async (id: string, opts?: { initial?: boolean }) => {
+    if (opts?.initial) setLoading(true);
+    else setRefreshing(true);
+    setFetchError(null);
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
       if (!res.ok) {
@@ -228,16 +256,19 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
       setCurrentPage(1);
-      // Reset the live flag if the event is not LIVE
-      if (data.event.status !== 'LIVE') {
-        hasReportedLive.current = false;
-      }
+      // NOTE: we intentionally do NOT reset hasReportedLive.current based on
+      // data.event.status here. If the backend hasn't flipped status to LIVE
+      // yet (e.g. it's updated by a delayed job), resetting the guard on every
+      // fetch would cause onStatusChange('LIVE') to keep re-firing, which
+      // re-triggers this fetch, which resets the guard again — an infinite
+      // flicker loop. The guard is only reset on event-id change or resume.
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
       toast.error(`Could not load event: ${msg}`);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -460,6 +491,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         toast.success('Event updated successfully!');
         setShowEditModal(false);
+        hasReportedLive.current = false; // date may have changed, allow re-detecting live
         fetchData(eventId!);
         setCountdownKey(prev => prev + 1);
       } else {
@@ -476,9 +508,36 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const handleStatusChange = useCallback((newStatus: string) => {
     if (newStatus === 'LIVE' && !hasReportedLive.current) {
       hasReportedLive.current = true;
+      // Background refresh only — does NOT set `loading`, so the page
+      // (and EventCountdown) stays mounted. This is what breaks the loop.
       fetchData(eventId!);
     }
   }, [fetchData, eventId]);
+
+  // ─── Poll for auto-pause ────────────────────────────────────────────
+  // The backend cron flips event.status to EXPIRED (with pausedAt set) roughly
+  // 24 hours after the event's date. EventCountdown already triggers one
+  // refresh the moment the event goes LIVE, but nothing checks again after
+  // that — so once the cron pauses the event, the UI would keep showing the
+  // stale "Live Now!" countdown until the user manually reloads the page.
+  // This effect polls in the background (via fetchData's non-initial path,
+  // so it never unmounts the page) while the event is underway, and stops
+  // automatically the moment event.status leaves ACTIVE/LIVE — whether
+  // because the cron paused it, or because it was resumed/deleted.
+  useEffect(() => {
+    if (!event || !eventId) return;
+    if (event.status === 'EXPIRED' || event.status === 'ARCHIVED') return;
+
+    const eventTime = new Date(event.date).getTime();
+    if (Date.now() < eventTime) return; // not started yet — nothing to poll for
+
+    const POLL_INTERVAL_MS = 60 * 1000; // check once a minute
+    const pollId = setInterval(() => {
+      fetchData(eventId);
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(pollId);
+  }, [event?.status, event?.date, eventId, fetchData]);
 
   // ─── Memoize event date ──────────────────────────────────────────────
   const eventDate = useMemo(() => event ? new Date(event.date) : null, [event?.date]);
@@ -554,7 +613,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   };
 
-  // ─── Loading state ──────────────────────────────────────────────────
+  // ─── Loading state (INITIAL load only — background refreshes no longer hit this) ──
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-3">
@@ -573,7 +632,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
           <div className="flex gap-3 justify-center">
             {fetchError && eventId && (
-              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
+              <button onClick={() => fetchData(eventId, { initial: true })} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
                 <ArrowLeft size={14} /> Retry
               </button>
             )}
@@ -743,6 +802,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <ArrowLeft size={14} /> Back to Dashboard
           </Link>
           <div className="flex items-center gap-2">
+            {refreshing && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400">
+                <div className="w-3 h-3 border-2 border-gray-300 border-t-[#0D4F4F] rounded-full animate-spin" />
+                Updating…
+              </span>
+            )}
             {!isArchived && (
               <button
                 onClick={openEditModal}
