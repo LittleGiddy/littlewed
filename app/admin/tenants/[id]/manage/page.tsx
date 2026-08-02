@@ -30,10 +30,16 @@ export default function AdminTenantsPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/admin/tenants', { credentials: 'include' });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
       const data = await res.json();
-      setTenants(data);
-    } catch {
-      toast.error('Failed to load tenants');
+      // ✅ Support both array and object responses
+      const tenantList = Array.isArray(data) ? data : data.tenants || [];
+      setTenants(tenantList);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load tenants');
     } finally {
       setLoading(false);
     }
