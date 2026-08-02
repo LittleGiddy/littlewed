@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendSms } from '@/lib/sms';
+import { sendSMS } from '@/lib/sms/index';
 
 export async function POST(
   req: NextRequest,
@@ -44,7 +44,7 @@ export async function POST(
     return NextResponse.json({ error: 'No valid guests with phone numbers' }, { status: 400 });
   }
 
-  // Calculate cost
+  // Calculate cost: first reminder free, subsequent cost 50 TZS
   let totalCost = 0;
   for (const g of guests) {
     totalCost += g.reminderCount === 0 ? 0 : 50;
@@ -64,6 +64,7 @@ export async function POST(
     });
   }
 
+  // ─── Send SMS using NextSMS ─────────────────────────────────────────────
   const results = [];
   for (const guest of guests) {
     try {
@@ -72,33 +73,23 @@ export async function POST(
         .replace(/{name}/g, guest.name)
         .replace(/{event}/g, event.name);
 
-      const smsResult = await sendSms(phone, personalized);
+      const smsResult = await sendSMS({
+        to: phone,
+        message: personalized,
+      });
 
-      // Determine if SMS was actually sent successfully
-      let success = false;
-      let errorMsg = null;
-      if (smsResult.success && smsResult.result?.SMSMessageData?.Recipients) {
-        const recipients = smsResult.result.SMSMessageData.Recipients;
-        // Check all recipients – for a single recipient we expect one item
-        const allOk = recipients.every((r: any) => r.status === 'Success');
-        if (allOk) {
-          success = true;
-        } else {
-          const failed = recipients.filter((r: any) => r.status !== 'Success');
-          errorMsg = failed.map((r: any) => `Status ${r.status}`).join(', ');
-        }
-      } else {
-        errorMsg = smsResult.error || 'SMS sending failed';
-      }
-
-      if (success) {
+      if (smsResult.success) {
         await prisma.guest.update({
           where: { id: guest.id },
           data: { reminderCount: { increment: 1 } },
         });
         results.push({ guestId: guest.id, success: true });
       } else {
-        results.push({ guestId: guest.id, success: false, error: errorMsg });
+        results.push({
+          guestId: guest.id,
+          success: false,
+          error: smsResult.error || 'SMS sending failed',
+        });
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
