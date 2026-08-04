@@ -19,6 +19,13 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'littlewed.com',
       },
+
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
