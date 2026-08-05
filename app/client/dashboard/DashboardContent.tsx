@@ -7,11 +7,10 @@ import {
   ArrowRight, Settings, BookOpen, MessageSquare, Download, Sparkles,
   Heart, Search, Bell, MapPin, Grid3x3, Eye, CalendarDays, UserCheck,
   CheckCircle, ChevronRight, TrendingUp, Gift, PartyPopper, Camera, Music, Utensils,
-  Star, Clock, Award, Zap
+  Star, Clock, Award, Zap, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import DeleteEventButton from '@/components/DeleteEventButton';
 import BuyCreditsButton from '@/app/components/BuyCreditsButton';
 
 interface DashboardContentProps {
@@ -106,7 +105,6 @@ function EventCarousel() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation Arrows */}
       <button
         onClick={prev}
         className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]"
@@ -120,7 +118,6 @@ function EventCarousel() {
         <ChevronRight size={18} />
       </button>
 
-      {/* Dots */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
         {carouselImages.map((_, index) => (
           <button
@@ -135,6 +132,38 @@ function EventCarousel() {
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Delete Event Button (Compact) ──────────────────────────────────────
+function CompactDeleteButton({ eventId }: { eventId: string }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this event? This action cannot be undone.')) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert('Failed to delete event');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleDelete}
+      disabled={isDeleting}
+      className="w-7 h-7 rounded-lg bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center text-[#9BAAB8] hover:text-[#C0392B] transition-colors active:scale-95"
+    >
+      <Trash2 size={13} />
+    </button>
   );
 }
 
@@ -221,7 +250,7 @@ export default function DashboardContent({
       variants={containerVariants}
     >
       {/* ─── Main Content ─── */}
-      <main className="max-w-lg mx-auto px-4 pt-4 pb-8">
+      <main className="max-w-lg mx-auto px-3 sm:px-4 pt-4 pb-8">
         {/* ─── Welcome Section ─── */}
         <motion.div
           variants={itemVariants}
@@ -245,21 +274,21 @@ export default function DashboardContent({
               key={stat.label}
               variants={statVariants}
               whileHover={{ y: -2 }}
-              className="bg-[#E8EDF2] rounded-2xl p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
+              className="bg-[#E8EDF2] rounded-2xl p-3.5 sm:p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
             >
               <div className="flex items-center justify-between">
                 <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
                   style={{ color: stat.color }}
                 >
-                  <stat.icon size={17} />
+                  <stat.icon size={15} />
                 </div>
-                <span className="font-serif text-xl font-bold text-[#0D1B1B]">
+                <span className="font-serif text-lg sm:text-xl font-bold text-[#0D1B1B]">
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </span>
               </div>
               <div className="flex items-center justify-between mt-1.5">
-                <p className="text-xs text-[#7A8FA6] font-medium">{stat.label}</p>
+                <p className="text-[10px] sm:text-xs text-[#7A8FA6] font-medium">{stat.label}</p>
                 {stat.label === 'Credits' && (
                   <BuyCreditsButton currentCredits={credits} compact />
                 )}
@@ -276,15 +305,15 @@ export default function DashboardContent({
               <Link
                 key={action.label}
                 href={action.href}
-                className="flex flex-col items-center gap-1.5 p-2.5 bg-[#E8EDF2] rounded-xl shadow-[4px_4px_10px_rgba(174,186,198,0.5),-4px_-4px_10px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[2px_2px_6px_rgba(174,186,198,0.5),-2px_-2px_6px_rgba(255,255,255,0.7)] transition-all active:scale-95"
+                className="flex flex-col items-center gap-1 p-2 bg-[#E8EDF2] rounded-xl shadow-[4px_4px_10px_rgba(174,186,198,0.5),-4px_-4px_10px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[2px_2px_6px_rgba(174,186,198,0.5),-2px_-2px_6px_rgba(255,255,255,0.7)] transition-all active:scale-95"
               >
                 <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
                   style={{ color: action.color }}
                 >
-                  <action.icon size={16} />
+                  <action.icon size={14} />
                 </div>
-                <span className="text-[9px] font-medium text-[#4A6072] text-center leading-tight">
+                <span className="text-[8px] sm:text-[9px] font-medium text-[#4A6072] text-center leading-tight">
                   {action.label}
                 </span>
               </Link>
@@ -294,20 +323,20 @@ export default function DashboardContent({
 
         {/* ─── Categories ─── */}
         <motion.div variants={itemVariants} className="mb-5">
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {categories.map((category) => {
               const isActive = activeCategory === category.id;
               return (
                 <button
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
                       ? 'bg-[#0D4F4F] text-white shadow-[4px_4px_10px_rgba(13,79,79,0.3),-2px_-2px_6px_rgba(255,255,255,0.2)]'
                       : 'bg-[#E8EDF2] text-[#4A6072] shadow-[3px_3px_8px_rgba(174,186,198,0.5),-3px_-3px_8px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5)]'
                   }`}
                 >
-                  <category.icon size={14} />
+                  <category.icon size={13} />
                   {category.label}
                 </button>
               );
@@ -347,48 +376,55 @@ export default function DashboardContent({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.06 }}
                   whileHover={{ y: -2 }}
-                  className="bg-[#E8EDF2] rounded-2xl p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
+                  className="bg-[#E8EDF2] rounded-2xl p-3.5 sm:p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
                 >
                   <div className="flex items-start gap-3">
+                    {/* ─── Date Badge ─── */}
                     <div
-                      className="w-12 h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-[3px_3px_8px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.2)]"
+                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-[3px_3px_8px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.2)]"
                       style={{ background: event.accentColor }}
                     >
-                      <span className="font-serif text-lg font-bold leading-none">{event.day}</span>
-                      <span className="text-[8px] font-bold uppercase opacity-85">{event.month}</span>
+                      <span className="font-serif text-base sm:text-lg font-bold leading-none">{event.day}</span>
+                      <span className="text-[6px] sm:text-[8px] font-bold uppercase opacity-85">{event.month}</span>
                     </div>
+
+                    {/* ─── Event Info ─── */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <Link href={`/client/events/${event.id}`}>
                             <h3 className="font-semibold text-sm text-[#0D1B1B] truncate">{event.name}</h3>
                           </Link>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            <span className="text-xs text-[#7A8FA6] flex items-center gap-1">
-                              <MapPin size={11} />
-                              {event.venue}
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5">
+                            <span className="text-[10px] sm:text-xs text-[#7A8FA6] flex items-center gap-0.5">
+                              <MapPin size={11} className="hidden sm:block" />
+                              <span className="truncate max-w-[80px] sm:max-w-[120px]">{event.venue}</span>
                             </span>
-                            <span className="text-xs text-[#7A8FA6] flex items-center gap-1">
-                              <Users size={11} />
+                            <span className="text-[10px] sm:text-xs text-[#7A8FA6] flex items-center gap-0.5">
+                              <Users size={11} className="hidden sm:block" />
                               {event.guestCount}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <DeleteEventButton eventId={event.id} />
+
+                        {/* ─── Actions ─── */}
+                        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+                          <CompactDeleteButton eventId={event.id} />
                           <Link
                             href={`/client/events/${event.id}`}
                             className="w-7 h-7 rounded-lg bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center text-[#7A8FA6] hover:text-[#0D4F4F] transition-colors"
                           >
-                            <ChevronRight size={14} />
+                            <ChevronRight size={13} />
                           </Link>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[10px] font-medium text-[#7A8FA6] bg-[#E8EDF2] px-2 py-0.5 rounded-full shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]">
+
+                      {/* ─── Tags ─── */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className="text-[9px] sm:text-[10px] font-medium text-[#7A8FA6] bg-[#E8EDF2] px-2 py-0.5 rounded-full shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]">
                           {event._count.guests} guests
                         </span>
-                        <span className="text-[10px] font-medium text-[#1A7A4A] bg-[#EDFAF4] px-2 py-0.5 rounded-full shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)]">
+                        <span className="text-[9px] sm:text-[10px] font-medium text-[#1A7A4A] bg-[#EDFAF4] px-2 py-0.5 rounded-full shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)]">
                           Active
                         </span>
                       </div>
