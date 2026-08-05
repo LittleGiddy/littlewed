@@ -15,14 +15,14 @@ export default async function ClientDashboard() {
 
   if (!tenantId) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center p-6 font-['DM_Sans']">
-        <div className="bg-white rounded-3xl p-12 max-w-md w-full text-center shadow-xl border border-gray-100">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center mx-auto mb-6 shadow-lg">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 font-['DM_Sans']">
+        <div className="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-lg border border-gray-100">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#F7931E] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25">
             <Sparkles className="w-10 h-10 text-white" />
           </div>
           <h1 className="font-serif text-2xl font-black text-gray-900 mb-2">Welcome, {session.user.name}</h1>
           <p className="text-gray-500 text-sm leading-relaxed">
-            You are logged in as <strong className="text-[#0D4F4F]">{(session.user as any).role}</strong>.<br />
+            You are logged in as <strong className="text-[#FF6B35]">{(session.user as any).role}</strong>.<br />
             No organisation is linked to this account.
           </p>
         </div>
@@ -42,11 +42,10 @@ export default async function ClientDashboard() {
     take: 5,
   });
 
-  // ✅ Transform events to match the expected shape in DashboardContent
   const transformedEvents = events.map((event) => ({
     id: event.id,
     name: event.name,
-    date: event.date.toISOString(), // Date → string
+    date: event.date.toISOString(),
     venue: event.venue,
     _count: { guests: event._count.guests },
   }));
@@ -65,7 +64,7 @@ export default async function ClientDashboard() {
       credits={tenant?.credits ?? 0}
       totalGuests={totalGuests}
       checkedIn={checkedIn}
-      events={transformedEvents} // ✅ Pass transformed events
+      events={transformedEvents}
       newEventUrl={newEventUrl}
     />
   );
