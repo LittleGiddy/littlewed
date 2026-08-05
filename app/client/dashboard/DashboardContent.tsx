@@ -6,7 +6,8 @@ import {
   Calendar, Users, QrCode, Plus, Coins, Upload, Palette, Send,
   ArrowRight, Settings, BookOpen, MessageSquare, Download, Sparkles,
   Heart, Search, Bell, MapPin, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, ChevronRight, TrendingUp, Gift, PartyPopper, Camera, Music, Utensils
+  CheckCircle, ChevronRight, TrendingUp, Gift, PartyPopper, Camera, Music, Utensils,
+  Star, Clock, Award, Zap
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -28,7 +29,7 @@ interface DashboardContentProps {
   newEventUrl: string;
 }
 
-// ─── Carousel Component ──────────────────────────────────────────────
+// ─── Skeuomorphic Carousel ──────────────────────────────────────────────
 const carouselImages = [
   {
     id: 1,
@@ -81,7 +82,7 @@ function EventCarousel() {
   };
 
   return (
-    <div className="relative w-full h-48 md:h-56 rounded-2xl overflow-hidden shadow-md border border-[#E2EAF0]">
+    <div className="relative w-full h-52 md:h-60 rounded-3xl overflow-hidden shadow-[8px_8px_16px_rgba(174,186,198,0.6),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/20">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
@@ -99,7 +100,7 @@ function EventCarousel() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0D4F4F]/80 via-[#0D4F4F]/30 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-            <h3 className="font-serif text-xl font-bold">{carouselImages[currentIndex].title}</h3>
+            <h3 className="font-serif text-xl font-bold tracking-wide">{carouselImages[currentIndex].title}</h3>
             <p className="text-sm text-white/80 mt-0.5">{carouselImages[currentIndex].subtitle}</p>
           </div>
         </motion.div>
@@ -108,13 +109,13 @@ function EventCarousel() {
       {/* Navigation Arrows */}
       <button
         onClick={prev}
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition z-10"
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]"
       >
         <ChevronRight size={18} className="rotate-180" />
       </button>
       <button
         onClick={next}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition z-10"
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]"
       >
         <ChevronRight size={18} />
       </button>
@@ -125,8 +126,10 @@ function EventCarousel() {
           <button
             key={index}
             onClick={() => goTo(index)}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              index === currentIndex ? 'w-7 bg-white' : 'w-1.5 bg-white/40'
+            className={`h-2 rounded-full transition-all duration-300 ${
+              index === currentIndex
+                ? 'w-8 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+                : 'w-2 bg-white/40'
             }`}
           />
         ))}
@@ -151,10 +154,10 @@ export default function DashboardContent({
   }, []);
 
   const stats = [
-    { label: 'Credits', value: credits, icon: Coins, color: '#0D4F4F', bg: '#EAF4F4' },
-    { label: 'Total Guests', value: totalGuests, icon: Users, color: '#0D4F4F', bg: '#EAF4F4' },
-    { label: 'Checked In', value: checkedIn, icon: UserCheck, color: '#1A7A4A', bg: '#EDFAF4' },
-    { label: 'Events', value: events.length, icon: CalendarDays, color: '#C07A20', bg: '#FEF6EC' },
+    { label: 'Credits', value: credits, icon: Coins, color: '#0D4F4F', bg: '#E8EDF2' },
+    { label: 'Total Guests', value: totalGuests, icon: Users, color: '#0D4F4F', bg: '#E8EDF2' },
+    { label: 'Checked In', value: checkedIn, icon: UserCheck, color: '#1A7A4A', bg: '#E8EDF2' },
+    { label: 'Events', value: events.length, icon: CalendarDays, color: '#C07A20', bg: '#E8EDF2' },
   ];
 
   const categories = [
@@ -212,7 +215,7 @@ export default function DashboardContent({
 
   return (
     <motion.div
-      className="min-h-screen bg-[#F0F4F8] pb-8 font-sans"
+      className="min-h-screen bg-[#E8EDF2] pb-8 font-sans"
       initial="hidden"
       animate={isLoaded ? 'visible' : 'hidden'}
       variants={containerVariants}
@@ -220,7 +223,10 @@ export default function DashboardContent({
       {/* ─── Main Content ─── */}
       <main className="max-w-lg mx-auto px-4 pt-4 pb-8">
         {/* ─── Welcome Section ─── */}
-        <motion.div variants={itemVariants} className="mb-5">
+        <motion.div
+          variants={itemVariants}
+          className="mb-5 p-4 rounded-2xl bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
+        >
           <h1 className="font-serif text-2xl font-bold text-[#0D1B1B]">
             Hello, <span className="text-[#0D4F4F]">{firstName}</span> 👋
           </h1>
@@ -239,12 +245,12 @@ export default function DashboardContent({
               key={stat.label}
               variants={statVariants}
               whileHover={{ y: -2 }}
-              className="bg-white rounded-2xl p-4 shadow-sm border border-[#E2EAF0]"
+              className="bg-[#E8EDF2] rounded-2xl p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
             >
               <div className="flex items-center justify-between">
                 <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ background: stat.bg, color: stat.color }}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
+                  style={{ color: stat.color }}
                 >
                   <stat.icon size={17} />
                 </div>
@@ -270,9 +276,12 @@ export default function DashboardContent({
               <Link
                 key={action.label}
                 href={action.href}
-                className="flex flex-col items-center gap-1.5 p-2.5 bg-white rounded-xl shadow-sm border border-[#E2EAF0] hover:shadow-md transition-all active:scale-95"
+                className="flex flex-col items-center gap-1.5 p-2.5 bg-[#E8EDF2] rounded-xl shadow-[4px_4px_10px_rgba(174,186,198,0.5),-4px_-4px_10px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[2px_2px_6px_rgba(174,186,198,0.5),-2px_-2px_6px_rgba(255,255,255,0.7)] transition-all active:scale-95"
               >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${action.color}10`, color: action.color }}>
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
+                  style={{ color: action.color }}
+                >
                   <action.icon size={16} />
                 </div>
                 <span className="text-[9px] font-medium text-[#4A6072] text-center leading-tight">
@@ -294,8 +303,8 @@ export default function DashboardContent({
                   onClick={() => setActiveCategory(category.id)}
                   className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
-                      ? 'bg-[#0D4F4F] text-white shadow-sm'
-                      : 'bg-white text-[#4A6072] border border-[#E2EAF0] hover:bg-[#F0F4F8]'
+                      ? 'bg-[#0D4F4F] text-white shadow-[4px_4px_10px_rgba(13,79,79,0.3),-2px_-2px_6px_rgba(255,255,255,0.2)]'
+                      : 'bg-[#E8EDF2] text-[#4A6072] shadow-[3px_3px_8px_rgba(174,186,198,0.5),-3px_-3px_8px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5)]'
                   }`}
                 >
                   <category.icon size={14} />
@@ -316,15 +325,15 @@ export default function DashboardContent({
           </div>
 
           {featuredEvents.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-[#E2EAF0]">
-              <div className="w-16 h-16 rounded-2xl bg-[#F0F4F8] flex items-center justify-center mx-auto mb-3">
+            <div className="bg-[#E8EDF2] rounded-2xl p-8 text-center shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20">
+              <div className="w-16 h-16 rounded-2xl bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center mx-auto mb-3">
                 <Sparkles className="w-8 h-8 text-[#7A8FA6]" />
               </div>
               <h3 className="font-serif text-lg font-bold text-[#0D1B1B]">No events yet</h3>
               <p className="text-sm text-[#7A8FA6] mt-1">Create your first event to get started.</p>
               <Link
                 href={newEventUrl}
-                className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-[#0D4F4F] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all"
+                className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-[#0D4F4F] text-white text-sm font-bold rounded-xl shadow-[4px_4px_10px_rgba(13,79,79,0.3),-2px_-2px_6px_rgba(255,255,255,0.2)] hover:shadow-[6px_6px_14px_rgba(13,79,79,0.4)] transition-all"
               >
                 <Plus size={16} /> Create Event
               </Link>
@@ -338,11 +347,11 @@ export default function DashboardContent({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.06 }}
                   whileHover={{ y: -2 }}
-                  className="bg-white rounded-2xl p-4 shadow-sm border border-[#E2EAF0]"
+                  className="bg-[#E8EDF2] rounded-2xl p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
                 >
                   <div className="flex items-start gap-3">
                     <div
-                      className="w-12 h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-sm"
+                      className="w-12 h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-[3px_3px_8px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.2)]"
                       style={{ background: event.accentColor }}
                     >
                       <span className="font-serif text-lg font-bold leading-none">{event.day}</span>
@@ -369,17 +378,17 @@ export default function DashboardContent({
                           <DeleteEventButton eventId={event.id} />
                           <Link
                             href={`/client/events/${event.id}`}
-                            className="w-7 h-7 rounded-lg bg-[#F0F4F8] hover:bg-[#E2EAF0] flex items-center justify-center text-[#7A8FA6] hover:text-[#0D4F4F] transition-colors"
+                            className="w-7 h-7 rounded-lg bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center text-[#7A8FA6] hover:text-[#0D4F4F] transition-colors"
                           >
                             <ChevronRight size={14} />
                           </Link>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-[10px] font-medium text-[#7A8FA6] bg-[#F0F4F8] px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-medium text-[#7A8FA6] bg-[#E8EDF2] px-2 py-0.5 rounded-full shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]">
                           {event._count.guests} guests
                         </span>
-                        <span className="text-[10px] font-medium text-[#1A7A4A] bg-[#EDFAF4] px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] font-medium text-[#1A7A4A] bg-[#EDFAF4] px-2 py-0.5 rounded-full shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)]">
                           Active
                         </span>
                       </div>
