@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar, Users, QrCode, Plus, Coins, Upload, Palette, Send,
-  ArrowRight, Settings, BookOpen, MessageSquare, Download, Sparkles,
-  Heart, Search, Bell, MapPin, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, ChevronRight, TrendingUp, Gift, PartyPopper, Camera, Music, Utensils,
-  Star, Clock, Award, Zap, Trash2
+  Calendar, Users, Plus, Coins, Upload, Palette, Send,
+  ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
+  CheckCircle, Sparkles, MapPin, Download, Trash2, ArrowUpRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -28,25 +26,34 @@ interface DashboardContentProps {
   newEventUrl: string;
 }
 
-// ─── Skeuomorphic Carousel ──────────────────────────────────────────────
+// ─── Palette ─────────────────────────────────────────────────────────────
+// Kept your teal/gold identity, but simplified to a flat "material" system:
+// one accent color, one ink color, one muted color, cards on white.
+const INK = '#0D1B1B';
+const MUTED = '#7A8FA6';
+const ACCENT = '#0D4F4F';
+const SURFACE = '#F4F6F9';
+const CARD = '#FFFFFF';
+
+// ─── Hero Carousel ───────────────────────────────────────────────────────
 const carouselImages = [
   {
     id: 1,
-    src: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=400&fit=crop',
+    src: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=900&h=500&fit=crop',
     title: 'Plan the Perfect Wedding',
-    subtitle: 'Manage guest lists, invitations, and check-ins all in one place.',
+    subtitle: 'Guest lists, invitations, and check-ins — all in one place.',
   },
   {
     id: 2,
-    src: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=800&h=400&fit=crop',
+    src: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?w=900&h=500&fit=crop',
     title: 'Effortless Guest Management',
-    subtitle: 'Track RSVPs, send reminders, and check in guests with QR codes.',
+    subtitle: 'Track RSVPs and check in guests instantly with QR codes.',
   },
   {
     id: 3,
-    src: 'https://images.unsplash.com/photo-1532712932145-1d5fbe6cda9b?w=800&h=400&fit=crop',
+    src: 'https://images.unsplash.com/photo-1532712932145-1d5fbe6cda9b?w=900&h=500&fit=crop',
     title: 'Beautiful Invitation Cards',
-    subtitle: 'Design custom cards and send them via WhatsApp or SMS.',
+    subtitle: 'Design custom cards and send via WhatsApp or SMS.',
   },
 ];
 
@@ -68,27 +75,15 @@ function EventCarousel() {
     setTimeout(() => setIsAutoPlaying(true), 3000);
   };
 
-  const next = () => {
-    setCurrentIndex((prev) => (prev + 1) % carouselImages.length);
-    setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 3000);
-  };
-
-  const prev = () => {
-    setCurrentIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
-    setIsAutoPlaying(false);
-    setTimeout(() => setIsAutoPlaying(true), 3000);
-  };
-
   return (
-    <div className="relative w-full h-52 md:h-60 rounded-3xl overflow-hidden shadow-[8px_8px_16px_rgba(174,186,198,0.6),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/20">
+    <div className="relative w-full h-56 sm:h-64 rounded-[28px] overflow-hidden shadow-lg shadow-black/10">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
-          initial={{ opacity: 0, scale: 1.05 }}
+          initial={{ opacity: 0, scale: 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.05 }}
-          transition={{ duration: 0.5 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
           className="absolute inset-0"
         >
           <Image
@@ -96,37 +91,28 @@ function EventCarousel() {
             alt={carouselImages[currentIndex].title}
             fill
             className="object-cover"
+            priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0D4F4F]/80 via-[#0D4F4F]/30 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-            <h3 className="font-serif text-xl font-bold tracking-wide">{carouselImages[currentIndex].title}</h3>
-            <p className="text-sm text-white/80 mt-0.5">{carouselImages[currentIndex].subtitle}</p>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            <h3 className="font-serif text-2xl font-bold text-white leading-tight">
+              {carouselImages[currentIndex].title}
+            </h3>
+            <p className="text-sm text-white/85 mt-1 max-w-[85%]">
+              {carouselImages[currentIndex].subtitle}
+            </p>
           </div>
         </motion.div>
       </AnimatePresence>
 
-      <button
-        onClick={prev}
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]"
-      >
-        <ChevronRight size={18} className="rotate-180" />
-      </button>
-      <button
-        onClick={next}
-        className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm text-white flex items-center justify-center hover:bg-white/30 transition shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]"
-      >
-        <ChevronRight size={18} />
-      </button>
-
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+      <div className="absolute top-4 right-4 flex gap-1.5 z-10">
         {carouselImages.map((_, index) => (
           <button
             key={index}
             onClick={() => goTo(index)}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              index === currentIndex
-                ? 'w-8 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
-                : 'w-2 bg-white/40'
+            aria-label={`Go to slide ${index + 1}`}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              index === currentIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/40'
             }`}
           />
         ))}
@@ -135,11 +121,13 @@ function EventCarousel() {
   );
 }
 
-// ─── Delete Event Button (Compact) ──────────────────────────────────────
+// ─── Delete Event Button ─────────────────────────────────────────────────
 function CompactDeleteButton({ eventId }: { eventId: string }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!confirm('Delete this event? This action cannot be undone.')) return;
     setIsDeleting(true);
     try {
@@ -160,9 +148,9 @@ function CompactDeleteButton({ eventId }: { eventId: string }) {
     <button
       onClick={handleDelete}
       disabled={isDeleting}
-      className="w-7 h-7 rounded-lg bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center text-[#9BAAB8] hover:text-[#C0392B] transition-colors active:scale-95"
+      className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors active:scale-90"
     >
-      <Trash2 size={13} />
+      <Trash2 size={15} />
     </button>
   );
 }
@@ -183,25 +171,25 @@ export default function DashboardContent({
   }, []);
 
   const stats = [
-    { label: 'Credits', value: credits, icon: Coins, color: '#0D4F4F', bg: '#E8EDF2' },
-    { label: 'Total Guests', value: totalGuests, icon: Users, color: '#0D4F4F', bg: '#E8EDF2' },
-    { label: 'Checked In', value: checkedIn, icon: UserCheck, color: '#1A7A4A', bg: '#E8EDF2' },
-    { label: 'Events', value: events.length, icon: CalendarDays, color: '#C07A20', bg: '#E8EDF2' },
+    { label: 'Credits', value: credits, icon: Coins, tint: '#0D4F4F', tintBg: '#E6F0EE' },
+    { label: 'Total Guests', value: totalGuests, icon: Users, tint: '#2563EB', tintBg: '#E8EFFD' },
+    { label: 'Checked In', value: checkedIn, icon: UserCheck, tint: '#1A7A4A', tintBg: '#E7F6EC' },
+    { label: 'Events', value: events.length, icon: CalendarDays, tint: '#C07A20', tintBg: '#FBF0E1' },
   ];
 
   const categories = [
-    { id: 'all', label: 'All Events', icon: Grid3x3 },
+    { id: 'all', label: 'All', icon: Grid3x3 },
     { id: 'upcoming', label: 'Upcoming', icon: Calendar },
     { id: 'live', label: 'Live', icon: Eye },
     { id: 'completed', label: 'Completed', icon: CheckCircle },
   ];
 
   const quickActions = [
-    { label: 'New Event', icon: Plus, href: newEventUrl, color: '#0D4F4F' },
-    { label: 'Import Guests', icon: Upload, href: '/client/guests/import/select-event', color: '#1A7A4A' },
-    { label: 'Design Card', icon: Palette, href: '/client/invitations/design/select-event', color: '#C07A20' },
-    { label: 'Send Invites', icon: Send, href: '/client/invitations/send/select-event', color: '#0D4F4F' },
-    { label: 'Backup Guests', icon: Download, href: '/client/guests/backup', color: '#6B3FA0' },
+    { label: 'New Event', sub: 'Start planning', icon: Plus, href: newEventUrl, tint: '#0D4F4F', tintBg: '#E6F0EE' },
+    { label: 'Import Guests', sub: 'From a file', icon: Upload, href: '/client/guests/import/select-event', tint: '#1A7A4A', tintBg: '#E7F6EC' },
+    { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event', tint: '#C07A20', tintBg: '#FBF0E1' },
+    { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event', tint: '#2563EB', tintBg: '#E8EFFD' },
+    { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup', tint: '#6B3FA0', tintBg: '#F0E9FA' },
   ];
 
   const featuredEvents = events.slice(0, 3).map((event, index) => {
@@ -212,131 +200,122 @@ export default function DashboardContent({
       accentColor: colors[index % colors.length],
       day: d.getDate(),
       month: d.toLocaleString('default', { month: 'short' }),
+      weekday: d.toLocaleString('default', { weekday: 'short' }),
       guestCount: event._count.guests,
     };
   });
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.06, delayChildren: 0.05 },
-    },
+    visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { type: 'spring' as const, damping: 22, stiffness: 100 },
-    },
-  };
-
-  const statVariants = {
-    hidden: { opacity: 0, scale: 0.9 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: { type: 'spring' as const, damping: 20, stiffness: 80 },
-    },
+    hidden: { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, damping: 22, stiffness: 100 } },
   };
 
   return (
     <motion.div
-      className="min-h-screen bg-[#E8EDF2] pb-8 font-sans"
+      className="min-h-screen pb-10 font-sans"
+      style={{ background: SURFACE }}
       initial="hidden"
       animate={isLoaded ? 'visible' : 'hidden'}
       variants={containerVariants}
     >
-      {/* ─── Main Content ─── */}
-      <main className="max-w-lg mx-auto px-3 sm:px-4 pt-4 pb-8">
-        {/* ─── Welcome Section ─── */}
-        <motion.div
-          variants={itemVariants}
-          className="mb-5 p-4 rounded-2xl bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
-        >
-          <h1 className="font-serif text-2xl font-bold text-[#0D1B1B]">
-            Hello, <span className="text-[#0D4F4F]">{firstName}</span> 👋
-          </h1>
-          <p className="text-sm text-[#7A8FA6]">Your wedding planning dashboard</p>
+      <main className="max-w-lg mx-auto px-4 pt-5 pb-8">
+        {/* ─── Header ─── */}
+        <motion.div variants={itemVariants} className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-xs font-medium tracking-wide" style={{ color: MUTED }}>WELCOME BACK</p>
+            <h1 className="font-serif text-2xl font-bold mt-0.5" style={{ color: INK }}>
+              {firstName} 👋
+            </h1>
+          </div>
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-serif font-bold text-white text-lg"
+            style={{ background: ACCENT }}>
+            {firstName?.[0]?.toUpperCase() ?? 'U'}
+          </div>
         </motion.div>
 
         {/* ─── Carousel ─── */}
-        <motion.div variants={itemVariants} className="mb-5">
+        <motion.div variants={itemVariants} className="mb-6">
           <EventCarousel />
         </motion.div>
 
-        {/* ─── Stats Grid ─── */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 mb-5">
+        {/* ─── Stats: large 2x2 grid, flat cards ─── */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 mb-6">
           {stats.map((stat) => (
             <motion.div
               key={stat.label}
-              variants={statVariants}
-              whileHover={{ y: -2 }}
-              className="bg-[#E8EDF2] rounded-2xl p-3.5 sm:p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
+              variants={itemVariants}
+              whileTap={{ scale: 0.97 }}
+              className="rounded-3xl p-4 flex flex-col justify-between"
+              style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <div
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
-                  style={{ color: stat.color }}
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                  style={{ background: stat.tintBg, color: stat.tint }}
                 >
-                  <stat.icon size={15} />
+                  <stat.icon size={18} />
                 </div>
-                <span className="font-serif text-lg sm:text-xl font-bold text-[#0D1B1B]">
-                  {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
-                </span>
+                {stat.label === 'Credits' && <BuyCreditsButton currentCredits={credits} compact />}
               </div>
-              <div className="flex items-center justify-between mt-1.5">
-                <p className="text-[10px] sm:text-xs text-[#7A8FA6] font-medium">{stat.label}</p>
-                {stat.label === 'Credits' && (
-                  <BuyCreditsButton currentCredits={credits} compact />
-                )}
+              <div>
+                <p className="font-serif text-2xl font-bold" style={{ color: INK }}>
+                  {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
+                </p>
+                <p className="text-xs font-medium mt-0.5" style={{ color: MUTED }}>{stat.label}</p>
               </div>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* ─── Quick Actions ─── */}
-        <motion.div variants={itemVariants} className="mb-5">
-          <h2 className="font-serif text-base font-bold text-[#0D1B1B] mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-5 gap-2">
+        {/* ─── Quick Actions: modern list-style cards ─── */}
+        <motion.div variants={itemVariants} className="mb-6">
+          <h2 className="font-serif text-lg font-bold mb-3" style={{ color: INK }}>Quick Actions</h2>
+          <div className="grid grid-cols-2 gap-3">
             {quickActions.map((action) => (
-              <Link
-                key={action.label}
-                href={action.href}
-                className="flex flex-col items-center gap-1 p-2 bg-[#E8EDF2] rounded-xl shadow-[4px_4px_10px_rgba(174,186,198,0.5),-4px_-4px_10px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[2px_2px_6px_rgba(174,186,198,0.5),-2px_-2px_6px_rgba(255,255,255,0.7)] transition-all active:scale-95"
-              >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]"
-                  style={{ color: action.color }}
+              <Link key={action.label} href={action.href}>
+                <motion.div
+                  whileTap={{ scale: 0.96 }}
+                  className="rounded-3xl p-4 h-full flex flex-col justify-between"
+                  style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
                 >
-                  <action.icon size={14} />
-                </div>
-                <span className="text-[8px] sm:text-[9px] font-medium text-[#4A6072] text-center leading-tight">
-                  {action.label}
-                </span>
+                  <div
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ background: action.tintBg, color: action.tint }}
+                  >
+                    <action.icon size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: INK }}>{action.label}</p>
+                    <p className="text-[11px] mt-0.5" style={{ color: MUTED }}>{action.sub}</p>
+                  </div>
+                </motion.div>
               </Link>
             ))}
           </div>
         </motion.div>
 
-        {/* ─── Categories ─── */}
-        <motion.div variants={itemVariants} className="mb-5">
-          <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {/* ─── Categories: pill tabs ─── */}
+        <motion.div variants={itemVariants} className="mb-4">
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {categories.map((category) => {
               const isActive = activeCategory === category.id;
               return (
                 <button
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all"
+                  style={
                     isActive
-                      ? 'bg-[#0D4F4F] text-white shadow-[4px_4px_10px_rgba(13,79,79,0.3),-2px_-2px_6px_rgba(255,255,255,0.2)]'
-                      : 'bg-[#E8EDF2] text-[#4A6072] shadow-[3px_3px_8px_rgba(174,186,198,0.5),-3px_-3px_8px_rgba(255,255,255,0.7)] border border-white/20 hover:shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5)]'
-                  }`}
+                      ? { background: ACCENT, color: '#fff' }
+                      : { background: CARD, color: MUTED, boxShadow: '0 2px 8px rgba(20,30,45,0.05)' }
+                  }
                 >
-                  <category.icon size={13} />
+                  <category.icon size={14} />
                   {category.label}
                 </button>
               );
@@ -347,22 +326,27 @@ export default function DashboardContent({
         {/* ─── Featured Events ─── */}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-serif text-base font-bold text-[#0D1B1B]">Featured Events</h2>
-            <Link href="/client/events" className="text-xs font-medium text-[#0D4F4F] hover:underline">
-              See All →
+            <h2 className="font-serif text-lg font-bold" style={{ color: INK }}>Your Events</h2>
+            <Link
+              href="/client/events"
+              className="flex items-center gap-0.5 text-xs font-bold"
+              style={{ color: ACCENT }}
+            >
+              See all <ChevronRight size={13} />
             </Link>
           </div>
 
           {featuredEvents.length === 0 ? (
-            <div className="bg-[#E8EDF2] rounded-2xl p-8 text-center shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20">
-              <div className="w-16 h-16 rounded-2xl bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="w-8 h-8 text-[#7A8FA6]" />
+            <div className="rounded-3xl p-10 text-center" style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E6F0EE' }}>
+                <Sparkles className="w-8 h-8" style={{ color: ACCENT }} />
               </div>
-              <h3 className="font-serif text-lg font-bold text-[#0D1B1B]">No events yet</h3>
-              <p className="text-sm text-[#7A8FA6] mt-1">Create your first event to get started.</p>
+              <h3 className="font-serif text-lg font-bold" style={{ color: INK }}>No events yet</h3>
+              <p className="text-sm mt-1" style={{ color: MUTED }}>Create your first event to get started.</p>
               <Link
                 href={newEventUrl}
-                className="inline-flex items-center gap-2 mt-4 px-6 py-2.5 bg-[#0D4F4F] text-white text-sm font-bold rounded-xl shadow-[4px_4px_10px_rgba(13,79,79,0.3),-2px_-2px_6px_rgba(255,255,255,0.2)] hover:shadow-[6px_6px_14px_rgba(13,79,79,0.4)] transition-all"
+                className="inline-flex items-center gap-2 mt-5 px-6 py-3 text-white text-sm font-bold rounded-2xl"
+                style={{ background: ACCENT }}
               >
                 <Plus size={16} /> Create Event
               </Link>
@@ -372,64 +356,57 @@ export default function DashboardContent({
               {featuredEvents.map((event, index) => (
                 <motion.div
                   key={event.id}
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.06 }}
-                  whileHover={{ y: -2 }}
-                  className="bg-[#E8EDF2] rounded-2xl p-3.5 sm:p-4 shadow-[6px_6px_14px_rgba(174,186,198,0.6),-6px_-6px_14px_rgba(255,255,255,0.8)] border border-white/20"
+                  className="rounded-3xl overflow-hidden"
+                  style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* ─── Date Badge ─── */}
-                    <div
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex flex-col items-center justify-center text-white flex-shrink-0 shadow-[3px_3px_8px_rgba(0,0,0,0.2),-2px_-2px_6px_rgba(255,255,255,0.2)]"
-                      style={{ background: event.accentColor }}
-                    >
-                      <span className="font-serif text-base sm:text-lg font-bold leading-none">{event.day}</span>
-                      <span className="text-[6px] sm:text-[8px] font-bold uppercase opacity-85">{event.month}</span>
-                    </div>
+                  <Link href={`/client/events/${event.id}`} className="block">
+                    <div className="flex items-stretch">
+                      {/* Date block */}
+                      <div
+                        className="w-20 flex flex-col items-center justify-center text-white flex-shrink-0"
+                        style={{ background: event.accentColor }}
+                      >
+                        <span className="text-[10px] font-bold uppercase opacity-80">{event.weekday}</span>
+                        <span className="font-serif text-2xl font-bold leading-none mt-0.5">{event.day}</span>
+                        <span className="text-[10px] font-bold uppercase opacity-80 mt-0.5">{event.month}</span>
+                      </div>
 
-                    {/* ─── Event Info ─── */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <Link href={`/client/events/${event.id}`}>
-                            <h3 className="font-semibold text-sm text-[#0D1B1B] truncate">{event.name}</h3>
-                          </Link>
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5">
-                            <span className="text-[10px] sm:text-xs text-[#7A8FA6] flex items-center gap-0.5">
-                              <MapPin size={11} className="hidden sm:block" />
-                              <span className="truncate max-w-[80px] sm:max-w-[120px]">{event.venue}</span>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0 p-4 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm truncate" style={{ color: INK }}>{event.name}</h3>
+                          <div className="flex items-center gap-1 mt-1">
+                            <MapPin size={12} style={{ color: MUTED }} />
+                            <span className="text-xs truncate" style={{ color: MUTED }}>{event.venue}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span
+                              className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                              style={{ background: '#E6F0EE', color: ACCENT }}
+                            >
+                              {event.guestCount} guests
                             </span>
-                            <span className="text-[10px] sm:text-xs text-[#7A8FA6] flex items-center gap-0.5">
-                              <Users size={11} className="hidden sm:block" />
-                              {event.guestCount}
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#E7F6EC', color: '#1A7A4A' }}>
+                              Active
                             </span>
                           </div>
                         </div>
 
-                        {/* ─── Actions ─── */}
-                        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-                          <CompactDeleteButton eventId={event.id} />
-                          <Link
-                            href={`/client/events/${event.id}`}
-                            className="w-7 h-7 rounded-lg bg-[#E8EDF2] shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)] flex items-center justify-center text-[#7A8FA6] hover:text-[#0D4F4F] transition-colors"
+                        <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center"
+                            style={{ background: SURFACE, color: ACCENT }}
                           >
-                            <ChevronRight size={13} />
-                          </Link>
+                            <ArrowUpRight size={15} />
+                          </div>
+                          <CompactDeleteButton eventId={event.id} />
                         </div>
                       </div>
-
-                      {/* ─── Tags ─── */}
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        <span className="text-[9px] sm:text-[10px] font-medium text-[#7A8FA6] bg-[#E8EDF2] px-2 py-0.5 rounded-full shadow-[inset_2px_2px_6px_rgba(174,186,198,0.5),inset_-2px_-2px_6px_rgba(255,255,255,0.7)]">
-                          {event._count.guests} guests
-                        </span>
-                        <span className="text-[9px] sm:text-[10px] font-medium text-[#1A7A4A] bg-[#EDFAF4] px-2 py-0.5 rounded-full shadow-[inset_1px_1px_3px_rgba(0,0,0,0.1)]">
-                          Active
-                        </span>
-                      </div>
                     </div>
-                  </div>
+                  </Link>
                 </motion.div>
               ))}
             </div>
