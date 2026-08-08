@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, Building2, Users, UserCog, CreditCard, 
   Activity, LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Sparkles
+  Sparkles, Bell, Search, Settings, HelpCircle, ChevronDown
 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
@@ -19,6 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const checkScreen = () => {
@@ -49,8 +50,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F7FA]">
-        <div className="w-10 h-10 border-4 border-[#EBEEF2] border-t-[#0D4F4F] rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <div className="w-10 h-10 border-4 border-[#E2E8F0] border-t-[#0D4F4F] rounded-full animate-spin" />
       </div>
     );
   }
@@ -75,562 +76,122 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return match ? match.label : 'Dashboard';
   };
 
+  const effectiveCollapsed = isCollapsed && !isHovered;
+
   const SidebarContent = ({ isMobile = false, onClose }: { isMobile?: boolean; onClose?: () => void }) => (
-    <div className={`sidebar-inner ${!isMobile && isCollapsed ? 'collapsed' : ''}`}>
-      {/* Brand */}
-      <div className="sidebar-brand-wrap">
-        <div className="sidebar-brand-icon">
-          <Sparkles size={20} className="text-[#E8A598]" />
+    <div className={`flex flex-col h-full p-4 transition-all duration-300 ${effectiveCollapsed && !isMobile ? 'items-center px-3' : ''}`}>
+      {/* ─── Brand ─── */}
+      <div className={`flex items-center ${effectiveCollapsed && !isMobile ? 'justify-center' : 'gap-3'} w-full pb-5 mb-4 border-b border-[#EEF2F6] relative`}>
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center shadow-lg shadow-[#0D4F4F]/20 flex-shrink-0">
+          <Sparkles size={20} className="text-white" />
         </div>
-        <div className="sidebar-brand-text">
-          <span className="sidebar-brand-name">LittleWed</span>
-          <span className="sidebar-brand-badge">Admin Panel</span>
-        </div>
+        {(!effectiveCollapsed || isMobile) && (
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="font-bold text-[#0D1B1B] text-base tracking-tight">LittleWed</span>
+            <span className="text-[10px] font-medium text-[#94A3B8] uppercase tracking-wider">Admin Panel</span>
+          </div>
+        )}
         {isMobile && (
-          <button 
-            onClick={onClose} 
-            className="ml-auto p-1.5 rounded-lg hover:bg-[#F0F4F8] text-[#7A8FA6] transition-colors"
-            aria-label="Close menu"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors ml-auto">
             <X size={18} />
           </button>
         )}
       </div>
 
+      {/* ─── Collapse Toggle ─── */}
       {!isMobile && (
-        <button 
+        <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="sidebar-collapse-btn"
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden lg:flex absolute -right-3 top-[72px] w-6 h-6 rounded-full bg-white border border-[#EEF2F6] shadow-md items-center justify-center text-[#94A3B8] hover:text-[#0D4F4F] hover:border-[#0D4F4F] transition-all z-10"
         >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
       )}
 
-      {/* User Profile */}
-      <div className="sidebar-profile">
-        <div className="sidebar-avatar">
-          {userInitial}
-          <div className="sidebar-avatar-ring" />
+      {/* ─── User Profile ─── */}
+      <div className={`flex items-center ${effectiveCollapsed && !isMobile ? 'justify-center' : 'gap-3'} w-full p-3 rounded-xl bg-[#F8FAFC] border border-[#EEF2F6] mb-5 transition-all`}>
+        <div className="relative flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center text-white font-bold text-sm shadow-sm">
+            {userInitial}
+          </div>
+          <div className="absolute -inset-0.5 rounded-full border-2 border-[#0D4F4F]/20 animate-pulse" />
         </div>
-        <div className="sidebar-profile-info">
-          <p className="sidebar-profile-name">{userName}</p>
-          <p className="sidebar-profile-email">{userEmail}</p>
-        </div>
+        {(!effectiveCollapsed || isMobile) && (
+          <div className="flex flex-col flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#0D1B1B] truncate">{userName}</p>
+            <p className="text-[10px] text-[#94A3B8] truncate">{userEmail}</p>
+          </div>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="sidebar-nav">
+      {/* ─── Navigation ─── */}
+      <nav className="flex-1 w-full space-y-1 overflow-y-auto py-2">
         {navItems.map((item) => {
           const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
           return (
             <Link
               key={item.path}
               href={item.path}
-              className={`sidebar-nav-link${isActive ? ' active' : ''}`}
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+                ${isActive 
+                  ? 'bg-[#0D4F4F] text-white shadow-md shadow-[#0D4F4F]/20' 
+                  : 'text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0D4F4F]'
+                }
+                ${effectiveCollapsed && !isMobile ? 'justify-center px-2' : ''}
+              `}
             >
-              <span className="sidebar-nav-icon-wrap">
-                <item.icon size={18} className="sidebar-nav-icon" />
+              <span className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'} ${isActive && 'group-hover:text-white'}`}>
+                <item.icon size={18} />
               </span>
-              <span className="sidebar-nav-label">{item.label}</span>
-              {isActive && <span className="sidebar-nav-dot" />}
+              {(!effectiveCollapsed || isMobile) && (
+                <>
+                  <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : ''}`}>
+                    {item.label}
+                  </span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/80 flex-shrink-0" />
+                  )}
+                </>
+              )}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="sidebar-footer">
-        <button onClick={() => signOut({ redirect: true, callbackUrl: '/login' })} className="sidebar-signout">
+      {/* ─── Footer ─── */}
+      <div className="w-full pt-4 mt-2 border-t border-[#EEF2F6]">
+        <button
+          onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+          className={`
+            flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 w-full
+            text-[#94A3B8] hover:text-[#DC2626] hover:bg-[#FEF2F2]
+            ${effectiveCollapsed && !isMobile ? 'justify-center px-2' : ''}
+          `}
+        >
           <LogOut size={18} />
-          <span className="sidebar-nav-label">Sign Out</span>
+          {(!effectiveCollapsed || isMobile) && (
+            <span className="text-sm font-medium">Sign Out</span>
+          )}
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="admin-layout">
-      <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-
-        .admin-layout {
-          min-height: 100vh;
-          background: #F5F7FA;
-          font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
-          display: flex;
-        }
-
-        /* ─── Desktop Sidebar ─── */
-        .admin-desktop-sidebar {
-          display: none;
-          position: fixed;
-          top: 0;
-          left: 0;
-          bottom: 0;
-          z-index: 30;
-          background: #ffffff;
-          border-right: 1px solid #EBEEF2;
-          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          overflow: hidden;
-          box-shadow: 4px 0 24px rgba(0,0,0,0.02);
-        }
-        @media (min-width: 1024px) {
-          .admin-desktop-sidebar {
-            display: block;
-            width: ${isCollapsed ? '76px' : '280px'};
-          }
-        }
-
-        .sidebar-inner {
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-          padding: 24px 16px;
-          transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .sidebar-inner.collapsed {
-          padding: 24px 12px;
-          align-items: center;
-        }
-
-        /* ─── Brand ─── */
-        .sidebar-brand-wrap {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding-bottom: 20px;
-          margin-bottom: 16px;
-          border-bottom: 1px solid #EBEEF2;
-          width: 100%;
-          position: relative;
-        }
-        .sidebar-brand-icon {
-          width: 38px;
-          height: 38px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #0D4F4F, #1A6B6B);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          box-shadow: 0 4px 12px rgba(13,79,79,0.15);
-        }
-        .sidebar-brand-text {
-          display: flex;
-          flex-direction: column;
-          line-height: 1.2;
-          overflow: hidden;
-          white-space: nowrap;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          opacity: 1;
-          width: 140px;
-        }
-        .sidebar-inner.collapsed .sidebar-brand-text {
-          opacity: 0;
-          width: 0;
-        }
-        .sidebar-brand-name {
-          font-family: 'Playfair Display', serif;
-          font-size: 17px;
-          font-weight: 800;
-          color: #0D1B1B;
-          letter-spacing: -0.3px;
-        }
-        .sidebar-brand-badge {
-          font-size: 9px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 1.2px;
-          color: #9BAAB8;
-          margin-top: 2px;
-        }
-
-        .sidebar-collapse-btn {
-          position: absolute;
-          right: -12px;
-          top: 76px;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 1px solid #EBEEF2;
-          background: #ffffff;
-          color: #7A8FA6;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-          z-index: 20;
-        }
-        .sidebar-collapse-btn:hover {
-          color: #0D4F4F;
-          border-color: #0D4F4F;
-          background: #F0F4F8;
-          box-shadow: 0 4px 12px rgba(13, 79, 79, 0.1);
-        }
-
-        /* ─── Profile ─── */
-        .sidebar-profile {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px;
-          border-radius: 12px;
-          background: #F8FAFC;
-          border: 1px solid #EBEEF2;
-          margin-bottom: 24px;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          overflow: hidden;
-          white-space: nowrap;
-          width: 100%;
-        }
-        .sidebar-inner.collapsed .sidebar-profile {
-          padding: 8px;
-          justify-content: center;
-          background: transparent;
-          border-color: transparent;
-          width: 52px;
-          align-self: center;
-        }
-        .sidebar-avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          flex-shrink: 0;
-          background: linear-gradient(135deg, #0D4F4F, #1A6B6B);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: 700;
-          font-size: 14px;
-          font-family: 'Playfair Display', serif;
-          position: relative;
-        }
-        .sidebar-avatar-ring {
-          position: absolute;
-          inset: -3px;
-          border-radius: 50%;
-          border: 2px solid rgba(13, 79, 79, 0.3);
-          animation: ringPulse 3s ease-in-out infinite;
-        }
-        @keyframes ringPulse {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(1.15); opacity: 0; }
-        }
-        .sidebar-profile-info {
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          opacity: 1;
-          width: 140px;
-        }
-        .sidebar-inner.collapsed .sidebar-profile-info {
-          opacity: 0;
-          width: 0;
-        }
-        .sidebar-profile-name {
-          font-size: 13.5px;
-          font-weight: 700;
-          color: #0D1B1B;
-          margin: 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .sidebar-profile-email {
-          font-size: 11px;
-          color: #9BAAB8;
-          font-weight: 500;
-          margin: 2px 0 0;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        /* ─── Navigation ─── */
-        .sidebar-nav {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          overflow-y: auto;
-          overflow-x: hidden;
-          padding: 4px 0;
-        }
-        .sidebar-nav-link {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 12px;
-          border-radius: 10px;
-          font-size: 14px;
-          font-weight: 500;
-          color: #5A6F82;
-          text-decoration: none;
-          transition: all 0.2s ease;
-          position: relative;
-          white-space: nowrap;
-          width: 100%;
-        }
-        .sidebar-nav-link:hover {
-          color: #0D4F4F;
-          background: #F0F4F8;
-        }
-        .sidebar-nav-link.active {
-          color: #0D4F4F;
-          background: rgba(13, 79, 79, 0.08);
-          font-weight: 600;
-        }
-        .sidebar-nav-link.active::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 50%;
-          transform: translateY(-50%);
-          height: 60%;
-          width: 3px;
-          border-radius: 0 4px 4px 0;
-          background: #0D4F4F;
-        }
-        .sidebar-inner.collapsed .sidebar-nav-link {
-          justify-content: center;
-          padding: 10px;
-        }
-        .sidebar-nav-icon-wrap {
-          width: 28px;
-          height: 28px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          transition: all 0.2s ease;
-        }
-        .sidebar-nav-link.active .sidebar-nav-icon-wrap {
-          background: rgba(13, 79, 79, 0.1);
-        }
-        .sidebar-nav-icon {
-          color: inherit;
-          flex-shrink: 0;
-        }
-        .sidebar-nav-label, .sidebar-nav-dot {
-          overflow: hidden;
-          white-space: nowrap;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          opacity: 1;
-          width: auto;
-        }
-        .sidebar-inner.collapsed .sidebar-nav-label,
-        .sidebar-inner.collapsed .sidebar-nav-dot {
-          opacity: 0;
-          width: 0;
-          margin: 0;
-        }
-        .sidebar-nav-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #0D4F4F;
-          flex-shrink: 0;
-          margin-left: auto;
-        }
-
-        /* ─── Footer ─── */
-        .sidebar-footer {
-          margin-top: auto;
-          padding-top: 16px;
-          border-top: 1px solid #EBEEF2;
-          width: 100%;
-        }
-        .sidebar-signout {
-          width: 100%;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 12px;
-          border-radius: 10px;
-          border: none;
-          background: transparent;
-          font-size: 14px;
-          font-weight: 500;
-          color: #7A8FA6;
-          font-family: inherit;
-          cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .sidebar-signout:hover {
-          color: #C0392B;
-          background: #FEF2F2;
-        }
-        .sidebar-inner.collapsed .sidebar-signout {
-          justify-content: center;
-          padding: 10px;
-        }
-
-        /* ─── Scrollbar ─── */
-        .sidebar-nav::-webkit-scrollbar {
-          width: 4px;
-        }
-        .sidebar-nav::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .sidebar-nav::-webkit-scrollbar-thumb {
-          background: #D8DEE5;
-          border-radius: 10px;
-        }
-        .sidebar-nav::-webkit-scrollbar-thumb:hover {
-          background: #9BAAB8;
-        }
-
-        /* ─── Mobile Sidebar ─── */
-        .admin-mobile-sidebar {
-          position: fixed;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: min(300px, 84vw);
-          z-index: 50;
-          background: white;
-          overflow-y: auto;
-          box-shadow: 4px 0 32px rgba(0,0,0,0.08);
-        }
-        .admin-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(13, 27, 27, 0.4);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          z-index: 40;
-        }
-
-        /* ─── Main Content ─── */
-        .admin-main-wrap {
-          min-height: 100vh;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-        }
-        @media (min-width: 1024px) {
-          .admin-main-wrap {
-            margin-left: ${isCollapsed ? '76px' : '280px'};
-            transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-        }
-
-        .admin-topbar {
-          position: sticky;
-          top: 0;
-          z-index: 20;
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border-bottom: 1px solid #EBEEF2;
-          padding: 16px 32px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-        .admin-topbar-left {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .admin-topbar-title {
-          font-size: 20px;
-          font-weight: 700;
-          color: #0D1B1B;
-          font-family: 'Playfair Display', serif;
-          letter-spacing: -0.3px;
-          margin: 0;
-        }
-        .admin-menu-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 10px;
-          border: 1px solid #EBEEF2;
-          background: #ffffff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #0D1B1B;
-          cursor: pointer;
-          flex-shrink: 0;
-          transition: all 0.2s ease;
-        }
-        .admin-menu-btn:hover {
-          border-color: #0D4F4F;
-          color: #0D4F4F;
-          background: #F0F4F8;
-        }
-        @media (min-width: 1024px) {
-          .admin-menu-btn {
-            display: none;
-          }
-        }
-
-        .admin-topbar-right {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .admin-topbar-username {
-          font-size: 14px;
-          color: #5A6F82;
-          font-weight: 600;
-          display: none;
-        }
-        @media (min-width: 640px) {
-          .admin-topbar-username {
-            display: block;
-          }
-        }
-        .admin-topbar-avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          flex-shrink: 0;
-          background: linear-gradient(135deg, #0D4F4F, #1A6B6B);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-size: 14px;
-          font-weight: 700;
-          font-family: 'Playfair Display', serif;
-          border: 2px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(13, 79, 79, 0.15);
-          cursor: pointer;
-          transition: transform 0.2s ease;
-        }
-        .admin-topbar-avatar:hover {
-          transform: scale(1.05);
-        }
-
-        .admin-page-content {
-          padding: 32px;
-          flex: 1;
-          max-width: 1600px;
-          width: 100%;
-          margin: 0 auto;
-        }
-        @media (max-width: 768px) {
-          .admin-page-content {
-            padding: 20px 16px 40px;
-          }
-          .admin-topbar {
-            padding: 12px 16px;
-          }
-        }
-      `}</style>
-
-      {/* Desktop Sidebar */}
-      <aside className="admin-desktop-sidebar">
-        <SidebarContent isMobile={false} />
+    <div className="min-h-screen bg-[#F8FAFC] flex font-sans antialiased">
+      {/* ─── Desktop Sidebar ─── */}
+      <aside 
+        className={`hidden lg:block fixed top-0 left-0 bottom-0 bg-white border-r border-[#EEF2F6] shadow-sm transition-all duration-300 z-30 ${
+          effectiveCollapsed ? 'w-[72px]' : 'w-[260px]'
+        }`}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar */}
+      {/* ─── Mobile Sidebar ─── */}
       <AnimatePresence>
         {sidebarOpen && !isLargeScreen && (
           <>
@@ -640,45 +201,55 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setSidebarOpen(false)}
-              className="admin-overlay"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="admin-mobile-sidebar"
+              className="fixed left-0 top-0 bottom-0 w-[300px] bg-white z-50 shadow-2xl overflow-y-auto"
             >
-              <SidebarContent isMobile={true} onClose={() => setSidebarOpen(false)} />
+              <SidebarContent isMobile onClose={() => setSidebarOpen(false)} />
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      {/* Main Content */}
-      <div className="admin-main-wrap">
-        <div className="admin-topbar">
-          <div className="admin-topbar-left">
-            <button className="admin-menu-btn" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle menu">
-              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      {/* ─── Main Content ─── */}
+      <div className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${effectiveCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'}`}>
+        {/* ─── Top Bar ─── */}
+        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-[#EEF2F6] px-4 sm:px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors"
+            >
+              <Menu size={20} className="text-[#0D1B1B]" />
             </button>
-            <h1 className="admin-topbar-title">{getPageTitle()}</h1>
+            <h1 className="text-lg font-semibold text-[#0D1B1B]">{getPageTitle()}</h1>
           </div>
-          <div className="admin-topbar-right">
+          <div className="flex items-center gap-3">
+            <button className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors text-[#64748B] hover:text-[#0D4F4F]">
+              <Search size={18} />
+            </button>
             <NotificationBell />
-            <span className="admin-topbar-username">{userName}</span>
-            <div className="admin-topbar-avatar" title={userName}>
-              {userInitial}
+            <div className="flex items-center gap-2 pl-2 border-l border-[#EEF2F6]">
+              <span className="text-sm font-medium text-[#64748B] hidden sm:block">{userName}</span>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                {userInitial}
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
+        {/* ─── Page Content ─── */}
         <motion.main
           key={pathname}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="admin-page-content"
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto"
         >
           {children}
         </motion.main>

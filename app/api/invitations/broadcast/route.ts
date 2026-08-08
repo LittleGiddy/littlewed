@@ -15,6 +15,12 @@ const fromSms = process.env.TWILIO_SMS_NUMBER;
 const COST_WHATSAPP = 50;
 const COST_SMS = 25;
 
+// ─── Helper: Get formatted guest name ──────────────────────────────────
+function getGuestFullName(guest: any): string {
+  const title = guest.title || 'Mr';
+  return `${title} ${guest.name}`;
+}
+
 async function sendWhatsAppInvitation(phone: string, imageUrl: string, message: string) {
   if (isMock) {
     console.log(`[MOCK] WhatsApp to ${phone}: image ${imageUrl}, message: ${message}`);
@@ -35,7 +41,8 @@ async function sendSmsCode(guest: any, message: string) {
     code = Math.floor(100000 + Math.random() * 900000).toString();
     await prisma.guest.update({ where: { id: guest.id }, data: { smsCode: code } });
   }
-  const finalMessage = `${message} Your check-in code is: ${code}`;
+  const cardInfo = guest.cardNumber ? ` (Card: ${guest.cardNumber})` : '';
+  const finalMessage = `${message} Your check-in code is: ${code}${cardInfo}`;
   if (isMock) {
     console.log(`[MOCK] SMS to ${guest.phone}: ${finalMessage}`);
     return;
@@ -157,15 +164,23 @@ export async function POST(req: NextRequest) {
       const channelType = guest.routingChannel === 'whatsapp' ? 'whatsapp' : 'sms';
       const cost = channelType === 'whatsapp' ? COST_WHATSAPP : COST_SMS;
       try {
+        const fullName = getGuestFullName(guest);
+        const cardInfo = guest.cardNumber ? ` (Card: ${guest.cardNumber})` : '';
+        const personalizedMessage = customMessage
+          .replace(/{title}/g, guest.title || 'Mr')
+          .replace(/{name}/g, guest.name)
+          .replace(/{fullName}/g, fullName)
+          .replace(/{cardNumber}/g, guest.cardNumber || '');
+
         if (channelType === 'whatsapp') {
           let cardUrl = guest.invitationCard;
           if (!cardUrl) {
             cardUrl = await generateAndSaveCard(guest, event.id, cardBuffer, qrPosition, qrColor);
           }
-          const whatsappMessage = `${customMessage} Scan the QR code at the entrance.`;
+          const whatsappMessage = `${personalizedMessage} Scan the QR code at the entrance.${cardInfo}`;
           await sendWhatsAppInvitation(guest.phone!, cardUrl!, whatsappMessage);
         } else {
-          await sendSmsCode(guest, customMessage);
+          await sendSmsCode(guest, personalizedMessage);
         }
 
         await prisma.$transaction([
@@ -173,9 +188,13 @@ export async function POST(req: NextRequest) {
           prisma.usageRecord.create({
             data: { tenantId, eventId: event.id, channel: channelType, cost },
           }),
+          prisma.guest.update({
+            where: { id: guest.id },
+            data: { invitationSentAt: new Date() },
+          }),
         ]);
         totalCost += cost;
-        results.push({ guestId: guest.id, name: guest.name, channel: channelType, success: true });
+        results.push({ guestId: guest.id, name: fullName, channel: channelType, success: true });
       } catch (error: any) {
         console.error(`Failed for ${guest.name}:`, error.message);
         results.push({ guestId: guest.id, name: guest.name, channel: channelType, success: false, error: error.message });

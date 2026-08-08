@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, MessageCircle, Phone } from 'lucide-react';
+import { 
+  ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, 
+  MessageCircle, Phone, Info, Sparkles, Calendar, User,
+  CreditCard, AlertCircle, CheckCircle, Bell, MessageSquare,
+  FileText, CornerDownRight, Hash
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -96,7 +101,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`);
       return;
     }
-    const costText = totalCost === 0 ? 'bure' : `${totalCost} TZS`;
+    const costText = totalCost === 0 ? 'Free' : `${totalCost} TZS`;
     if (!confirm(`Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}? Cost: ${costText}.`)) return;
 
     setSending(true);
@@ -145,6 +150,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   if (!event) {
     return (
       <div className="text-center py-12">
+        <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
         <p className="text-gray-500">Event not found.</p>
         <Link href="/client/dashboard" className="text-[#0D4F4F] underline mt-2 inline-block">
           Go back
@@ -186,6 +192,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               <span className="font-medium">
                 Cost: {totalCost === 0 ? 'Free' : `${totalCost} TZS`}
                 <span className="text-xs text-gray-400 block">
+                  <Info size={10} className="inline mr-0.5" />
                   First 2 reminders per guest are free
                 </span>
               </span>
@@ -194,15 +201,20 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">
-            💬 Reminders are sent via SMS to all selected guests with a phone number.
+          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+            <MessageSquare size={12} />
+            Reminders are sent via SMS to all selected guests with a phone number.
           </p>
         </div>
 
         <div className="p-5">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              SMS Message <span className="text-gray-400 text-xs">(use {'{name}'} for guest name)</span>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+              <FileText size={15} />
+              SMS Message
+              <span className="text-gray-400 text-xs font-normal ml-1">
+                (use {'{name}'} for guest name)
+              </span>
             </label>
             <textarea
               rows={5}
@@ -244,11 +256,14 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                   </div>
                   <div className="text-xs text-gray-400">
                     {guest.reminderCount < 2 ? (
-                      <span className="text-[#0D4F4F]">Free</span>
+                      <span className="text-[#0D4F4F] flex items-center gap-0.5">
+                        <Sparkles size={10} /> Free
+                      </span>
                     ) : (
                       <span>50 TZS</span>
                     )}
-                    <span className="ml-2 bg-gray-100 px-2 py-0.5 rounded-full">
+                    <span className="ml-2 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      <Hash size={9} />
                       {guest.reminderCount} sent
                     </span>
                   </div>
@@ -268,8 +283,9 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             </button>
             <button
               onClick={() => router.push(`/client/events/${eventId}`)}
-              className="px-6 border border-gray-300 rounded-xl py-2.5 font-medium hover:bg-gray-50 transition"
+              className="px-6 border border-gray-300 rounded-xl py-2.5 font-medium hover:bg-gray-50 transition flex items-center gap-1.5"
             >
+              <X size={16} />
               Cancel
             </button>
           </div>

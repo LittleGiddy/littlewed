@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
+import { normalizePhone } from '@/lib/phone';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,9 +27,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // ─── Validate phone numbers ──────────────────────────────────────
-    const validGuests = guests.filter((g: any) => g.phone && g.phone.startsWith('+'));
-    const invalidCount = guests.length - validGuests.length;
+    // ─── Validate phone numbers and normalize ────────────────────────
+    const validGuests: any[] = [];
+    let invalidCount = 0;
+
+    for (const g of guests) {
+      if (g.phone) {
+        const { normalized, isValid } = normalizePhone(g.phone);
+        if (isValid) {
+          validGuests.push({
+            ...g,
+            phone: normalized,
+          });
+        } else {
+          invalidCount++;
+          console.log(`Invalid phone: ${g.phone} (${g.name})`);
+        }
+      } else {
+        invalidCount++;
+      }
+    }
 
     if (validGuests.length === 0) {
       return NextResponse.json({
@@ -37,7 +55,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check guest limit ──────────────────────────────────────────
+    // ─── Check guest limit ────────────────────────────────────────────
     if (!event.tenant?.bypassPayment && event.guestCount) {
       const currentGuests = await prisma.guest.count({ where: { eventId } });
       if (currentGuests + validGuests.length > event.guestCount) {
@@ -48,7 +66,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Duplicate detection using phone ──────────────────────────
+    // ─── Duplicate detection using phone ────────────────────────────
     const phoneNumbers = validGuests.map((g: any) => g.phone);
     const existingGuests = await prisma.guest.findMany({
       where: {
@@ -74,17 +92,17 @@ export async function POST(req: NextRequest) {
         skipped: validGuests.length,
         duplicateNames: existingGuests.map(g => g.name),
         invalidCount,
-        message: 'All valid guests are duplicates. No new guests added.',
+        message: `All valid guests are duplicates. No new guests added. (${invalidCount} invalid numbers skipped)`,
       });
     }
 
-    // ─── Insert unique guests ──────────────────────────────────────
-    // ✅ Include guestType if provided
+    // ─── Insert unique guests ────────────────────────────────────────
     const guestsToInsert = uniqueGuests.map((g: any) => ({
-      name: g.name,
+      name: g.name.trim(),
       phone: g.phone,
-      email: g.email || null,
-      guestType: g.guestType || null, // NEW: store the guest type
+      title: g.title || 'Mr', // ✅ Include title
+      cardNumber: g.cardNumber || null, // ✅ Include card number
+      email: null, // ✅ Email is not required – set to null
       eventId,
       routingChannel: 'sms',
       smsCode: randomBytes(4).toString('hex').toUpperCase(),
@@ -96,15 +114,32 @@ export async function POST(req: NextRequest) {
       skipDuplicates: true,
     });
 
-    return NextResponse.json({
+    // ─── Return response ──────────────────────────────────────────────
+    const responseData: any = {
       count: result.count,
       skipped: validGuests.length - result.count,
       invalidCount,
-      duplicateNames: existingGuests.map(g => g.name),
-      message: result.count > 0
-        ? `Imported ${result.count} guest${result.count > 1 ? 's' : ''}${(validGuests.length - result.count) > 0 ? `, skipped ${validGuests.length - result.count} duplicate${(validGuests.length - result.count) > 1 ? 's' : ''}` : ''}${invalidCount > 0 ? `, ${invalidCount} invalid number${invalidCount > 1 ? 's' : ''} skipped` : ''}`
-        : `No new guests imported (all ${validGuests.length} were duplicates${invalidCount > 0 ? `, ${invalidCount} invalid numbers` : ''})`,
-    });
+      message: '',
+    };
+
+    if (duplicateNames.length > 0) {
+      responseData.duplicateNames = duplicateNames;
+    }
+
+    if (result.count > 0) {
+      responseData.message = `✅ Imported ${result.count} guest${result.count > 1 ? 's' : ''}`;
+      if (validGuests.length - result.count > 0) {
+        responseData.message += `, skipped ${validGuests.length - result.count} duplicate${(validGuests.length - result.count) > 1 ? 's' : ''}`;
+      }
+      if (invalidCount > 0) {
+        responseData.message += `, ${invalidCount} invalid number${invalidCount > 1 ? 's' : ''} skipped`;
+      }
+      responseData.message += '.';
+    } else {
+      responseData.message = `No new guests imported (all ${validGuests.length} were duplicates${invalidCount > 0 ? `, ${invalidCount} invalid numbers` : ''})`;
+    }
+
+    return NextResponse.json(responseData);
   } catch (error: any) {
     console.error('Import error:', error);
     return NextResponse.json(

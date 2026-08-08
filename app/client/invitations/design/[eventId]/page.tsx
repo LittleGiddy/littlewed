@@ -6,7 +6,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Eye, EyeOff, Undo, Redo,
   Lock, Unlock, BringToFront, SendToBack, Grid, ChevronDown, ChevronRight,
-  Settings, QrCode, User, Users // new icons
+  Settings, QrCode, User, Users, UserCheck, Hash
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,7 +39,7 @@ const ALIGN_V = [
 ];
 
 // ─── Layer creators ──────────────────────────────────────────────────────
-const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false) => ({
+const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false, isCardNumber = false) => ({
   id: generateId(),
   type: 'text',
   x, y, rotation: 0,
@@ -47,8 +47,9 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false,
   color: '#ffffff', align: 'center',
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
   visible: true, locked: false,
-  isGuestName, // flag for guest name placeholder
-  isGuestType, // flag for guest type placeholder
+  isGuestName,
+  isGuestType,
+  isCardNumber,
 });
 
 const createRectLayer = (x = 30, y = 30, w = 40, h = 20) => ({
@@ -297,19 +298,27 @@ export default function InvitationDesigner() {
   };
 
   const addGuestNameLayer = () => {
-    const newLayer = createTextLayer('Guest Name', 50, 60, true, false);
+    const newLayer = createTextLayer('{guestName}', 50, 60, true, false, false);
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
     toast.success('Guest name layer added!');
   };
 
-  const addGuestTypeLayer = () => {
-    const newLayer = createTextLayer('Single/Double', 50, 70, false, true);
+  const addGuestTitleLayer = () => {
+    const newLayer = createTextLayer('{guestTitle}', 50, 55, false, true, false);
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
-    toast.success('Guest type layer added!');
+    toast.success('Guest title layer added!');
+  };
+
+  const addCardNumberLayer = () => {
+    const newLayer = createTextLayer('{cardNumber}', 50, 65, false, false, true);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
+    toast.success('Card number layer added!');
   };
 
   const addRectLayer = () => {
@@ -850,7 +859,7 @@ export default function InvitationDesigner() {
 
         {/* ─── Controls ─── */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Quick Add Guest Name & Type */}
+          {/* Quick Add Guest Name, Title & Card Number */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-sm flex items-center gap-1"><User size={14} className="text-[#0D4F4F]" /> Guest Name</span>
@@ -862,9 +871,18 @@ export default function InvitationDesigner() {
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm flex items-center gap-1"><Users size={14} className="text-[#0D4F4F]" /> Guest Type (Single/Double)</span>
+              <span className="font-semibold text-sm flex items-center gap-1"><UserCheck size={14} className="text-[#0D4F4F]" /> Guest Title (Mr/Miss)</span>
               <button
-                onClick={addGuestTypeLayer}
+                onClick={addGuestTitleLayer}
+                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-sm flex items-center gap-1"><Hash size={14} className="text-[#0D4F4F]" /> Card Number</span>
+              <button
+                onClick={addCardNumberLayer}
                 className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
               >
                 <Plus size={14} /> Add
@@ -893,6 +911,7 @@ export default function InvitationDesigner() {
                     {layer.type === 'text' ? `📝 ${layer.text.substring(0, 20)}` : layer.type === 'rect' ? '⬛ Rectangle' : '━ Line'}
                     {layer.isGuestName && ' ✨'}
                     {layer.isGuestType && ' 🏷️'}
+                    {layer.isCardNumber && ' 🔢'}
                   </span>
                   <div className="flex gap-1">
                     <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded">
@@ -925,6 +944,15 @@ export default function InvitationDesigner() {
                           value={selectedLayer.text}
                           onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                         />
+                        {selectedLayer.isGuestName && (
+                          <p className="text-xs text-[#0D4F4F] mt-1">✨ This will be replaced with each guest's name</p>
+                        )}
+                        {selectedLayer.isGuestType && (
+                          <p className="text-xs text-[#0D4F4F] mt-1">🏷️ This will be replaced with each guest's title (Mr/Miss)</p>
+                        )}
+                        {selectedLayer.isCardNumber && (
+                          <p className="text-xs text-[#0D4F4F] mt-1">🔢 This will be replaced with each guest's card number</p>
+                        )}
                       </div>
                       <div>
                         <label className="flex justify-between text-sm">Font Family</label>

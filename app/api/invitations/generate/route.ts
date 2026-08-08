@@ -5,22 +5,27 @@ import { prisma } from '@/lib/prisma';
 import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
 import { put } from '@vercel/blob';
 
-export async function POST(req: NextRequest) {
-  const host = req.headers.get('host') || '';
-  const isCloudflareTunnel = host.includes('trycloudflare.com') || host.includes('loca.lt');
+// ─── Helper: Get formatted guest name ──────────────────────────────────
+function getGuestFullName(guest: any): string {
+  const title = guest.title || 'Mr';
+  return `${title} ${guest.name}`;
+}
 
-  let session = null;
-  if (!isCloudflareTunnel) {
-    session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const tenantId = (session.user as any).tenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: 'Tenant not found' }, { status: 400 });
   }
 
   const { eventId } = await req.json();
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
     include: { guests: true },
   });
 
@@ -28,14 +33,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  if (!isCloudflareTunnel && session) {
-    const tenantId = (session.user as any).tenantId;
-    if (event.tenantId !== tenantId && (session.user as any).role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-  }
-
-  // Use the event's own card settings
   if (!event.templateCardUrl) {
     return NextResponse.json(
       { error: 'No invitation card configured for this event. Please design it first.' },
@@ -55,10 +52,11 @@ export async function POST(req: NextRequest) {
         y: event.namePlacementY ?? 50,
         fontSize: event.nameFontSize ?? 24,
         fontColor: event.nameFontColor ?? '#000000',
+        fontFamily: event.nameFontFamily || 'Playfair Display, serif',
       }
-    : undefined;
+    : null;
 
-  // Fetch the base card from its public Blob URL
+  // Fetch the base card
   let cardBuffer: Buffer;
   try {
     const response = await fetch(event.templateCardUrl);
@@ -79,18 +77,23 @@ export async function POST(req: NextRequest) {
     try {
       const token = generateGuestToken(guest.id, eventId);
       const qrBuffer = await generateQRBuffer(token, qrPosition.size);
+      const fullName = getGuestFullName(guest);
+      const cardNumber = guest.cardNumber || '';
+
+      // ✅ Call with 6 arguments
       const finalCardBuffer = await compositeQROnCard(
         cardBuffer,
         qrBuffer,
         qrPosition,
         namePosition,
-        event.includeName ? guest.name : undefined
+        event.includeName ? fullName : undefined,
+        cardNumber
       );
 
       const key = `guests/${event.tenantId}/${guest.id}.png`;
       const blob = await put(key, finalCardBuffer, {
         access: 'public',
-        contentType: 'image/png',    
+        contentType: 'image/png',
       });
 
       await prisma.guest.update({
@@ -98,7 +101,7 @@ export async function POST(req: NextRequest) {
         data: { invitationCard: blob.url, qrToken: token },
       });
 
-      results.push({ guestId: guest.id, name: guest.name, success: true });
+      results.push({ guestId: guest.id, name: fullName, success: true });
     } catch (error: any) {
       console.error(`Failed for ${guest.name}:`, error);
       results.push({
@@ -109,11 +112,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  const successCount = results.filter(r => r.success).length;
-  const failCount = results.filter(r => !r.success).length;
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
 
   return NextResponse.json({
     success: true,

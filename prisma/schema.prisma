@@ -211,6 +211,8 @@ model Guest {
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
   guestType  String?  // 'single', 'double', or any custom value
+  title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
+  cardNumber     String?   @unique       // e.g., "G-001", "G-002"
 }
 
 model UsageRecord {

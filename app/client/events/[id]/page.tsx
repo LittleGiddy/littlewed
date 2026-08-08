@@ -3,12 +3,14 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import {
   Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft,
   Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare,
   Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
   Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
-  AlarmClock, AlarmClockOff, RotateCw, Pencil
+  AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
+  Check, Coins, Sparkles, Hash, FileText
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -44,7 +46,7 @@ interface EventData {
   resumedBy: string | null;
 }
 
-// ─── Countdown timer component (memoized) ──────────────────────────────
+// ─── Countdown timer component ──────────────────────────────────────────
 const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [status, setStatus] = useState('');
@@ -60,23 +62,10 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
 
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        setStatus(prev => {
-          if (prev !== 'LIVE') {
-            if (onStatusChange) {
-              // Defer to the next tick. onStatusChange updates the PARENT
-              // (EventDetailPage's state), and calling it synchronously here
-              // — in the same call stack as this component's own setStatus —
-              // makes React think we're updating EventDetailPage while
-              // EventCountdown is still mid render/commit cycle, which triggers:
-              // "Cannot update a component while rendering a different component".
-              // setTimeout(…, 0) breaks the synchronous chain so the parent
-              // update happens cleanly after this component settles.
-              setTimeout(() => onStatusChange('LIVE'), 0);
-            }
-            return 'LIVE';
-          }
-          return prev;
-        });
+        if (status !== 'LIVE') {
+          setStatus('LIVE');
+          if (onStatusChange) onStatusChange('LIVE');
+        }
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
@@ -102,11 +91,7 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-    // NOTE: onStatusChange intentionally excluded from deps below (see handleStatusChange,
-    // which is now stable and safe to omit) to avoid re-running this effect on every
-    // parent re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
+  }, [target, onStatusChange]);
 
   const formattedTime = `${String(timeLeft.days).padStart(2, '0')}d ${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
@@ -142,14 +127,11 @@ EventCountdown.displayName = 'EventCountdown';
 
 export default function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
-  // `loading` now controls ONLY the initial full-page spinner (first load / event switch).
   const [loading, setLoading] = useState(true);
-  // `refreshing` covers background refetches (e.g. after "going live", edit, resume)
-  // WITHOUT unmounting the page, which is what caused the flicker loop.
-  const [refreshing, setRefreshing] = useState(false);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -191,6 +173,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   });
   const [editing, setEditing] = useState(false);
 
+  // ─── Edit Guest Modal ─────────────────────────────────────────────────
+  const [showEditGuestModal, setShowEditGuestModal] = useState(false);
+  const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+  const [editGuestForm, setEditGuestForm] = useState({ name: '', phone: '' });
+  const [savingGuest, setSavingGuest] = useState(false);
+
+  // ─── Check session and redirect if not authenticated ─────────────────
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+    const role = (session.user as any)?.role;
+    if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') {
+      router.push('/login');
+      return;
+    }
+  }, [session, sessionStatus, router]);
+
   // ─── Resume event ──────────────────────────────────────────────────────
   const handleResumeEvent = async () => {
     if (!eventId) return;
@@ -206,7 +208,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       const data = await res.json();
       if (res.ok) {
         toast.success('Event resumed successfully!');
-        hasReportedLive.current = false; // event is active again, allow future LIVE detection
         fetchData(eventId);
         setCountdownKey(prev => prev + 1);
       } else {
@@ -217,36 +218,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // ─── Effects ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    params.then(({ id }) => {
-      if (cancelled) return;
-      setEventId(id);
-      // Reset the live flag when event ID changes
-      hasReportedLive.current = false;
-      fetchData(id, { initial: true });
-      fetchCredits();
-    }).catch((err) => {
-      console.error('Failed to resolve params:', err);
-      setFetchError('Could not read event ID from URL.');
-      setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [params]);
-
-  // ─── Fetch data (stable via useCallback) ─────────────────────────────
-  // `initial: true` shows the full-page spinner (event/id not yet loaded).
-  // Any other call (background refresh triggered by the countdown going live,
-  // an edit, or a resume) uses a lightweight `refreshing` flag instead, so the
-  // page — and crucially the mounted <EventCountdown> — never unmounts.
-  const fetchData = useCallback(async (id: string, opts?: { initial?: boolean }) => {
-    if (opts?.initial) setLoading(true);
-    else setRefreshing(true);
+  // ─── Fetch data ──────────────────────────────────────────────────────
+  const fetchData = useCallback(async (id: string) => {
+    setLoading(true);
     setFetchError(null);
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          router.push('/login');
+          return;
+        }
         let detail = `HTTP ${res.status}`;
         try { const b = await res.json(); detail = b?.error || b?.message || detail; } catch { }
         throw new Error(detail);
@@ -256,21 +238,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
       setCurrentPage(1);
-      // NOTE: we intentionally do NOT reset hasReportedLive.current based on
-      // data.event.status here. If the backend hasn't flipped status to LIVE
-      // yet (e.g. it's updated by a delayed job), resetting the guard on every
-      // fetch would cause onStatusChange('LIVE') to keep re-firing, which
-      // re-triggers this fetch, which resets the guard again — an infinite
-      // flicker loop. The guard is only reset on event-id change or resume.
+      if (data.event.status !== 'LIVE') {
+        hasReportedLive.current = false;
+      }
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
       toast.error(`Could not load event: ${msg}`);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  }, []);
+  }, [router]);
 
   const fetchCredits = async () => {
     try {
@@ -280,6 +258,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setCredits(data.tenant?.credits ?? 0);
     } catch { }
   };
+
+  // ─── Effects ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    params.then(({ id }) => {
+      if (cancelled) return;
+      setEventId(id);
+      fetchData(id);
+      fetchCredits();
+    }).catch((err) => {
+      console.error('Failed to resolve params:', err);
+      setFetchError('Could not read event ID from URL.');
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [params, fetchData]);
 
   // ─── Guest selection ──────────────────────────────────────────────────
   const toggleSelectAll = () => {
@@ -316,6 +310,57 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) { toast.success('Guest deleted'); setGuests(prev => prev.filter(g => g.id !== guestId)); setSelectedGuests(prev => { const s = new Set(prev); s.delete(guestId); return s; }); }
       else { const data = await res.json(); toast.error(data.error || 'Failed to delete'); }
     } catch { toast.error('Network error'); }
+  };
+
+  // ─── Edit Guest handlers ──────────────────────────────────────────────
+  const openEditGuestModal = (guest: Guest) => {
+    setEditingGuest(guest);
+    setEditGuestForm({ name: guest.name, phone: guest.phone });
+    setShowEditGuestModal(true);
+  };
+
+  const handleEditGuestChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditGuestForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSaveGuest = async () => {
+    if (!editingGuest) return;
+    if (!editGuestForm.name.trim() || !editGuestForm.phone.trim()) {
+      toast.error('Name and phone are required');
+      return;
+    }
+
+    setSavingGuest(true);
+    try {
+      const res = await fetch(`/api/guests/${editingGuest.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editGuestForm.name.trim(),
+          phone: editGuestForm.phone.trim(),
+        }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Guest updated successfully!');
+        setGuests(prev => prev.map(g =>
+          g.id === editingGuest.id
+            ? { ...g, name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() }
+            : g
+        ));
+        setShowEditGuestModal(false);
+        setEditingGuest(null);
+        fetchData(eventId!);
+      } else {
+        toast.error(data.error || 'Failed to update guest');
+      }
+    } catch {
+      toast.error('Network error');
+    } finally {
+      setSavingGuest(false);
+    }
   };
 
   // ─── Scroll to top ──────────────────────────────────────────────────
@@ -448,10 +493,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const openEditModal = () => {
     if (!event) return;
 
-    // Parse the UTC date and convert to local for display
     const eventDate = new Date(event.date);
-
-    // Format for datetime-local input (local time)
     const year = eventDate.getFullYear();
     const month = String(eventDate.getMonth() + 1).padStart(2, '0');
     const day = String(eventDate.getDate()).padStart(2, '0');
@@ -491,7 +533,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         toast.success('Event updated successfully!');
         setShowEditModal(false);
-        hasReportedLive.current = false; // date may have changed, allow re-detecting live
         fetchData(eventId!);
         setCountdownKey(prev => prev + 1);
       } else {
@@ -508,39 +549,122 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const handleStatusChange = useCallback((newStatus: string) => {
     if (newStatus === 'LIVE' && !hasReportedLive.current) {
       hasReportedLive.current = true;
-      // Background refresh only — does NOT set `loading`, so the page
-      // (and EventCountdown) stays mounted. This is what breaks the loop.
       fetchData(eventId!);
     }
   }, [fetchData, eventId]);
 
-  // ─── Poll for auto-pause ────────────────────────────────────────────
-  // The backend cron flips event.status to EXPIRED (with pausedAt set) roughly
-  // 24 hours after the event's date. EventCountdown already triggers one
-  // refresh the moment the event goes LIVE, but nothing checks again after
-  // that — so once the cron pauses the event, the UI would keep showing the
-  // stale "Live Now!" countdown until the user manually reloads the page.
-  // This effect polls in the background (via fetchData's non-initial path,
-  // so it never unmounts the page) while the event is underway, and stops
-  // automatically the moment event.status leaves ACTIVE/LIVE — whether
-  // because the cron paused it, or because it was resumed/deleted.
-  useEffect(() => {
-    if (!event || !eventId) return;
-    if (event.status === 'EXPIRED' || event.status === 'ARCHIVED') return;
-
-    const eventTime = new Date(event.date).getTime();
-    if (Date.now() < eventTime) return; // not started yet — nothing to poll for
-
-    const POLL_INTERVAL_MS = 60 * 1000; // check once a minute
-    const pollId = setInterval(() => {
-      fetchData(eventId);
-    }, POLL_INTERVAL_MS);
-
-    return () => clearInterval(pollId);
-  }, [event?.status, event?.date, eventId, fetchData]);
-
   // ─── Memoize event date ──────────────────────────────────────────────
   const eventDate = useMemo(() => event ? new Date(event.date) : null, [event?.date]);
+
+  // ─── Stats ──────────────────────────────────────────────────────────
+  const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
+  const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
+  const checkedInAll = guests.filter(g => g.checkedIn).length;
+
+  // ─── Event Status Helpers ──────────────────────────────────────────
+  const isExpired = event?.status === 'EXPIRED';
+  const isArchived = event?.status === 'ARCHIVED';
+  const isLive = event?.status === 'LIVE';
+  const isActive = event?.status === 'ACTIVE' || event?.status === 'LIVE';
+  const isDraft = event?.status === 'DRAFT';
+
+  const canResume = isExpired && event?.pausedAt && differenceInHours(new Date(), new Date(event.pausedAt)) < 168;
+  const daysRemainingToResume = isExpired && event?.pausedAt
+    ? Math.max(0, 7 - differenceInHours(new Date(), new Date(event.pausedAt)) / 24)
+    : 0;
+
+  const getStatusBadge = () => {
+    if (isArchived) {
+      return {
+        icon: <AlarmClockOff size={16} />,
+        label: 'Archived',
+        className: 'bg-gray-100 text-gray-600 border-gray-200'
+      };
+    }
+    if (isExpired) {
+      if (canResume) {
+        return {
+          icon: <Timer size={16} />,
+          label: `Paused (${daysRemainingToResume.toFixed(0)} days left to resume)`,
+          className: 'bg-amber-50 text-amber-700 border-amber-200'
+        };
+      }
+      return {
+        icon: <AlarmClockOff size={16} />,
+        label: 'Expired (cannot resume)',
+        className: 'bg-red-50 text-red-700 border-red-200'
+      };
+    }
+    if (isLive) {
+      return {
+        icon: <AlarmClock size={16} className="animate-pulse" />,
+        label: 'Live Now!',
+        className: 'bg-green-50 text-green-700 border-green-200'
+      };
+    }
+    if (isActive) {
+      const hoursUntil = differenceInHours(new Date(event!.date), new Date());
+      if (hoursUntil <= 24 && hoursUntil > 0) {
+        return {
+          icon: <Timer size={16} className="animate-pulse" />,
+          label: 'Coming in 24 hours',
+          className: 'bg-amber-50 text-amber-700 border-amber-200'
+        };
+      }
+      return {
+        icon: <CalendarClock size={16} />,
+        label: `Active (${formatDistanceToNow(new Date(event!.date), { addSuffix: true })})`,
+        className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]'
+      };
+    }
+    if (isDraft) {
+      return {
+        icon: <AlertCircle size={16} />,
+        label: 'Draft',
+        className: 'bg-gray-100 text-gray-500 border-gray-200'
+      };
+    }
+    return {
+      icon: <AlertCircle size={16} />,
+      label: event?.status || 'Unknown',
+      className: 'bg-gray-100 text-gray-500 border-gray-200'
+    };
+  };
+
+  const statusBadge = getStatusBadge();
+  const isEventDisabled = isExpired || isArchived;
+
+  // ─── Loading state ──────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+        <p className="text-sm text-gray-400">Loading event…</p>
+      </div>
+    );
+  }
+
+  if (fetchError || !event) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">{fetchError ? 'Failed to Load Event' : 'Event Not Found'}</h1>
+          <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
+          <div className="flex gap-3 justify-center">
+            {fetchError && eventId && (
+              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
+                <ArrowLeft size={14} /> Retry
+              </button>
+            )}
+            <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition">
+              <ArrowLeft size={14} /> Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Render helpers ──────────────────────────────────────────────────
   const renderGuestCard = (guest: Guest) => {
@@ -607,128 +731,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             >
               <Trash2 size={15} />
             </button>
+            <button
+              onClick={() => openEditGuestModal(guest)}
+              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
+            >
+              <Edit2 size={15} />
+            </button>
           </div>
         </div>
       </div>
     );
   };
 
-  // ─── Loading state (INITIAL load only — background refreshes no longer hit this) ──
-  if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-64 gap-3">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Loading event…</p>
-      </div>
-    );
-  }
-
-  if (fetchError || !event) {
-    return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">{fetchError ? 'Failed to Load Event' : 'Event Not Found'}</h1>
-          <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
-          <div className="flex gap-3 justify-center">
-            {fetchError && eventId && (
-              <button onClick={() => fetchData(eventId, { initial: true })} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
-                <ArrowLeft size={14} /> Retry
-              </button>
-            )}
-            <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition">
-              <ArrowLeft size={14} /> Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Stats ──────────────────────────────────────────────────────────
-  const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
-  const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
-  const checkedInAll = guests.filter(g => g.checkedIn).length;
-
-  // ─── Event Status Helpers ──────────────────────────────────────────
-  const isExpired = event.status === 'EXPIRED';
-  const isArchived = event.status === 'ARCHIVED';
-  const isLive = event.status === 'LIVE';
-  const isActive = event.status === 'ACTIVE' || event.status === 'LIVE';
-  const isDraft = event.status === 'DRAFT';
-
-  const canResume = isExpired && event.pausedAt && differenceInHours(new Date(), new Date(event.pausedAt)) < 168;
-  const daysRemainingToResume = isExpired && event.pausedAt
-    ? Math.max(0, 7 - differenceInHours(new Date(), new Date(event.pausedAt)) / 24)
-    : 0;
-
-  const getStatusBadge = () => {
-    if (isArchived) {
-      return {
-        icon: <AlarmClockOff size={16} />,
-        label: 'Archived',
-        className: 'bg-gray-100 text-gray-600 border-gray-200'
-      };
-    }
-    if (isExpired) {
-      if (canResume) {
-        return {
-          icon: <Timer size={16} />,
-          label: `Paused (${daysRemainingToResume.toFixed(0)} days left to resume)`,
-          className: 'bg-amber-50 text-amber-700 border-amber-200'
-        };
-      }
-      return {
-        icon: <AlarmClockOff size={16} />,
-        label: 'Expired (cannot resume)',
-        className: 'bg-red-50 text-red-700 border-red-200'
-      };
-    }
-    if (isLive) {
-      return {
-        icon: <AlarmClock size={16} className="animate-pulse" />,
-        label: 'Live Now!',
-        className: 'bg-green-50 text-green-700 border-green-200'
-      };
-    }
-    if (isActive) {
-      const hoursUntil = differenceInHours(new Date(event.date), new Date());
-      if (hoursUntil <= 24 && hoursUntil > 0) {
-        return {
-          icon: <Timer size={16} className="animate-pulse" />,
-          label: 'Coming in 24 hours',
-          className: 'bg-amber-50 text-amber-700 border-amber-200'
-        };
-      }
-      return {
-        icon: <CalendarClock size={16} />,
-        label: `Active (${formatDistanceToNow(new Date(event.date), { addSuffix: true })})`,
-        className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]'
-      };
-    }
-    if (isDraft) {
-      return {
-        icon: <AlertCircle size={16} />,
-        label: 'Draft',
-        className: 'bg-gray-100 text-gray-500 border-gray-200'
-      };
-    }
-    return {
-      icon: <AlertCircle size={16} />,
-      label: event.status || 'Unknown',
-      className: 'bg-gray-100 text-gray-500 border-gray-200'
-    };
-  };
-
-  const statusBadge = getStatusBadge();
-
-  // ─── Check if event is disabled ────────────────────────────────────
-  const isEventDisabled = isExpired || isArchived;
-
+  // ─── Main JSX ──────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        /* ── Themed Modal styles ── */
         .tm-overlay { position: fixed; inset: 0; background: rgba(13,27,27,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; animation: tmOverlayIn 0.18s ease both; }
         @keyframes tmOverlayIn { from { opacity: 0; } to { opacity: 1; } }
         .tm-modal { background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; scrollbar-width: none; box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 40px 80px rgba(0,0,0,0.1); font-family: 'DM Sans', 'Segoe UI', sans-serif; animation: tmModalIn 0.32s cubic-bezier(0.16,1,0.3,1) both; }
@@ -802,12 +820,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <ArrowLeft size={14} /> Back to Dashboard
           </Link>
           <div className="flex items-center gap-2">
-            {refreshing && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400">
-                <div className="w-3 h-3 border-2 border-gray-300 border-t-[#0D4F4F] rounded-full animate-spin" />
-                Updating…
-              </span>
-            )}
             {!isArchived && (
               <button
                 onClick={openEditModal}
@@ -929,7 +941,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
                 <span className={`kumbusha-btn-badge${isFree ? ' free' : ''}`}>
-                  {isFree ? '✓ Free' : `${kumbushaTotalCost} TZS`}
+                  {isFree ? <Check size={14} className="inline" /> : `${kumbushaTotalCost} TZS`}
                 </span>
               </button>
             </div>
@@ -1072,7 +1084,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
 
               <div className={`tm-cost-row ${isFree ? 'free' : 'paid'}`}>
-                <div className="tm-cost-icon">{isFree ? '✅' : '💰'}</div>
+                <div className="tm-cost-icon">{isFree ? <Check size={18} className="text-green-600" /> : <Coins size={18} className="text-amber-600" />}</div>
                 <div>
                   <div className="tm-cost-text">
                     {isFree
@@ -1133,7 +1145,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
 
               <div className="tm-cost-row paid">
-                <div className="tm-cost-icon">💰</div>
+                <div className="tm-cost-icon"><Coins size={18} className="text-amber-600" /></div>
                 <div>
                   <div className="tm-cost-text">Gharama: {checkedInCount * 300} TZS (300 TZS/mgeni)</div>
                   {credits !== null && <div className="tm-cost-balance">Mikopo iliyobaki: {credits} TZS</div>}
@@ -1336,6 +1348,63 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Edit Guest Modal ──────────────────────────────────────────── */}
+      {showEditGuestModal && editingGuest && (
+        <div className="tm-overlay" onClick={e => { if (e.target === e.currentTarget) setShowEditGuestModal(false); }}>
+          <div className="tm-modal" style={{ maxWidth: '460px' }}>
+            <div className="tm-bar teal" />
+            <div className="tm-head">
+              <div>
+                <div className="tm-eyebrow"><div className="tm-eyebrow-dot" /> Edit Guest</div>
+                <h2 className="tm-title">Update <span>Guest Details</span></h2>
+              </div>
+              <button className="tm-close" onClick={() => setShowEditGuestModal(false)}><X size={15} /></button>
+            </div>
+            <div className="tm-body">
+              <div className="space-y-4">
+                <div className="field-wrap">
+                  <label className="field-label">Full Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={editGuestForm.name}
+                    onChange={handleEditGuestChange}
+                    className="field-input"
+                    placeholder="Enter guest name"
+                    required
+                  />
+                </div>
+                <div className="field-wrap">
+                  <label className="field-label">Phone Number</label>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={editGuestForm.phone}
+                    onChange={handleEditGuestChange}
+                    className="field-input"
+                    placeholder="+255712345678"
+                    required
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Include country code (e.g., +255...)</p>
+                </div>
+              </div>
+
+              <div className="tm-actions" style={{ marginTop: '20px' }}>
+                <button type="button" className="tm-cancel-btn" onClick={() => setShowEditGuestModal(false)}>Cancel</button>
+                <button
+                  type="button"
+                  className="tm-send-btn teal"
+                  onClick={handleSaveGuest}
+                  disabled={savingGuest || !editGuestForm.name.trim() || !editGuestForm.phone.trim()}
+                >
+                  {savingGuest ? <><div className="tm-spinner" /> Saving…</> : <><Save size={15} /> Save Changes</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

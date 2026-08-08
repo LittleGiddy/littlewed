@@ -1,269 +1,215 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { UserPlus, Phone, User, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
 
 export default function AddGuestPage() {
   const { eventId } = useParams();
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [focused, setFocused] = useState<string | null>(null);
-  const [limit, setLimit] = useState<{ remaining: number; totalGuests: number } | null>(null);
+  const [form, setForm] = useState({
+    title: 'Mr',
+    name: '',
+    phone: '',
+    cardNumber: '',
+    email: '',
+  });
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
 
+  // Auto-generate card number on load
   useEffect(() => {
-    fetch(`/api/events/${eventId}/guests/count`, { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => setLimit({ remaining: data.guestCount - data.totalGuests, totalGuests: data.totalGuests }))
-      .catch(() => setLimit(null));
-  }, [eventId]);
+    generateCardNumber();
+  }, []);
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    e?.preventDefault();
+  const generateCardNumber = async () => {
+    setIsGeneratingCard(true);
+    try {
+      const res = await fetch('/api/guests/next-card-number', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setForm(prev => ({ ...prev, cardNumber: data.cardNumber }));
+      }
+    } catch {
+      // fallback – generate locally
+      const rand = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      setForm(prev => ({ ...prev, cardNumber: `G-${rand}` }));
+    } finally {
+      setIsGeneratingCard(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
+
+    if (!form.name.trim() || !form.phone.trim()) {
+      setError('Name and phone are required');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/guests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, eventId }),
+        body: JSON.stringify({
+          title: form.title,
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          cardNumber: form.cardNumber.trim() || undefined,
+          email: form.email.trim() || undefined,
+          eventId,
+        }),
         credentials: 'include',
       });
+
       const data = await res.json();
       if (res.ok) {
+        toast.success(`Guest "${form.title} ${form.name}" added successfully`);
         router.push(`/client/events/${eventId}`);
       } else {
         setError(data.error || 'Failed to add guest');
       }
     } catch {
-      setError('Network error. Please try again.');
+      setError('Network error');
     } finally {
       setLoading(false);
     }
   };
 
-  const isValid = name.trim() && phone.trim();
-
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .ag-wrap {
-          font-family: 'DM Sans', 'Segoe UI', sans-serif;
-          max-width: 480px;
-          margin: 0 auto;
-          padding: 48px 24px 64px;
-          animation: agFadeIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes agFadeIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .ag-back {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 13px; font-weight: 700; color: #0D4F4F;
-          text-decoration: none; margin-bottom: 28px;
-          transition: opacity 0.15s, gap 0.15s;
-        }
-        .ag-back:hover { opacity: 0.7; gap: 4px; }
-
-        .ag-eyebrow {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
-          display: flex; align-items: center; gap: 7px;
-        }
-        .ag-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #E8A598; }
-
-        .ag-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 30px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.15; letter-spacing: -0.4px; margin: 0 0 6px;
-        }
-        .ag-title span { color: #E8A598; }
-
-        .ag-subtitle { font-size: 14px; color: #7A8FA6; line-height: 1.6; margin: 0 0 28px; }
-
-        .ag-card {
-          background: white; border: 1.5px solid #E2EAF0; border-radius: 22px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
-          overflow: hidden;
-          animation: agCardIn 0.55s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes agCardIn {
-          from { opacity: 0; transform: translateY(20px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .ag-card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
-        .ag-card-body { padding: 32px 32px 28px; }
-
-        .ag-field { position: relative; margin-bottom: 20px; }
-
-        .ag-label {
-          position: absolute; left: 46px; top: 50%; transform: translateY(-50%);
-          font-size: 14px; color: #9BAAB8; pointer-events: none; background: white;
-          padding: 0 4px; font-weight: 500;
-          transition: top 0.2s cubic-bezier(0.4,0,0.2,1),
-                      font-size 0.2s cubic-bezier(0.4,0,0.2,1),
-                      color 0.2s cubic-bezier(0.4,0,0.2,1);
-        }
-        .ag-label.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
-
-        .ag-input-wrap {
-          display: flex; align-items: center;
-          border: 1.5px solid #E2EAF0; border-radius: 13px;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          background: white; overflow: hidden;
-        }
-        .ag-input-wrap.focused {
-          border-color: #0D4F4F;
-          box-shadow: 0 0 0 4px rgba(13,79,79,0.08);
-        }
-
-        .ag-input-icon {
-          width: 46px; display: flex; align-items: center; justify-content: center;
-          color: #C8D4DE; flex-shrink: 0;
-          transition: color 0.2s;
-        }
-        .ag-input-wrap.focused .ag-input-icon { color: #0D4F4F; }
-
-        .ag-input {
-          flex: 1; padding: 15px 15px 15px 0; border: none; outline: none;
-          font-size: 14px; font-family: inherit; color: #0D1B1B;
-          font-weight: 500; background: transparent;
-        }
-
-        .ag-hint { font-size: 11px; color: #9BAAB8; margin-top: 5px; padding-left: 46px; }
-        .ag-hint strong { color: #0D4F4F; }
-
-        .ag-error {
-          background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
-          padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
-          margin-bottom: 20px; display: flex; gap: 8px; align-items: flex-start;
-          animation: shake 0.35s ease;
-        }
-        @keyframes shake {
-          0%,100% { transform: translateX(0); }
-          20%      { transform: translateX(-6px); }
-          60%      { transform: translateX(6px); }
-          80%      { transform: translateX(-3px); }
-        }
-
-        .ag-btn {
-          width: 100%; padding: 15px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.35);
-          transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-          letter-spacing: 0.2px; position: relative; overflow: hidden;
-        }
-        .ag-btn::after {
-          content: ''; position: absolute; inset: 0;
-          background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
-          opacity: 0; transition: opacity 0.2s;
-        }
-        .ag-btn:hover:not(:disabled)::after { opacity: 1; }
-        .ag-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
-        .ag-btn:active:not(:disabled) { transform: translateY(0); }
-        .ag-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .ag-spinner {
-          width: 17px; height: 17px; border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white; border-radius: 50%;
-          animation: spin 0.7s linear infinite; flex-shrink: 0;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        @media (max-width: 540px) {
-          .ag-wrap { padding: 28px 16px 48px; }
-          .ag-title { font-size: 26px; }
-          .ag-card-body { padding: 24px 20px 22px; }
-        }
-      `}</style>
-
-      <div className="ag-wrap">
-        <Link href={`/client/events/${eventId}`} className="ag-back">
-          <ArrowLeft size={14} /> Back to Event
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="flex items-center gap-3 mb-6">
+        <Link
+          href={`/client/events/${eventId}`}
+          className="text-gray-500 hover:text-[#0D4F4F] transition"
+        >
+          <ArrowLeft size={20} />
         </Link>
-
-        <div className="ag-eyebrow">
-          <div className="ag-eyebrow-dot" />
-          Guest Management
-        </div>
-        <h1 className="ag-title">Add a <span>Guest</span></h1>
-        <p className="ag-subtitle">Fill in the guest's details to add them to this event.</p>
-
-        {limit !== null && (
-          <div className="mb-4 text-sm">
-            <span className="font-semibold">Remaining guest slots:</span> {Math.max(0, limit.remaining)}
-          </div>
-        )}
-
-        <div className="ag-card">
-          <div className="ag-card-bar" />
-          <div className="ag-card-body">
-
-            {error && (
-              <div className="ag-error"><span>⚠️</span><span>{error}</span></div>
-            )}
-
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="ag-field">
-                <label className={`ag-label ${focused === 'name' || name ? 'up' : ''}`}>Full Name</label>
-                <div className={`ag-input-wrap ${focused === 'name' ? 'focused' : ''}`}>
-                  <div className="ag-input-icon"><User size={16} /></div>
-                  <input
-                    type="text"
-                    className="ag-input"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    onFocus={() => setFocused('name')}
-                    onBlur={() => setFocused(null)}
-                    autoComplete="name"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="ag-field">
-                <label className={`ag-label ${focused === 'phone' || phone ? 'up' : ''}`}>Phone Number</label>
-                <div className={`ag-input-wrap ${focused === 'phone' ? 'focused' : ''}`}>
-                  <div className="ag-input-icon"><Phone size={16} /></div>
-                  <input
-                    type="tel"
-                    className="ag-input"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value)}
-                    onFocus={() => setFocused('phone')}
-                    onBlur={() => setFocused(null)}
-                    autoComplete="tel"
-                    required
-                  />
-                </div>
-                <div className="ag-hint">Include country code, e.g. <strong>+255712345678</strong></div>
-              </div>
-
-              <button type="submit" className="ag-btn" disabled={!isValid || loading || limit?.remaining === 0}>
-                {loading
-                  ? <><div className="ag-spinner" /> Adding Guest…</>
-                  : <><UserPlus size={16} /> Add Guest</>
-                }
-              </button>
-              {limit?.remaining === 0 && (
-                <p className="text-xs text-amber-600 mt-2 text-center">Guest limit reached. Please top up to add more.</p>
-              )}
-            </form>
-          </div>
-        </div>
+        <h1 className="font-serif text-2xl font-black text-gray-900">Add Guest</h1>
       </div>
-    </>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+              <UserCheck size={15} />
+              Title
+            </label>
+            <select
+              value={form.title}
+              onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
+              className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+            >
+              {TITLES.map(title => (
+                <option key={title} value={title}>{title}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Full Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+              <User size={15} />
+              Full Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+              placeholder="e.g., John Doe"
+              required
+            />
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+              <Phone size={15} />
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+              className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+              placeholder="e.g., +255712345678"
+              required
+            />
+            <p className="text-xs text-gray-400 mt-1">Include country code with + (e.g., +255...)</p>
+          </div>
+
+          {/* Card Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+              <Hash size={15} />
+              Card Number
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.cardNumber}
+                onChange={e => setForm(prev => ({ ...prev, cardNumber: e.target.value }))}
+                className="flex-1 p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                placeholder="e.g., G-001"
+              />
+              <button
+                type="button"
+                onClick={generateCardNumber}
+                disabled={isGeneratingCard}
+                className="px-4 py-2.5 bg-[#0D4F4F] text-white rounded-xl font-medium hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Sparkles size={15} />
+                Auto
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Leave empty for auto-generation, or enter a custom number</p>
+          </div>
+
+          {/* Email (optional) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email (optional)</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+              className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+              placeholder="guest@example.com"
+            />
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? 'Adding...' : 'Add Guest'}
+            </button>
+            <Link
+              href={`/client/events/${eventId}`}
+              className="px-6 border border-gray-300 rounded-xl py-2.5 font-medium hover:bg-gray-50 transition"
+            >
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
