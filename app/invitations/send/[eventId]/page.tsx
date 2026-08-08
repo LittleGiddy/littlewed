@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image } from 'lucide-react';
+import { Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Guest {
@@ -11,7 +11,15 @@ interface Guest {
   routingChannel: string;
   invitationCard: string | null;
   smsCode: string | null;
+  qrToken: string | null;
+  cardNumber: string | null;
+  title: string | null;
   invitationSentAt: string | null;
+}
+
+interface EventSettings {
+  customMessage: string;
+  templateCardUrl: string | null;
 }
 
 export default function SendPage() {
@@ -21,6 +29,7 @@ export default function SendPage() {
   const [results, setResults] = useState<{ guestId: string; name: string; success: boolean; error?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
+  const [eventSettings, setEventSettings] = useState<EventSettings | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -28,6 +37,7 @@ export default function SendPage() {
       fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }).then(r => r.json()),
     ]).then(([guestsData, settings]) => {
       setGuests(guestsData);
+      setEventSettings(settings);
       setCustomMessage(settings.customMessage || "You're invited! Scan the QR code at the entrance.");
       setLoading(false);
     }).catch(() => {
@@ -85,7 +95,13 @@ export default function SendPage() {
     return 'pending';
   };
 
+  const getFullName = (guest: Guest) => {
+    return guest.title ? `${guest.title} ${guest.name}` : guest.name;
+  };
+
   if (loading) return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
+
+  const hasCard = guests.some(g => g.invitationCard);
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
@@ -239,10 +255,46 @@ export default function SendPage() {
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
+        .card-info {
+          font-size: 9px;
+          color: #999;
+          margin-top: 2px;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .card-info span {
+          background: rgba(0,0,0,0.05);
+          padding: 1px 6px;
+          border-radius: 10px;
+        }
       `}</style>
 
       <h1 className="font-serif text-3xl font-black text-gray-900 mb-2">Send Invitations</h1>
       <p className="text-gray-500 mb-4">Broadcast invitation messages with QR cards to all guests.</p>
+
+      {/* ─── Card Summary ─── */}
+      <div className="mb-4 bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Image size={18} className="text-[#0D4F4F]" />
+          <span className="font-medium text-sm">Card Status:</span>
+        </div>
+        <div className="flex gap-4 text-sm">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle size={14} className="text-green-600" />
+            {guests.filter(g => g.invitationCard).length} with card
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Clock size={14} className="text-amber-500" />
+            {guests.filter(g => !g.invitationCard).length} without card
+          </span>
+        </div>
+        {!hasCard && (
+          <span className="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+            ⚠️ Generate invitation cards first
+          </span>
+        )}
+      </div>
 
       <div className="chat-container">
         <div className="chat-header">
@@ -261,11 +313,12 @@ export default function SendPage() {
             const isSent = status === 'sent';
             const isFailed = status === 'failed';
             const isPending = status === 'pending';
+            const fullName = getFullName(guest);
             return (
               <div key={guest.id} className="guest-message-group">
                 <div className="guest-label">
                   <span className="guest-avatar">{guest.name.charAt(0).toUpperCase()}</span>
-                  <span>{guest.name}</span>
+                  <span>{fullName}</span>
                   <span className="channel-icon">{channelIcon}</span>
                   {isSent && <CheckCircle size={12} className="text-green-600" />}
                   {isFailed && <XCircle size={12} className="text-red-500" />}
@@ -280,6 +333,10 @@ export default function SendPage() {
                       className="card-preview w-full max-w-[180px]"
                     />
                   )}
+                  <div className="card-info">
+                    {guest.cardNumber && <span>Card: {guest.cardNumber}</span>}
+                    {guest.smsCode && <span>Code: {guest.smsCode}</span>}
+                  </div>
                   <div className="timestamp">
                     {isSent ? 'Sent' : isFailed ? (result?.error || 'Failed') : 'Queued'}
                   </div>
