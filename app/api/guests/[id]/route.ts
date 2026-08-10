@@ -42,7 +42,6 @@ export async function PUT(
     const { id } = await params;
     const { name, phone } = await req.json();
 
-    // ─── Validation ──────────────────────────────────────────────────────
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
@@ -50,7 +49,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
-    // Normalize phone number
     const { normalized, isValid } = normalizePhone(phone);
     if (!isValid) {
       return NextResponse.json(
@@ -59,7 +57,6 @@ export async function PUT(
       );
     }
 
-    // ─── Check if guest exists and belongs to tenant ────────────────────
     const existingGuest = await prisma.guest.findFirst({
       where: { id, event: { tenantId } },
     });
@@ -68,12 +65,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
-    // ─── Check for duplicate phone in the same event ────────────────────
     const duplicate = await prisma.guest.findFirst({
       where: {
         eventId: existingGuest.eventId,
         phone: normalized,
-        id: { not: id }, // exclude current guest
+        id: { not: id },
       },
     });
 
@@ -84,14 +80,11 @@ export async function PUT(
       );
     }
 
-    // ─── Update guest ────────────────────────────────────────────────────
     const updatedGuest = await prisma.guest.update({
       where: { id },
       data: {
         name: name.trim(),
         phone: normalized,
-        // Routing channel is automatically determined by phone format
-        // If you want to allow changing routing channel, add it here
       },
     });
 
@@ -100,6 +93,51 @@ export async function PUT(
     console.error('Error updating guest:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update guest' },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── PATCH (Update routing channel) ─────────────────────────────────────
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const tenantId = (session.user as any).tenantId;
+    const { id } = await params;
+    const { routingChannel } = await req.json();
+
+    if (!routingChannel || !['whatsapp', 'sms'].includes(routingChannel)) {
+      return NextResponse.json(
+        { error: 'Invalid routing channel' },
+        { status: 400 }
+      );
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id, event: { tenantId } },
+    });
+
+    if (!guest) {
+      return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
+    }
+
+    const updatedGuest = await prisma.guest.update({
+      where: { id },
+      data: { routingChannel },
+    });
+
+    return NextResponse.json({ success: true, guest: updatedGuest });
+  } catch (error) {
+    console.error('PATCH guest error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

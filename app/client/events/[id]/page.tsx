@@ -10,7 +10,7 @@ import {
   Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
   Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
-  Check, Coins, Sparkles, Hash, FileText
+  Check, Coins, Sparkles, Hash, FileText, Loader2
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -141,6 +141,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ── Ref to prevent duplicate LIVE reports ──────────────────────────────
   const hasReportedLive = useRef(false);
+
+  // ── Generate Cards state ──────────────────────────────────────────────
+  const [generatingCards, setGeneratingCards] = useState(false);
 
   // ── Pagination & search ────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
@@ -737,6 +740,38 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             >
               <Edit2 size={15} />
             </button>
+            {/* ─── Re-check WhatsApp Button ─── */}
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!guest.phone) {
+                  toast.error('Guest has no phone number');
+                  return;
+                }
+                const res = await fetch('/api/whatsapp/check', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ phone: guest.phone }),
+                });
+                const data = await res.json();
+                if (data.hasWhatsApp) {
+                  const updateRes = await fetch(`/api/guests/${guest.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ routingChannel: 'whatsapp' }),
+                  });
+                  if (updateRes.ok) {
+                    toast.success(`✅ ${guest.name} is on WhatsApp!`);
+                    fetchData(eventId!);
+                  }
+                } else {
+                  toast(`❌ ${guest.name} is not on WhatsApp`, { icon: 'ℹ️' });
+                }
+              }}
+              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
+            >
+              <MessageCircle size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -955,6 +990,42 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <Link href={`/client/invitations/design/${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
               <Palette size={14} /> Design Card
             </Link>
+
+            {/* ─── Generate Cards Button ─── */}
+            <button
+              onClick={async () => {
+                if (!confirm('Generate invitation cards for ALL guests in this event?')) return;
+                setGeneratingCards(true);
+                try {
+                  const res = await fetch('/api/invitations/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eventId: event.id }),
+                    credentials: 'include',
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    toast.success(`✅ Generated ${data.generated} invitation cards`);
+                    fetchData(eventId!);
+                  } else {
+                    toast.error(data.error || 'Failed to generate cards');
+                  }
+                } catch {
+                  toast.error('Network error');
+                } finally {
+                  setGeneratingCards(false);
+                }
+              }}
+              disabled={generatingCards || guests.length === 0}
+              className="bg-amber-600 text-white text-center py-2.5 rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {generatingCards ? (
+                <><Loader2 size={15} className="animate-spin" /> Generating...</>
+              ) : (
+                <><Palette size={14} /> Generate Cards</>
+              )}
+            </button>
+
             <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
               <QrCode size={14} /> Check-In
             </Link>
