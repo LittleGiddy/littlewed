@@ -1,9 +1,7 @@
-// app/api/whatsapp/test/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { testWhatsAppConnection } from '@/lib/whatsapp';
+import { sendWhatsAppMessage } from '@/lib/whatsapp';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +19,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate phone number format
     const cleanNumber = phoneNumber.replace(/^\+/, '');
     if (!/^[0-9]{10,15}$/.test(cleanNumber)) {
       return NextResponse.json(
@@ -30,7 +27,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await testWhatsAppConnection(cleanNumber);
+    // ✅ Use sendWhatsAppMessage directly
+    const result = await sendWhatsAppMessage({
+      to: cleanNumber,
+      type: 'text',
+      text: 'Hello from LittleWed! Your WhatsApp integration is working 🎉',
+    });
 
     if (result.success) {
       return NextResponse.json({
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('Test endpoint error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to send test message' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }

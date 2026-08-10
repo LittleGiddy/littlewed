@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
@@ -13,6 +13,8 @@ export default function AddGuestPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState<{ hasWhatsApp: boolean; waId?: string } | null>(null);
   const [form, setForm] = useState({
     title: 'Mr',
     name: '',
@@ -36,13 +38,44 @@ export default function AddGuestPage() {
         setForm(prev => ({ ...prev, cardNumber: data.cardNumber }));
       }
     } catch {
-      // fallback – generate locally
       const rand = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       setForm(prev => ({ ...prev, cardNumber: `G-${rand}` }));
     } finally {
       setIsGeneratingCard(false);
     }
   };
+
+  // ─── Check WhatsApp Number ──────────────────────────────────────────
+  const checkWhatsApp = async () => {
+  if (!form.phone) {
+    toast.error('Please enter a phone number first');
+    return;
+  }
+  setCheckingWhatsApp(true);
+  setWhatsappStatus(null);
+  try {
+    const res = await fetch('/api/whatsapp/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: form.phone }),
+    });
+    const data = await res.json();
+    setWhatsappStatus(data);
+    if (data.hasWhatsApp) {
+      toast.success('✅ Number has WhatsApp!');
+    } else {
+      // ✅ Fixed: Use toast() instead of toast.info()
+      toast('ℹ️ Number does not have WhatsApp (SMS will be used)', {
+        icon: 'ℹ️',
+        duration: 4000,
+      });
+    }
+  } catch {
+    toast.error('Failed to check WhatsApp');
+  } finally {
+    setCheckingWhatsApp(false);
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +105,8 @@ export default function AddGuestPage() {
 
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Guest "${form.title} ${form.name}" added successfully`);
+        const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
+        toast.success(`Guest "${form.title} ${form.name}" added (${channel})`);
         router.push(`/client/events/${eventId}`);
       } else {
         setError(data.error || 'Failed to add guest');
@@ -137,14 +171,34 @@ export default function AddGuestPage() {
               <Phone size={15} />
               Phone Number <span className="text-red-500">*</span>
             </label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
-              className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-              placeholder="e.g., +255712345678"
-              required
-            />
+            <div className="flex gap-2">
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                className="flex-1 p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                placeholder="+255712345678"
+                required
+              />
+              <button
+                type="button"
+                onClick={checkWhatsApp}
+                disabled={checkingWhatsApp}
+                className="px-4 py-2 bg-[#0D4F4F] text-white rounded-xl font-medium hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {checkingWhatsApp ? <Loader2 size={16} className="animate-spin" /> : null}
+                {checkingWhatsApp ? 'Checking...' : 'Check WhatsApp'}
+              </button>
+            </div>
+            {whatsappStatus && (
+              <p className={`text-xs mt-1.5 flex items-center gap-1.5 ${whatsappStatus.hasWhatsApp ? 'text-green-600' : 'text-amber-600'}`}>
+                {whatsappStatus.hasWhatsApp ? (
+                  <><CheckCircle size={12} /> WhatsApp number detected {whatsappStatus.waId && `(WA ID: ${whatsappStatus.waId})`}</>
+                ) : (
+                  <><XCircle size={12} /> SMS will be used (no WhatsApp detected)</>
+                )}
+              </p>
+            )}
             <p className="text-xs text-gray-400 mt-1">Include country code with + (e.g., +255...)</p>
           </div>
 

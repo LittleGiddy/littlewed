@@ -4,8 +4,8 @@ const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID!;
 const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN!;
 const API_VERSION = 'v19.0';
 
-interface SendMessageParams {
-  to: string;                    // Phone number (e.g., 255712345678)
+export interface SendMessageParams {
+  to: string;
   type: 'text' | 'template';
   text?: string;
   templateName?: string;
@@ -15,9 +15,19 @@ interface SendMessageParams {
 export async function sendWhatsAppMessage(params: SendMessageParams) {
   const { to, type, text, templateName, templateParams } = params;
 
+  if (!to) {
+    return { success: false, error: 'Phone number is required' };
+  }
+
+  const cleanTo = to.replace(/^\+/, '');
+
+  if (!/^[0-9]{10,15}$/.test(cleanTo)) {
+    return { success: false, error: 'Invalid phone number format' };
+  }
+
   let body: any = {
     messaging_product: 'whatsapp',
-    to: to.replace(/^\+/, ''),    // Remove leading '+'
+    to: cleanTo,
   };
 
   if (type === 'text' && text) {
@@ -28,7 +38,10 @@ export async function sendWhatsAppMessage(params: SendMessageParams) {
     body.template = {
       name: templateName,
       language: { code: 'en' },
-      components: templateParams ? [
+    };
+
+    if (templateParams && templateParams.length > 0) {
+      body.template.components = [
         {
           type: 'body',
           parameters: templateParams.map((param) => ({
@@ -36,8 +49,10 @@ export async function sendWhatsAppMessage(params: SendMessageParams) {
             text: param,
           })),
         },
-      ] : [],
-    };
+      ];
+    }
+  } else {
+    return { success: false, error: 'Invalid message type or missing parameters' };
   }
 
   const url = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`;
@@ -55,7 +70,8 @@ export async function sendWhatsAppMessage(params: SendMessageParams) {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Failed to send WhatsApp message');
+      console.error('WhatsApp API error:', data);
+      return { success: false, error: data.error?.message || 'Failed to send WhatsApp message' };
     }
 
     return { success: true, data };
@@ -65,7 +81,57 @@ export async function sendWhatsAppMessage(params: SendMessageParams) {
   }
 }
 
-// ─── Quick test function ─────────────────────────────────────────────────
+export async function sendInvitationTemplate(
+  guest: {
+    phone: string | null;
+    name: string;
+    cardNumber: string | null;
+    title?: string | null;
+  },
+  event: {
+    name: string;
+    date: Date | string;
+    venue: string;
+    time?: string;
+  }
+) {
+  if (!guest.phone) {
+    return { success: false, error: 'Guest has no phone number' };
+  }
+
+  const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+  const cardNumber = guest.cardNumber || 'N/A';
+  
+  const eventDate = typeof event.date === 'string' ? new Date(event.date) : event.date;
+  const formattedDate = eventDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  
+  const formattedTime = event.time || eventDate.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const params = [
+    fullName,
+    event.name,
+    formattedDate,
+    event.venue,
+    formattedTime,
+    cardNumber,
+  ];
+
+  return await sendWhatsAppMessage({
+    to: guest.phone,
+    type: 'template',
+    templateName: 'invitation_reminder',
+    templateParams: params,
+  });
+}
+
+// ─── Test function ────────────────────────────────────────────────────────
 export async function testWhatsAppConnection(to: string) {
   const result = await sendWhatsAppMessage({
     to,

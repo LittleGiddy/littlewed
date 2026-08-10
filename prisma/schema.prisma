@@ -213,6 +213,7 @@ model Guest {
   guestType  String?  // 'single', 'double', or any custom value
   title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
   cardNumber     String?   @unique       // e.g., "G-001", "G-002"
+  waId           String?   // WhatsApp ID from Meta
 }
 
 model UsageRecord {

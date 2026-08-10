@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
+import { isWhatsAppNumber } from '@/lib/validate-whatsapp';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -18,16 +19,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Normalize phone
+  // ─── Normalize phone ──────────────────────────────────────────────────
   const { normalized, isValid } = normalizePhone(phone);
   if (!isValid) {
     return NextResponse.json(
-      { error: 'Invalid phone number format. Must start with "+" and include country code (e.g., +255712345678).' },
+      { error: 'Invalid phone number format. Must start with "+" and include country code.' },
       { status: 400 }
     );
   }
 
-  // ─── Check duplicate phone ──────────────────────────────────────────
+  // ─── Check if number has WhatsApp (using Meta Contacts API) ──────────
+  let routingChannel = 'sms';
+  let whatsappVerified = false;
+  let waId: string | undefined;
+
+  try {
+    const result = await isWhatsAppNumber(normalized);
+    if (result.hasWhatsApp) {
+      routingChannel = 'whatsapp';
+      whatsappVerified = true;
+      waId = result.waId;
+    }
+  } catch (error) {
+    console.error(`WhatsApp check failed for ${normalized}:`, error);
+    // Fallback to SMS if the check fails
+    routingChannel = 'sms';
+  }
+
+  // ─── Check duplicate ──────────────────────────────────────────────────
   const existing = await prisma.guest.findFirst({
     where: { eventId, phone: normalized },
   });
@@ -64,15 +83,13 @@ export async function POST(req: NextRequest) {
     const currentCount = await prisma.guest.count({ where: { eventId } });
     if (currentCount >= event.guestCount) {
       return NextResponse.json(
-        {
-          error: `Guest limit reached (${event.guestCount}). Please top up to add more.`,
-        },
+        { error: `Guest limit reached (${event.guestCount}).` },
         { status: 400 }
       );
     }
   }
 
-  // ─── Generate card number if not provided ──────────────────────────
+  // ─── Generate card number ──────────────────────────────────────────
   let finalCardNumber = cardNumber?.trim() || null;
   if (!finalCardNumber) {
     const count = await prisma.guest.count({ where: { eventId } });
@@ -88,11 +105,17 @@ export async function POST(req: NextRequest) {
       cardNumber: finalCardNumber,
       email: email?.trim() || null,
       eventId,
-      routingChannel: 'sms',
+      routingChannel,
+      // Store the WhatsApp ID if available
+      waId: waId || null,
       smsCode: randomBytes(4).toString('hex').toUpperCase(),
       qrToken: randomBytes(16).toString('hex'),
     },
   });
 
-  return NextResponse.json(guest);
+  return NextResponse.json({
+    ...guest,
+    whatsappDetected: whatsappVerified,
+    routingChannel,
+  });
 }
