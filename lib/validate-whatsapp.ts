@@ -11,17 +11,16 @@ export interface MetaContactCheckResult {
   status?: string;
 }
 
-/**
- * Checks if a phone number has an active WhatsApp account using Meta's Contacts API.
- * @param phoneNumber - The phone number in international format (including '+').
- * @returns An object indicating if the contact has WhatsApp and their wa_id.
- */
 export async function isWhatsAppNumber(phoneNumber: string): Promise<MetaContactCheckResult> {
   try {
-    // Clean the number: remove '+' and any spaces
     const cleanNumber = phoneNumber.replace(/^\+/, '').replace(/\s/g, '');
 
-    // 1. Call the contacts endpoint
+    // Validate that PHONE_NUMBER_ID is set
+    if (!PHONE_NUMBER_ID || PHONE_NUMBER_ID === 'your_phone_number_id') {
+      console.warn('⚠️ WHATSAPP_PHONE_NUMBER_ID is not configured correctly');
+      return { hasWhatsApp: false, error: 'WhatsApp not configured' };
+    }
+
     const response = await fetch(
       `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/contacts`,
       {
@@ -41,13 +40,21 @@ export async function isWhatsAppNumber(phoneNumber: string): Promise<MetaContact
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData?.error?.message || `API call failed (HTTP ${response.status})`;
+      
+      // Don't throw for 403/401 – just return false with error
+      if (response.status === 401 || response.status === 403) {
+        return {
+          hasWhatsApp: false,
+          error: 'WhatsApp API not configured. Please check your credentials.',
+        };
+      }
+      
       throw new Error(errorMessage);
     }
 
     const data = await response.json();
-
-    // 2. Parse the response
     const contact = data.contacts?.[0];
+    
     if (!contact) {
       return {
         hasWhatsApp: false,
@@ -55,7 +62,6 @@ export async function isWhatsAppNumber(phoneNumber: string): Promise<MetaContact
       };
     }
 
-    // A valid contact will have a wa_id and a status of 'valid'.
     const hasWhatsApp = !!contact.wa_id && contact.status !== 'invalid' && contact.status !== 'failed';
 
     return {
@@ -70,18 +76,4 @@ export async function isWhatsAppNumber(phoneNumber: string): Promise<MetaContact
       error: error.message || 'Lookup failed',
     };
   }
-}
-
-/**
- * Bulk check multiple phone numbers
- */
-export async function checkWhatsAppNumbers(phones: string[]): Promise<MetaContactCheckResult[]> {
-  const results: MetaContactCheckResult[] = [];
-  for (const phone of phones) {
-    const result = await isWhatsAppNumber(phone);
-    results.push(result);
-    // Add a small delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  return results;
 }
