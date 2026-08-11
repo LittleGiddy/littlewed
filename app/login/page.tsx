@@ -589,6 +589,9 @@ export default function LoginPage() {
               <Link href="/privacy-policy" className="text-sm text-gray-500 hover:text-[#0D4F4F] transition">
                 Privacy Policy
               </Link>
+              <Link href="/data-deletion" className="block text-sm text-gray-500 hover:text-[#0D4F4F] transition">
+                Data Deletion
+              </Link>
               <div>© 2026 <strong>LittleWed</strong>. All rights reserved.</div>
               <div>Managed by <strong>MAHIRI GLOBAL LTD</strong></div>
             </div>
