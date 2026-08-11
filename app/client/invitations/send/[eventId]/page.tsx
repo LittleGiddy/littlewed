@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { 
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
-  Eye, EyeOff, ChevronDown, ChevronUp, Copy, Check, Filter,
-  Smartphone, QrCode, Calendar, MapPin, User, Hash, Palette
+  ChevronDown, ChevronUp, Copy, Check, Filter,
+  User, Hash, Calendar, MapPin, Smartphone, QrCode,
+  Wand2, FileText, Eye, EyeOff, Edit3
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -33,7 +34,6 @@ interface EventData {
   venue: string;
   address: string;
   tenant: { testMode: boolean };
-  templateCardUrl: string | null;
 }
 
 interface SendResult {
@@ -44,6 +44,31 @@ interface SendResult {
   channel?: string;
 }
 
+// ─── Placeholder definitions ──────────────────────────────────────────────
+const PLACEHOLDERS = [
+  { key: '{fullName}', label: 'Full Name', icon: User, example: 'Mr. John Doe' },
+  { key: '{title}', label: 'Title', icon: User, example: 'Mr / Miss / Mrs' },
+  { key: '{name}', label: 'Name', icon: User, example: 'John Doe' },
+  { key: '{cardNumber}', label: 'Card Number', icon: Hash, example: 'G-0042' },
+  { key: '{smsCode}', label: 'Check-in Code', icon: QrCode, example: 'ABC123' },
+  { key: '{event}', label: 'Event Name', icon: Calendar, example: 'Sarah & James Wedding' },
+  { key: '{date}', label: 'Event Date', icon: Calendar, example: 'August 15, 2026' },
+  { key: '{venue}', label: 'Venue', icon: MapPin, example: 'The Grand Ballroom' },
+];
+
+// ─── Default template ──────────────────────────────────────────────────────
+const DEFAULT_MESSAGE = `Hello {fullName},
+
+You're invited to {event}!
+
+📅 Date: {date}
+📍 Venue: {venue}
+🎟️ Your Card: {cardNumber}
+🔑 Check-in Code: {smsCode}
+
+Scan your QR code at the entrance.
+We look forward to celebrating with you! 🎉`;
+
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -53,14 +78,14 @@ export default function SendInvitationsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<SendResult[]>([]);
-  const [customMessage, setCustomMessage] = useState('');
+  const [message, setMessage] = useState(DEFAULT_MESSAGE);
   const [filterChannel, setFilterChannel] = useState<'all' | 'whatsapp' | 'sms'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'sent' | 'pending' | 'failed'>('all');
   const [expandedGuest, setExpandedGuest] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [hasCardTemplate, setHasCardTemplate] = useState(false);
+  const [previewGuestId, setPreviewGuestId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -86,8 +111,9 @@ export default function SendInvitationsPage() {
 
         setEvent(eventData.event || eventData);
         setGuests(guestsData || []);
-        setCustomMessage(settings.customMessage || "You're invited! Scan the QR code at the entrance.");
-        setHasCardTemplate(!!settings.templateCardUrl);
+        if (settings.customMessage) {
+          setMessage(settings.customMessage);
+        }
       } catch (error) {
         console.error('Load error:', error);
         toast.error('Failed to load data');
@@ -98,37 +124,46 @@ export default function SendInvitationsPage() {
     loadData();
   }, [eventId]);
 
-  // ─── Generate Cards ────────────────────────────────────────────────────
-  const generateCards = async () => {
-    if (!hasCardTemplate) {
-      toast.error('Please design an invitation card first!');
-      router.push(`/client/invitations/design/${eventId}`);
-      return;
-    }
+  // ─── Insert placeholder at cursor ──────────────────────────────────────
+  const insertPlaceholder = (placeholder: string) => {
+    const textarea = document.getElementById('message-editor') as HTMLTextAreaElement;
+    if (!textarea) return;
 
-    setGenerating(true);
-    try {
-      const res = await fetch('/api/invitations/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId }),
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`✅ Generated ${data.generated} invitation cards`);
-        // Refresh guest list
-        const guestsRes = await fetch(`/api/events/${eventId}/guests`, { credentials: 'include' });
-        const guestsData = await guestsRes.json();
-        setGuests(guestsData);
-      } else {
-        toast.error(data.error || 'Failed to generate cards');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setGenerating(false);
-    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = message;
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    const newText = before + placeholder + after;
+    
+    setMessage(newText);
+    
+    // Set cursor position after the inserted placeholder
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + placeholder.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 10);
+  };
+
+  // ─── Get preview message ───────────────────────────────────────────────
+  const getPreviewMessage = (guest: Guest) => {
+    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    const formattedDate = event ? new Date(event.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }) : '';
+
+    return message
+      .replace(/{title}/g, guest.title || 'Mr')
+      .replace(/{name}/g, guest.name)
+      .replace(/{fullName}/g, fullName)
+      .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
+      .replace(/{smsCode}/g, guest.smsCode || 'N/A')
+      .replace(/{event}/g, event?.name || '')
+      .replace(/{date}/g, formattedDate)
+      .replace(/{venue}/g, event?.venue || '');
   };
 
   // ─── Send to a single guest ────────────────────────────────────────────
@@ -144,7 +179,7 @@ export default function SendInvitationsPage() {
         body: JSON.stringify({ 
           guestId: guest.id, 
           eventId,
-          message: customMessage,
+          message,
         }),
         credentials: 'include',
       });
@@ -173,6 +208,11 @@ export default function SendInvitationsPage() {
     const targetGuests = getFilteredGuests();
     if (targetGuests.length === 0) {
       toast.error('No guests matching the current filters');
+      return;
+    }
+
+    if (!message.trim()) {
+      toast.error('Please write a message');
       return;
     }
 
@@ -261,9 +301,12 @@ export default function SendInvitationsPage() {
     );
   }
 
+  // ─── Get a sample guest for preview ────────────────────────────────────
+  const previewGuest = guests.find(g => g.id === previewGuestId) || guests[0] || null;
+
   // ─── Render ────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -281,24 +324,6 @@ export default function SendInvitationsPage() {
           </div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {/* ─── Generate Cards Button ─── */}
-          <button
-            onClick={generateCards}
-            disabled={generating}
-            className="px-4 py-2 bg-amber-600 text-white rounded-xl font-semibold text-sm hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-2"
-          >
-            {generating ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />}
-            {generating ? 'Generating...' : hasCard ? 'Regenerate Cards' : 'Generate Cards'}
-          </button>
-          {!hasCardTemplate && (
-            <button
-              onClick={() => router.push(`/client/invitations/design/${eventId}`)}
-              className="px-4 py-2 bg-red-500 text-white rounded-xl font-semibold text-sm hover:bg-red-600 transition flex items-center gap-2 animate-pulse"
-            >
-              <AlertCircle size={16} />
-              Design Card First!
-            </button>
-          )}
           <button
             onClick={() => sendToChannel('whatsapp')}
             disabled={sending || whatsappCount === 0}
@@ -318,38 +343,6 @@ export default function SendInvitationsPage() {
         </div>
       </div>
 
-      {/* ─── Card Status Banner ─── */}
-      {!hasCard && hasCardTemplate && (
-        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-amber-700">
-            <AlertCircle size={18} />
-            <span className="text-sm font-medium">No cards generated yet. Click "Generate Cards" to create them.</span>
-          </div>
-          <button
-            onClick={generateCards}
-            disabled={generating}
-            className="px-4 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 transition"
-          >
-            Generate Now
-          </button>
-        </div>
-      )}
-
-      {!hasCardTemplate && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-red-700">
-            <AlertCircle size={18} />
-            <span className="text-sm font-medium">No invitation card template designed. Please design one first.</span>
-          </div>
-          <Link
-            href={`/client/invitations/design/${eventId}`}
-            className="px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition"
-          >
-            Design Card
-          </Link>
-        </div>
-      )}
-
       {/* ─── Stats Cards ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
@@ -368,6 +361,13 @@ export default function SendInvitationsPage() {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center gap-2">
+            <Phone size={16} className="text-blue-600" />
+            <span className="text-sm font-medium text-gray-600">SMS</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{smsCount}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+          <div className="flex items-center gap-2">
             <CheckCircle size={16} className="text-green-600" />
             <span className="text-sm font-medium text-gray-600">Sent</span>
           </div>
@@ -380,12 +380,134 @@ export default function SendInvitationsPage() {
           </div>
           <p className="text-2xl font-bold text-gray-900">{guests.filter(g => g.invitationCard).length}</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
-          <div className="flex items-center gap-2">
-            <Palette size={16} className="text-amber-600" />
-            <span className="text-sm font-medium text-gray-600">Template</span>
+      </div>
+
+      {/* ─── Main Layout: Message Editor + Preview ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* ─── Left: Message Editor ─── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-[#0D4F4F]" />
+              <span className="font-semibold text-gray-800">Message Template</span>
+            </div>
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="text-sm text-gray-400 hover:text-[#0D4F4F] transition flex items-center gap-1"
+            >
+              {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </button>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{hasCardTemplate ? '✅' : '❌'}</p>
+
+          <div className="p-5">
+            {/* ─── Placeholder Buttons ─── */}
+            <div className="mb-4">
+              <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                <Wand2 size={12} />
+                Click a placeholder to insert it into your message:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {PLACEHOLDERS.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => insertPlaceholder(p.key)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-[#0D4F4F] hover:text-white rounded-full text-xs font-medium transition group"
+                    title={`Example: ${p.example}`}
+                  >
+                    <p.icon size={12} className="group-hover:text-white" />
+                    {p.key}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ─── Textarea ─── */}
+            <textarea
+              id="message-editor"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={8}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none font-mono text-sm"
+              placeholder="Write your invitation message here... Use the placeholders above to personalize for each guest."
+            />
+
+            {/* ─── Character Count ─── */}
+            <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+              <span>{message.length} characters</span>
+              <span className="text-[#0D4F4F] font-medium">
+                {message.includes('{fullName}') ? '✅ Personalized' : '⚠️ No {fullName} placeholder'}
+              </span>
+            </div>
+
+            {/* ─── Preview Button ─── */}
+            {previewGuest && (
+              <button
+                onClick={() => setShowPreview(!showPreview)}
+                className="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition flex items-center justify-center gap-2"
+              >
+                <Eye size={16} />
+                {showPreview ? 'Hide Preview' : `Preview for ${getFullName(previewGuest)}`}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ─── Right: Live Preview ─── */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Smartphone size={18} className="text-[#0D4F4F]" />
+              <span className="font-semibold text-gray-800">Preview</span>
+            </div>
+            {previewGuest && (
+              <span className="text-xs text-gray-400">
+                {getFullName(previewGuest)} · {previewGuest.cardNumber || 'No card'}
+              </span>
+            )}
+          </div>
+
+          <div className="p-5">
+            {!previewGuest ? (
+              <div className="text-center py-8 text-gray-400">
+                <Users size={32} className="mx-auto mb-2 opacity-30" />
+                <p className="text-sm">No guests available for preview</p>
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                {/* ─── Guest Selector ─── */}
+                <div className="mb-3">
+                  <select
+                    value={previewGuestId || ''}
+                    onChange={(e) => setPreviewGuestId(e.target.value)}
+                    className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                  >
+                    {guests.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {getFullName(g)} {g.cardNumber ? `(${g.cardNumber})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* ─── Preview Message ─── */}
+                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm min-h-[200px]">
+                  <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                    {showPreview ? getPreviewMessage(previewGuest) : message}
+                  </div>
+                </div>
+
+                {/* ─── Placeholder Legend ─── */}
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
+                  {PLACEHOLDERS.map((p) => (
+                    <span key={p.key} className="bg-gray-100 px-2 py-0.5 rounded">
+                      {p.key}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -467,6 +589,15 @@ export default function SendInvitationsPage() {
             </button>
           )}
         </div>
+        <button
+          onClick={() => {
+            setFilterChannel('all');
+            setFilterStatus('all');
+          }}
+          className="text-sm text-gray-400 hover:text-gray-600 transition"
+        >
+          Clear Filters
+        </button>
       </div>
 
       {/* ─── Guest List ─── */}
@@ -489,7 +620,7 @@ export default function SendInvitationsPage() {
             </span>
             <button
               onClick={broadcast}
-              disabled={sending || filteredGuests.length === 0}
+              disabled={sending || filteredGuests.length === 0 || !message.trim()}
               className="px-4 py-1.5 bg-[#0D4F4F] text-white rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -498,7 +629,7 @@ export default function SendInvitationsPage() {
           </div>
         </div>
 
-        <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+        <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
           {filteredGuests.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users size={48} className="mx-auto mb-3 text-gray-300" />
@@ -540,18 +671,6 @@ export default function SendInvitationsPage() {
                         </span>
                         {guest.cardNumber && (
                           <span className="text-xs text-gray-400 font-mono">#{guest.cardNumber}</span>
-                        )}
-                        {guest.invitationCard && (
-                          <span className="text-xs text-green-600 flex items-center gap-1">
-                            <CheckCircle size={10} />
-                            Card Ready
-                          </span>
-                        )}
-                        {!guest.invitationCard && hasCardTemplate && (
-                          <span className="text-xs text-amber-600 flex items-center gap-1">
-                            <Clock size={10} />
-                            No Card
-                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
@@ -648,39 +767,6 @@ export default function SendInvitationsPage() {
                             <CheckCircle size={14} />
                             <span>Checked In ✅</span>
                           </div>
-                        )}
-                        {!guest.invitationCard && hasCardTemplate && (
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              // Generate card for this specific guest
-                              setGenerating(true);
-                              try {
-                                const res = await fetch('/api/invitations/generate', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ eventId, guestId: guest.id }),
-                                  credentials: 'include',
-                                });
-                                const data = await res.json();
-                                if (res.ok) {
-                                  toast.success(`Card generated for ${guest.name}`);
-                                  const guestsRes = await fetch(`/api/events/${eventId}/guests`, { credentials: 'include' });
-                                  const guestsData = await guestsRes.json();
-                                  setGuests(guestsData);
-                                } else {
-                                  toast.error(data.error || 'Failed to generate card');
-                                }
-                              } catch {
-                                toast.error('Network error');
-                              } finally {
-                                setGenerating(false);
-                              }
-                            }}
-                            className="text-sm text-amber-600 hover:text-amber-700 font-medium"
-                          >
-                            Generate Card →
-                          </button>
                         )}
                       </div>
                     </div>
