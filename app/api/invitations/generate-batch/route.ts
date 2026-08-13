@@ -118,11 +118,12 @@ export async function POST(req: NextRequest) {
           cardNumber
         );
 
-        // ─── 5. Upload to Vercel Blob ─────────────────────────────────
+        // ─── 5. Upload to Vercel Blob with allowOverwrite ──────────────
         const key = `guests/${event.tenantId}/${guest.id}.png`;
         const blob = await put(key, finalCardBuffer, {
           access: 'public',
           contentType: 'image/png',
+          allowOverwrite: true, // ✅ Add this to fix the error
         });
 
         // ─── 6. Update database ────────────────────────────────────────
