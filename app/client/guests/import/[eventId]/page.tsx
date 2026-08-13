@@ -17,6 +17,7 @@ interface ParsedGuest {
   normalizedPhone: string;
   email?: string;
   guestType?: string;
+  title?: string;
   isValid: boolean;
   statusMessage?: string;
   cardNumber?: string;
@@ -90,40 +91,129 @@ export default function ImportGuestsPage() {
     return { normalized: '+' + cleaned, isValid: true };
   };
 
-  // ─── PDF Parser (runs on text returned from the server) ─────────────
-  const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType: string }[] => {
-    const guests: { name: string; phone: string; cardNumber: string; guestType: string }[] = [];
+  // ─── Title Extraction Helper ──────────────────────────────────────────
+  const extractTitle = (name: string): { cleanName: string; title?: string } => {
+    const titlePatterns = [
+      { pattern: /^(MR\.?\s+)/i, title: 'Mr' },
+      { pattern: /^(MRS\.?\s+)/i, title: 'Mrs' },
+      { pattern: /^(MS\.?\s+)/i, title: 'Ms' },
+      { pattern: /^(MISS\.?\s+)/i, title: 'Miss' },
+      { pattern: /^(DR\.?\s+)/i, title: 'Dr' },
+      { pattern: /^(PROF\.?\s+)/i, title: 'Prof' },
+      { pattern: /^(SIR\.?\s+)/i, title: 'Sir' },
+      { pattern: /^(MR\/MRS\.?\s+)/i, title: 'Mr/Mrs' },
+      { pattern: /^(MR\s+&\s+MRS\.?\s+)/i, title: 'Mr & Mrs' },
+      { pattern: /^(MR\.?\s+&\s+MRS\.?\s+)/i, title: 'Mr & Mrs' },
+      { pattern: /^(MR\.?\s+AND\s+MRS\.?\s+)/i, title: 'Mr & Mrs' },
+      { pattern: /^(R\/MRS\.?\s+)/i, title: 'Mr/Mrs' },
+      { pattern: /^([A-Z]+\/[A-Z]+\.?\s+)/i, title: 'Mr/Mrs' },
+      { pattern: /^([A-Z]+\s+&\s+[A-Z]+\.?\s+)/i, title: 'Mr & Mrs' },
+    ];
+
+    for (const { pattern, title } of titlePatterns) {
+      if (pattern.test(name)) {
+        const cleanName = name.replace(pattern, '').trim();
+        return { cleanName, title };
+      }
+    }
+
+    return { cleanName: name };
+  };
+
+  // ─── PDF Parser (Enhanced for Tables) ──────────────────────────────
+  const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] => {
+    const guests: { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] = [];
     const lines = text.split('\n');
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed) continue;
+      if (!trimmed || trimmed.length < 5) continue;
 
-      // Format: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE")
-      const match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      // Skip header rows
+      if (/^(SN|NO|#|S\/N|NAME|PHONE|CARD|TYPE|GUEST)/i.test(trimmed)) continue;
+
+      // Pattern 1: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE")
+      let match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
       if (match) {
         const name = match[2].trim();
         const phone = match[3];
         const cardType = match[4];
+        const { cleanName, title } = extractTitle(name);
         
         guests.push({
-          name,
+          name: cleanName,
           phone,
           cardNumber: match[1],
           guestType: cardType,
+          title: title || 'Mr',
         });
         continue;
       }
 
-      // Format: NAME PHONE CARD (without SN)
-      const altMatch = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
-      if (altMatch) {
+      // Pattern 2: NAME PHONE CARD (without SN)
+      match = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      if (match) {
+        const name = match[1].trim();
+        const phone = match[2];
+        const cardType = match[3];
+        const { cleanName, title } = extractTitle(name);
+        
         guests.push({
-          name: altMatch[1].trim(),
-          phone: altMatch[2],
+          name: cleanName,
+          phone,
           cardNumber: '',
-          guestType: altMatch[3],
+          guestType: cardType,
+          title: title || 'Mr',
         });
+        continue;
+      }
+
+      // Pattern 3: NAME PHONE (without card type)
+      match = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d{9,13})$/);
+      if (match) {
+        const name = match[1].trim();
+        const phone = match[2];
+        const { cleanName, title } = extractTitle(name);
+        
+        guests.push({
+          name: cleanName,
+          phone,
+          cardNumber: '',
+          guestType: 'SINGLE',
+          title: title || 'Mr',
+        });
+        continue;
+      }
+
+      // Pattern 4: Table format with possible extra spaces
+      // Try to extract phone number from any position
+      const phoneMatch = trimmed.match(/(\+\d{10,13}|\d{9,13})/);
+      if (phoneMatch) {
+        const phone = phoneMatch[1];
+        // Get name by removing phone and any remaining numbers
+        let name = trimmed.replace(phone, '').trim();
+        // Remove any remaining digits at start or end
+        name = name.replace(/^\d+\s*/, '').replace(/\s*\d+$/, '').trim();
+        
+        if (name && name.length > 2) {
+          // Try to find card type in the remaining text
+          let cardType = 'SINGLE';
+          const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i);
+          if (cardMatch) {
+            cardType = cardMatch[1].toUpperCase();
+            name = name.replace(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i, '').trim();
+          }
+          
+          const { cleanName, title } = extractTitle(name);
+          
+          guests.push({
+            name: cleanName,
+            phone,
+            cardNumber: '',
+            guestType: cardType,
+            title: title || 'Mr',
+          });
+        }
       }
     }
 
@@ -133,25 +223,34 @@ export default function ImportGuestsPage() {
   // ─── PDF handler: sends file to server API route for parsing ────────
   const parsePDFFile = async (file: File) => {
     try {
+      setUploading(true);
+      setError('');
+
       const formData = new FormData();
       formData.append('file', file);
 
       const res = await fetch('/api/guests/parse-pdf', {
         method: 'POST',
         body: formData,
+        credentials: 'include',
       });
 
       const data = await res.json();
 
       if (!res.ok) {
         setError(data.error || 'Failed to parse PDF');
+        setUploading(false);
         return;
       }
 
-      const rawGuests = parsePDFGuests(data.text);
+      const text = data.text || '';
+      console.log('PDF text extracted (first 300 chars):', text.substring(0, 300));
+
+      const rawGuests = parsePDFGuests(text);
 
       if (rawGuests.length === 0) {
         setError('No guest data found in the PDF. Please ensure the format matches the sample.');
+        setUploading(false);
         return;
       }
 
@@ -163,18 +262,21 @@ export default function ImportGuestsPage() {
           normalizedPhone: norm.normalized,
           isValid: norm.isValid,
           statusMessage: norm.message,
-          guestType: g.guestType,
-          cardNumber: g.cardNumber,
+          guestType: g.guestType || 'SINGLE',
+          cardNumber: g.cardNumber || '',
+          title: g.title || 'Mr',
         };
       });
 
       setParsedGuests(guests);
       checkLimit(guests.filter(g => g.isValid).length);
       setStep('preview');
+      setUploading(false);
       toast.success(`Parsed ${guests.length} guests from PDF`);
     } catch (err) {
       console.error('PDF parsing error:', err);
       setError('Failed to parse PDF: ' + (err as Error).message);
+      setUploading(false);
     }
   };
 
@@ -262,6 +364,7 @@ export default function ImportGuestsPage() {
               normalizedPhone: norm.normalized,
               isValid: norm.isValid,
               statusMessage: norm.message,
+              title: g.title || 'Mr',
             };
           });
           setParsedGuests(normalized);
@@ -276,8 +379,8 @@ export default function ImportGuestsPage() {
     }
   };
 
-  const parseVCard = (vcfData: string): { name: string; phone: string; email?: string; guestType?: string }[] => {
-    const guests: { name: string; phone: string; email?: string; guestType?: string }[] = [];
+  const parseVCard = (vcfData: string): { name: string; phone: string; email?: string; guestType?: string; title?: string }[] => {
+    const guests: { name: string; phone: string; email?: string; guestType?: string; title?: string }[] = [];
     const cards = vcfData.split(/BEGIN:VCARD/i).filter(card => card.trim());
 
     for (const card of cards) {
@@ -286,6 +389,7 @@ export default function ImportGuestsPage() {
       let phone = '';
       let email = '';
       let guestType = '';
+      let title = '';
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -311,9 +415,12 @@ export default function ImportGuestsPage() {
         } else if (trimmed.startsWith('X-GUEST-TYPE:')) {
           const parts = trimmed.split(':');
           if (parts.length > 1) guestType = parts.slice(1).join(':').trim();
+        } else if (trimmed.startsWith('X-TITLE:')) {
+          const parts = trimmed.split(':');
+          if (parts.length > 1) title = parts.slice(1).join(':').trim();
         }
       }
-      if (name && phone) guests.push({ name, phone, email: email || undefined, guestType: guestType || undefined });
+      if (name && phone) guests.push({ name, phone, email: email || undefined, guestType: guestType || undefined, title: title || undefined });
     }
     return guests;
   };
@@ -333,10 +440,11 @@ export default function ImportGuestsPage() {
   };
 
   const downloadSampleCSV = () => {
-    const headers = ['name', 'phone', 'email', 'guestType'];
+    const headers = ['title', 'name', 'phone', 'email', 'guestType'];
     const sampleData = [
-      ['John Doe', '+255712345678', 'john@example.com', 'single'],
-      ['Jane Smith', '+255755123456', 'jane@example.com', 'double'],
+      ['Mr', 'John Doe', '+255712345678', 'john@example.com', 'single'],
+      ['Mrs', 'Jane Smith', '+255755123456', 'jane@example.com', 'double'],
+      ['Mr/Mrs', 'James & Mary Brown', '+255782345678', 'brown@example.com', 'double'],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -352,10 +460,10 @@ export default function ImportGuestsPage() {
 
   const downloadSamplePDF = () => {
     const sampleData = [
-      'SN  NAME                    PHONE       CARD',
-      '1   ADRIAN                  766084935   DOUBLE',
-      '2   AGNES LWAMBANO          713502010   DOUBLE',
-      '3   ALIPHONSINA             715164791   DOUBLE',
+      'SN  TITLE    NAME                    PHONE       CARD',
+      '1   Mr       ADRIAN                  766084935   DOUBLE',
+      '2   Mrs      AGNES LWAMBANO          713502010   DOUBLE',
+      '3   Mr/Mrs   ALIPHONSINA             715164791   DOUBLE',
     ].join('\n');
     
     const blob = new Blob([sampleData], { type: 'text/plain' });
@@ -418,13 +526,15 @@ export default function ImportGuestsPage() {
           const phone = c.tel?.[0] || '';
           const email = c.email?.[0] || '';
           const norm = normalizePhone(phone);
+          const { cleanName, title } = extractTitle(name);
           return {
-            name,
+            name: cleanName,
             phone,
             normalizedPhone: norm.normalized,
             isValid: norm.isValid,
             statusMessage: norm.message,
             email,
+            title: title || 'Mr',
           };
         })
         .filter((g: ParsedGuest) => g.name && g.phone);
@@ -456,14 +566,16 @@ export default function ImportGuestsPage() {
       const email = emailCol ? row[emailCol]?.toString().trim() : undefined;
       const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() : undefined;
       const norm = normalizePhone(phone);
+      const { cleanName, title } = extractTitle(name);
       return {
-        name,
+        name: cleanName,
         phone,
         normalizedPhone: norm.normalized,
         isValid: norm.isValid,
         statusMessage: norm.message,
         email,
         guestType,
+        title: title || 'Mr',
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -507,6 +619,7 @@ export default function ImportGuestsPage() {
       email: g.email,
       guestType: g.guestType,
       cardNumber: g.cardNumber,
+      title: g.title || 'Mr',
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
@@ -645,14 +758,14 @@ export default function ImportGuestsPage() {
             </p>
             <div className="bg-white p-3 rounded-lg font-mono text-xs text-gray-700 border border-gray-200 overflow-x-auto">
               <pre>
-{`SN  NAME                    PHONE       CARD
-1   ADRIAN                  766084935   DOUBLE
-2   AGNES LWAMBANO          713502010   DOUBLE
-3   ALIPHONSINA             715164791   DOUBLE`}
+{`SN  TITLE    NAME                    PHONE       CARD
+1   Mr       ADRIAN                  766084935   DOUBLE
+2   Mrs      AGNES LWAMBANO          713502010   DOUBLE
+3   Mr/Mrs   ALIPHONSINA             715164791   DOUBLE`}
               </pre>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              The system will extract: Name, Phone, and Guest Type (SINGLE/DOUBLE)
+              Supported titles: Mr, Mrs, Ms, Miss, Dr, Prof, Sir, Mr/Mrs, Mr & Mrs
             </p>
           </div>
         </>
@@ -783,8 +896,13 @@ export default function ImportGuestsPage() {
                     <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-amber-50/50'}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {guest.title && (
+                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                {guest.title}
+                              </span>
+                            )}
+                            {isEditing ? (
                               <input
                                 type="text"
                                 value={editValue}
@@ -792,10 +910,10 @@ export default function ImportGuestsPage() {
                                 className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
                                 autoFocus
                               />
-                            </div>
-                          ) : (
-                            <p className="font-medium text-gray-800 break-words">{guest.name}</p>
-                          )}
+                            ) : (
+                              <p className="font-medium text-gray-800 break-words">{guest.name}</p>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 font-mono mt-0.5">{guest.normalizedPhone || guest.phone}</p>
                           {guest.email && <p className="text-xs text-gray-400 mt-0.5 truncate">{guest.email}</p>}
                           {guest.guestType && (
@@ -855,6 +973,7 @@ export default function ImportGuestsPage() {
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Title</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Name</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Phone</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Email</th>
@@ -870,6 +989,13 @@ export default function ImportGuestsPage() {
                       const isEditing = editingIndex === originalIndex;
                       return (
                         <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
+                          <td className="px-4 py-2">
+                            {guest.title ? (
+                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                {guest.title}
+                              </span>
+                            ) : '—'}
+                          </td>
                           <td className="px-4 py-2">
                             {isEditing ? (
                               <div className="flex items-center gap-1">
