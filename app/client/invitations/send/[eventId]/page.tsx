@@ -129,11 +129,9 @@ export default function SendInvitationsPage() {
   // ─── Get Full Name ──────────────────────────────────────────────────────
   const getFullName = (guest: Guest): string => {
     if (!guest) return '';
-    // If title exists and is not null/empty, use it
     if (guest.title && guest.title.trim() !== '') {
       return `${guest.title} ${guest.name}`;
     }
-    // Otherwise just return the name
     return guest.name;
   };
 
@@ -151,7 +149,6 @@ export default function SendInvitationsPage() {
     
     setMessage(newText);
     
-    // Set cursor position after the inserted placeholder
     setTimeout(() => {
       textarea.focus();
       const newCursorPos = start + placeholder.length;
@@ -247,7 +244,18 @@ export default function SendInvitationsPage() {
       await new Promise(r => setTimeout(r, 300));
     }
 
-    toast.success(`Sent to ${successCount} of ${targetGuests.length} guests`);
+    // ✅ FIX: Use toast with icon instead of toast.warning
+    if (successCount === targetGuests.length) {
+      toast.success(`✅ Sent to all ${successCount} guests!`);
+    } else if (successCount > 0) {
+      toast(`⚠️ Sent to ${successCount} of ${targetGuests.length} guests. ${targetGuests.length - successCount} failed.`, {
+        icon: '⚠️',
+        duration: 5000,
+      });
+    } else {
+      toast.error(`❌ Failed to send to any guests.`);
+    }
+
     setSending(false);
     
     // Refresh guest list
