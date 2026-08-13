@@ -25,6 +25,7 @@ interface Guest {
   invitationSentAt: string | null;
   whatsappDetected?: boolean;
   checkedIn?: boolean;
+  guestType?: string | null; // ✅ Added guestType
 }
 
 interface EventData {
@@ -54,6 +55,7 @@ const PLACEHOLDERS = [
   { key: '{event}', label: 'Event Name', icon: Calendar, example: 'Sarah & James Wedding' },
   { key: '{date}', label: 'Event Date', icon: Calendar, example: 'August 15, 2026' },
   { key: '{venue}', label: 'Venue', icon: MapPin, example: 'The Grand Ballroom' },
+  { key: '{cardType}', label: 'Card Type', icon: Users, example: 'SINGLE / DOUBLE' },
 ];
 
 // ─── Default template ──────────────────────────────────────────────────────
@@ -124,6 +126,17 @@ export default function SendInvitationsPage() {
     loadData();
   }, [eventId]);
 
+  // ─── Get Full Name ──────────────────────────────────────────────────────
+  const getFullName = (guest: Guest): string => {
+    if (!guest) return '';
+    // If title exists and is not null/empty, use it
+    if (guest.title && guest.title.trim() !== '') {
+      return `${guest.title} ${guest.name}`;
+    }
+    // Otherwise just return the name
+    return guest.name;
+  };
+
   // ─── Insert placeholder at cursor ──────────────────────────────────────
   const insertPlaceholder = (placeholder: string) => {
     const textarea = document.getElementById('message-editor') as HTMLTextAreaElement;
@@ -148,22 +161,28 @@ export default function SendInvitationsPage() {
 
   // ─── Get preview message ───────────────────────────────────────────────
   const getPreviewMessage = (guest: Guest) => {
-    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    if (!guest) return '';
+    
+    const fullName = getFullName(guest);
     const formattedDate = event ? new Date(event.date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     }) : '';
 
+    // Determine card type display - safely handle undefined/null
+    const cardTypeDisplay = guest.guestType || 'SINGLE';
+
     return message
-      .replace(/{title}/g, guest.title || 'Mr')
+      .replace(/{title}/g, guest.title || '')
       .replace(/{name}/g, guest.name)
       .replace(/{fullName}/g, fullName)
       .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
       .replace(/{smsCode}/g, guest.smsCode || 'N/A')
       .replace(/{event}/g, event?.name || '')
       .replace(/{date}/g, formattedDate)
-      .replace(/{venue}/g, event?.venue || '');
+      .replace(/{venue}/g, event?.venue || '')
+      .replace(/{cardType}/g, cardTypeDisplay);
   };
 
   // ─── Send to a single guest ────────────────────────────────────────────
@@ -279,10 +298,6 @@ export default function SendInvitationsPage() {
     }
     if (guest.invitationSentAt) return 'sent';
     return 'pending';
-  };
-
-  const getFullName = (guest: Guest) => {
-    return guest.title ? `${guest.title} ${guest.name}` : guest.name;
   };
 
   // ─── Copy to clipboard ─────────────────────────────────────────────────
