@@ -92,17 +92,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const results = [];
+    const results: { guestId: string; name: string; success: boolean; error?: string; cardUrl?: string }[] = [];
     let completed = 0;
     let failed = 0;
 
     for (const guest of event.guests) {
       try {
+        // ─── 1. Generate QR token ──────────────────────────────────────
         const token = generateGuestToken(guest.id, eventId);
+        
+        // ─── 2. Generate QR buffer ──────────────────────────────────────
         const qrBuffer = await generateQRBuffer(token, qrPosition.size);
+        
+        // ─── 3. Get guest details ──────────────────────────────────────
         const fullName = getGuestFullName(guest);
         const cardNumber = guest.cardNumber || '';
 
+        // ─── 4. Composite QR on card ───────────────────────────────────
         const finalCardBuffer = await compositeQROnCard(
           cardBuffer,
           qrBuffer,
@@ -112,18 +118,25 @@ export async function POST(req: NextRequest) {
           cardNumber
         );
 
+        // ─── 5. Upload to Vercel Blob ─────────────────────────────────
         const key = `guests/${event.tenantId}/${guest.id}.png`;
         const blob = await put(key, finalCardBuffer, {
           access: 'public',
           contentType: 'image/png',
         });
 
+        // ─── 6. Update database ────────────────────────────────────────
         await prisma.guest.update({
           where: { id: guest.id },
           data: { invitationCard: blob.url, qrToken: token },
         });
 
-        results.push({ guestId: guest.id, name: fullName, success: true });
+        results.push({ 
+          guestId: guest.id, 
+          name: fullName, 
+          success: true,
+          cardUrl: blob.url,
+        });
         completed++;
       } catch (error: any) {
         console.error(`Failed for ${guest.name}:`, error);

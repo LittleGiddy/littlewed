@@ -651,20 +651,18 @@ const handleGenerateCards = async () => {
     return;
   }
 
-  // Show info for large batches (using toast with custom icon)
+  // Show info for large batches
   if (pendingGuests.length > 50) {
     toast(
-      `Generating ${pendingGuests.length} cards. This may take a few minutes. The process will continue in the background.`,
-      { 
-        duration: 5000,
-        icon: '⏳'
-      }
+      `Generating ${pendingGuests.length} cards. This may take a few minutes.`,
+      { duration: 5000, icon: '⏳' }
     );
   }
 
   setGeneratingCards(true);
   let completed = 0;
   let failed = 0;
+  const allResults: { name: string; success: boolean; error?: string }[] = [];
 
   try {
     const BATCH_SIZE = 10;
@@ -692,7 +690,16 @@ const handleGenerateCards = async () => {
 
         const data = await res.json();
 
-        if (res.ok) {
+        if (res.ok && data.results) {
+          // Collect results from this batch
+          data.results.forEach((r: any) => {
+            allResults.push({ 
+              name: r.name, 
+              success: r.success, 
+              error: r.error 
+            });
+          });
+          
           completed += data.completed || 0;
           failed += data.failed || 0;
           
@@ -701,6 +708,7 @@ const handleGenerateCards = async () => {
             id: currentToast 
           });
         } else {
+          console.error('Batch error response:', data);
           toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, { 
             id: currentToast 
           });
@@ -711,36 +719,53 @@ const handleGenerateCards = async () => {
         failed += batch.length;
       }
 
-      // Small delay between batches
       if (i < batches.length - 1) {
         await new Promise(r => setTimeout(r, 500));
       }
     }
 
-    // Final result
+    // ─── Show results ──────────────────────────────────────────────────
     if (completed === pendingGuests.length) {
       toast.success(`✅ All ${completed} cards generated successfully!`, { 
         id: currentToast,
         duration: 3000
       });
     } else if (completed > 0) {
-      // Use toast with custom icon for warning
+      // Show summary with success/fail counts
+      const successful = allResults.filter(r => r.success).map(r => r.name);
+      const failedList = allResults.filter(r => !r.success).map(r => `${r.name}: ${r.error || 'Unknown error'}`);
+      
       toast(
-        `⚠️ Generated ${completed} cards, ${failed} failed. Please try again for the failed ones.`,
+        `⚠️ Generated ${completed} cards, ${failed} failed.`,
         { 
           id: currentToast,
           duration: 5000,
           icon: '⚠️'
         }
       );
+      
+      // Show details of failed guests
+      if (failedList.length > 0) {
+        console.log('Failed guests:', failedList);
+        // Show in a separate toast with details
+        setTimeout(() => {
+          toast(
+            `Failed: ${failedList.join(' | ')}`,
+            { 
+              duration: 8000,
+              icon: '❌'
+            }
+          );
+        }, 1000);
+      }
     } else {
-      toast.error(`Failed to generate any cards. Please try again.`, { 
+      toast.error(`❌ Failed to generate any cards. Please try again.`, { 
         id: currentToast,
         duration: 5000
       });
     }
 
-    // Refresh data
+    // ─── Refresh data ──────────────────────────────────────────────────
     fetchData(eventId!);
   } catch (err) {
     console.error('Generation error:', err);
@@ -1108,23 +1133,30 @@ const handleGenerateCards = async () => {
               <Palette size={14} /> Design Card
             </Link>
 
-            {/* ─── Generate Cards Button ─── */}
-            {(() => {
-              const pendingCount = guests.filter(g => !g.invitationCard).length;
-              return (
-                <button
-                  onClick={handleGenerateCards}
-                  disabled={generatingCards || guests.length === 0 || isEventDisabled}
-                  className={`${isEventDisabled ? 'bg-gray-400' : 'bg-amber-600 hover:bg-amber-700'} text-white text-center py-2.5 rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2`}
-                >
-                  {generatingCards ? (
-                    <><Loader2 size={15} className="animate-spin" /> Generating...</>
-                  ) : (
-                    <><Palette size={14} /> Generate Cards {pendingCount > 0 ? `(${pendingCount})` : ''}</>
-                  )}
-                </button>
-              );
-            })()}
+{/* ─── Generate Cards Button ─── */}
+{(() => {
+  const pendingCount = guests.filter(g => !g.invitationCard).length;
+  const hasCards = guests.some(g => g.invitationCard);
+  
+  return (
+    <button
+      onClick={handleGenerateCards}
+      disabled={generatingCards || guests.length === 0 || isEventDisabled}
+      className={`${isEventDisabled ? 'bg-gray-400' : 'bg-amber-600 hover:bg-amber-700'} text-white text-center py-2.5 rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2`}
+    >
+      {generatingCards ? (
+        <><Loader2 size={15} className="animate-spin" /> Generating...</>
+      ) : (
+        <>
+          <Palette size={14} /> 
+          Generate Cards 
+          {pendingCount > 0 ? `(${pendingCount} pending)` : ''}
+          {hasCards && pendingCount === 0 && ' ✅ All done'}
+        </>
+      )}
+    </button>
+  );
+})()}
 
             <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
               <QrCode size={14} /> Check-In
