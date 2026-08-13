@@ -26,8 +26,8 @@ interface Guest {
   invitationSentAt: string | null;
   thanksSentAt: string | null;
   reminderCount: number;
-  invitationCard: string | null; // ✅ Added to track if card exists
-  title?: string | null; // ✅ Added for title
+  invitationCard: string | null;
+  title?: string | null;
 }
 
 interface EventData {
@@ -640,173 +640,120 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const statusBadge = getStatusBadge();
 
-// ─── Generate Cards Handler ────────────────────────────────────────────
-const handleGenerateCards = async () => {
-  if (!event) return;
-  
-  const pendingGuests = guests.filter(g => !g.invitationCard);
-  
-  if (pendingGuests.length === 0) {
-    toast.success('All guests already have cards! 🎉');
-    return;
-  }
-
-  // Show info for large batches
-  if (pendingGuests.length > 50) {
-    toast(
-      `Generating ${pendingGuests.length} cards. This may take a few minutes.`,
-      { duration: 5000, icon: '⏳' }
-    );
-  }
-
-  setGeneratingCards(true);
-  let completed = 0;
-  let failed = 0;
-  const allResults: { name: string; success: boolean; error?: string }[] = [];
-
-  try {
-    const BATCH_SIZE = 10;
-    const batches = [];
+  // ─── Generate Cards Handler ────────────────────────────────────────────
+  const handleGenerateCards = async () => {
+    if (!event) return;
     
-    for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) {
-      batches.push(pendingGuests.slice(i, i + BATCH_SIZE));
+    const pendingGuests = guests.filter(g => !g.invitationCard);
+    
+    if (pendingGuests.length === 0) {
+      toast.success('All guests already have cards! 🎉');
+      return;
     }
 
-    let currentToast = toast.loading(`Generating cards (0/${pendingGuests.length})...`);
+    if (pendingGuests.length > 50) {
+      toast(
+        `Generating ${pendingGuests.length} cards. This may take a few minutes.`,
+        { duration: 5000, icon: '⏳' }
+      );
+    }
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    setGeneratingCards(true);
+    let completed = 0;
+    let failed = 0;
+    const allResults: { name: string; success: boolean; error?: string }[] = [];
+
+    try {
+      const BATCH_SIZE = 10;
+      const batches = [];
       
-      try {
-        const res = await fetch('/api/invitations/generate-batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            eventId: event.id, 
-            guestIds: batch.map(g => g.id) 
-          }),
-          credentials: 'include',
-        });
+      for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) {
+        batches.push(pendingGuests.slice(i, i + BATCH_SIZE));
+      }
 
-        const data = await res.json();
+      let currentToast = toast.loading(`Generating cards (0/${pendingGuests.length})...`);
 
-        if (res.ok && data.results) {
-          // Collect results from this batch
-          data.results.forEach((r: any) => {
-            allResults.push({ 
-              name: r.name, 
-              success: r.success, 
-              error: r.error 
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        
+        try {
+          const res = await fetch('/api/invitations/generate-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              eventId: event.id, 
+              guestIds: batch.map(g => g.id) 
+            }),
+            credentials: 'include',
+          });
+
+          const data = await res.json();
+
+          if (res.ok && data.results) {
+            data.results.forEach((r: any) => {
+              allResults.push({ 
+                name: r.name, 
+                success: r.success, 
+                error: r.error 
+              });
             });
-          });
-          
-          completed += data.completed || 0;
-          failed += data.failed || 0;
-          
-          const progress = Math.min(completed + failed, pendingGuests.length);
-          toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, { 
-            id: currentToast 
-          });
-        } else {
-          console.error('Batch error response:', data);
-          toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, { 
-            id: currentToast 
-          });
+            
+            completed += data.completed || 0;
+            failed += data.failed || 0;
+            
+            const progress = Math.min(completed + failed, pendingGuests.length);
+            toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, { 
+              id: currentToast 
+            });
+          } else {
+            console.error('Batch error response:', data);
+            toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, { 
+              id: currentToast 
+            });
+            failed += batch.length;
+          }
+        } catch (err) {
+          console.error(`Batch ${i + 1} error:`, err);
           failed += batch.length;
         }
-      } catch (err) {
-        console.error(`Batch ${i + 1} error:`, err);
-        failed += batch.length;
-      }
 
-      if (i < batches.length - 1) {
-        await new Promise(r => setTimeout(r, 500));
-      }
-    }
-
-    // ─── Show results ──────────────────────────────────────────────────
-    if (completed === pendingGuests.length) {
-      toast.success(`✅ All ${completed} cards generated successfully!`, { 
-        id: currentToast,
-        duration: 3000
-      });
-    } else if (completed > 0) {
-      // Show summary with success/fail counts
-      const successful = allResults.filter(r => r.success).map(r => r.name);
-      const failedList = allResults.filter(r => !r.success).map(r => `${r.name}: ${r.error || 'Unknown error'}`);
-      
-      toast(
-        `⚠️ Generated ${completed} cards, ${failed} failed.`,
-        { 
-          id: currentToast,
-          duration: 5000,
-          icon: '⚠️'
+        if (i < batches.length - 1) {
+          await new Promise(r => setTimeout(r, 500));
         }
-      );
-      
-      // Show details of failed guests
-      if (failedList.length > 0) {
-        console.log('Failed guests:', failedList);
-        // Show in a separate toast with details
-        setTimeout(() => {
-          toast(
-            `Failed: ${failedList.join(' | ')}`,
-            { 
-              duration: 8000,
-              icon: '❌'
-            }
-          );
-        }, 1000);
       }
-    } else {
-      toast.error(`❌ Failed to generate any cards. Please try again.`, { 
-        id: currentToast,
-        duration: 5000
-      });
+
+      if (completed === pendingGuests.length) {
+        toast.success(`✅ All ${completed} cards generated successfully!`, { 
+          id: currentToast,
+          duration: 3000
+        });
+      } else if (completed > 0) {
+        toast(
+          `⚠️ Generated ${completed} cards, ${failed} failed. Please try again.`,
+          { 
+            id: currentToast,
+            duration: 5000,
+            icon: '⚠️'
+          }
+        );
+      } else {
+        toast.error(`❌ Failed to generate any cards. Please try again.`, { 
+          id: currentToast,
+          duration: 5000
+        });
+      }
+
+      fetchData(eventId!);
+    } catch (err) {
+      console.error('Generation error:', err);
+      toast.error('Network error while generating cards');
+    } finally {
+      setGeneratingCards(false);
     }
+  };
 
-    // ─── Refresh data ──────────────────────────────────────────────────
-    fetchData(eventId!);
-  } catch (err) {
-    console.error('Generation error:', err);
-    toast.error('Network error while generating cards');
-  } finally {
-    setGeneratingCards(false);
-  }
-};
-  // ─── Loading state ──────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="flex flex-col justify-center items-center h-64 gap-3">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Loading event…</p>
-      </div>
-    );
-  }
-
-  if (fetchError || !event) {
-    return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">{fetchError ? 'Failed to Load Event' : 'Event Not Found'}</h1>
-          <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
-          <div className="flex gap-3 justify-center">
-            {fetchError && eventId && (
-              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
-                <ArrowLeft size={14} /> Retry
-              </button>
-            )}
-            <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition">
-              <ArrowLeft size={14} /> Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Render helpers ──────────────────────────────────────────────────
+  // ─── RENDER GUEST CARD ────────────────────────────────────────────────
+  // ✅ ONLY ONE renderGuestCard function
   const renderGuestCard = (guest: Guest) => {
     const isSelected = selectedGuests.has(guest.id);
     const isWhatsApp = guest.routingChannel === 'whatsapp';
@@ -833,7 +780,9 @@ const handleGenerateCards = async () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-gray-800 text-sm truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
+              <p className="font-semibold text-gray-800 text-sm truncate">
+                {guest.title ? `${guest.title} ${guest.name}` : guest.name}
+              </p>
               {isCheckedIn && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                   <CheckCircle size={12} /> Checked In
@@ -844,9 +793,14 @@ const handleGenerateCards = async () => {
                   <Heart size={12} /> Thanks
                 </span>
               )}
-              {hasCard && (
+              {/* ─── CARD STATUS BADGE ─── */}
+              {hasCard ? (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  <ImageIcon size={12} /> Card
+                  <ImageIcon size={12} /> Card ✓
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <Clock size={12} /> No Card
                 </span>
               )}
             </div>
@@ -866,6 +820,18 @@ const handleGenerateCards = async () => {
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {/* ─── VIEW CARD BUTTON ─── */}
+            {guest.invitationCard && (
+              <a
+                href={guest.invitationCard}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
+                title="View Card"
+              >
+                <ImageIcon size={15} />
+              </a>
+            )}
             {event?.tenant?.testMode && (
               <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
                 <ExternalLink size={15} />
@@ -919,6 +885,38 @@ const handleGenerateCards = async () => {
       </div>
     );
   };
+
+  // ─── Loading state ──────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+        <p className="text-sm text-gray-400">Loading event…</p>
+      </div>
+    );
+  }
+
+  if (fetchError || !event) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">{fetchError ? 'Failed to Load Event' : 'Event Not Found'}</h1>
+          <p className="text-gray-500 text-sm mb-5">{fetchError ?? "This event doesn't exist or you don't have access to it."}</p>
+          <div className="flex gap-3 justify-center">
+            {fetchError && eventId && (
+              <button onClick={() => fetchData(eventId)} className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition">
+                <ArrowLeft size={14} /> Retry
+              </button>
+            )}
+            <Link href="/client/dashboard" className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition">
+              <ArrowLeft size={14} /> Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Main JSX ──────────────────────────────────────────────────────────
   return (
@@ -1133,30 +1131,30 @@ const handleGenerateCards = async () => {
               <Palette size={14} /> Design Card
             </Link>
 
-{/* ─── Generate Cards Button ─── */}
-{(() => {
-  const pendingCount = guests.filter(g => !g.invitationCard).length;
-  const hasCards = guests.some(g => g.invitationCard);
-  
-  return (
-    <button
-      onClick={handleGenerateCards}
-      disabled={generatingCards || guests.length === 0 || isEventDisabled}
-      className={`${isEventDisabled ? 'bg-gray-400' : 'bg-amber-600 hover:bg-amber-700'} text-white text-center py-2.5 rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2`}
-    >
-      {generatingCards ? (
-        <><Loader2 size={15} className="animate-spin" /> Generating...</>
-      ) : (
-        <>
-          <Palette size={14} /> 
-          Generate Cards 
-          {pendingCount > 0 ? `(${pendingCount} pending)` : ''}
-          {hasCards && pendingCount === 0 && ' ✅ All done'}
-        </>
-      )}
-    </button>
-  );
-})()}
+            {/* ─── Generate Cards Button ─── */}
+            {(() => {
+              const pendingCount = guests.filter(g => !g.invitationCard).length;
+              const hasCards = guests.some(g => g.invitationCard);
+              
+              return (
+                <button
+                  onClick={handleGenerateCards}
+                  disabled={generatingCards || guests.length === 0 || isEventDisabled}
+                  className={`${isEventDisabled ? 'bg-gray-400' : 'bg-amber-600 hover:bg-amber-700'} text-white text-center py-2.5 rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2`}
+                >
+                  {generatingCards ? (
+                    <><Loader2 size={15} className="animate-spin" /> Generating...</>
+                  ) : (
+                    <>
+                      <Palette size={14} /> 
+                      Generate Cards 
+                      {pendingCount > 0 ? `(${pendingCount} pending)` : ''}
+                      {hasCards && pendingCount === 0 && ' ✅ All done'}
+                    </>
+                  )}
+                </button>
+              );
+            })()}
 
             <Link href={`/client/check-in?event=${event.id}`} className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] text-center py-2.5 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2">
               <QrCode size={14} /> Check-In
