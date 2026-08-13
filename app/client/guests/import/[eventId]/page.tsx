@@ -46,8 +46,9 @@ export default function ImportGuestsPage() {
   const [showValidOnly, setShowValidOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Editing state
+  // ─── Editing state ──────────────────────────────────────────────────
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editField, setEditField] = useState<'name' | 'title' | null>(null);
   const [editValue, setEditValue] = useState('');
 
   useEffect(() => {
@@ -120,6 +121,34 @@ export default function ImportGuestsPage() {
     return { cleanName: name };
   };
 
+  // ─── Edit Functions ──────────────────────────────────────────────────
+  const startEditing = (index: number, field: 'name' | 'title', currentValue: string) => {
+    setEditingIndex(index);
+    setEditField(field);
+    setEditValue(currentValue);
+  };
+
+  const saveEdit = (index: number) => {
+    const updated = [...parsedGuests];
+    const field = editField;
+    if (field === 'name') {
+      updated[index].name = editValue.trim() || updated[index].name;
+    } else if (field === 'title') {
+      updated[index].title = editValue.trim() || updated[index].title;
+    }
+    setParsedGuests(updated);
+    setEditingIndex(null);
+    setEditField(null);
+    setEditValue('');
+    toast.success(`${field === 'name' ? 'Name' : 'Title'} updated`);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditField(null);
+    setEditValue('');
+  };
+
   // ─── PDF Parser (Enhanced for Tables) ──────────────────────────────
   const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] => {
     const guests: { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] = [];
@@ -186,17 +215,13 @@ export default function ImportGuestsPage() {
       }
 
       // Pattern 4: Table format with possible extra spaces
-      // Try to extract phone number from any position
       const phoneMatch = trimmed.match(/(\+\d{10,13}|\d{9,13})/);
       if (phoneMatch) {
         const phone = phoneMatch[1];
-        // Get name by removing phone and any remaining numbers
         let name = trimmed.replace(phone, '').trim();
-        // Remove any remaining digits at start or end
         name = name.replace(/^\d+\s*/, '').replace(/\s*\d+$/, '').trim();
         
         if (name && name.length > 2) {
-          // Try to find card type in the remaining text
           let cardType = 'SINGLE';
           const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i);
           if (cardMatch) {
@@ -584,25 +609,6 @@ export default function ImportGuestsPage() {
     toast.success(`Mapped ${guests.length} guests (${guests.filter(g => g.isValid).length} valid)`);
   };
 
-  const startEditing = (index: number, currentName: string) => {
-    setEditingIndex(index);
-    setEditValue(currentName);
-  };
-
-  const saveEdit = (index: number) => {
-    const updated = [...parsedGuests];
-    updated[index].name = editValue.trim() || updated[index].name;
-    setParsedGuests(updated);
-    setEditingIndex(null);
-    setEditValue('');
-    toast.success('Name updated');
-  };
-
-  const cancelEdit = () => {
-    setEditingIndex(null);
-    setEditValue('');
-  };
-
   const handleImport = async () => {
     const validGuests = parsedGuests.filter(g => g.isValid);
     if (validGuests.length === 0) {
@@ -887,31 +893,104 @@ export default function ImportGuestsPage() {
                 </label>
               </h2>
 
-              {/* Mobile card view */}
+              {/* ─── Mobile card view ──────────────────────────────────── */}
               <div className="sm:hidden divide-y divide-gray-100 max-h-96 overflow-y-auto">
                 {shown.map((guest) => {
                   const originalIndex = parsedGuests.indexOf(guest);
-                  const isEditing = editingIndex === originalIndex;
+                  const isEditingName = editingIndex === originalIndex && editField === 'name';
+                  const isEditingTitle = editingIndex === originalIndex && editField === 'title';
                   return (
                     <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-amber-50/50'}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {guest.title && (
-                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                {guest.title}
-                              </span>
-                            )}
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
-                                autoFocus
-                              />
+                          {/* Title */}
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            {isEditingTitle ? (
+                              <div className="flex items-center gap-1 w-full">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  placeholder="Title"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-red-500 hover:text-red-700 transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
                             ) : (
-                              <p className="font-medium text-gray-800 break-words">{guest.name}</p>
+                              <div className="flex items-center gap-1 group">
+                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {guest.title || '—'}
+                                </span>
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100"
+                                  title="Edit title"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {/* Name */}
+                          <div className="flex items-center gap-1.5">
+                            {isEditingName ? (
+                              <div className="flex items-center gap-1 w-full">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  placeholder="Name"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-red-500 hover:text-red-700 transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 group flex-1">
+                                <p className="font-medium text-gray-800 break-words">{guest.name}</p>
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'name', guest.name)}
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                  title="Edit name"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <p className="text-xs text-gray-500 font-mono mt-0.5">{guest.normalizedPhone || guest.phone}</p>
@@ -934,41 +1013,13 @@ export default function ImportGuestsPage() {
                             )}
                           </div>
                         </div>
-                        <div className="ml-3 flex-shrink-0">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => saveEdit(originalIndex)}
-                                className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
-                                title="Save"
-                              >
-                                <Save size={18} />
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="text-red-500 hover:text-red-700 transition"
-                                title="Cancel"
-                              >
-                                <XCircle size={18} />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => startEditing(originalIndex, guest.name)}
-                              className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
-                              title="Edit name"
-                            >
-                              <Pencil size={18} />
-                            </button>
-                          )}
-                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Desktop table view */}
+              {/* ─── Desktop table view ────────────────────────────────── */}
               <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
@@ -980,35 +1031,101 @@ export default function ImportGuestsPage() {
                       <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Card</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
-                      <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {shown.map((guest) => {
                       const originalIndex = parsedGuests.indexOf(guest);
-                      const isEditing = editingIndex === originalIndex;
+                      const isEditingName = editingIndex === originalIndex && editField === 'name';
+                      const isEditingTitle = editingIndex === originalIndex && editField === 'title';
                       return (
                         <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
                           <td className="px-4 py-2">
-                            {guest.title ? (
-                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                {guest.title}
-                              </span>
-                            ) : '—'}
+                            {isEditingTitle ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  placeholder="Title"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-red-500 hover:text-red-700 transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 group">
+                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {guest.title || '—'}
+                                </span>
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100"
+                                  title="Edit title"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-2">
-                            {isEditing ? (
+                            {isEditingName ? (
                               <div className="flex items-center gap-1">
                                 <input
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
                                   className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  placeholder="Name"
                                   autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
                                 />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-red-500 hover:text-red-700 transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
                               </div>
                             ) : (
-                              <span className="break-words">{guest.name}</span>
+                              <div className="flex items-center gap-1 group">
+                                <span className="break-words">{guest.name}</span>
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'name', guest.name)}
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                  title="Edit name"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-2 font-mono text-xs break-all">{guest.normalizedPhone || guest.phone}</td>
@@ -1034,34 +1151,6 @@ export default function ImportGuestsPage() {
                               <span className="text-amber-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
                                 <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
                               </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2">
-                            {isEditing ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
-                                  title="Save"
-                                >
-                                  <Save size={16} />
-                                </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="text-red-500 hover:text-red-700 transition"
-                                  title="Cancel"
-                                >
-                                  <XCircle size={16} />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => startEditing(originalIndex, guest.name)}
-                                className="text-[#0D4F4F] hover:text-[#0A3D3D] transition"
-                                title="Edit name"
-                              >
-                                <Pencil size={16} />
-                              </button>
                             )}
                           </td>
                         </tr>
