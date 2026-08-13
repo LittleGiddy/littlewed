@@ -25,7 +25,7 @@ interface Guest {
   invitationSentAt: string | null;
   whatsappDetected?: boolean;
   checkedIn?: boolean;
-  guestType?: string | null; // ✅ Added guestType
+  guestType?: string | null;
 }
 
 interface EventData {
@@ -170,7 +170,6 @@ export default function SendInvitationsPage() {
       day: 'numeric',
     }) : '';
 
-    // Determine card type display - safely handle undefined/null
     const cardTypeDisplay = guest.guestType || 'SINGLE';
 
     return message
