@@ -17,7 +17,7 @@ interface ParsedGuest {
   normalizedPhone: string;
   email?: string;
   guestType?: string;
-  title?: string; // Now optional - no default
+  title?: string;
   isValid: boolean;
   statusMessage?: string;
   cardNumber?: string;
@@ -159,7 +159,7 @@ export default function ImportGuestsPage() {
       if (!trimmed || trimmed.length < 5) continue;
 
       // Skip header rows
-      if (/^(SN|NO|#|S\/N|NAME|PHONE|CARD|TYPE|GUEST)/i.test(trimmed)) continue;
+      if (/^(SN|NO|#|S\/N|NAME|PHONE|CARD|TYPE|GUEST|TITLE)/i.test(trimmed)) continue;
 
       // Pattern 1: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE")
       let match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
@@ -174,7 +174,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: match[1],
           guestType: cardType,
-          title: title, // No default - keep as undefined if not found
+          title: title || '', // Empty string if no title found
         });
         continue;
       }
@@ -192,7 +192,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: cardType,
-          title: title, // No default - keep as undefined if not found
+          title: title || '', // Empty string if no title found
         });
         continue;
       }
@@ -209,7 +209,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: 'SINGLE',
-          title: title, // No default - keep as undefined if not found
+          title: title || '', // Empty string if no title found
         });
         continue;
       }
@@ -236,7 +236,7 @@ export default function ImportGuestsPage() {
             phone,
             cardNumber: '',
             guestType: cardType,
-            title: title, // No default - keep as undefined if not found
+            title: title || '', // Empty string if no title found
           });
         }
       }
@@ -289,7 +289,7 @@ export default function ImportGuestsPage() {
           statusMessage: norm.message,
           guestType: g.guestType || 'SINGLE',
           cardNumber: g.cardNumber || '',
-          title: g.title || '', // Empty string if no title found
+          title: g.title || '', // ✅ NO default "Mr" - empty string if no title
         };
       });
 
@@ -391,7 +391,7 @@ export default function ImportGuestsPage() {
               normalizedPhone: norm.normalized,
               isValid: norm.isValid,
               statusMessage: norm.message,
-              title: g.title || '', // Empty string if no title
+              title: g.title || '', // ✅ NO default "Mr"
             };
           });
           setParsedGuests(normalized);
@@ -561,7 +561,7 @@ export default function ImportGuestsPage() {
             isValid: norm.isValid,
             statusMessage: norm.message,
             email,
-            title: title || '', // Empty string if no title
+            title: title || '', // ✅ NO default "Mr"
           };
         })
         .filter((g: ParsedGuest) => g.name && g.phone);
@@ -605,7 +605,7 @@ export default function ImportGuestsPage() {
         statusMessage: norm.message,
         email,
         guestType,
-        title: title || '', // Empty string if no title
+        title: title || '', // ✅ NO default "Mr"
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -630,7 +630,7 @@ export default function ImportGuestsPage() {
       email: g.email,
       guestType: g.guestType,
       cardNumber: g.cardNumber,
-      title: g.title || '', // Empty string if no title
+      title: g.title || '', // ✅ NO default "Mr"
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
