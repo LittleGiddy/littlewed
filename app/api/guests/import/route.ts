@@ -100,9 +100,10 @@ export async function POST(req: NextRequest) {
     const guestsToInsert = uniqueGuests.map((g: any) => ({
       name: g.name.trim(),
       phone: g.phone,
-      title: g.title || 'Mr', // ✅ Include title
-      cardNumber: g.cardNumber || null, // ✅ Include card number
-      email: null, // ✅ Email is not required – set to null
+      title: g.title || '', // ✅ FIXED: Empty string instead of 'Mr'
+      cardNumber: g.cardNumber || null,
+      guestType: g.guestType || 'SINGLE', // ✅ Added guestType
+      email: null,
       eventId,
       routingChannel: 'sms',
       smsCode: randomBytes(4).toString('hex').toUpperCase(),
