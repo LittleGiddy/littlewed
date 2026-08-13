@@ -174,7 +174,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: match[1],
           guestType: cardType,
-          title: title || '', // Empty string if no title found
+          title: title || '', // ✅ Empty string if no title
         });
         continue;
       }
@@ -192,7 +192,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: cardType,
-          title: title || '', // Empty string if no title found
+          title: title || '', // ✅ Empty string if no title
         });
         continue;
       }
@@ -209,7 +209,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: 'SINGLE',
-          title: title || '', // Empty string if no title found
+          title: title || '', // ✅ Empty string if no title
         });
         continue;
       }
@@ -236,7 +236,7 @@ export default function ImportGuestsPage() {
             phone,
             cardNumber: '',
             guestType: cardType,
-            title: title || '', // Empty string if no title found
+            title: title || '', // ✅ Empty string if no title
           });
         }
       }
@@ -289,7 +289,7 @@ export default function ImportGuestsPage() {
           statusMessage: norm.message,
           guestType: g.guestType || 'SINGLE',
           cardNumber: g.cardNumber || '',
-          title: g.title || '', // ✅ NO default "Mr" - empty string if no title
+          title: g.title || '', // ✅ Empty string if no title
         };
       });
 
@@ -391,7 +391,7 @@ export default function ImportGuestsPage() {
               normalizedPhone: norm.normalized,
               isValid: norm.isValid,
               statusMessage: norm.message,
-              title: g.title || '', // ✅ NO default "Mr"
+              title: g.title || '', // ✅ Empty string if no title
             };
           });
           setParsedGuests(normalized);
@@ -561,7 +561,7 @@ export default function ImportGuestsPage() {
             isValid: norm.isValid,
             statusMessage: norm.message,
             email,
-            title: title || '', // ✅ NO default "Mr"
+            title: title || '', // ✅ Empty string if no title
           };
         })
         .filter((g: ParsedGuest) => g.name && g.phone);
@@ -605,7 +605,7 @@ export default function ImportGuestsPage() {
         statusMessage: norm.message,
         email,
         guestType,
-        title: title || '', // ✅ NO default "Mr"
+        title: title || '', // ✅ Empty string if no title
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -630,7 +630,7 @@ export default function ImportGuestsPage() {
       email: g.email,
       guestType: g.guestType,
       cardNumber: g.cardNumber,
-      title: g.title || '', // ✅ NO default "Mr"
+      title: g.title || '', // ✅ Empty string if no title
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
