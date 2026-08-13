@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Upload, FileSpreadsheet, X, AlertCircle, Loader2, Download, 
-  AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle 
+  AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle, FileText
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
@@ -16,9 +16,10 @@ interface ParsedGuest {
   phone: string;
   normalizedPhone: string;
   email?: string;
-  guestType?: string; // 'single', 'double', or custom
+  guestType?: string;
   isValid: boolean;
   statusMessage?: string;
+  cardNumber?: string;
 }
 
 interface ColumnMapping {
@@ -43,7 +44,7 @@ export default function ImportGuestsPage() {
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [showValidOnly, setShowValidOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  
   // Editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -89,98 +90,102 @@ export default function ImportGuestsPage() {
     return { normalized: '+' + cleaned, isValid: true };
   };
 
-  const downloadSampleCSV = () => {
-    const headers = ['name', 'phone', 'email', 'guestType'];
-    const sampleData = [
-      ['John Doe', '+255712345678', 'john@example.com', 'single'],
-      ['Jane Smith', '+255755123456', 'jane@example.com', 'double'],
-    ];
-    const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sample-guests.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+  // ─── PDF Parser (runs on text returned from the server) ─────────────
+  const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType: string }[] => {
+    const guests: { name: string; phone: string; cardNumber: string; guestType: string }[] = [];
+    const lines = text.split('\n');
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
-    else if (e.type === 'dragleave') setDragActive(false);
-  };
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) handleFile(droppedFile);
-  };
+      // Format: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE")
+      const match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      if (match) {
+        const name = match[2].trim();
+        const phone = match[3];
+        const cardType = match[4];
+        
+        guests.push({
+          name,
+          phone,
+          cardNumber: match[1],
+          guestType: cardType,
+        });
+        continue;
+      }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) handleFile(selectedFile);
-  };
-
-  const handleFile = (file: File) => {
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'vcf') {
-      toast.error('Please upload a CSV, Excel, or VCF file');
-      return;
+      // Format: NAME PHONE CARD (without SN)
+      const altMatch = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      if (altMatch) {
+        guests.push({
+          name: altMatch[1].trim(),
+          phone: altMatch[2],
+          cardNumber: '',
+          guestType: altMatch[3],
+        });
+      }
     }
-    setFile(file);
-    setError('');
-    setLimitWarning(null);
-    parseFile(file);
+
+    return guests;
   };
 
-  const importFromPhone = async () => {
-    if (!('contacts' in navigator)) {
-      toast.error('Your browser does not support contact import');
-      return;
-    }
+  // ─── PDF handler: sends file to server API route for parsing ────────
+  const parsePDFFile = async (file: File) => {
     try {
-      setUploading(true);
-      setImportStatus('Loading contacts...');
-      const contacts = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: true });
-      setImportStatus('Formatting contacts...');
-      const guests: ParsedGuest[] = contacts
-        .map((c: any) => {
-          const name = c.name?.[0] || '';
-          const phone = c.tel?.[0] || '';
-          const email = c.email?.[0] || '';
-          const norm = normalizePhone(phone);
-          return {
-            name,
-            phone,
-            normalizedPhone: norm.normalized,
-            isValid: norm.isValid,
-            statusMessage: norm.message,
-            email,
-            // guestType: not available from phone contacts
-          };
-        })
-        .filter((g: ParsedGuest) => g.name && g.phone);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/guests/parse-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Failed to parse PDF');
+        return;
+      }
+
+      const rawGuests = parsePDFGuests(data.text);
+
+      if (rawGuests.length === 0) {
+        setError('No guest data found in the PDF. Please ensure the format matches the sample.');
+        return;
+      }
+
+      const guests: ParsedGuest[] = rawGuests.map(g => {
+        const norm = normalizePhone(g.phone);
+        return {
+          name: g.name,
+          phone: g.phone,
+          normalizedPhone: norm.normalized,
+          isValid: norm.isValid,
+          statusMessage: norm.message,
+          guestType: g.guestType,
+          cardNumber: g.cardNumber,
+        };
+      });
+
       setParsedGuests(guests);
       checkLimit(guests.filter(g => g.isValid).length);
       setStep('preview');
-      setImportStatus('');
-      toast.success(`Imported ${guests.length} contacts`);
+      toast.success(`Parsed ${guests.length} guests from PDF`);
     } catch (err) {
-      toast.error('Failed to import contacts');
-    } finally {
-      setUploading(false);
-      setImportStatus('');
+      console.error('PDF parsing error:', err);
+      setError('Failed to parse PDF: ' + (err as Error).message);
     }
   };
 
+  // ─── File Parser ────────────────────────────────────────────────────
   const parseFile = (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
+
+    if (ext === 'pdf') {
+      parsePDFFile(file);
+      return;
+    }
 
     if (ext === 'csv') {
       Papa.parse(file, {
@@ -327,6 +332,115 @@ export default function ImportGuestsPage() {
     }
   };
 
+  const downloadSampleCSV = () => {
+    const headers = ['name', 'phone', 'email', 'guestType'];
+    const sampleData = [
+      ['John Doe', '+255712345678', 'john@example.com', 'single'],
+      ['Jane Smith', '+255755123456', 'jane@example.com', 'double'],
+    ];
+    const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample-guests.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadSamplePDF = () => {
+    const sampleData = [
+      'SN  NAME                    PHONE       CARD',
+      '1   ADRIAN                  766084935   DOUBLE',
+      '2   AGNES LWAMBANO          713502010   DOUBLE',
+      '3   ALIPHONSINA             715164791   DOUBLE',
+    ].join('\n');
+    
+    const blob = new Blob([sampleData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample-guests-format.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Sample format downloaded (paste into PDF)');
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') setDragActive(true);
+    else if (e.type === 'dragleave') setDragActive(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const droppedFile = e.dataTransfer.files[0];
+    if (droppedFile) handleFile(droppedFile);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) handleFile(selectedFile);
+  };
+
+  const handleFile = (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'vcf' && ext !== 'pdf') {
+      toast.error('Please upload a CSV, Excel, VCF, or PDF file');
+      return;
+    }
+    setFile(file);
+    setError('');
+    setLimitWarning(null);
+    parseFile(file);
+  };
+
+  const importFromPhone = async () => {
+    if (!('contacts' in navigator)) {
+      toast.error('Your browser does not support contact import');
+      return;
+    }
+    try {
+      setUploading(true);
+      setImportStatus('Loading contacts...');
+      const contacts = await (navigator as any).contacts.select(['name', 'tel', 'email'], { multiple: true });
+      setImportStatus('Formatting contacts...');
+      const guests: ParsedGuest[] = contacts
+        .map((c: any) => {
+          const name = c.name?.[0] || '';
+          const phone = c.tel?.[0] || '';
+          const email = c.email?.[0] || '';
+          const norm = normalizePhone(phone);
+          return {
+            name,
+            phone,
+            normalizedPhone: norm.normalized,
+            isValid: norm.isValid,
+            statusMessage: norm.message,
+            email,
+          };
+        })
+        .filter((g: ParsedGuest) => g.name && g.phone);
+      setParsedGuests(guests);
+      checkLimit(guests.filter(g => g.isValid).length);
+      setStep('preview');
+      setImportStatus('');
+      toast.success(`Imported ${guests.length} contacts`);
+    } catch (err) {
+      toast.error('Failed to import contacts');
+    } finally {
+      setUploading(false);
+      setImportStatus('');
+    }
+  };
+
   const applyMapping = () => {
     const nameCol = Object.keys(mapping).find(k => mapping[k] === 'name');
     const phoneCol = Object.keys(mapping).find(k => mapping[k] === 'phone');
@@ -391,7 +505,8 @@ export default function ImportGuestsPage() {
       name: g.name,
       phone: g.normalizedPhone,
       email: g.email,
-      guestType: g.guestType, // add this
+      guestType: g.guestType,
+      cardNumber: g.cardNumber,
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
@@ -435,7 +550,7 @@ export default function ImportGuestsPage() {
   const downloadInvalid = () => {
     const invalid = parsedGuests.filter(g => !g.isValid);
     if (invalid.length === 0) {
-      toast('No invalid guests to export', { icon: 'ℹ️' });
+      toast('No invalid guests to export');
       return;
     }
     const header = 'Name,Original Phone,Reason';
@@ -455,7 +570,6 @@ export default function ImportGuestsPage() {
   const validCount = parsedGuests.filter(g => g.isValid).length;
   const invalidCount = parsedGuests.filter(g => !g.isValid).length;
 
-  // ─── Render ──────────────────────────────────────────────
   const displayGuests = showValidOnly ? parsedGuests.filter(g => g.isValid) : parsedGuests;
   const shown = displayGuests.slice(0, 50);
 
@@ -470,15 +584,24 @@ export default function ImportGuestsPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <h1 className="text-2xl font-bold">Import Guests</h1>
-        <button
-          onClick={downloadSampleCSV}
-          className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
-        >
-          <Download size={14} /> Sample CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={downloadSampleCSV}
+            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
+          >
+            <Download size={14} /> Sample CSV
+          </button>
+          <button
+            onClick={downloadSamplePDF}
+            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
+          >
+            <FileText size={14} /> PDF Format
+          </button>
+        </div>
       </div>
+      
       <p className="text-gray-500 text-sm sm:text-base mb-6">
-        Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, or <strong>vCard (.vcf)</strong> file, or import from your phone contacts.
+        Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, <strong>vCard (.vcf)</strong>, or <strong>PDF</strong> file, or import from your phone contacts.
         For CSV/Excel, you'll be able to map columns to our fields. Phone numbers will be auto‑formatted to international format.
       </p>
 
@@ -506,9 +629,31 @@ export default function ImportGuestsPage() {
           >
             <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-600">Drag & drop your file here, or click to browse</p>
-            <p className="text-xs text-gray-400 mt-1">Supports CSV, Excel, and VCF</p>
-            <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.vcf" onChange={handleFileSelect} className="hidden" />
+            <p className="text-xs text-gray-400 mt-1">Supports CSV, Excel, VCF, and PDF</p>
+            <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.vcf,.pdf" onChange={handleFileSelect} className="hidden" />
             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          </div>
+
+          {/* PDF Format Guide */}
+          <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
+              <FileText size={16} className="text-[#0D4F4F]" />
+              PDF Format Guide
+            </h3>
+            <p className="text-xs text-gray-600 mb-2">
+              Your PDF should follow this format:
+            </p>
+            <div className="bg-white p-3 rounded-lg font-mono text-xs text-gray-700 border border-gray-200 overflow-x-auto">
+              <pre>
+{`SN  NAME                    PHONE       CARD
+1   ADRIAN                  766084935   DOUBLE
+2   AGNES LWAMBANO          713502010   DOUBLE
+3   ALIPHONSINA             715164791   DOUBLE`}
+              </pre>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              The system will extract: Name, Phone, and Guest Type (SINGLE/DOUBLE)
+            </p>
           </div>
         </>
       )}
@@ -566,7 +711,11 @@ export default function ImportGuestsPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 rounded-xl p-3 mb-4 gap-2">
             <div className="flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-green-600" />
+              {file?.name?.endsWith('.pdf') ? (
+                <FileText className="w-5 h-5 text-red-600" />
+              ) : (
+                <FileSpreadsheet className="w-5 h-5 text-green-600" />
+              )}
               <span className="text-sm font-medium truncate">{file?.name}</span>
               <span className="text-xs text-gray-500">({parsedGuests.length} guests)</span>
             </div>
@@ -652,6 +801,9 @@ export default function ImportGuestsPage() {
                           {guest.guestType && (
                             <p className="text-xs text-gray-600 mt-0.5">Type: {guest.guestType}</p>
                           )}
+                          {guest.cardNumber && (
+                            <p className="text-xs text-gray-400 mt-0.5">Card: {guest.cardNumber}</p>
+                          )}
                           <div className="mt-1">
                             {guest.isValid ? (
                               <span className="text-green-600 text-xs font-medium flex items-center gap-1">
@@ -707,6 +859,7 @@ export default function ImportGuestsPage() {
                       <th className="px-4 py-2 text-left whitespace-nowrap">Phone</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Email</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Card</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Action</th>
                     </tr>
@@ -745,6 +898,7 @@ export default function ImportGuestsPage() {
                               </span>
                             ) : '—'}
                           </td>
+                          <td className="px-4 py-2 font-mono text-xs">{guest.cardNumber || '—'}</td>
                           <td className="px-4 py-2">
                             {guest.isValid ? (
                               <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
