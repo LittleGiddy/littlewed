@@ -97,6 +97,8 @@ model Tenant {
   qrSize             Int?
   testMode           Boolean  @default(false)
   thanksCardUrl      String?
+  whatsappTemplate      String?  @default("event_invitation")
+  whatsappAccount       String?  @default("TANZANIATIP")
 
   users              User[]
   events             Event[]
@@ -123,6 +125,14 @@ model Event {
   expiredNotified Boolean @default(false) // track if expiration email was sent
   checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
 
+  // ─── Wedding-specific fields ─────────────────────────────────────────
+  hostFamily  String?  // e.g., "Mr & Mrs Allan Swai"
+  person1     String?  // e.g., "Agape"
+  person2     String?  // e.g., "Gladness"
+  time        String?  // e.g., "5:00 PM"
+  imageUrl    String?  // Header image URL
+
+  
   // Invitation card fields
   templateCardUrl  String?
   qrPlacementX     Float?
@@ -284,3 +294,4 @@ model IncomingEmail {
   guestId     String?  // Link to the guest who replied
   processedAt DateTime?
 }
+

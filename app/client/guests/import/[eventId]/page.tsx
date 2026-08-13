@@ -903,7 +903,7 @@ export default function ImportGuestsPage() {
                     <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-amber-50/50'}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          {/* Title */}
+                          {/* Title with always-visible edit button */}
                           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                             {isEditingTitle ? (
                               <div className="flex items-center gap-1 w-full">
@@ -935,21 +935,21 @@ export default function ImportGuestsPage() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 group">
+                              <>
                                 <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                                   {guest.title || '—'}
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100"
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
                                 </button>
-                              </div>
+                              </>
                             )}
                           </div>
-                          {/* Name */}
+                          {/* Name with always-visible edit button */}
                           <div className="flex items-center gap-1.5">
                             {isEditingName ? (
                               <div className="flex items-center gap-1 w-full">
@@ -981,16 +981,16 @@ export default function ImportGuestsPage() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 group flex-1">
+                              <>
                                 <p className="font-medium text-gray-800 break-words">{guest.name}</p>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
                                 </button>
-                              </div>
+                              </>
                             )}
                           </div>
                           <p className="text-xs text-gray-500 font-mono mt-0.5">{guest.normalizedPhone || guest.phone}</p>
@@ -1071,13 +1071,13 @@ export default function ImportGuestsPage() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 group">
+                              <div className="flex items-center gap-1">
                                 <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                                   {guest.title || '—'}
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100"
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
@@ -1116,11 +1116,11 @@ export default function ImportGuestsPage() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 group">
+                              <div className="flex items-center gap-1">
                                 <span className="break-words">{guest.name}</span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                  className="text-gray-400 hover:text-[#0D4F4F] transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
