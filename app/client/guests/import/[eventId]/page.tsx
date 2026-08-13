@@ -17,14 +17,14 @@ interface ParsedGuest {
   normalizedPhone: string;
   email?: string;
   guestType?: string;
-  title?: string;
+  title?: string; // Now optional - no default
   isValid: boolean;
   statusMessage?: string;
   cardNumber?: string;
 }
 
 interface ColumnMapping {
-  [key: string]: 'name' | 'phone' | 'email' | 'guestType' | 'skip';
+  [key: string]: 'name' | 'phone' | 'email' | 'guestType' | 'title' | 'skip';
 }
 
 export default function ImportGuestsPage() {
@@ -174,7 +174,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: match[1],
           guestType: cardType,
-          title: title || 'Mr',
+          title: title, // No default - keep as undefined if not found
         });
         continue;
       }
@@ -192,7 +192,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: cardType,
-          title: title || 'Mr',
+          title: title, // No default - keep as undefined if not found
         });
         continue;
       }
@@ -209,7 +209,7 @@ export default function ImportGuestsPage() {
           phone,
           cardNumber: '',
           guestType: 'SINGLE',
-          title: title || 'Mr',
+          title: title, // No default - keep as undefined if not found
         });
         continue;
       }
@@ -236,7 +236,7 @@ export default function ImportGuestsPage() {
             phone,
             cardNumber: '',
             guestType: cardType,
-            title: title || 'Mr',
+            title: title, // No default - keep as undefined if not found
           });
         }
       }
@@ -289,7 +289,7 @@ export default function ImportGuestsPage() {
           statusMessage: norm.message,
           guestType: g.guestType || 'SINGLE',
           cardNumber: g.cardNumber || '',
-          title: g.title || 'Mr',
+          title: g.title || '', // Empty string if no title found
         };
       });
 
@@ -334,6 +334,7 @@ export default function ImportGuestsPage() {
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
             else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
+            else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -366,6 +367,7 @@ export default function ImportGuestsPage() {
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
             else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
+            else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -389,7 +391,7 @@ export default function ImportGuestsPage() {
               normalizedPhone: norm.normalized,
               isValid: norm.isValid,
               statusMessage: norm.message,
-              title: g.title || 'Mr',
+              title: g.title || '', // Empty string if no title
             };
           });
           setParsedGuests(normalized);
@@ -468,7 +470,7 @@ export default function ImportGuestsPage() {
     const headers = ['title', 'name', 'phone', 'email', 'guestType'];
     const sampleData = [
       ['Mr', 'John Doe', '+255712345678', 'john@example.com', 'single'],
-      ['Mrs', 'Jane Smith', '+255755123456', 'jane@example.com', 'double'],
+      ['', 'Jane Smith', '+255755123456', 'jane@example.com', 'double'],
       ['Mr/Mrs', 'James & Mary Brown', '+255782345678', 'brown@example.com', 'double'],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
@@ -488,7 +490,7 @@ export default function ImportGuestsPage() {
       'SN  TITLE    NAME                    PHONE       CARD',
       '1   Mr       ADRIAN                  766084935   DOUBLE',
       '2   Mrs      AGNES LWAMBANO          713502010   DOUBLE',
-      '3   Mr/Mrs   ALIPHONSINA             715164791   DOUBLE',
+      '3            ALIPHONSINA             715164791   DOUBLE',
     ].join('\n');
     
     const blob = new Blob([sampleData], { type: 'text/plain' });
@@ -559,7 +561,7 @@ export default function ImportGuestsPage() {
             isValid: norm.isValid,
             statusMessage: norm.message,
             email,
-            title: title || 'Mr',
+            title: title || '', // Empty string if no title
           };
         })
         .filter((g: ParsedGuest) => g.name && g.phone);
@@ -581,6 +583,8 @@ export default function ImportGuestsPage() {
     const phoneCol = Object.keys(mapping).find(k => mapping[k] === 'phone');
     const emailCol = Object.keys(mapping).find(k => mapping[k] === 'email');
     const guestTypeCol = Object.keys(mapping).find(k => mapping[k] === 'guestType');
+    const titleCol = Object.keys(mapping).find(k => mapping[k] === 'title');
+    
     if (!nameCol || !phoneCol) {
       setError('Please map the "name" and "phone" columns.');
       return;
@@ -590,8 +594,9 @@ export default function ImportGuestsPage() {
       const phone = row[phoneCol]?.toString().trim() || '';
       const email = emailCol ? row[emailCol]?.toString().trim() : undefined;
       const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() : undefined;
+      const title = titleCol ? row[titleCol]?.toString().trim() : undefined;
       const norm = normalizePhone(phone);
-      const { cleanName, title } = extractTitle(name);
+      const { cleanName } = extractTitle(name);
       return {
         name: cleanName,
         phone,
@@ -600,7 +605,7 @@ export default function ImportGuestsPage() {
         statusMessage: norm.message,
         email,
         guestType,
-        title: title || 'Mr',
+        title: title || '', // Empty string if no title
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -625,7 +630,7 @@ export default function ImportGuestsPage() {
       email: g.email,
       guestType: g.guestType,
       cardNumber: g.cardNumber,
-      title: g.title || 'Mr',
+      title: g.title || '', // Empty string if no title
     }));
     setUploading(true);
     setImportStatus('Importing guests...');
@@ -722,6 +727,7 @@ export default function ImportGuestsPage() {
       <p className="text-gray-500 text-sm sm:text-base mb-6">
         Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, <strong>vCard (.vcf)</strong>, or <strong>PDF</strong> file, or import from your phone contacts.
         For CSV/Excel, you'll be able to map columns to our fields. Phone numbers will be auto‑formatted to international format.
+        <span className="block text-xs text-gray-400 mt-1">Leave <strong>Title</strong> column empty if you don't want to use titles.</span>
       </p>
 
       {step === 'upload' && (
@@ -767,11 +773,12 @@ export default function ImportGuestsPage() {
 {`SN  TITLE    NAME                    PHONE       CARD
 1   Mr       ADRIAN                  766084935   DOUBLE
 2   Mrs      AGNES LWAMBANO          713502010   DOUBLE
-3   Mr/Mrs   ALIPHONSINA             715164791   DOUBLE`}
+3            ALIPHONSINA             715164791   DOUBLE`}
               </pre>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Supported titles: Mr, Mrs, Ms, Miss, Dr, Prof, Sir, Mr/Mrs, Mr & Mrs
+              Supported titles: Mr, Mrs, Ms, Miss, Dr, Prof, Sir, Mr/Mrs, Mr & Mrs.<br />
+              Leave title column empty for guests without titles.
             </p>
           </div>
         </>
@@ -809,7 +816,8 @@ export default function ImportGuestsPage() {
                       <option value="name">Name</option>
                       <option value="phone">Phone</option>
                       <option value="email">Email</option>
-                      <option value="guestType">Guest Type (Single/Double)</option>
+                      <option value="guestType">Guest Type</option>
+                      <option value="title">Title (Mr/Mrs/etc.)</option>
                     </select>
                   </div>
                 ))}
