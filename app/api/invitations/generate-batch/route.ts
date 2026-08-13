@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
+import { put } from '@vercel/blob';
+
+// ─── Helper: Get formatted guest name ──────────────────────────────────
+function getGuestFullName(guest: any): string {
+  const title = guest.title || '';
+  return title ? `${title} ${guest.name}` : guest.name;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,17 +18,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const tenantId = (session.user as any).tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant not found' }, { status: 400 });
+    }
+
     const { eventId, guestIds } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
       return NextResponse.json({ error: 'Missing eventId or guestIds' }, { status: 400 });
     }
 
-    // Verify event belongs to user
+    // ─── Fetch event with only the specified guests ────────────────────
     const event = await prisma.event.findFirst({
-      where: {
-        id: eventId,
-        tenantId: (session.user as any).tenantId,
+      where: { id: eventId, tenantId },
+      include: {
+        guests: {
+          where: {
+            id: { in: guestIds },
+          },
+        },
       },
     });
 
@@ -28,48 +45,94 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Fetch guests
-    const guests = await prisma.guest.findMany({
-      where: {
-        id: { in: guestIds },
-        eventId,
-      },
-    });
+    if (!event.templateCardUrl) {
+      return NextResponse.json(
+        { error: 'No invitation card configured for this event. Please design it first.' },
+        { status: 400 }
+      );
+    }
+
+    if (event.guests.length === 0) {
+      return NextResponse.json({
+        completed: 0,
+        failed: 0,
+        results: [],
+        message: 'No guests found in this batch',
+      });
+    }
+
+    const qrPosition = {
+      x: event.qrPlacementX ?? 100,
+      y: event.qrPlacementY ?? 100,
+      size: event.qrSize ?? 200,
+    };
+
+    const namePosition = event.includeName
+      ? {
+          x: event.namePlacementX ?? 50,
+          y: event.namePlacementY ?? 50,
+          fontSize: event.nameFontSize ?? 24,
+          fontColor: event.nameFontColor ?? '#000000',
+          fontFamily: event.nameFontFamily || 'Playfair Display, serif',
+        }
+      : null;
+
+    // ─── Fetch the base card once ──────────────────────────────────────
+    let cardBuffer: Buffer;
+    try {
+      const response = await fetch(event.templateCardUrl);
+      if (!response.ok) throw new Error(`Failed to fetch base card: ${response.statusText}`);
+      const arrayBuffer = await response.arrayBuffer();
+      cardBuffer = Buffer.from(arrayBuffer);
+    } catch (error) {
+      console.error('Error fetching base card:', error);
+      return NextResponse.json(
+        { error: 'Could not load base card image. Please re‑upload the template.' },
+        { status: 400 }
+      );
+    }
 
     const results = [];
     let completed = 0;
     let failed = 0;
 
-    for (const guest of guests) {
+    for (const guest of event.guests) {
       try {
-        // ─── Method 1: If you have a direct generation function ──────
-        // const cardUrl = await generateInvitationCard(guest);
-        
-        // ─── Method 2: Call your existing generate API ────────────────
-        // This reuses your existing logic without duplicating code
-        const generateRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/invitations/generate-single`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestId: guest.id, eventId }),
+        const token = generateGuestToken(guest.id, eventId);
+        const qrBuffer = await generateQRBuffer(token, qrPosition.size);
+        const fullName = getGuestFullName(guest);
+        const cardNumber = guest.cardNumber || '';
+
+        const finalCardBuffer = await compositeQROnCard(
+          cardBuffer,
+          qrBuffer,
+          qrPosition,
+          namePosition,
+          event.includeName ? fullName : undefined,
+          cardNumber
+        );
+
+        const key = `guests/${event.tenantId}/${guest.id}.png`;
+        const blob = await put(key, finalCardBuffer, {
+          access: 'public',
+          contentType: 'image/png',
         });
 
-        const data = await generateRes.json();
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { invitationCard: blob.url, qrToken: token },
+        });
 
-        if (generateRes.ok && data.cardUrl) {
-          // Update guest record with the card URL
-          await prisma.guest.update({
-            where: { id: guest.id },
-            data: { invitationCard: data.cardUrl },
-          });
-          
-          results.push({ guestId: guest.id, name: guest.name, success: true });
-          completed++;
-        } else {
-          throw new Error(data.error || 'Generation failed');
-        }
+        results.push({ guestId: guest.id, name: fullName, success: true });
+        completed++;
       } catch (error: any) {
-        console.error(`Failed to generate card for ${guest.name}:`, error);
-        results.push({ guestId: guest.id, name: guest.name, success: false, error: error.message });
+        console.error(`Failed for ${guest.name}:`, error);
+        results.push({
+          guestId: guest.id,
+          name: guest.name,
+          success: false,
+          error: error.message || 'Unknown error',
+        });
         failed++;
       }
     }
@@ -78,7 +141,7 @@ export async function POST(req: NextRequest) {
       completed,
       failed,
       results,
-      total: guests.length,
+      total: event.guests.length,
     });
   } catch (error: any) {
     console.error('Batch generation error:', error);
