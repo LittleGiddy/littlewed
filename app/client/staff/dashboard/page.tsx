@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Users, Camera, Key, QrCode, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Users, Camera, Key, QrCode, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 
@@ -18,6 +18,44 @@ interface Event {
   name: string;
   date: string;
 }
+
+// ─── Sound effects using Web Audio API ────────────────────────────────
+const playSound = (type: 'success' | 'fail') => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  if (type === 'success') {
+    oscillator.frequency.value = 880;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.4);
+
+    setTimeout(() => {
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.frequency.value = 1108;
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc2.start(audioCtx.currentTime);
+      osc2.stop(audioCtx.currentTime + 0.3);
+    }, 150);
+  } else {
+    oscillator.frequency.value = 440;
+    oscillator.type = 'sawtooth';
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.5);
+  }
+};
 
 export default function StaffDashboard() {
   const { data: session, status } = useSession();
@@ -36,8 +74,16 @@ export default function StaffDashboard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrMessage, setQrMessage] = useState('');
+  const [blockedMessage, setBlockedMessage] = useState('');
+  const [availableAt, setAvailableAt] = useState('');
+  const [countdown, setCountdown] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [guestType, setGuestType] = useState('');
+  const [checkedIn, setCheckedIn] = useState(false);
+  const [loadingCheckin, setLoadingCheckin] = useState(false);
   const itemsPerPage = 10;
 
+  // ─── Auth Check ──────────────────────────────────────────────────────
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
     if (session?.user?.role !== 'STAFF') router.push('/login');
@@ -50,6 +96,7 @@ export default function StaffDashboard() {
     }
   }, [session, status, router]);
 
+  // ─── Load Guests ─────────────────────────────────────────────────────
   const loadGuests = async (eventId: string) => {
     setSelectedEventId(eventId);
     setCurrentPage(1);
@@ -60,17 +107,53 @@ export default function StaffDashboard() {
     setFilteredGuests(data);
   };
 
+  // ─── Filter Guests ──────────────────────────────────────────────────
   useEffect(() => {
     const filtered = guests.filter(g =>
-      g.name.toLowerCase().includes(searchTerm.toLowerCase()) || g.phone.includes(searchTerm)
+      g.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      g.phone.includes(searchTerm)
     );
     setFilteredGuests(filtered);
     setCurrentPage(1);
   }, [searchTerm, guests]);
 
+  // ─── Countdown Timer ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!availableAt) {
+      setCountdown('');
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const target = new Date(availableAt);
+      const now = new Date();
+      const diff = target.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown('🟢 Available now! Refresh to check in.');
+        clearInterval(timer);
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown(
+        `${hours.toString().padStart(2, '0')}:${minutes
+          .toString()
+          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [availableAt]);
+
+  // ─── QR Scanner ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!showCheckinModal || checkinMode !== 'qr') return;
     let stream: MediaStream | null = null;
+
     const startCamera = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -86,14 +169,23 @@ export default function StaffDashboard() {
       }
     };
     startCamera();
-    return () => { if (stream) stream.getTracks().forEach(t => t.stop()); setScanning(false); };
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      setScanning(false);
+    };
   }, [showCheckinModal, checkinMode]);
 
   const scanFrame = () => {
     if (!videoRef.current || !canvasRef.current || !scanning) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (video.readyState !== video.HAVE_ENOUGH_DATA) { requestAnimationFrame(scanFrame); return; }
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+      requestAnimationFrame(scanFrame);
+      return;
+    }
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
@@ -112,10 +204,22 @@ export default function StaffDashboard() {
     }
   };
 
-  useEffect(() => { if (scanning) requestAnimationFrame(scanFrame); }, [scanning]);
+  useEffect(() => {
+    if (scanning) {
+      requestAnimationFrame(scanFrame);
+    }
+  }, [scanning]);
 
+  // ─── Core Check-in Function ─────────────────────────────────────────
   const processCheckin = async (token: string) => {
-    setQrMessage('Checking in…');
+    setLoadingCheckin(true);
+    setQrMessage('');
+    setBlockedMessage('');
+    setAvailableAt('');
+    setCheckedIn(false);
+    setGuestName('');
+    setGuestType('');
+
     try {
       const res = await fetch('/api/check-in', {
         method: 'POST',
@@ -124,24 +228,55 @@ export default function StaffDashboard() {
         credentials: 'include',
       });
       const data = await res.json();
+
+      // ─── Event hasn't started yet ──────────────────────────────────────
+      if (res.status === 403 && data.availableAt) {
+        setBlockedMessage(data.error);
+        setAvailableAt(data.availableAt);
+        playSound('fail');
+        setQrMessage(`⏰ ${data.error}`);
+        return;
+      }
+
       if (res.ok) {
-        toast.success(`Checked in: ${data.guest.name}`);
+        playSound('success');
+        setCheckedIn(true);
+        setGuestName(data.guest.name);
+        setGuestType(data.guest.guestType || '—');
         setQrMessage(`✅ ${data.guest.name} checked in`);
-        setTimeout(() => { loadGuests(selectedEventId); setShowCheckinModal(false); setQrMessage(''); }, 1200);
+        setTimeout(() => {
+          loadGuests(selectedEventId);
+          setShowCheckinModal(false);
+          setQrMessage('');
+          setCheckedIn(false);
+          setGuestName('');
+          setGuestType('');
+        }, 1500);
       } else {
-        toast.error(data.error);
+        playSound('fail');
         setQrMessage(`❌ ${data.error}`);
       }
     } catch {
-      toast.error('Network error');
+      playSound('fail');
       setQrMessage('❌ Network error');
+    } finally {
+      setLoadingCheckin(false);
     }
   };
 
+  // ─── Manual Check-in ─────────────────────────────────────────────────
   const handleManualCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode) return;
-    setQrMessage('Checking…');
+
+    setLoadingCheckin(true);
+    setQrMessage('');
+    setBlockedMessage('');
+    setAvailableAt('');
+    setCheckedIn(false);
+    setGuestName('');
+    setGuestType('');
+
     try {
       const res = await fetch('/api/check-in', {
         method: 'POST',
@@ -150,18 +285,41 @@ export default function StaffDashboard() {
         credentials: 'include',
       });
       const data = await res.json();
+
+      // ─── Event hasn't started yet ──────────────────────────────────────
+      if (res.status === 403 && data.availableAt) {
+        setBlockedMessage(data.error);
+        setAvailableAt(data.availableAt);
+        playSound('fail');
+        setQrMessage(`⏰ ${data.error}`);
+        setManualCode('');
+        return;
+      }
+
       if (res.ok) {
-        toast.success(`Checked in: ${data.guest.name}`);
+        playSound('success');
+        setCheckedIn(true);
+        setGuestName(data.guest.name);
+        setGuestType(data.guest.guestType || '—');
         setQrMessage(`✅ ${data.guest.name} checked in`);
         setManualCode('');
-        setTimeout(() => { loadGuests(selectedEventId); setShowCheckinModal(false); setQrMessage(''); }, 1200);
+        setTimeout(() => {
+          loadGuests(selectedEventId);
+          setShowCheckinModal(false);
+          setQrMessage('');
+          setCheckedIn(false);
+          setGuestName('');
+          setGuestType('');
+        }, 1500);
       } else {
-        toast.error(data.error);
+        playSound('fail');
         setQrMessage(`❌ ${data.error}`);
       }
     } catch {
-      toast.error('Network error');
+      playSound('fail');
       setQrMessage('❌ Network error');
+    } finally {
+      setLoadingCheckin(false);
     }
   };
 
@@ -197,7 +355,6 @@ export default function StaffDashboard() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Header ── */
         .sd-header {
           display: flex; align-items: flex-start; justify-content: space-between;
           gap: 16px; margin-bottom: 32px; flex-wrap: wrap;
@@ -216,7 +373,6 @@ export default function StaffDashboard() {
         .sd-title span { color: #E8A598; }
         .sd-subtitle { font-size: 14px; color: #7A8FA6; margin: 0; }
 
-        /* Header right */
         .sd-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
 
         .sd-stat-pill {
@@ -239,7 +395,6 @@ export default function StaffDashboard() {
         .sd-checkin-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
         .sd-checkin-btn:active { transform: translateY(0); }
 
-        /* ── Event selector ── */
         .sd-card {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 20px;
           overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05);
@@ -269,7 +424,6 @@ export default function StaffDashboard() {
         }
         .sd-select:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
 
-        /* ── Event meta bar ── */
         .sd-event-meta {
           display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
           padding: 14px 24px; background: rgba(13,79,79,0.03);
@@ -282,7 +436,6 @@ export default function StaffDashboard() {
           font-size: 15px; font-weight: 800; color: #0D1B1B; letter-spacing: -0.2px;
         }
 
-        /* ── Search ── */
         .sd-search-wrap { position: relative; margin-bottom: 16px; }
         .sd-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9BAAB8; pointer-events: none; }
         .sd-search {
@@ -294,7 +447,6 @@ export default function StaffDashboard() {
         }
         .sd-search:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
 
-        /* ── Guest table ── */
         .sd-guest-card {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 20px;
           overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05);
@@ -343,7 +495,6 @@ export default function StaffDashboard() {
           padding: 4px 10px; border-radius: 20px;
         }
 
-        /* ── Pagination ── */
         .sd-pagination {
           display: flex; align-items: center; justify-content: center; gap: 8px;
           padding: 16px 24px; border-top: 1.5px solid #F0F4F8;
@@ -358,7 +509,6 @@ export default function StaffDashboard() {
         .sd-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .sd-page-label { font-size: 13px; font-weight: 600; color: #7A8FA6; padding: 0 4px; }
 
-        /* ── Empty state ── */
         .sd-empty { padding: 48px 24px; text-align: center; }
         .sd-empty-icon {
           width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 14px;
@@ -371,7 +521,7 @@ export default function StaffDashboard() {
         }
         .sd-empty-sub { font-size: 13.5px; color: #9BAAB8; }
 
-        /* ── Modal overlay ── */
+        /* ── Modal ── */
         .sd-modal-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.45);
           display: flex; align-items: center; justify-content: center;
@@ -384,7 +534,7 @@ export default function StaffDashboard() {
         }
 
         .sd-modal {
-          background: white; border-radius: 24px; width: 100%; max-width: 480px;
+          background: white; border-radius: 24px; width: 100%; max-width: 500px;
           max-height: 90vh; overflow-y: auto;
           box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 32px 64px rgba(0,0,0,0.12);
           animation: sdModalIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
@@ -415,7 +565,6 @@ export default function StaffDashboard() {
 
         .sd-modal-body { padding: 20px 24px 24px; }
 
-        /* Mode toggle */
         .sd-mode-toggle {
           display: flex; gap: 8px; margin-bottom: 20px;
           background: #F7F9FB; border-radius: 14px; padding: 5px;
@@ -432,14 +581,12 @@ export default function StaffDashboard() {
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
-        /* QR viewfinder */
         .sd-qr-wrap {
           border-radius: 16px; overflow: hidden; background: #0D1B1B;
           aspect-ratio: 4/3; position: relative;
         }
         .sd-qr-wrap video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-        /* Scan corner decorations */
         .sd-qr-corners {
           position: absolute; inset: 0; pointer-events: none;
           display: flex; align-items: center; justify-content: center;
@@ -455,7 +602,6 @@ export default function StaffDashboard() {
 
         .sd-qr-hint { text-align: center; font-size: 12.5px; color: #9BAAB8; margin-top: 10px; font-weight: 500; }
 
-        /* Manual input */
         .sd-code-input {
           width: 100%; padding: 16px; text-align: center;
           font-size: 26px; letter-spacing: 6px; font-family: 'Courier New', monospace;
@@ -477,13 +623,28 @@ export default function StaffDashboard() {
         .sd-submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
         .sd-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-        /* QR message */
         .sd-qr-msg {
           margin-top: 14px; padding: 12px 16px; border-radius: 12px;
           font-size: 13.5px; font-weight: 600; text-align: center;
         }
         .sd-qr-msg.success { background: rgba(26,122,74,0.08); border: 1px solid rgba(26,122,74,0.2); color: #1A7A4A; }
         .sd-qr-msg.error   { background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B; }
+        .sd-qr-msg.warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+
+        /* ─── Checked-in Guest Details ────────────────────────────────── */
+        .sd-checked-in-details {
+          margin-top: 14px; padding: 14px 16px; border-radius: 12px;
+          background: #F0FDF4; border: 1.5px solid #86EFAC;
+          display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+        .sd-checked-in-details .sd-check-icon { color: #1A7A4A; }
+        .sd-checked-in-details .sd-guest-info {
+          font-weight: 600; color: #0D1B1B; flex: 1;
+        }
+        .sd-checked-in-details .sd-guest-type {
+          font-size: 12px; font-weight: 700; color: #1A7A4A;
+          background: rgba(26,122,74,0.12); padding: 2px 10px; border-radius: 12px;
+        }
 
         @media (max-width: 560px) {
           .sd-wrap { padding: 24px 16px 48px; }
@@ -624,7 +785,7 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      {/* ── Check-in Modal ── */}
+      {/* ─── Check-in Modal ── */}
       {showCheckinModal && (
         <div className="sd-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCheckinModal(false); }}>
           <div className="sd-modal">
@@ -656,6 +817,18 @@ export default function StaffDashboard() {
                       <div className="sd-corner bl" />
                       <div className="sd-corner br" />
                     </div>
+                    {loadingCheckin && (
+                      <div style={{
+                        position: 'absolute', inset: 0, display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(0,0,0,0.5)'
+                      }}>
+                        <div style={{ color: 'white', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: 20, height: 20, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                          Checking in…
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <p className="sd-qr-hint">Position the guest's QR code within the frame</p>
                 </>
@@ -666,19 +839,62 @@ export default function StaffDashboard() {
                     className="sd-code-input"
                     value={manualCode}
                     onChange={e => setManualCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
-                    placeholder="e.g. 4D2ACD88"
+                    placeholder="Enter SMS code"
                     maxLength={10}
                     required
+                    disabled={loadingCheckin}
                   />
-                  <button type="submit" className="sd-submit-btn" disabled={manualCode.length < 6}>
-                    <CheckCircle size={16} /> Check In
+                  <button type="submit" className="sd-submit-btn" disabled={manualCode.length < 6 || loadingCheckin}>
+                    {loadingCheckin ? (
+                      <>
+                        <div style={{ width: 18, height: 18, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        Checking…
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={16} /> Check In
+                      </>
+                    )}
                   </button>
                 </form>
               )}
 
-              {qrMessage && (
+              {/* ─── Blocked Message - Event hasn't started ──────────────── */}
+              {blockedMessage && availableAt && (
+                <div className="sd-qr-msg warning" style={{ marginTop: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                    <Clock size={18} />
+                    <span>Check-in not available yet</span>
+                  </div>
+                  <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.9 }}>
+                    {blockedMessage}
+                  </div>
+                  {countdown && (
+                    <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '8px' }}>
+                      {countdown}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── Success / Error Message ────────────────────────────── */}
+              {qrMessage && !blockedMessage && (
                 <div className={`sd-qr-msg ${qrMessage.includes('✅') ? 'success' : 'error'}`}>
                   {qrMessage}
+                </div>
+              )}
+
+              {/* ─── Checked-in Guest Details ───────────────────────────── */}
+              {checkedIn && guestName && (
+                <div className="sd-checked-in-details">
+                  <CheckCircle size={20} className="sd-check-icon" />
+                  <span className="sd-guest-info">{guestName}</span>
+                  {guestType && guestType !== '—' && (
+                    <span className="sd-guest-type">
+                      {guestType === 'single' ? 'Single' : guestType === 'double' ? 'Double' : guestType}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '12px', color: '#1A7A4A', fontWeight: 600 }}>✓ Checked in</span>
                 </div>
               )}
 

@@ -121,6 +121,7 @@ model Event {
   resumedAt     DateTime? // when the event was last resumed (for tracking)
   reminderSent  Boolean  @default(false) // track if 24h reminder was sent
   expiredNotified Boolean @default(false) // track if expiration email was sent
+  checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
 
   // Invitation card fields
   templateCardUrl  String?

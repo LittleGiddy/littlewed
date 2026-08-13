@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { QrCode, Key, Loader2, CheckCircle, XCircle, User, Users } from 'lucide-react';
+import { QrCode, Key, Loader2, CheckCircle, User, Users, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 
@@ -22,7 +22,6 @@ const playSound = (type: 'success' | 'fail') => {
     oscillator.start(audioCtx.currentTime);
     oscillator.stop(audioCtx.currentTime + 0.4);
 
-    // Second beep for success
     setTimeout(() => {
       const osc2 = audioCtx.createOscillator();
       const gain2 = audioCtx.createGain();
@@ -56,6 +55,9 @@ export default function CheckInPage() {
   const [guestType, setGuestType] = useState('');
   const [checkedIn, setCheckedIn] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [blockedMessage, setBlockedMessage] = useState('');
+  const [availableAt, setAvailableAt] = useState('');
+  const [countdown, setCountdown] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -121,9 +123,45 @@ export default function CheckInPage() {
     }
   }, [scanning]);
 
+  // ─── Countdown Timer ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!availableAt) {
+      setCountdown('');
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const target = new Date(availableAt);
+      const now = new Date();
+      const diff = target.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setCountdown('🟢 Available now! Refresh to check in.');
+        clearInterval(timer);
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setCountdown(
+        `${hours.toString().padStart(2, '0')}:${minutes
+          .toString()
+          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [availableAt]);
+
+  // ─── Core Functions ──────────────────────────────────────────────────
   const processCheckinWithToken = async (token: string) => {
     setLoading(true);
     setMessage('');
+    setBlockedMessage('');
+    setAvailableAt('');
+    setCheckedIn(false);
     try {
       const res = await fetch('/api/check-in', {
         method: 'POST',
@@ -132,6 +170,16 @@ export default function CheckInPage() {
         credentials: 'include',
       });
       const data = await res.json();
+
+      // ─── Event hasn't started yet ──────────────────────────────────────
+      if (res.status === 403 && data.availableAt) {
+        setBlockedMessage(data.error);
+        setAvailableAt(data.availableAt);
+        playSound('fail');
+        toast.error('Check-in not available yet');
+        return;
+      }
+
       if (res.ok) {
         playSound('success');
         setCheckedIn(true);
@@ -164,6 +212,9 @@ export default function CheckInPage() {
     if (!code) return;
     setLoading(true);
     setMessage('');
+    setBlockedMessage('');
+    setAvailableAt('');
+    setCheckedIn(false);
     try {
       const res = await fetch('/api/check-in', {
         method: 'POST',
@@ -172,6 +223,17 @@ export default function CheckInPage() {
         credentials: 'include',
       });
       const data = await res.json();
+
+      // ─── Event hasn't started yet ──────────────────────────────────────
+      if (res.status === 403 && data.availableAt) {
+        setBlockedMessage(data.error);
+        setAvailableAt(data.availableAt);
+        playSound('fail');
+        toast.error('Check-in not available yet');
+        setCode('');
+        return;
+      }
+
       if (res.ok) {
         playSound('success');
         setCheckedIn(true);
@@ -211,15 +273,21 @@ export default function CheckInPage() {
         ← Back to Event
       </Link>
 
-      <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 mb-2">Venue Check‑in</h1>
-      <p className="text-gray-500 text-sm mb-6">Scan guest QR code or enter 6‑digit SMS code</p>
+      <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 mb-2">
+        Venue Check‑in
+      </h1>
+      <p className="text-gray-500 text-sm mb-6">
+        Scan guest QR code or enter 6‑digit SMS code
+      </p>
 
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-6">
         <button
           onClick={() => setMode('qr')}
           className={`flex-1 py-2 rounded-xl font-semibold transition ${
-            mode === 'qr' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            mode === 'qr'
+              ? 'bg-[#0D4F4F] text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           <QrCode size={16} className="inline mr-1" /> QR Scanner
@@ -227,7 +295,9 @@ export default function CheckInPage() {
         <button
           onClick={() => setMode('manual')}
           className={`flex-1 py-2 rounded-xl font-semibold transition ${
-            mode === 'manual' ? 'bg-[#0D4F4F] text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            mode === 'manual'
+              ? 'bg-[#0D4F4F] text-white shadow-md'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           <Key size={16} className="inline mr-1" /> Manual Code
@@ -247,7 +317,9 @@ export default function CheckInPage() {
             )}
           </div>
           {scanning && (
-            <p className="text-center text-sm text-gray-500 mt-2">Position QR code in the frame</p>
+            <p className="text-center text-sm text-gray-500 mt-2">
+              Position QR code in the frame
+            </p>
           )}
         </div>
       )}
@@ -257,11 +329,15 @@ export default function CheckInPage() {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
           <form onSubmit={handleManualCheckIn} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">6‑digit code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                6‑digit code
+              </label>
               <input
                 type="text"
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onChange={(e) =>
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }
                 className="w-full p-3 text-center text-2xl tracking-widest font-mono border rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                 placeholder="000000"
                 maxLength={6}
@@ -293,6 +369,30 @@ export default function CheckInPage() {
         </div>
       )}
 
+      {/* ─── Blocked Message - Event hasn't started ──────────────────── */}
+      {blockedMessage && availableAt && (
+        <div className="mt-6 p-6 rounded-2xl text-center bg-amber-50 border border-amber-200">
+          <div className="flex flex-col items-center gap-3">
+            <Clock size={48} className="text-amber-500" />
+            <h3 className="text-lg font-bold text-amber-800">
+              Check-in Not Available Yet
+            </h3>
+            <p className="text-amber-700">{blockedMessage}</p>
+            {countdown && (
+              <>
+                <p className="text-3xl font-mono font-bold text-amber-800">
+                  {countdown}
+                </p>
+                <p className="text-sm text-amber-600">until check-in opens</p>
+              </>
+            )}
+            <p className="text-sm text-amber-600 mt-2">
+              ⏰ Please wait until the event starts to check in.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Guest Details on Check‑in Success */}
       {checkedIn && (
         <div className="mt-6 bg-white rounded-2xl shadow-lg border border-gray-100 p-6 animate-fadeInUp">
@@ -312,11 +412,12 @@ export default function CheckInPage() {
               </span>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">Checked in successfully – enjoy the event!</p>
+          <p className="text-xs text-gray-400 mt-3">
+            Checked in successfully – enjoy the event!
+          </p>
         </div>
       )}
 
-      {/* CSS Animation */}
       <style jsx global>{`
         @keyframes fadeInUp {
           from {
