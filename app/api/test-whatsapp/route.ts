@@ -1,22 +1,53 @@
 // app/api/test-whatsapp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { sendWhatsAppTemplate } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
-    
     const { phone } = await req.json();
 
-    // ✅ Use hello_world template
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
+    }
+
+    // ✅ Use your LittleWed template instead of hello_world
     const result = await sendWhatsAppTemplate({
       to: phone,
-      template: 'hello_world',
+      template: 'LittleWed', // ← Changed from 'hello_world'
+      personalisation: [
+        {
+          "1": "GIDEON FELIX",
+          "2": "Mr & Mrs Allan Swai",
+          "3": "Agape",
+          "4": "Gladness",
+          "5": "15 Septemba 2026",
+          "6": "Tazara",
+          "7": "5:00 PM",
+          "8": "1",
+          "9": "DOUBLE"
+        }
+      ],
+      header: {
+        image: {
+          file: 'https://www.gstatic.com/webp/gallery/1.png',
+          name: 'Wedding Invitation',
+        }
+      },
+      button: {
+        personalisation: {
+          url_link: {
+            parameters: ['example123']
+          }
+        }
+      }
     });
 
     return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[Test] Error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to send test message' },
+      { status: 500 }
+    );
   }
 }
