@@ -225,6 +225,13 @@ model Guest {
   title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
   cardNumber     String?   @unique       // e.g., "G-001", "G-002"
   waId           String?   // WhatsApp ID from Meta
+
+  // ─── Relations ──────────────────────────────────────────────────────────
+  messageLogs MessageLog[]  // ✅ ADDED: Relation to message logs
+  
+  @@index([eventId])
+  @@index([phone])
+  @@index([smsCode])
 }
 
 model UsageRecord {
@@ -295,3 +302,33 @@ model IncomingEmail {
   processedAt DateTime?
 }
 
+// ─── Message Logging Models ──────────────────────────────────────────────
+
+model MessageLog {
+  id          String   @id @default(cuid())
+  messageId   String   @unique  // The ID from NexSMS/WhatsApp
+  guestId     String?
+  guest       Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  type        String   // WHATSAPP, SMS
+  template    String?
+  status      String   // SENT, PENDING, DELIVERED, FAILED, REJECTED
+  error       String?
+  createdAt   DateTime @default(now())
+  deliveredAt DateTime?
+  rawData     Json?
+
+  @@index([messageId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DeliveryLog {
+  id          String   @id @default(cuid())
+  messageId   String
+  status      String
+  rawData     Json
+  createdAt   DateTime @default(now())
+
+  @@index([messageId])
+  @@index([createdAt])
+}
