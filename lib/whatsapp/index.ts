@@ -4,7 +4,6 @@ const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN!;
 const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Ltd';
 const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
 
-// ─── Types ──────────────────────────────────────────────────────────────
 export interface SendWhatsAppTemplateOptions {
   to: string | string[];
   template: string;
@@ -23,11 +22,6 @@ export interface SendWhatsAppResult {
   data?: any;
 }
 
-// ─── Functions ──────────────────────────────────────────────────────────
-
-/**
- * Send a WhatsApp template message via NexSMS
- */
 export async function sendWhatsAppTemplate({
   to,
   template,
@@ -60,7 +54,8 @@ export async function sendWhatsAppTemplate({
     body.button = button;
   }
 
-  console.log('[WhatsApp] Sending to:', NEXTSMS_API_URL);
+  console.log('[WhatsApp] Sending template:', template);
+  console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
   console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
 
   try {
@@ -73,16 +68,6 @@ export async function sendWhatsAppTemplate({
       },
       body: JSON.stringify(body),
     });
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('[WhatsApp] Non-JSON response:', {
-        status: response.status,
-        body: text.slice(0, 500),
-      });
-      throw new Error(`Server returned non-JSON (${response.status}).`);
-    }
 
     const data = await response.json();
 
@@ -100,9 +85,6 @@ export async function sendWhatsAppTemplate({
   }
 }
 
-/**
- * Send a wedding invitation template
- */
 export async function sendWeddingInvitation(
   phone: string,
   data: {
@@ -119,75 +101,36 @@ export async function sendWeddingInvitation(
     inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
-  const personalisation = [
-    {
-      "1": data.name,
-      "2": data.hostFamily,
-      "3": data.person1,
-      "4": data.person2,
-      "5": data.date,
-      "6": data.venue,
-      "7": data.time,
-      "8": data.cardNumber,
-      "9": data.cardType,
-    }
-  ];
-
-  const header = data.imageUrl ? {
+  // ✅ Header with image (required by your template)
+  const header = {
     image: {
-      file: data.imageUrl,
+      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
       name: 'Wedding Invitation',
     }
-  } : undefined;
+  };
 
-  const button = data.inviteLink ? {
-    url: data.inviteLink,
-  } : undefined;
+  // ✅ Button with URL (required by your template)
+  const button = {
+    url: data.inviteLink || 'https://littlewed.co.tz/invite/default',
+  };
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'LittleWed',
-    personalisation,
+    template: 'LittleWed', // Your template name
+    personalisation: [
+      {
+        "1": data.name,
+        "2": data.hostFamily,
+        "3": data.person1,
+        "4": data.person2,
+        "5": data.date,
+        "6": data.venue,
+        "7": data.time,
+        "8": data.cardNumber,
+        "9": data.cardType,
+      }
+    ],
     header,
     button,
   });
-}
-
-/**
- * Send a generic reminder template
- */
-export async function sendReminder(
-  phone: string,
-  data: {
-    name: string;
-    eventName: string;
-    date: string;
-    venue: string;
-    time: string;
-  }
-): Promise<SendWhatsAppResult> {
-  const personalisation = [
-    {
-      "1": data.name,
-      "2": data.eventName,
-      "3": data.date,
-      "4": data.venue,
-      "5": data.time,
-    }
-  ];
-
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'event_reminder',
-    personalisation,
-  });
-}
-
-/**
- * Check if a phone number has WhatsApp
- */
-export async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; error?: string }> {
-  // Since NexSMS doesn't have a direct check endpoint,
-  // we assume WhatsApp is available and let the send API handle errors
-  return { hasWhatsApp: true };
 }
