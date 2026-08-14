@@ -1,7 +1,7 @@
 // lib/whatsapp/index.ts
 
 const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN!;
-const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'TANZANIATIP';
+const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Ltd';
 const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
 
 // ─── Types ──────────────────────────────────────────────────────────────
