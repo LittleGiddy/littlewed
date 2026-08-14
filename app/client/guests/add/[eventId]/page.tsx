@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2, AlertCircle, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
@@ -14,7 +14,7 @@ export default function AddGuestPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
-  const [whatsappStatus, setWhatsappStatus] = useState<{ hasWhatsApp: boolean; waId?: string } | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<{ hasWhatsApp: boolean; waId?: string; status?: string } | null>(null);
   const [form, setForm] = useState({
     title: 'Mr',
     name: '',
@@ -45,37 +45,49 @@ export default function AddGuestPage() {
     }
   };
 
-  // ─── Check WhatsApp Number ──────────────────────────────────────────
+  // ─── Check WhatsApp Number via NexSMS ────────────────────────────────
   const checkWhatsApp = async () => {
-  if (!form.phone) {
-    toast.error('Please enter a phone number first');
-    return;
-  }
-  setCheckingWhatsApp(true);
-  setWhatsappStatus(null);
-  try {
-    const res = await fetch('/api/whatsapp/check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: form.phone }),
-    });
-    const data = await res.json();
-    setWhatsappStatus(data);
-    if (data.hasWhatsApp) {
-      toast.success('✅ Number has WhatsApp!');
-    } else {
-      // ✅ Fixed: Use toast() instead of toast.info()
-      toast('ℹ️ Number does not have WhatsApp (SMS will be used)', {
-        icon: 'ℹ️',
-        duration: 4000,
-      });
+    if (!form.phone) {
+      toast.error('Please enter a phone number first');
+      return;
     }
-  } catch {
-    toast.error('Failed to check WhatsApp');
-  } finally {
-    setCheckingWhatsApp(false);
-  }
-};
+    setCheckingWhatsApp(true);
+    setWhatsappStatus(null);
+    try {
+      // ✅ Use the correct API route that checks via NexSMS
+      const res = await fetch('/api/whatsapp/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: form.phone }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setWhatsappStatus(data);
+        if (data.hasWhatsApp) {
+          toast.success('Number has WhatsApp!', {
+            icon: <CheckCircle size={18} className="text-green-600" />,
+            duration: 3000,
+          });
+        } else {
+          toast('Number does not have WhatsApp (SMS will be used)', {
+            icon: <Info size={18} className="text-amber-500" />,
+            duration: 4000,
+          });
+        }
+      } else {
+        toast.error(data.error || 'Failed to check WhatsApp', {
+          icon: <AlertCircle size={18} className="text-red-500" />,
+        });
+      }
+    } catch {
+      toast.error('Failed to check WhatsApp', {
+        icon: <AlertCircle size={18} className="text-red-500" />,
+      });
+    } finally {
+      setCheckingWhatsApp(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,13 +118,21 @@ export default function AddGuestPage() {
       const data = await res.json();
       if (res.ok) {
         const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
-        toast.success(`Guest "${form.title} ${form.name}" added (${channel})`);
+        toast.success(`Guest "${form.title} ${form.name}" added (${channel})`, {
+          icon: <UserCheck size={18} className="text-green-600" />,
+        });
         router.push(`/client/events/${eventId}`);
       } else {
         setError(data.error || 'Failed to add guest');
+        toast.error(data.error || 'Failed to add guest', {
+          icon: <AlertCircle size={18} className="text-red-500" />,
+        });
       }
     } catch {
       setError('Network error');
+      toast.error('Network error. Please try again.', {
+        icon: <AlertCircle size={18} className="text-red-500" />,
+      });
     } finally {
       setLoading(false);
     }
@@ -186,7 +206,7 @@ export default function AddGuestPage() {
                 disabled={checkingWhatsApp}
                 className="px-4 py-2 bg-[#0D4F4F] text-white rounded-xl font-medium hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
               >
-                {checkingWhatsApp ? <Loader2 size={16} className="animate-spin" /> : null}
+                {checkingWhatsApp ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
                 {checkingWhatsApp ? 'Checking...' : 'Check WhatsApp'}
               </button>
             </div>
@@ -242,7 +262,8 @@ export default function AddGuestPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
+              <AlertCircle size={16} />
               {error}
             </div>
           )}
@@ -253,6 +274,7 @@ export default function AddGuestPage() {
               disabled={loading}
               className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <UserCheck size={18} />}
               {loading ? 'Adding...' : 'Add Guest'}
             </button>
             <Link

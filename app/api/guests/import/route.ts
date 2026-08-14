@@ -5,13 +5,40 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
-import { isWhatsAppNumber } from '@/lib/validate-whatsapp';
+
+// ─── Helper: Check WhatsApp using NexSMS ──────────────────────────────
+async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
+  // Since NexSMS doesn't have a direct WhatsApp check endpoint,
+  // we assume WhatsApp is available and let the send API handle errors.
+  // This is the safest approach - if the number doesn't have WhatsApp,
+  // the send API will return an error and we can fallback to SMS.
+  
+  // For now, return true (will use WhatsApp if available, SMS as fallback)
+  return { hasWhatsApp: true };
+  
+  // If NexSMS adds a number context API in the future, use it here:
+  // try {
+  //   const cleanPhone = phone.replace(/^\+/, '').replace(/\D/g, '');
+  //   const response = await fetch('https://messaging-service.co.tz/api/whatsapp/v2/number/context', {
+  //     method: 'POST',
+  //     headers: {
+  //       'Authorization': `Bearer ${process.env.NEXTSMS_TOKEN}`,
+  //       'Content-Type': 'application/json',
+  //     },
+  //     body: JSON.stringify({ to: [cleanPhone] }),
+  //   });
+  //   const data = await response.json();
+  //   return { hasWhatsApp: data.status === 'valid', waId: data.waId };
+  // } catch (error: any) {
+  //   return { hasWhatsApp: false, error: error.message };
+  // }
+}
 
 // ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
 async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
   for (let i = 0; i < retries; i++) {
     try {
-      const result = await isWhatsAppNumber(phone);
+      const result = await checkWhatsAppNumber(phone);
       return result;
     } catch (error: any) {
       if (i === retries - 1) {

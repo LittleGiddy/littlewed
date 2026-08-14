@@ -753,137 +753,105 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   // ─── RENDER GUEST CARD ────────────────────────────────────────────────
-  // ✅ ONLY ONE renderGuestCard function
   const renderGuestCard = (guest: Guest) => {
-    const isSelected = selectedGuests.has(guest.id);
-    const isWhatsApp = guest.routingChannel === 'whatsapp';
-    const isCheckedIn = guest.checkedIn;
-    const hasThanks = guest.thanksSentAt;
-    const reminderCount = guest.reminderCount;
-    const hasCard = guest.invitationCard;
+  const isSelected = selectedGuests.has(guest.id);
+  const isWhatsApp = guest.routingChannel === 'whatsapp';
+  const isCheckedIn = guest.checkedIn;
+  const hasThanks = guest.thanksSentAt;
+  const reminderCount = guest.reminderCount;
+  const hasCard = guest.invitationCard;
 
-    return (
-      <div
-        key={guest.id}
-        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
-        style={{ transition: 'all 0.15s' }}
-      >
-        <div className="flex items-center p-3 gap-3">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => toggleSelectGuest(guest.id)}
-            className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
-          />
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            {guest.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-gray-800 text-sm truncate">
-                {guest.title ? `${guest.title} ${guest.name}` : guest.name}
-              </p>
-              {isCheckedIn && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                  <CheckCircle size={12} /> Checked In
-                </span>
-              )}
-              {hasThanks && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
-                  <Heart size={12} /> Thanks
-                </span>
-              )}
-              {/* ─── CARD STATUS BADGE ─── */}
-              {hasCard ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  <ImageIcon size={12} /> Card ✓
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                  <Clock size={12} /> No Card
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
-                {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
-                {isWhatsApp ? 'WhatsApp' : 'SMS'}
+  return (
+    <div
+      key={guest.id}
+      className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
+      style={{ transition: 'all 0.15s' }}
+    >
+      <div className="flex items-center p-3 gap-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => toggleSelectGuest(guest.id)}
+          className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
+        />
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          {guest.name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-gray-800 text-sm truncate">
+              {guest.title ? `${guest.title} ${guest.name}` : guest.name}
+            </p>
+            {isCheckedIn && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                <CheckCircle size={12} /> Checked In
               </span>
-              {guest.phone && (
-                <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
-              )}
-              {reminderCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                  <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
+            )}
+            {hasThanks && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                <Heart size={12} /> Thanks
+              </span>
+            )}
+            {hasCard ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                <ImageIcon size={12} /> Card ✓
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <Clock size={12} /> No Card
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {guest.invitationCard && (
-              <a
-                href={guest.invitationCard}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
-                title="View Card"
-              >
-                <ImageIcon size={15} />
-              </a>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
+              {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
+              {isWhatsApp ? 'WhatsApp' : 'SMS'}
+            </span>
+            {guest.phone && (
+              <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
             )}
-            {event?.tenant?.testMode && (
-              <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
-                <ExternalLink size={15} />
-              </Link>
+            {reminderCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
+              </span>
             )}
-            <button
-              onClick={() => deleteGuest(guest.id)}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
-            >
-              <Trash2 size={15} />
-            </button>
-            <button
-              onClick={() => openEditGuestModal(guest)}
-              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
-            >
-              <Edit2 size={15} />
-            </button>
-            <button
-              onClick={async (e) => {
-                e.stopPropagation();
-                if (!guest.phone) {
-                  toast.error('Guest has no phone number');
-                  return;
-                }
-                const res = await fetch('/api/whatsapp/check', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ phone: guest.phone }),
-                });
-                const data = await res.json();
-                if (data.hasWhatsApp) {
-                  const updateRes = await fetch(`/api/guests/${guest.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ routingChannel: 'whatsapp' }),
-                  });
-                  if (updateRes.ok) {
-                    toast.success(`✅ ${guest.name} is on WhatsApp!`);
-                    fetchData(eventId!);
-                  }
-                } else {
-                  toast(`❌ ${guest.name} is not on WhatsApp`, { icon: 'ℹ️' });
-                }
-              }}
-              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
-            >
-              <MessageCircle size={14} />
-            </button>
           </div>
         </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {guest.invitationCard && (
+            <a
+              href={guest.invitationCard}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
+              title="View Card"
+            >
+              <ImageIcon size={15} />
+            </a>
+          )}
+          {event?.tenant?.testMode && (
+            <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
+              <ExternalLink size={15} />
+            </Link>
+          )}
+          <button
+            onClick={() => deleteGuest(guest.id)}
+            className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
+          >
+            <Trash2 size={15} />
+          </button>
+          <button
+            onClick={() => openEditGuestModal(guest)}
+            className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
+          >
+            <Edit2 size={15} />
+          </button>
+          {/* ✅ REMOVED: The WhatsApp check button is no longer here */}
+        </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // ─── Loading state ──────────────────────────────────────────────────
   if (loading) {
