@@ -1,9 +1,28 @@
+// app/api/guests/import/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
+import { isWhatsAppNumber } from '@/lib/validate-whatsapp';
+
+// ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
+async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await isWhatsAppNumber(phone);
+      return result;
+    } catch (error: any) {
+      if (i === retries - 1) {
+        return { hasWhatsApp: false, error: error.message };
+      }
+      // Wait before retry
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+  return { hasWhatsApp: false, error: 'Max retries exceeded' };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,7 +31,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { guests, eventId } = await req.json();
+    const { guests, eventId, detectWhatsApp = true } = await req.json();
 
     if (!guests || !Array.isArray(guests) || guests.length === 0 || !eventId) {
       return NextResponse.json({ error: 'Missing guests or eventId' }, { status: 400 });
@@ -73,7 +92,7 @@ export async function POST(req: NextRequest) {
         eventId,
         phone: { in: phoneNumbers },
       },
-      select: { phone: true, name: true },
+      select: { phone: true, name: true, routingChannel: true },
     });
 
     const existingPhones = new Set(existingGuests.map(g => g.phone));
@@ -96,19 +115,45 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ─── Insert unique guests ────────────────────────────────────────
-    const guestsToInsert = uniqueGuests.map((g: any) => ({
-      name: g.name.trim(),
-      phone: g.phone,
-      title: g.title || '', // ✅ FIXED: Empty string instead of 'Mr'
-      cardNumber: g.cardNumber || null,
-      guestType: g.guestType || 'SINGLE', // ✅ Added guestType
-      email: null,
-      eventId,
-      routingChannel: 'sms',
-      smsCode: randomBytes(4).toString('hex').toUpperCase(),
-      qrToken: randomBytes(16).toString('hex'),
-    }));
+    // ─── Detect WhatsApp for each guest (if enabled) ──────────────────
+    let whatsappCount = 0;
+    let smsCount = 0;
+    const guestsToInsert = [];
+
+    for (const g of uniqueGuests) {
+      let routingChannel = 'sms';
+      
+      if (detectWhatsApp && g.phone) {
+        try {
+          const result = await checkWhatsAppWithRetry(g.phone);
+          if (result.hasWhatsApp) {
+            routingChannel = 'whatsapp';
+            whatsappCount++;
+          } else {
+            smsCount++;
+          }
+        } catch (error) {
+          // If check fails, default to SMS
+          smsCount++;
+          console.log(`WhatsApp check failed for ${g.name}:`, error);
+        }
+      } else {
+        smsCount++;
+      }
+
+      guestsToInsert.push({
+        name: g.name.trim(),
+        phone: g.phone,
+        title: g.title || '',
+        cardNumber: g.cardNumber || null,
+        guestType: g.guestType || 'SINGLE',
+        email: null,
+        eventId,
+        routingChannel,
+        smsCode: randomBytes(4).toString('hex').toUpperCase(),
+        qrToken: randomBytes(16).toString('hex'),
+      });
+    }
 
     const result = await prisma.guest.createMany({
       data: guestsToInsert,
@@ -120,6 +165,8 @@ export async function POST(req: NextRequest) {
       count: result.count,
       skipped: validGuests.length - result.count,
       invalidCount,
+      whatsappCount,
+      smsCount,
       message: '',
     };
 
@@ -135,7 +182,9 @@ export async function POST(req: NextRequest) {
       if (invalidCount > 0) {
         responseData.message += `, ${invalidCount} invalid number${invalidCount > 1 ? 's' : ''} skipped`;
       }
-      responseData.message += '.';
+      if (detectWhatsApp) {
+        responseData.message += `. ${whatsappCount} on WhatsApp, ${smsCount} on SMS.`;
+      }
     } else {
       responseData.message = `No new guests imported (all ${validGuests.length} were duplicates${invalidCount > 0 ? `, ${invalidCount} invalid numbers` : ''})`;
     }

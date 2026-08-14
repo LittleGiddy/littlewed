@@ -1,8 +1,9 @@
+// app/api/events/[eventId]/send-reminders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendSMS } from '@/lib/sms/index';
+import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
 
 export async function POST(
   req: NextRequest,
@@ -64,7 +65,7 @@ export async function POST(
     });
   }
 
-  // ─── Send SMS using NextSMS ─────────────────────────────────────────────
+  // ─── Send SMS via NexSMS ─────────────────────────────────────────────
   const results = [];
   for (const guest of guests) {
     try {

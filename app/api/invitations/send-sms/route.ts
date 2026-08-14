@@ -1,8 +1,9 @@
+// app/api/invitations/send-sms/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendSMS } from '@/lib/sms/index';
+import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
 
 // ─── Helper: Get full name ──────────────────────────────────────────────
 function getFullName(guest: any): string {
@@ -19,7 +20,7 @@ function personalizeMessage(message: string, guest: any, event: any): string {
   });
 
   return message
-    .replace(/{title}/g, guest.title || 'Mr')
+    .replace(/{title}/g, guest.title || '')
     .replace(/{name}/g, guest.name)
     .replace(/{fullName}/g, fullName)
     .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
@@ -44,7 +45,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
-    // Fetch guest and event
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
     });
@@ -74,14 +74,13 @@ export async function POST(req: NextRequest) {
       event
     );
 
-    // ─── Send SMS via NextSMS ──────────────────────────────────────────────
+    // ─── Send SMS via NexSMS ──────────────────────────────────────────────
     const result = await sendSMS({
       to: guest.phone,
       message: personalizedMessage,
     });
 
     if (result.success) {
-      // Update guest's invitation sent status
       await prisma.guest.update({
         where: { id: guest.id },
         data: { invitationSentAt: new Date() },

@@ -643,9 +643,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Generate Cards Handler ────────────────────────────────────────────
   const handleGenerateCards = async () => {
     if (!event) return;
-    
+
     const pendingGuests = guests.filter(g => !g.invitationCard);
-    
+
     if (pendingGuests.length === 0) {
       toast.success('All guests already have cards! 🎉');
       return;
@@ -666,7 +666,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     try {
       const BATCH_SIZE = 10;
       const batches = [];
-      
+
       for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) {
         batches.push(pendingGuests.slice(i, i + BATCH_SIZE));
       }
@@ -675,14 +675,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-        
+
         try {
           const res = await fetch('/api/invitations/generate-batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              eventId: event.id, 
-              guestIds: batch.map(g => g.id) 
+            body: JSON.stringify({
+              eventId: event.id,
+              guestIds: batch.map(g => g.id)
             }),
             credentials: 'include',
           });
@@ -691,24 +691,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
           if (res.ok && data.results) {
             data.results.forEach((r: any) => {
-              allResults.push({ 
-                name: r.name, 
-                success: r.success, 
-                error: r.error 
+              allResults.push({
+                name: r.name,
+                success: r.success,
+                error: r.error
               });
             });
-            
+
             completed += data.completed || 0;
             failed += data.failed || 0;
-            
+
             const progress = Math.min(completed + failed, pendingGuests.length);
-            toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, { 
-              id: currentToast 
+            toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, {
+              id: currentToast
             });
           } else {
             console.error('Batch error response:', data);
-            toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, { 
-              id: currentToast 
+            toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, {
+              id: currentToast
             });
             failed += batch.length;
           }
@@ -723,21 +723,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       }
 
       if (completed === pendingGuests.length) {
-        toast.success(`✅ All ${completed} cards generated successfully!`, { 
+        toast.success(`✅ All ${completed} cards generated successfully!`, {
           id: currentToast,
           duration: 3000
         });
       } else if (completed > 0) {
         toast(
           `⚠️ Generated ${completed} cards, ${failed} failed. Please try again.`,
-          { 
+          {
             id: currentToast,
             duration: 5000,
             icon: '⚠️'
           }
         );
       } else {
-        toast.error(`❌ Failed to generate any cards. Please try again.`, { 
+        toast.error(`❌ Failed to generate any cards. Please try again.`, {
           id: currentToast,
           duration: 5000
         });
@@ -820,7 +820,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {/* ─── VIEW CARD BUTTON ─── */}
             {guest.invitationCard && (
               <a
                 href={guest.invitationCard}
@@ -1135,7 +1134,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {(() => {
               const pendingCount = guests.filter(g => !g.invitationCard).length;
               const hasCards = guests.some(g => g.invitationCard);
-              
+
               return (
                 <button
                   onClick={handleGenerateCards}
@@ -1146,8 +1145,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <><Loader2 size={15} className="animate-spin" /> Generating...</>
                   ) : (
                     <>
-                      <Palette size={14} /> 
-                      Generate Cards 
+                      <Palette size={14} />
+                      Generate Cards
                       {pendingCount > 0 ? `(${pendingCount} pending)` : ''}
                       {hasCards && pendingCount === 0 && ' ✅ All done'}
                     </>

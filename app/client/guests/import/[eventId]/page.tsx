@@ -2,8 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Upload, FileSpreadsheet, X, AlertCircle, Loader2, Download, 
+import {
+  Upload, FileSpreadsheet, X, AlertCircle, Loader2, Download,
   AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle, FileText
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -45,11 +45,12 @@ export default function ImportGuestsPage() {
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [showValidOnly, setShowValidOnly] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // ─── Editing state ──────────────────────────────────────────────────
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editField, setEditField] = useState<'name' | 'title' | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [detectWhatsApp, setDetectWhatsApp] = useState(true);
 
   useEffect(() => {
     fetch(`/api/events/${eventId}/guests/count`, { credentials: 'include' })
@@ -168,7 +169,7 @@ export default function ImportGuestsPage() {
         const phone = match[3];
         const cardType = match[4];
         const { cleanName, title } = extractTitle(name);
-        
+
         guests.push({
           name: cleanName,
           phone,
@@ -186,7 +187,7 @@ export default function ImportGuestsPage() {
         const phone = match[2];
         const cardType = match[3];
         const { cleanName, title } = extractTitle(name);
-        
+
         guests.push({
           name: cleanName,
           phone,
@@ -203,7 +204,7 @@ export default function ImportGuestsPage() {
         const name = match[1].trim();
         const phone = match[2];
         const { cleanName, title } = extractTitle(name);
-        
+
         guests.push({
           name: cleanName,
           phone,
@@ -220,7 +221,7 @@ export default function ImportGuestsPage() {
         const phone = phoneMatch[1];
         let name = trimmed.replace(phone, '').trim();
         name = name.replace(/^\d+\s*/, '').replace(/\s*\d+$/, '').trim();
-        
+
         if (name && name.length > 2) {
           let cardType = 'SINGLE';
           const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i);
@@ -228,9 +229,9 @@ export default function ImportGuestsPage() {
             cardType = cardMatch[1].toUpperCase();
             name = name.replace(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i, '').trim();
           }
-          
+
           const { cleanName, title } = extractTitle(name);
-          
+
           guests.push({
             name: cleanName,
             phone,
@@ -492,7 +493,7 @@ export default function ImportGuestsPage() {
       '2   Mrs      AGNES LWAMBANO          713502010   DOUBLE',
       '3            ALIPHONSINA             715164791   DOUBLE',
     ].join('\n');
-    
+
     const blob = new Blob([sampleData], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -584,7 +585,7 @@ export default function ImportGuestsPage() {
     const emailCol = Object.keys(mapping).find(k => mapping[k] === 'email');
     const guestTypeCol = Object.keys(mapping).find(k => mapping[k] === 'guestType');
     const titleCol = Object.keys(mapping).find(k => mapping[k] === 'title');
-    
+
     if (!nameCol || !phoneCol) {
       setError('Please map the "name" and "phone" columns.');
       return;
@@ -615,50 +616,57 @@ export default function ImportGuestsPage() {
   };
 
   const handleImport = async () => {
-    const validGuests = parsedGuests.filter(g => g.isValid);
-    if (validGuests.length === 0) {
-      toast.error('No valid guests to import');
-      return;
-    }
-    if (limitWarning) {
-      toast.error('Cannot import – exceeds guest limit');
-      return;
-    }
-    const guestsToImport = validGuests.map(g => ({
-      name: g.name,
-      phone: g.normalizedPhone,
-      email: g.email,
-      guestType: g.guestType,
-      cardNumber: g.cardNumber,
-      title: g.title || '', // ✅ Empty string if no title
-    }));
-    setUploading(true);
-    setImportStatus('Importing guests...');
-    try {
-      const res = await fetch('/api/guests/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guests: guestsToImport, eventId }),
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(`✅ ${data.count} guests imported successfully!`);
-        router.push(`/client/events/${eventId}`);
-      } else {
-        toast.error(data.error || 'Import failed');
-        if (data.error?.includes('limit') || data.error?.includes('exceeds')) {
-          setLimitWarning(data.error);
-        }
+  const validGuests = parsedGuests.filter(g => g.isValid);
+  if (validGuests.length === 0) {
+    toast.error('No valid guests to import');
+    return;
+  }
+  if (limitWarning) {
+    toast.error('Cannot import – exceeds guest limit');
+    return;
+  }
+  const guestsToImport = validGuests.map(g => ({
+    name: g.name,
+    phone: g.normalizedPhone,
+    email: g.email,
+    guestType: g.guestType,
+    cardNumber: g.cardNumber,
+    title: g.title || '',
+  }));
+  setUploading(true);
+  setImportStatus('Importing guests...');
+  try {
+    const res = await fetch('/api/guests/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        guests: guestsToImport, 
+        eventId,
+        detectWhatsApp, // ✅ Pass the toggle value
+      }),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (res.ok) {
+      let successMsg = `✅ ${data.count} guests imported successfully!`;
+      if (data.whatsappCount !== undefined) {
+        successMsg += ` ${data.whatsappCount} on WhatsApp, ${data.smsCount} on SMS.`;
       }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setUploading(false);
-      setImportStatus('');
+      toast.success(successMsg);
+      router.push(`/client/events/${eventId}`);
+    } else {
+      toast.error(data.error || 'Import failed');
+      if (data.error?.includes('limit') || data.error?.includes('exceeds')) {
+        setLimitWarning(data.error);
+      }
     }
-  };
-
+  } catch {
+    toast.error('Network error');
+  } finally {
+    setUploading(false);
+    setImportStatus('');
+  }
+};
   const removeFile = () => {
     setFile(null);
     setParsedGuests([]);
@@ -723,7 +731,7 @@ export default function ImportGuestsPage() {
           </button>
         </div>
       </div>
-      
+
       <p className="text-gray-500 text-sm sm:text-base mb-6">
         Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, <strong>vCard (.vcf)</strong>, or <strong>PDF</strong> file, or import from your phone contacts.
         For CSV/Excel, you'll be able to map columns to our fields. Phone numbers will be auto‑formatted to international format.
@@ -743,9 +751,8 @@ export default function ImportGuestsPage() {
           )}
 
           <div
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition ${
-              dragActive ? 'border-[#0D4F4F] bg-[rgba(13,79,79,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
-            }`}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition ${dragActive ? 'border-[#0D4F4F] bg-[rgba(13,79,79,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -759,6 +766,25 @@ export default function ImportGuestsPage() {
             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           </div>
 
+          {/* ─── WhatsApp Detection Toggle ─── */}
+          <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={detectWhatsApp}
+                onChange={(e) => setDetectWhatsApp(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Auto-detect WhatsApp numbers
+              </span>
+            </label>
+            <span className="text-xs text-gray-400">
+              (Slower import, but auto-routes guests to WhatsApp)
+            </span>
+          </div>
+
+
           {/* PDF Format Guide */}
           <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
             <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
@@ -770,7 +796,7 @@ export default function ImportGuestsPage() {
             </p>
             <div className="bg-white p-3 rounded-lg font-mono text-xs text-gray-700 border border-gray-200 overflow-x-auto">
               <pre>
-{`SN  TITLE    NAME                    PHONE       CARD
+                {`SN  TITLE    NAME                    PHONE       CARD
 1   Mr       ADRIAN                  766084935   DOUBLE
 2   Mrs      AGNES LWAMBANO          713502010   DOUBLE
 3            ALIPHONSINA             715164791   DOUBLE`}
@@ -1140,11 +1166,10 @@ export default function ImportGuestsPage() {
                           <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
                           <td className="px-4 py-2">
                             {guest.guestType ? (
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                guest.guestType.toLowerCase() === 'double' ? 'bg-purple-100 text-purple-700' :
-                                guest.guestType.toLowerCase() === 'single' ? 'bg-blue-100 text-blue-700' :
-                                'bg-gray-100 text-gray-600'
-                              }`}>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${guest.guestType.toLowerCase() === 'double' ? 'bg-purple-100 text-purple-700' :
+                                  guest.guestType.toLowerCase() === 'single' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-gray-100 text-gray-600'
+                                }`}>
                                 {guest.guestType}
                               </span>
                             ) : '—'}

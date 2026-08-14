@@ -23,8 +23,8 @@ export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, refe
   // Remove leading '+' from phone number
   const cleanTo = to.replace(/^\+/, '');
 
-  console.log('[NextSMS] Sending to:', endpoint);
-  console.log('[NextSMS] Payload:', { from: sender, to: cleanTo, text: message, flash, reference: ref });
+  console.log('[SMS] Sending to:', endpoint);
+  console.log('[SMS] Payload:', { from: sender, to: cleanTo, text: message, flash, reference: ref });
 
   try {
     const response = await fetch(endpoint, {
@@ -46,7 +46,7 @@ export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, refe
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const text = await response.text();
-      console.error('[NextSMS] Non-JSON response:', {
+      console.error('[SMS] Non-JSON response:', {
         status: response.status,
         body: text.slice(0, 500),
       });
@@ -64,7 +64,7 @@ export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, refe
 
     return { success: true, messageId };
   } catch (error: any) {
-    console.error('[NextSMS] Error sending SMS:', error);
+    console.error('[SMS] Error sending SMS:', error);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
