@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/messaging'; // ✅ Updated import
+import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 
 export async function POST(req: NextRequest) {
