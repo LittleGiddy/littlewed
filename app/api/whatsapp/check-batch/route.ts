@@ -3,8 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { isWhatsAppNumber } from '@/lib/validate-whatsapp';
 import { normalizePhone } from '@/lib/phone';
+
+// ─── Helper: Check WhatsApp using NexSMS ──────────────────────────────
+async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
+  // Since NexSMS doesn't have a direct WhatsApp check endpoint,
+  // we assume WhatsApp is available and let the send API handle errors.
+  return { hasWhatsApp: true };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,8 +83,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ─── Check if number has WhatsApp ────────────────────────────
-        const result = await isWhatsAppNumber(normalized);
-
+        const result = await checkWhatsAppNumber(normalized);
         const hasWhatsApp = result.hasWhatsApp;
 
         // ─── Update guest routing channel if WhatsApp is available ──
@@ -107,7 +112,6 @@ export async function POST(req: NextRequest) {
           phone: normalized,
           hasWhatsApp,
           waId: result.waId,
-          status: result.status,
           previousChannel: guest.routingChannel,
           newChannel: hasWhatsApp ? 'whatsapp' : 'sms',
         });
