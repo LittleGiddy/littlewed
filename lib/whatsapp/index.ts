@@ -109,10 +109,9 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ✅ Button with URL (required by your template)
-  const button = {
-    url: data.inviteLink || 'https://littlewed.co.tz/invite/default',
-  };
+  // ✅ Since the button is DYNAMIC, the URL goes in personalisation
+  // The button is configured in the template with {{1}} or similar
+  // DO NOT send a separate button object
 
   return sendWhatsAppTemplate({
     to: phone,
@@ -128,10 +127,10 @@ export async function sendWeddingInvitation(
         "7": data.time,
         "8": data.cardNumber,
         "9": data.cardType,
-        // ❌ Remove "10" from personalisation - it's now in button object
+        "10": data.inviteLink || 'https://littlewed.co.tz/invite/default', // ✅ Button URL as personalisation
       }
     ],
     header,
-    button, // ✅ Button object is REQUIRED
+    // ❌ NO button object - it's handled in personalisation
   });
 }
