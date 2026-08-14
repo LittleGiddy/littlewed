@@ -12,8 +12,6 @@ export interface SendWhatsAppTemplateOptions {
     image?: { file: string; name?: string };
     document?: { file: string; name?: string };
   };
-  // NextSMS button shape for a dynamic-URL button component:
-  // { personalisation: { url_link: { parameters: [ "<suffix-or-value>" ] } } }
   button?: {
     personalisation: {
       url_link: {
@@ -62,9 +60,11 @@ export async function sendWhatsAppTemplate({
     body.button = button;
   }
 
-  console.log('[WhatsApp] Sending template:', template);
+  console.log('[WhatsApp] ====== SENDING MESSAGE ======');
+  console.log('[WhatsApp] Template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
-  console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
+  console.log('[WhatsApp] To:', cleanTo);
+  console.log('[WhatsApp] Full Payload:', JSON.stringify(body, null, 2));
 
   try {
     const response = await fetch(NEXTSMS_API_URL, {
@@ -79,16 +79,62 @@ export async function sendWhatsAppTemplate({
 
     const data = await response.json();
 
+    // ─── Detailed logging ──────────────────────────────────────────────
+    console.log('[WhatsApp] Response Status:', response.status);
+    console.log('[WhatsApp] Response Data:', JSON.stringify(data, null, 2));
+
     if (!response.ok) {
-      const errorMsg = data.message || data.error || `HTTP ${response.status}`;
+      // ─── Parse error details ─────────────────────────────────────────
+      let errorMsg = data.message || data.error || `HTTP ${response.status}`;
+      
+      // Check for specific error types
+      if (data.errors) {
+        console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
+        
+        // Check for template errors
+        if (data.errors.template) {
+          console.error('[WhatsApp] Template Error:', data.errors.template);
+        }
+        // Check for phone number errors
+        if (data.errors.to) {
+          console.error('[WhatsApp] Phone Number Error:', data.errors.to);
+        }
+        // Check for account errors
+        if (data.errors.account) {
+          console.error('[WhatsApp] Account Error:', data.errors.account);
+        }
+      }
+
+      // ─── Check for specific failure reasons ─────────────────────────
+      if (errorMsg.includes('template')) {
+        console.error('[WhatsApp] ❌ Template issue - check if template is approved and variables match');
+      }
+      if (errorMsg.includes('phone') || errorMsg.includes('to')) {
+        console.error('[WhatsApp] ❌ Phone number issue - check format (E.164)');
+      }
+      if (errorMsg.includes('account')) {
+        console.error('[WhatsApp] ❌ Account issue - check NEXTSMS_ACCOUNT');
+      }
+      if (errorMsg.includes('verified') || errorMsg.includes('approved')) {
+        console.error('[WhatsApp] ❌ Template not approved by Meta yet');
+      }
+      if (errorMsg.includes('business')) {
+        console.error('[WhatsApp] ❌ Business verification issue - check Meta Business status');
+      }
+
       throw new Error(errorMsg);
     }
+
+    // ─── Success but check for delivery status ─────────────────────────
+    console.log('[WhatsApp] ✅ Message accepted by NexSMS');
+    console.log('[WhatsApp] Message ID:', data.data?.messageId || data.messageId || data.id);
+    console.log('[WhatsApp] Status:', data.data?.status || data.status || 'PENDING');
 
     const messageId = data.data?.messageId || data.messageId || data.id;
 
     return { success: true, messageId, data };
   } catch (error: any) {
-    console.error('[WhatsApp] Error sending template:', error);
+    console.error('[WhatsApp] ❌ Error sending template:', error.message);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
@@ -106,12 +152,16 @@ export async function sendWeddingInvitation(
     cardNumber: string;
     cardType: string;
     imageUrl?: string;
-    // NOTE: this should be just the dynamic suffix (e.g. "cmsstoff00000lb049powypl6"),
-    // not the full URL — NextSMS appends it to the static prefix baked into the
-    // approved template's button config.
     inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
+  console.log('[WhatsApp] Phone:', phone);
+  console.log('[WhatsApp] Name:', data.name);
+  console.log('[WhatsApp] Host Family:', data.hostFamily);
+  console.log('[WhatsApp] Event:', data.date, data.venue);
+  console.log('[WhatsApp] Card:', data.cardNumber, data.cardType);
+
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -120,12 +170,9 @@ export async function sendWeddingInvitation(
   };
 
   const linkSuffix = data.inviteLink || 'default';
+  console.log('[WhatsApp] Link Suffix:', linkSuffix);
 
-  // TODO: verify against your NextSMS template config whether LittleWed's body
-  // variables are numbered ("1".."9") like below, or named (e.g. "name",
-  // "host_family", ...) like NextSMS's own "monthly_event" example
-  // ({ "name": "Mbelwa" }). If named, rename these keys to match.
-  return sendWhatsAppTemplate({
+  const result = await sendWhatsAppTemplate({
     to: phone,
     template: 'LittleWed',
     personalisation: [
@@ -150,4 +197,26 @@ export async function sendWeddingInvitation(
       },
     },
   });
+
+  console.log('[WhatsApp] Result:', result.success ? '✅ Success' : '❌ Failed');
+  if (!result.success) {
+    console.log('[WhatsApp] Error:', result.error);
+  }
+
+  return result;
+}
+
+/**
+ * Helper: Convert a full URL to just the suffix
+ * e.g., "https://littlewed.co.tz/invite/abc123" → "abc123"
+ */
+export function toLinkSuffix(value: string): string {
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] || value;
+  } catch {
+    // Not a full URL — assume it's already a suffix
+    return value;
+  }
 }
