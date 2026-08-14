@@ -146,7 +146,7 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'event_invitation',
+    template: 'LittleWed',
     personalisation,
     header,
     button,
