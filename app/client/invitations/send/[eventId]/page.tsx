@@ -7,8 +7,8 @@ import {
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
   ChevronDown, ChevronUp, Copy, Check, Filter,
-  User, Hash, Calendar, MapPin, Smartphone, QrCode,
-  Wand2, FileText, Eye, EyeOff, Edit3
+  Smartphone, QrCode, Calendar, MapPin, User, Hash,
+  FileText, Info, Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -25,7 +25,6 @@ interface Guest {
   invitationSentAt: string | null;
   whatsappDetected?: boolean;
   checkedIn?: boolean;
-  guestType?: string | null;
 }
 
 interface EventData {
@@ -45,32 +44,6 @@ interface SendResult {
   channel?: string;
 }
 
-// ─── Placeholder definitions ──────────────────────────────────────────────
-const PLACEHOLDERS = [
-  { key: '{fullName}', label: 'Full Name', icon: User, example: 'Mr. John Doe' },
-  { key: '{title}', label: 'Title', icon: User, example: 'Mr / Miss / Mrs' },
-  { key: '{name}', label: 'Name', icon: User, example: 'John Doe' },
-  { key: '{cardNumber}', label: 'Card Number', icon: Hash, example: 'G-0042' },
-  { key: '{smsCode}', label: 'Check-in Code', icon: QrCode, example: 'ABC123' },
-  { key: '{event}', label: 'Event Name', icon: Calendar, example: 'Sarah & James Wedding' },
-  { key: '{date}', label: 'Event Date', icon: Calendar, example: 'August 15, 2026' },
-  { key: '{venue}', label: 'Venue', icon: MapPin, example: 'The Grand Ballroom' },
-  { key: '{cardType}', label: 'Card Type', icon: Users, example: 'SINGLE / DOUBLE' },
-];
-
-// ─── Default template ──────────────────────────────────────────────────────
-const DEFAULT_MESSAGE = `Hello {fullName},
-
-You're invited to {event}!
-
-📅 Date: {date}
-📍 Venue: {venue}
-🎟️ Your Card: {cardNumber}
-🔑 Check-in Code: {smsCode}
-
-Scan your QR code at the entrance.
-We look forward to celebrating with you! 🎉`;
-
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -81,13 +54,12 @@ export default function SendInvitationsPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<SendResult[]>([]);
-  const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [customMessage, setCustomMessage] = useState('');
   const [filterChannel, setFilterChannel] = useState<'all' | 'whatsapp' | 'sms'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'sent' | 'pending' | 'failed'>('all');
   const [expandedGuest, setExpandedGuest] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [previewGuestId, setPreviewGuestId] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp'>('sms');
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -113,9 +85,7 @@ export default function SendInvitationsPage() {
 
         setEvent(eventData.event || eventData);
         setGuests(guestsData || []);
-        if (settings.customMessage) {
-          setMessage(settings.customMessage);
-        }
+        setCustomMessage(settings.customMessage || "Hello {fullName}, you're invited to {event}! 🎉\n\n📍 Venue: {venue}\n📅 Date: {date}\n🎟️ Card: {cardNumber}\n🔑 Code: {smsCode}\n\nWe look forward to celebrating with you!");
       } catch (error) {
         console.error('Load error:', error);
         toast.error('Failed to load data');
@@ -126,48 +96,14 @@ export default function SendInvitationsPage() {
     loadData();
   }, [eventId]);
 
-  // ─── Get Full Name ──────────────────────────────────────────────────────
-  const getFullName = (guest: Guest): string => {
-    if (!guest) return '';
-    if (guest.title && guest.title.trim() !== '') {
-      return `${guest.title} ${guest.name}`;
-    }
-    return guest.name;
-  };
-
-  // ─── Insert placeholder at cursor ──────────────────────────────────────
-  const insertPlaceholder = (placeholder: string) => {
-    const textarea = document.getElementById('message-editor') as HTMLTextAreaElement;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = message;
-    const before = text.substring(0, start);
-    const after = text.substring(end);
-    const newText = before + placeholder + after;
-    
-    setMessage(newText);
-    
-    setTimeout(() => {
-      textarea.focus();
-      const newCursorPos = start + placeholder.length;
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 10);
-  };
-
-  // ─── Get preview message ───────────────────────────────────────────────
-  const getPreviewMessage = (guest: Guest) => {
-    if (!guest) return '';
-    
-    const fullName = getFullName(guest);
-    const formattedDate = event ? new Date(event.date).toLocaleDateString('en-US', {
+  // ─── Helper: Replace placeholders in SMS message ──────────────────────
+  const personalizeMessage = (message: string, guest: Guest, event: EventData): string => {
+    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    }) : '';
-
-    const cardTypeDisplay = guest.guestType || 'SINGLE';
+    });
 
     return message
       .replace(/{title}/g, guest.title || '')
@@ -175,27 +111,38 @@ export default function SendInvitationsPage() {
       .replace(/{fullName}/g, fullName)
       .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
       .replace(/{smsCode}/g, guest.smsCode || 'N/A')
-      .replace(/{event}/g, event?.name || '')
+      .replace(/{event}/g, event.name)
       .replace(/{date}/g, formattedDate)
-      .replace(/{venue}/g, event?.venue || '')
-      .replace(/{cardType}/g, cardTypeDisplay);
+      .replace(/{venue}/g, event.venue)
+      .replace(/{address}/g, event.address || '');
   };
 
   // ─── Send to a single guest ────────────────────────────────────────────
   const sendToGuest = async (guest: Guest): Promise<SendResult> => {
     try {
-      const endpoint = guest.routingChannel === 'whatsapp' 
-        ? '/api/invitations/send-template'
-        : '/api/invitations/send-sms';
+      let endpoint: string;
+      let body: any;
+
+      if (guest.routingChannel === 'whatsapp') {
+        endpoint = '/api/invitations/send-template';
+        body = { 
+          guestId: guest.id, 
+          eventId,
+        };
+      } else {
+        endpoint = '/api/invitations/send-sms';
+        const personalizedMessage = personalizeMessage(customMessage, guest, event!);
+        body = { 
+          guestId: guest.id, 
+          eventId,
+          message: personalizedMessage,
+        };
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          guestId: guest.id, 
-          eventId,
-          message,
-        }),
+        body: JSON.stringify(body),
         credentials: 'include',
       });
       
@@ -226,11 +173,6 @@ export default function SendInvitationsPage() {
       return;
     }
 
-    if (!message.trim()) {
-      toast.error('Please write a message');
-      return;
-    }
-
     setSending(true);
     setResults([]);
     let successCount = 0;
@@ -244,7 +186,6 @@ export default function SendInvitationsPage() {
       await new Promise(r => setTimeout(r, 300));
     }
 
-    // ✅ FIX: Use toast with icon instead of toast.warning
     if (successCount === targetGuests.length) {
       toast.success(`✅ Sent to all ${successCount} guests!`);
     } else if (successCount > 0) {
@@ -258,7 +199,6 @@ export default function SendInvitationsPage() {
 
     setSending(false);
     
-    // Refresh guest list
     const guestsRes = await fetch(`/api/events/${eventId}/guests`, { credentials: 'include' });
     const guestsData = await guestsRes.json();
     setGuests(guestsData);
@@ -307,6 +247,10 @@ export default function SendInvitationsPage() {
     return 'pending';
   };
 
+  const getFullName = (guest: Guest) => {
+    return guest.title ? `${guest.title} ${guest.name}` : guest.name;
+  };
+
   // ─── Copy to clipboard ─────────────────────────────────────────────────
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -323,12 +267,9 @@ export default function SendInvitationsPage() {
     );
   }
 
-  // ─── Get a sample guest for preview ────────────────────────────────────
-  const previewGuest = guests.find(g => g.id === previewGuestId) || guests[0] || null;
-
   // ─── Render ────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       {/* ─── Header ─── */}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -365,8 +306,107 @@ export default function SendInvitationsPage() {
         </div>
       </div>
 
+      {/* ─── Channel Toggle & Message Editor ─── */}
+      <div className="mb-6">
+        {/* Toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveChannel('sms')}
+            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
+              activeChannel === 'sms' 
+                ? 'bg-[#0D4F4F] text-white shadow-md' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <Phone size={18} /> SMS Editor
+          </button>
+          <button
+            onClick={() => setActiveChannel('whatsapp')}
+            className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-semibold transition flex items-center justify-center gap-2 ${
+              activeChannel === 'whatsapp' 
+                ? 'bg-green-600 text-white shadow-md' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <MessageCircle size={18} /> WhatsApp Template
+          </button>
+        </div>
+
+        {/* ─── SMS Editor ─── */}
+        {activeChannel === 'sms' && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={18} className="text-[#0D4F4F]" />
+              <h2 className="font-semibold text-gray-800">SMS Message Template</h2>
+              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Custom</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Write your SMS message below. Use placeholders to personalize for each guest.
+              <br />
+              Available placeholders: <code className="bg-gray-100 px-1 rounded text-[10px]">{'{fullName}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{event}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{date}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{venue}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{cardNumber}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{smsCode}'}</code>{' '}
+              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{name}'}</code>
+            </p>
+            <textarea
+              value={customMessage}
+              onChange={(e) => setCustomMessage(e.target.value)}
+              rows={4}
+              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm font-mono"
+              placeholder="Write your SMS message here... Use placeholders to personalize for each guest."
+            />
+            <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+              <span>{customMessage.length} characters</span>
+              <span className="text-[#0D4F4F] font-medium">
+                {customMessage.includes('{fullName}') ? '✅ Personalized' : '⚠️ Add {fullName} placeholder'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* ─── WhatsApp Template Info ─── */}
+        {activeChannel === 'whatsapp' && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <MessageCircle size={18} className="text-green-600" />
+              <h2 className="font-semibold text-green-800">WhatsApp Template</h2>
+              <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full">✓ Pre-approved</span>
+            </div>
+            <p className="text-sm text-green-700 mb-3">
+              WhatsApp invitations use the pre-approved template <strong>"LittleWed"</strong>.
+              No custom message is needed - the template will be sent automatically with guest details.
+            </p>
+            <div className="bg-white rounded-xl p-4 border border-green-200">
+              <p className="font-medium text-[#0D4F4F] text-sm flex items-center gap-2">
+                <Eye size={14} /> Template Preview
+              </p>
+              <div className="mt-2 space-y-0.5 text-sm text-gray-700 border-t border-gray-100 pt-3">
+                <p>Hello <span className="text-[#0D4F4F] font-medium">{'{name}'}</span>,</p>
+                <p><span className="text-[#0D4F4F] font-medium">{'{hostFamily}'}</span> invites you to <span className="text-[#0D4F4F] font-medium">{'{person1}'}</span> &amp; <span className="text-[#0D4F4F] font-medium">{'{person2}'}</span> on <span className="text-[#0D4F4F] font-medium">{'{date}'}</span>.</p>
+                <p>Venue: <span className="text-[#0D4F4F] font-medium">{'{venue}'}</span> at <span className="text-[#0D4F4F] font-medium">{'{time}'}</span></p>
+                <p>Card: <span className="text-[#0D4F4F] font-medium">{'{cardNumber}'}</span> <span className="text-[#0D4F4F] font-medium">{'{cardType}'}</span></p>
+                <div className="mt-2 pt-2 border-t border-green-100">
+                  <a 
+                    href="#" 
+                    className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 border border-green-200"
+                  >
+                    <span>🔗</span> View Full Invite
+                  </a>
+                </div>
+                <p className="text-[10px] text-green-500 mt-2 flex items-center gap-1">
+                  <CheckCircle size={10} /> This template is approved by WhatsApp and ready to send
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ─── Stats Cards ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center gap-2">
             <Users size={16} className="text-[#0D4F4F]" />
@@ -383,13 +423,6 @@ export default function SendInvitationsPage() {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center gap-2">
-            <Phone size={16} className="text-blue-600" />
-            <span className="text-sm font-medium text-gray-600">SMS</span>
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{smsCount}</p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
-          <div className="flex items-center gap-2">
             <CheckCircle size={16} className="text-green-600" />
             <span className="text-sm font-medium text-gray-600">Sent</span>
           </div>
@@ -401,135 +434,6 @@ export default function SendInvitationsPage() {
             <span className="text-sm font-medium text-gray-600">With Card</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{guests.filter(g => g.invitationCard).length}</p>
-        </div>
-      </div>
-
-      {/* ─── Main Layout: Message Editor + Preview ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* ─── Left: Message Editor ─── */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText size={18} className="text-[#0D4F4F]" />
-              <span className="font-semibold text-gray-800">Message Template</span>
-            </div>
-            <button
-              onClick={() => setShowPreview(!showPreview)}
-              className="text-sm text-gray-400 hover:text-[#0D4F4F] transition flex items-center gap-1"
-            >
-              {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
-              {showPreview ? 'Hide Preview' : 'Show Preview'}
-            </button>
-          </div>
-
-          <div className="p-5">
-            {/* ─── Placeholder Buttons ─── */}
-            <div className="mb-4">
-              <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
-                <Wand2 size={12} />
-                Click a placeholder to insert it into your message:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {PLACEHOLDERS.map((p) => (
-                  <button
-                    key={p.key}
-                    onClick={() => insertPlaceholder(p.key)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-[#0D4F4F] hover:text-white rounded-full text-xs font-medium transition group"
-                    title={`Example: ${p.example}`}
-                  >
-                    <p.icon size={12} className="group-hover:text-white" />
-                    {p.key}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ─── Textarea ─── */}
-            <textarea
-              id="message-editor"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={8}
-              className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none font-mono text-sm"
-              placeholder="Write your invitation message here... Use the placeholders above to personalize for each guest."
-            />
-
-            {/* ─── Character Count ─── */}
-            <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
-              <span>{message.length} characters</span>
-              <span className="text-[#0D4F4F] font-medium">
-                {message.includes('{fullName}') ? '✅ Personalized' : '⚠️ No {fullName} placeholder'}
-              </span>
-            </div>
-
-            {/* ─── Preview Button ─── */}
-            {previewGuest && (
-              <button
-                onClick={() => setShowPreview(!showPreview)}
-                className="mt-4 w-full py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition flex items-center justify-center gap-2"
-              >
-                <Eye size={16} />
-                {showPreview ? 'Hide Preview' : `Preview for ${getFullName(previewGuest)}`}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ─── Right: Live Preview ─── */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Smartphone size={18} className="text-[#0D4F4F]" />
-              <span className="font-semibold text-gray-800">Preview</span>
-            </div>
-            {previewGuest && (
-              <span className="text-xs text-gray-400">
-                {getFullName(previewGuest)} · {previewGuest.cardNumber || 'No card'}
-              </span>
-            )}
-          </div>
-
-          <div className="p-5">
-            {!previewGuest ? (
-              <div className="text-center py-8 text-gray-400">
-                <Users size={32} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">No guests available for preview</p>
-              </div>
-            ) : (
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                {/* ─── Guest Selector ─── */}
-                <div className="mb-3">
-                  <select
-                    value={previewGuestId || ''}
-                    onChange={(e) => setPreviewGuestId(e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                  >
-                    {guests.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {getFullName(g)} {g.cardNumber ? `(${g.cardNumber})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* ─── Preview Message ─── */}
-                <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm min-h-[200px]">
-                  <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                    {showPreview ? getPreviewMessage(previewGuest) : message}
-                  </div>
-                </div>
-
-                {/* ─── Placeholder Legend ─── */}
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-400">
-                  {PLACEHOLDERS.map((p) => (
-                    <span key={p.key} className="bg-gray-100 px-2 py-0.5 rounded">
-                      {p.key}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -642,7 +546,7 @@ export default function SendInvitationsPage() {
             </span>
             <button
               onClick={broadcast}
-              disabled={sending || filteredGuests.length === 0 || !message.trim()}
+              disabled={sending || filteredGuests.length === 0}
               className="px-4 py-1.5 bg-[#0D4F4F] text-white rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -651,7 +555,7 @@ export default function SendInvitationsPage() {
           </div>
         </div>
 
-        <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+        <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
           {filteredGuests.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users size={48} className="mx-auto mb-3 text-gray-300" />
@@ -833,6 +737,7 @@ export default function SendInvitationsPage() {
           )}
         </div>
       )}
+      
     </div>
   );
 }
