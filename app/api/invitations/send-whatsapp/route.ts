@@ -5,6 +5,21 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
 
+// Helper: NextSMS wants only the dynamic suffix for a "Dynamic Link" button,
+// not the full URL (the static prefix is baked into the approved template).
+// This strips a full https://littlewed.co.tz/invite/<suffix> URL down to
+// <suffix> if a full URL is passed in; if it's already just a suffix, it's
+// returned unchanged.
+function toLinkSuffix(value: string): string {
+  try {
+    const url = new URL(value);
+    const parts = url.pathname.split('/').filter(Boolean);
+    return parts[parts.length - 1] || value;
+  } catch {
+    // Not a full URL — assume it's already a suffix
+    return value;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,7 +63,15 @@ export async function POST(req: NextRequest) {
         template: template,
         personalisation: [{ "1": guest.name }],
         header: imageUrl ? { image: { file: imageUrl, name: 'Invitation' } } : undefined,
-        button: buttonUrl ? { url: buttonUrl } : undefined,
+        button: buttonUrl
+          ? {
+              personalisation: {
+                url_link: {
+                  parameters: [toLinkSuffix(buttonUrl)],
+                },
+              },
+            }
+          : undefined,
       });
     } else {
       // Send wedding invitation
@@ -67,7 +90,8 @@ export async function POST(req: NextRequest) {
         cardNumber: guest.cardNumber || '108',
         cardType: guest.guestType || 'SINGLE',
         imageUrl: imageUrl || guest.event.imageUrl,
-        inviteLink: buttonUrl || `https://littlewed.co.tz/invite/${guest.id}`,
+        // sendWeddingInvitation expects the suffix only (see note above)
+        inviteLink: buttonUrl ? toLinkSuffix(buttonUrl) : guest.id,
       });
     }
 
