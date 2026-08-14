@@ -7,7 +7,8 @@ import {
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
   Eye, EyeOff, ChevronDown, ChevronUp, Copy, Check, Filter,
-  Smartphone, QrCode, Calendar, MapPin, User, Hash
+  Smartphone, QrCode, Calendar, MapPin, User, Hash,
+  FileText // ✅ Added FileText
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
