@@ -1,9 +1,9 @@
+// app/api/invitations/send-template/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-// ✅ Import the correct function from whatsapp/index
-import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
-    // ✅ Fetch guest and event with proper includes
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
     });
@@ -32,24 +31,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
     }
 
-    // ✅ Check if guest has a phone number
     if (!guest.phone) {
       return NextResponse.json({
         error: 'Guest has no phone number',
       }, { status: 400 });
     }
 
-    // Check if guest has WhatsApp routing
     if (guest.routingChannel !== 'whatsapp') {
       return NextResponse.json({
         error: `This guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
       }, { status: 400 });
     }
 
-    // ✅ Send the wedding invitation using NexSMS
+    // ✅ Send the wedding invitation with button
     const result = await sendWeddingInvitation(guest.phone, {
       name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
-      hostFamily: 'Mr & Mrs Allan Swai', // You can make this dynamic
+      hostFamily: 'Mr & Mrs Allan Swai',
       person1: 'Agape',
       person2: 'Gladness',
       date: new Date(event.date).toLocaleDateString('sw-TZ', {
@@ -66,7 +63,6 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.success) {
-      // Update guest's invitation sent status
       await prisma.guest.update({
         where: { id: guest.id },
         data: { invitationSentAt: new Date() },

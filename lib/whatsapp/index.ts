@@ -109,9 +109,10 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ✅ If your template's button uses a variable (e.g., {{1}}), 
-  // include the URL in personalisation and REMOVE the button object
-  // If your template has a static button, keep the button object
+  // ✅ Button with URL (required by your template)
+  const button = {
+    url: data.inviteLink || 'https://littlewed.co.tz/invite/default',
+  };
 
   return sendWhatsAppTemplate({
     to: phone,
@@ -127,54 +128,10 @@ export async function sendWeddingInvitation(
         "7": data.time,
         "8": data.cardNumber,
         "9": data.cardType,
-        "10": data.inviteLink || 'https://littlewed.co.tz/invite/default', // ✅ URL as personalisation
+        // ❌ Remove "10" from personalisation - it's now in button object
       }
     ],
     header,
-    // ❌ REMOVED: button object - URL is now in personalisation
-    // button: { url: data.inviteLink || 'https://littlewed.co.tz/invite/default' },
-  });
-}
-
-// ─── Alternative: If your template has NO button ──────────────────────────
-export async function sendSimpleWeddingInvitation(
-  phone: string,
-  data: {
-    name: string;
-    hostFamily: string;
-    person1: string;
-    person2: string;
-    date: string;
-    venue: string;
-    time: string;
-    cardNumber: string;
-    cardType: string;
-    imageUrl?: string;
-  }
-): Promise<SendWhatsAppResult> {
-  const header = data.imageUrl ? {
-    image: {
-      file: data.imageUrl,
-      name: 'Wedding Invitation',
-    }
-  } : undefined;
-
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'LittleWed_Simple', // Use a template without button
-    personalisation: [
-      {
-        "1": data.name,
-        "2": data.hostFamily,
-        "3": data.person1,
-        "4": data.person2,
-        "5": data.date,
-        "6": data.venue,
-        "7": data.time,
-        "8": data.cardNumber,
-        "9": data.cardType,
-      }
-    ],
-    header,
+    button, // ✅ Button object is REQUIRED
   });
 }
