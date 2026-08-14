@@ -12,7 +12,15 @@ export interface SendWhatsAppTemplateOptions {
     image?: { file: string; name?: string };
     document?: { file: string; name?: string };
   };
-  button?: { url: string };
+  // NextSMS button shape for a dynamic-URL button component:
+  // { personalisation: { url_link: { parameters: [ "<suffix-or-value>" ] } } }
+  button?: {
+    personalisation: {
+      url_link: {
+        parameters: string[];
+      };
+    };
+  };
 }
 
 export interface SendWhatsAppResult {
@@ -98,7 +106,10 @@ export async function sendWeddingInvitation(
     cardNumber: string;
     cardType: string;
     imageUrl?: string;
-    inviteLink?: string; // now just the suffix, e.g. "cmsstoff00000lb049powypl6"
+    // NOTE: this should be just the dynamic suffix (e.g. "cmsstoff00000lb049powypl6"),
+    // not the full URL — NextSMS appends it to the static prefix baked into the
+    // approved template's button config.
+    inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
   const header = {
@@ -110,6 +121,10 @@ export async function sendWeddingInvitation(
 
   const linkSuffix = data.inviteLink || 'default';
 
+  // TODO: verify against your NextSMS template config whether LittleWed's body
+  // variables are numbered ("1".."9") like below, or named (e.g. "name",
+  // "host_family", ...) like NextSMS's own "monthly_event" example
+  // ({ "name": "Mbelwa" }). If named, rename these keys to match.
   return sendWhatsAppTemplate({
     to: phone,
     template: 'LittleWed',
@@ -127,6 +142,12 @@ export async function sendWeddingInvitation(
       }
     ],
     header,
-    button: { url: linkSuffix }, // just "cmsstoff00000lb049powypl6", NOT the full URL
+    button: {
+      personalisation: {
+        url_link: {
+          parameters: [linkSuffix],
+        },
+      },
+    },
   });
 }
