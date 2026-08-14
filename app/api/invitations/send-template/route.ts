@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendInvitationTemplate } from '@/lib/whatsapp';
+// ✅ Import the correct function from whatsapp/index
+import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,21 +46,24 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ Send the template
-    const result = await sendInvitationTemplate(
-      {
-        phone: guest.phone,
-        name: guest.name,
-        cardNumber: guest.cardNumber,
-        title: guest.title,
-      },
-      {
-        name: event.name,
-        date: event.date,
-        venue: event.venue,
-        time: undefined,
-      }
-    );
+    // ✅ Send the wedding invitation using NexSMS
+    const result = await sendWeddingInvitation(guest.phone, {
+      name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
+      hostFamily: 'Mr & Mrs Allan Swai', // You can make this dynamic
+      person1: 'Agape',
+      person2: 'Gladness',
+      date: new Date(event.date).toLocaleDateString('sw-TZ', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+      venue: event.venue || 'The Embassy Hall',
+      time: event.time || '5:00 PM',
+      cardNumber: guest.cardNumber || '108',
+      cardType: guest.guestType || 'SINGLE',
+      imageUrl: 'https://www.gstatic.com/webp/gallery/1.png',
+      inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
+    });
 
     if (result.success) {
       // Update guest's invitation sent status
