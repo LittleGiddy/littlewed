@@ -84,7 +84,7 @@ export default function SendInvitationsPage() {
 
         setEvent(eventData.event || eventData);
         setGuests(guestsData || []);
-        setCustomMessage(settings.customMessage || "You're invited! Scan the QR code at the entrance.");
+        setCustomMessage(settings.customMessage || "Hello {fullName}, you're invited to {event}! Scan the QR code at the entrance.");
       } catch (error) {
         console.error('Load error:', error);
         toast.error('Failed to load data');
@@ -95,21 +95,56 @@ export default function SendInvitationsPage() {
     loadData();
   }, [eventId]);
 
+  // ─── Helper: Replace placeholders in SMS message ──────────────────────
+  const personalizeMessage = (message: string, guest: Guest, event: EventData): string => {
+    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
+    return message
+      .replace(/{title}/g, guest.title || 'Mr')
+      .replace(/{name}/g, guest.name)
+      .replace(/{fullName}/g, fullName)
+      .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
+      .replace(/{smsCode}/g, guest.smsCode || 'N/A')
+      .replace(/{event}/g, event.name)
+      .replace(/{date}/g, formattedDate)
+      .replace(/{venue}/g, event.venue)
+      .replace(/{address}/g, event.address || '');
+  };
+
   // ─── Send to a single guest ────────────────────────────────────────────
   const sendToGuest = async (guest: Guest): Promise<SendResult> => {
     try {
-      const endpoint = guest.routingChannel === 'whatsapp' 
-        ? '/api/invitations/send-template'
-        : '/api/invitations/send-sms';
+      let endpoint: string;
+      let body: any;
+
+      if (guest.routingChannel === 'whatsapp') {
+        // ✅ WhatsApp: Use template, NOT custom message
+        endpoint = '/api/invitations/send-template';
+        body = { 
+          guestId: guest.id, 
+          eventId,
+          // WhatsApp uses template, not custom message
+        };
+      } else {
+        // ✅ SMS: Use custom message with placeholders
+        endpoint = '/api/invitations/send-sms';
+        const personalizedMessage = personalizeMessage(customMessage, guest, event!);
+        body = { 
+          guestId: guest.id, 
+          eventId,
+          message: personalizedMessage,
+        };
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          guestId: guest.id, 
-          eventId,
-          message: customMessage,
-        }),
+        body: JSON.stringify(body),
         credentials: 'include',
       });
       
@@ -261,6 +296,37 @@ export default function SendInvitationsPage() {
             <Phone size={16} />
             SMS ({smsCount})
           </button>
+        </div>
+      </div>
+
+      {/* ─── SMS Message Editor ─── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
+        <h2 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+          <FileText size={18} className="text-[#0D4F4F]" />
+          SMS Message Template
+        </h2>
+        <p className="text-xs text-gray-400 mb-3">
+          This message is used for <strong>SMS</strong> only. WhatsApp uses a pre-approved template.
+          <br />
+          Available placeholders: <code className="bg-gray-100 px-1 rounded">{'{fullName}'}</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{event}'}</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{date}'}</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{venue}'}</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{cardNumber}'}</code>,{' '}
+          <code className="bg-gray-100 px-1 rounded">{'{smsCode}'}</code>
+        </p>
+        <textarea
+          value={customMessage}
+          onChange={(e) => setCustomMessage(e.target.value)}
+          rows={3}
+          className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
+          placeholder="Write your SMS message here... Use placeholders to personalize for each guest."
+        />
+        <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
+          <span>{customMessage.length} characters</span>
+          <span className="text-[#0D4F4F] font-medium">
+            {customMessage.includes('{fullName}') ? '✅ Personalized' : '⚠️ No {fullName} placeholder'}
+          </span>
         </div>
       </div>
 
