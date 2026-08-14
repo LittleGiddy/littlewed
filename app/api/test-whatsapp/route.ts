@@ -10,10 +10,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
-    // ✅ Use your LittleWed template instead of hello_world
     const result = await sendWhatsAppTemplate({
       to: phone,
-      template: 'LittleWed', // ← Changed from 'hello_world'
+      template: 'LittleWed',
       personalisation: [
         {
           "1": "GIDEON FELIX",
@@ -41,6 +40,9 @@ export async function POST(req: NextRequest) {
         }
       }
     });
+
+    // ─── Log the full response ──────────────────────────────────────────
+    console.log('[Test] Full response:', JSON.stringify(result, null, 2));
 
     return NextResponse.json(result);
   } catch (error: any) {
