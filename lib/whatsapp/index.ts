@@ -98,10 +98,9 @@ export async function sendWeddingInvitation(
     cardNumber: string;
     cardType: string;
     imageUrl?: string;
-    inviteLink?: string;
+    inviteLink?: string; // now just the suffix, e.g. "cmsstoff00000lb049powypl6"
   }
 ): Promise<SendWhatsAppResult> {
-  // ✅ Header with image (required by your template)
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -109,9 +108,7 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ✅ Since the button is DYNAMIC, the URL goes in personalisation
-  // The button is configured in the template with {{1}} or similar
-  // DO NOT send a separate button object
+  const linkSuffix = data.inviteLink || 'default';
 
   return sendWhatsAppTemplate({
     to: phone,
@@ -127,10 +124,9 @@ export async function sendWeddingInvitation(
         "7": data.time,
         "8": data.cardNumber,
         "9": data.cardType,
-        "10": data.inviteLink || 'https://littlewed.co.tz/invite/default', // ✅ Button URL as personalisation
       }
     ],
     header,
-    // ❌ NO button object - it's handled in personalisation
+    button: { url: linkSuffix }, // just "cmsstoff00000lb049powypl6", NOT the full URL
   });
 }
