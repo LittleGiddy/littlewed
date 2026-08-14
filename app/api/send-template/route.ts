@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWhatsAppTemplate } from '@/lib/messaging';
+import { sendWhatsAppTemplate } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
