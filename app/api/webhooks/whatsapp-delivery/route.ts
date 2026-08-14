@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 // ─── Configuration ──────────────────────────────────────────────────────
 // This token should match the one in your NexSMS dashboard
-const WEBHOOK_VERIFY_TOKEN = process.env.NEXTSMS_WEBHOOK_TOKEN || 'your-verify-token-here';
+const WEBHOOK_VERIFY_TOKEN = process.env.NEXTSMS_WEBHOOK_TOKEN || 'a7f8e3d9c1b5a4e6f8d7c9b1a2e3f4d5c6b7a';
 
 export async function POST(req: NextRequest) {
   try {
