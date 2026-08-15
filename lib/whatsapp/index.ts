@@ -39,11 +39,21 @@ export async function sendWhatsAppTemplate({
     throw new Error('NEXTSMS_TOKEN is not set');
   }
 
+  // ─── Convert to array and CLEAN phone numbers for WhatsApp ──────────
   const toArray = Array.isArray(to) ? to : [to];
-  const cleanTo = toArray.map(phone => parseInt(phone.replace(/^\+/, '').replace(/\D/g, '')));
+  
+  // ✅ FIX: Remove '+' and any non-digit characters, then convert to number
+  // WhatsApp API expects: [255769999902] NOT [+255769999902]
+  const cleanTo = toArray.map(phone => {
+    const cleaned = String(phone).replace(/^\+/, '').replace(/\D/g, '');
+    return parseInt(cleaned);
+  });
+
+  console.log('[WhatsApp] Original numbers:', toArray);
+  console.log('[WhatsApp] Clean numbers (no +):', cleanTo);
 
   const body: any = {
-    to: cleanTo,
+    to: cleanTo, // ✅ Now sending: [255769999902] instead of [+255769999902]
     account: NEXTSMS_ACCOUNT,
     template: template,
   };
@@ -63,7 +73,7 @@ export async function sendWhatsAppTemplate({
   console.log('[WhatsApp] ====== SENDING MESSAGE ======');
   console.log('[WhatsApp] Template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
-  console.log('[WhatsApp] To:', cleanTo);
+  console.log('[WhatsApp] To (clean):', cleanTo);
   console.log('[WhatsApp] Full Payload:', JSON.stringify(body, null, 2));
 
   try {
@@ -91,15 +101,12 @@ export async function sendWhatsAppTemplate({
       if (data.errors) {
         console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
         
-        // Check for template errors
         if (data.errors.template) {
           console.error('[WhatsApp] Template Error:', data.errors.template);
         }
-        // Check for phone number errors
         if (data.errors.to) {
           console.error('[WhatsApp] Phone Number Error:', data.errors.to);
         }
-        // Check for account errors
         if (data.errors.account) {
           console.error('[WhatsApp] Account Error:', data.errors.account);
         }
@@ -110,7 +117,7 @@ export async function sendWhatsAppTemplate({
         console.error('[WhatsApp] ❌ Template issue - check if template is approved and variables match');
       }
       if (errorMsg.includes('phone') || errorMsg.includes('to')) {
-        console.error('[WhatsApp] ❌ Phone number issue - check format (E.164)');
+        console.error('[WhatsApp] ❌ Phone number issue - check format (should be without +)');
       }
       if (errorMsg.includes('account')) {
         console.error('[WhatsApp] ❌ Account issue - check NEXTSMS_ACCOUNT');
@@ -130,9 +137,24 @@ export async function sendWhatsAppTemplate({
     console.log('[WhatsApp] Message ID:', data.data?.messageId || data.messageId || data.id);
     console.log('[WhatsApp] Status:', data.data?.status || data.status || 'PENDING');
 
+    // ─── Save message ID to database (optional) ────────────────────────
     const messageId = data.data?.messageId || data.messageId || data.id;
 
-    return { success: true, messageId, data };
+    // If you want to save to database, uncomment and add prisma import
+    // try {
+    //   await prisma.messageLog.create({
+    //     data: {
+    //       messageId: String(messageId),
+    //       type: 'WHATSAPP',
+    //       template: template,
+    //       status: 'SENT',
+    //     },
+    //   });
+    // } catch (dbError) {
+    //   console.warn('[WhatsApp] Failed to save MessageLog:', dbError);
+    // }
+
+    return { success: true, messageId: String(messageId), data };
   } catch (error: any) {
     console.error('[WhatsApp] ❌ Error sending template:', error.message);
     return { success: false, error: error.message || 'Unknown error' };
@@ -156,7 +178,7 @@ export async function sendWeddingInvitation(
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-  console.log('[WhatsApp] Phone:', phone);
+  console.log('[WhatsApp] Phone (before clean):', phone);
   console.log('[WhatsApp] Name:', data.name);
   console.log('[WhatsApp] Host Family:', data.hostFamily);
   console.log('[WhatsApp] Event:', data.date, data.venue);
@@ -173,7 +195,7 @@ export async function sendWeddingInvitation(
   console.log('[WhatsApp] Link Suffix:', linkSuffix);
 
   const result = await sendWhatsAppTemplate({
-    to: phone,
+    to: phone, // ✅ Will be cleaned inside sendWhatsAppTemplate
     template: 'LittleWed',
     personalisation: [
       {
