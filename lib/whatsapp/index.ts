@@ -39,21 +39,11 @@ export async function sendWhatsAppTemplate({
     throw new Error('NEXTSMS_TOKEN is not set');
   }
 
-  // ─── Convert to array and CLEAN phone numbers for WhatsApp ──────────
   const toArray = Array.isArray(to) ? to : [to];
-  
-  // ✅ FIX: Remove '+' and any non-digit characters, then convert to number
-  // WhatsApp API expects: [255769999902] NOT [+255769999902]
-  const cleanTo = toArray.map(phone => {
-    const cleaned = String(phone).replace(/^\+/, '').replace(/\D/g, '');
-    return parseInt(cleaned);
-  });
-
-  console.log('[WhatsApp] Original numbers:', toArray);
-  console.log('[WhatsApp] Clean numbers (no +):', cleanTo);
+  const cleanTo = toArray.map(phone => parseInt(phone.replace(/^\+/, '').replace(/\D/g, '')));
 
   const body: any = {
-    to: cleanTo, // ✅ Now sending: [255769999902] instead of [+255769999902]
+    to: cleanTo,
     account: NEXTSMS_ACCOUNT,
     template: template,
   };
@@ -73,7 +63,7 @@ export async function sendWhatsAppTemplate({
   console.log('[WhatsApp] ====== SENDING MESSAGE ======');
   console.log('[WhatsApp] Template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
-  console.log('[WhatsApp] To (clean):', cleanTo);
+  console.log('[WhatsApp] To:', cleanTo);
   console.log('[WhatsApp] Full Payload:', JSON.stringify(body, null, 2));
 
   try {
@@ -89,58 +79,24 @@ export async function sendWhatsAppTemplate({
 
     const data = await response.json();
 
-    // ─── Detailed logging ──────────────────────────────────────────────
     console.log('[WhatsApp] Response Status:', response.status);
     console.log('[WhatsApp] Response Data:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
-      // ─── Parse error details ─────────────────────────────────────────
       let errorMsg = data.message || data.error || `HTTP ${response.status}`;
       
-      // Check for specific error types
       if (data.errors) {
         console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-        
-        if (data.errors.template) {
-          console.error('[WhatsApp] Template Error:', data.errors.template);
-        }
-        if (data.errors.to) {
-          console.error('[WhatsApp] Phone Number Error:', data.errors.to);
-        }
-        if (data.errors.account) {
-          console.error('[WhatsApp] Account Error:', data.errors.account);
-        }
-      }
-
-      // ─── Check for specific failure reasons ─────────────────────────
-      if (errorMsg.includes('template')) {
-        console.error('[WhatsApp] ❌ Template issue - check if template is approved and variables match');
-      }
-      if (errorMsg.includes('phone') || errorMsg.includes('to')) {
-        console.error('[WhatsApp] ❌ Phone number issue - check format (should be without +)');
-      }
-      if (errorMsg.includes('account')) {
-        console.error('[WhatsApp] ❌ Account issue - check NEXTSMS_ACCOUNT');
-      }
-      if (errorMsg.includes('verified') || errorMsg.includes('approved')) {
-        console.error('[WhatsApp] ❌ Template not approved by Meta yet');
-      }
-      if (errorMsg.includes('business')) {
-        console.error('[WhatsApp] ❌ Business verification issue - check Meta Business status');
       }
 
       throw new Error(errorMsg);
     }
 
-    // ─── Success but check for delivery status ─────────────────────────
     console.log('[WhatsApp] ✅ Message accepted by NexSMS');
-    console.log('[WhatsApp] Message ID:', data.data?.messageId || data.messageId || data.id);
-    console.log('[WhatsApp] Status:', data.data?.status || data.status || 'PENDING');
+    
+    const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
 
     // ─── Save message ID to database (optional) ────────────────────────
-    const messageId = data.data?.messageId || data.messageId || data.id;
-
-    // If you want to save to database, uncomment and add prisma import
     // try {
     //   await prisma.messageLog.create({
     //     data: {
@@ -161,6 +117,8 @@ export async function sendWhatsAppTemplate({
   }
 }
 
+// ─── Wedding Invitation (Full Template with Header & Button) ──────────
+
 export async function sendWeddingInvitation(
   phone: string,
   data: {
@@ -178,11 +136,6 @@ export async function sendWeddingInvitation(
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-  console.log('[WhatsApp] Phone (before clean):', phone);
-  console.log('[WhatsApp] Name:', data.name);
-  console.log('[WhatsApp] Host Family:', data.hostFamily);
-  console.log('[WhatsApp] Event:', data.date, data.venue);
-  console.log('[WhatsApp] Card:', data.cardNumber, data.cardType);
 
   const header = {
     image: {
@@ -192,10 +145,9 @@ export async function sendWeddingInvitation(
   };
 
   const linkSuffix = data.inviteLink || 'default';
-  console.log('[WhatsApp] Link Suffix:', linkSuffix);
 
-  const result = await sendWhatsAppTemplate({
-    to: phone, // ✅ Will be cleaned inside sendWhatsAppTemplate
+  return sendWhatsAppTemplate({
+    to: phone,
     template: 'LittleWed',
     personalisation: [
       {
@@ -219,18 +171,38 @@ export async function sendWeddingInvitation(
       },
     },
   });
+}
 
-  console.log('[WhatsApp] Result:', result.success ? '✅ Success' : '❌ Failed');
-  if (!result.success) {
-    console.log('[WhatsApp] Error:', result.error);
+// ─── NEW: Simple Template (No Header, No Button) ──────────────────────
+
+export async function sendSimpleTestMessage(
+  phone: string,
+  data: {
+    name: string;
+    cardNumber: string;
   }
+): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING SIMPLE TEST MESSAGE ======');
+  console.log('[WhatsApp] Phone:', phone);
+  console.log('[WhatsApp] Name:', data.name);
+  console.log('[WhatsApp] Card Number:', data.cardNumber);
 
-  return result;
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'test_simple', // ← Your simple template name
+    personalisation: [
+      {
+        "1": data.name,
+        "2": data.cardNumber,
+      }
+    ],
+    // ❌ No header
+    // ❌ No button
+  });
 }
 
 /**
  * Helper: Convert a full URL to just the suffix
- * e.g., "https://littlewed.co.tz/invite/abc123" → "abc123"
  */
 export function toLinkSuffix(value: string): string {
   try {
@@ -238,7 +210,6 @@ export function toLinkSuffix(value: string): string {
     const parts = url.pathname.split('/').filter(Boolean);
     return parts[parts.length - 1] || value;
   } catch {
-    // Not a full URL — assume it's already a suffix
     return value;
   }
 }
