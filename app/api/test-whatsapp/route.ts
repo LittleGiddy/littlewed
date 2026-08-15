@@ -1,6 +1,6 @@
 // app/api/test-whatsapp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { sendSimpleTestMessage } from '@/lib/whatsapp/index';
+import { sendHelloWorld } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,12 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
-    // ─── Test with the SIMPLE template ──────────────────────────────
-    const result = await sendSimpleTestMessage(phone, {
-      name: 'GIDEON FELIX',
-      cardNumber: '108',
-    });
-
+    const result = await sendHelloWorld(phone);
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('[Test] Error:', error);

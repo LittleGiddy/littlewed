@@ -213,3 +213,24 @@ export function toLinkSuffix(value: string): string {
     return value;
   }
 }
+
+
+
+// lib/whatsapp/index.ts
+
+// ─── NEW: Send hello_world template ──────────────────────────────────
+
+export async function sendHelloWorld(
+  phone: string
+): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING HELLO WORLD ======');
+  console.log('[WhatsApp] Phone:', phone);
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'hello_world',
+    // ❌ No personalisation
+    // ❌ No header
+    // ❌ No button
+  });
+}
