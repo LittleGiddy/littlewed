@@ -89,8 +89,6 @@ export async function POST(req: NextRequest) {
         time: guest.event.time || '5:00 PM',
         cardNumber: guest.cardNumber || '108',
         cardType: guest.guestType || 'SINGLE',
-        imageUrl: imageUrl || guest.event.imageUrl,
-        // sendWeddingInvitation expects the suffix only (see note above)
         inviteLink: buttonUrl ? toLinkSuffix(buttonUrl) : guest.id,
       });
     }
