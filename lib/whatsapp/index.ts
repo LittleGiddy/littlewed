@@ -1,7 +1,7 @@
 // lib/whatsapp/index.ts
 
 const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN!;
-const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Ltd';
+const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Global Limited';
 const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
 
 export interface SendWhatsAppTemplateOptions {
@@ -96,20 +96,6 @@ export async function sendWhatsAppTemplate({
     
     const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
 
-    // ─── Save message ID to database (optional) ────────────────────────
-    // try {
-    //   await prisma.messageLog.create({
-    //     data: {
-    //       messageId: String(messageId),
-    //       type: 'WHATSAPP',
-    //       template: template,
-    //       status: 'SENT',
-    //     },
-    //   });
-    // } catch (dbError) {
-    //   console.warn('[WhatsApp] Failed to save MessageLog:', dbError);
-    // }
-
     return { success: true, messageId: String(messageId), data };
   } catch (error: any) {
     console.error('[WhatsApp] ❌ Error sending template:', error.message);
@@ -173,7 +159,7 @@ export async function sendWeddingInvitation(
   });
 }
 
-// ─── NEW: Simple Template (No Header, No Button) ──────────────────────
+// ─── Simple Template (No Header, No Button) ──────────────────────────
 
 export async function sendSimpleTestMessage(
   phone: string,
@@ -183,21 +169,29 @@ export async function sendSimpleTestMessage(
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING SIMPLE TEST MESSAGE ======');
-  console.log('[WhatsApp] Phone:', phone);
-  console.log('[WhatsApp] Name:', data.name);
-  console.log('[WhatsApp] Card Number:', data.cardNumber);
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'test_simple', // ← Your simple template name
+    template: 'test_simple',
     personalisation: [
       {
         "1": data.name,
         "2": data.cardNumber,
       }
     ],
-    // ❌ No header
-    // ❌ No button
+  });
+}
+
+// ─── Hello World Test ──────────────────────────────────────────────────
+
+export async function sendHelloWorld(
+  phone: string
+): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING HELLO WORLD ======');
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'hello_world',
   });
 }
 
@@ -212,25 +206,4 @@ export function toLinkSuffix(value: string): string {
   } catch {
     return value;
   }
-}
-
-
-
-// lib/whatsapp/index.ts
-
-// ─── NEW: Send hello_world template ──────────────────────────────────
-
-export async function sendHelloWorld(
-  phone: string
-): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING HELLO WORLD ======');
-  console.log('[WhatsApp] Phone:', phone);
-
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'hello_world',
-    // ❌ No personalisation
-    // ❌ No header
-    // ❌ No button
-  });
 }
