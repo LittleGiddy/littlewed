@@ -1,192 +1,90 @@
-// lib/whatsapp/index.ts
+// app/api/invitations/send-template/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 
-const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN!;
-const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Global Limited';
-const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
-
-export interface SendWhatsAppTemplateOptions {
-  to: string | string[];
-  template: string;
-  personalisation?: Record<string, string>[];
-  header?: {
-    image?: { file: string; name?: string };
-    document?: { file: string; name?: string };
-  };
-  button?: {
-    personalisation: {
-      url_link: {
-        parameters: string[];
-      };
-    };
-  };
-}
-
-export interface SendWhatsAppResult {
-  success: boolean;
-  messageId?: string;
-  error?: string;
-  data?: any;
-}
-
-export async function sendWhatsAppTemplate({
-  to,
-  template,
-  personalisation,
-  header,
-  button,
-}: SendWhatsAppTemplateOptions): Promise<SendWhatsAppResult> {
-  if (!NEXTSMS_TOKEN) {
-    throw new Error('NEXTSMS_TOKEN is not set');
-  }
-
-  const toArray = Array.isArray(to) ? to : [to];
-  const cleanTo = toArray.map(phone => parseInt(phone.replace(/^\+/, '').replace(/\D/g, '')));
-
-  const body: any = {
-    to: cleanTo,
-    account: NEXTSMS_ACCOUNT,
-    template: template,
-  };
-
-  if (personalisation) {
-    body.personalisation = personalisation;
-  }
-
-  if (header) {
-    body.header = header;
-  }
-
-  if (button) {
-    body.button = button;
-  }
-
-  console.log('[WhatsApp] ====== SENDING MESSAGE ======');
-  console.log('[WhatsApp] Template:', template);
-  console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
-  console.log('[WhatsApp] To:', cleanTo);
-  console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
-
+export async function POST(req: NextRequest) {
   try {
-    const response = await fetch(NEXTSMS_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${NEXTSMS_TOKEN}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const data = await response.json();
-
-    console.log('[WhatsApp] Response Status:', response.status);
-    console.log('[WhatsApp] Response Data:', JSON.stringify(data, null, 2));
-
-    if (!response.ok) {
-      let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      if (data.errors) {
-        console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-      }
-      throw new Error(errorMsg);
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('[WhatsApp] ✅ Message accepted by NexSMS');
-    
-    const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
+    const tenantId = (session.user as any).tenantId;
+    const { guestId, eventId } = await req.json();
 
-    return { success: true, messageId: String(messageId), data };
+    if (!guestId || !eventId) {
+      return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
+    }
+
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, event: { tenantId } },
+    });
+
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, tenantId },
+    });
+
+    if (!guest || !event) {
+      return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
+    }
+
+    // ─── THIS IS WHERE THE ERROR IS THROWN ──────────────────────────────
+    if (!guest.phone) {
+      return NextResponse.json({ 
+        error: 'Phone number is required' 
+      }, { status: 400 });
+    }
+
+    // ─── Check if guest has WhatsApp routing ──────────────────────────────
+    if (guest.routingChannel !== 'whatsapp') {
+      return NextResponse.json({
+        error: `Guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
+      }, { status: 400 });
+    }
+
+    // ─── Send the invitation ──────────────────────────────────────────────
+    const result = await sendWeddingInvitation(guest.phone, {
+      name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
+      hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
+      person1: event.person1 || 'Agape',
+      person2: event.person2 || 'Gladness',
+      date: new Date(event.date).toLocaleDateString('sw-TZ', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+      venue: event.venue || 'The Embassy Hall',
+      time: event.time || '5:00 PM',
+      cardNumber: guest.cardNumber || '108',
+      cardType: guest.guestType || 'SINGLE',
+      inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
+    });
+
+    if (result.success) {
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: { invitationSentAt: new Date() },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Invitation sent successfully!',
+        data: result.data,
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+      }, { status: 500 });
+    }
   } catch (error: any) {
-    console.error('[WhatsApp] ❌ Error sending template:', error.message);
-    return { success: false, error: error.message || 'Unknown error' };
-  }
-}
-
-// ─── Wedding Invitation (NO HEADER) ────────────────────────────────────
-
-export async function sendWeddingInvitation(
-  phone: string,
-  data: {
-    name: string;
-    hostFamily: string;
-    person1: string;
-    person2: string;
-    date: string;
-    venue: string;
-    time: string;
-    cardNumber: string;
-    cardType: string;
-    inviteLink?: string;
-  }
-): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-
-  const linkSuffix = data.inviteLink || 'default';
-
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'LittleWed', // Or use UUID: 'b8519b7d-c820-4c7b-914e-36302b245725'
-    personalisation: [
-      {
-        "var1": data.name,
-        "var2": data.hostFamily,
-        "var3": data.person1,
-        "var4": data.person2,
-        "var5": data.date,
-        "var6": data.venue,
-        "var7": data.time,
-        "var8": data.cardNumber,
-        "var9": data.cardType,
-      }
-    ],
-    // ❌ No header - template doesn't have image
-    button: {
-      personalisation: {
-        url_link: {
-          parameters: [linkSuffix],
-        },
-      },
-    },
-  });
-}
-
-// ─── Simple Test Template ──────────────────────────────────────────────
-
-export async function sendSimpleTestMessage(
-  phone: string,
-  data: {
-    name: string;
-    cardNumber: string;
-  }
-): Promise<SendWhatsAppResult> {
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'test_simple',
-    personalisation: [
-      {
-        "var1": data.name,
-        "var2": data.cardNumber,
-      }
-    ],
-  });
-}
-
-// ─── Hello World ──────────────────────────────────────────────────────
-
-export async function sendHelloWorld(
-  phone: string
-): Promise<SendWhatsAppResult> {
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'hello_world',
-  });
-}
-
-export function toLinkSuffix(value: string): string {
-  try {
-    const url = new URL(value);
-    const parts = url.pathname.split('/').filter(Boolean);
-    return parts[parts.length - 1] || value;
-  } catch {
-    return value;
+    console.error('Send template error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
