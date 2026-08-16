@@ -124,7 +124,7 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'LittleWed',
+    template: 'LittleWed', // Or use UUID: 'b8519b7d-c820-4c7b-914e-36302b245725'
     personalisation: [
       {
         "var1": data.name,
@@ -138,7 +138,7 @@ export async function sendWeddingInvitation(
         "var9": data.cardType,
       }
     ],
-    // ❌ No header
+    // ❌ No header - template doesn't have image
     button: {
       personalisation: {
         url_link: {
