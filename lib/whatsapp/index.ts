@@ -64,7 +64,7 @@ export async function sendWhatsAppTemplate({
   console.log('[WhatsApp] Template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
   console.log('[WhatsApp] To:', cleanTo);
-  console.log('[WhatsApp] Full Payload:', JSON.stringify(body, null, 2));
+  console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
 
   try {
     const response = await fetch(NEXTSMS_API_URL, {
@@ -84,11 +84,9 @@ export async function sendWhatsAppTemplate({
 
     if (!response.ok) {
       let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      
       if (data.errors) {
         console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
       }
-
       throw new Error(errorMsg);
     }
 
@@ -103,7 +101,7 @@ export async function sendWhatsAppTemplate({
   }
 }
 
-// ─── Wedding Invitation (Full Template with Header & Button) ──────────
+// ─── Wedding Invitation (NO HEADER) ────────────────────────────────────
 
 export async function sendWeddingInvitation(
   phone: string,
@@ -117,18 +115,10 @@ export async function sendWeddingInvitation(
     time: string;
     cardNumber: string;
     cardType: string;
-    imageUrl?: string;
     inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-
-  const header = {
-    image: {
-      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
-      name: 'Wedding Invitation',
-    }
-  };
 
   const linkSuffix = data.inviteLink || 'default';
 
@@ -137,18 +127,18 @@ export async function sendWeddingInvitation(
     template: 'LittleWed',
     personalisation: [
       {
-        "1": data.name,
-        "2": data.hostFamily,
-        "3": data.person1,
-        "4": data.person2,
-        "5": data.date,
-        "6": data.venue,
-        "7": data.time,
-        "8": data.cardNumber,
-        "9": data.cardType,
+        "var1": data.name,
+        "var2": data.hostFamily,
+        "var3": data.person1,
+        "var4": data.person2,
+        "var5": data.date,
+        "var6": data.venue,
+        "var7": data.time,
+        "var8": data.cardNumber,
+        "var9": data.cardType,
       }
     ],
-    header,
+    // ❌ No header
     button: {
       personalisation: {
         url_link: {
@@ -159,7 +149,7 @@ export async function sendWeddingInvitation(
   });
 }
 
-// ─── Simple Template (No Header, No Button) ──────────────────────────
+// ─── Simple Test Template ──────────────────────────────────────────────
 
 export async function sendSimpleTestMessage(
   phone: string,
@@ -168,36 +158,29 @@ export async function sendSimpleTestMessage(
     cardNumber: string;
   }
 ): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING SIMPLE TEST MESSAGE ======');
-
   return sendWhatsAppTemplate({
     to: phone,
     template: 'test_simple',
     personalisation: [
       {
-        "1": data.name,
-        "2": data.cardNumber,
+        "var1": data.name,
+        "var2": data.cardNumber,
       }
     ],
   });
 }
 
-// ─── Hello World Test ──────────────────────────────────────────────────
+// ─── Hello World ──────────────────────────────────────────────────────
 
 export async function sendHelloWorld(
   phone: string
 ): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING HELLO WORLD ======');
-
   return sendWhatsAppTemplate({
     to: phone,
     template: 'hello_world',
   });
 }
 
-/**
- * Helper: Convert a full URL to just the suffix
- */
 export function toLinkSuffix(value: string): string {
   try {
     const url = new URL(value);
