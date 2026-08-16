@@ -8,7 +8,7 @@ import {
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
   ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
-  FileText, Info, Eye
+  FileText, Info, Eye, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -60,6 +60,7 @@ export default function SendInvitationsPage() {
   const [expandedGuest, setExpandedGuest] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [loadingGuests, setLoadingGuests] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -70,29 +71,32 @@ export default function SendInvitationsPage() {
   const successCount = results.filter(r => r.success).length;
 
   // ─── Load Data ──────────────────────────────────────────────────────────
+  const loadData = async () => {
+    setLoadingGuests(true);
+    try {
+      const [eventRes, guestsRes, settingsRes] = await Promise.all([
+        fetch(`/api/events/${eventId}`, { credentials: 'include' }),
+        fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }),
+        fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }),
+      ]);
+
+      const eventData = await eventRes.json();
+      const guestsData = await guestsRes.json();
+      const settings = await settingsRes.json();
+
+      setEvent(eventData.event || eventData);
+      setGuests(guestsData || []);
+      setCustomMessage(settings.customMessage || "Hello {fullName},\n\nYou're invited to {event}! 🎉\n\n📍 Venue: {venue}\n📅 Date: {date}\n🎟️ Card: {cardNumber}\n\nWe look forward to celebrating with you!");
+    } catch (error) {
+      console.error('Load error:', error);
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+      setLoadingGuests(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [eventRes, guestsRes, settingsRes] = await Promise.all([
-          fetch(`/api/events/${eventId}`, { credentials: 'include' }),
-          fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }),
-          fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }),
-        ]);
-
-        const eventData = await eventRes.json();
-        const guestsData = await guestsRes.json();
-        const settings = await settingsRes.json();
-
-        setEvent(eventData.event || eventData);
-        setGuests(guestsData || []);
-        setCustomMessage(settings.customMessage || "Hello {fullName}, you're invited to {event}! 🎉\n\n📍 Venue: {venue}\n📅 Date: {date}\n🎟️ Card: {cardNumber}\n🔑 Code: {smsCode}\n\nWe look forward to celebrating with you!");
-      } catch (error) {
-        console.error('Load error:', error);
-        toast.error('Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, [eventId]);
 
@@ -173,6 +177,11 @@ export default function SendInvitationsPage() {
       return;
     }
 
+    if (!customMessage.trim() && targetGuests.some(g => g.routingChannel === 'sms')) {
+      toast.error('Please write an SMS message');
+      return;
+    }
+
     setSending(true);
     setResults([]);
     let successCount = 0;
@@ -183,25 +192,23 @@ export default function SendInvitationsPage() {
       newResults.push(result);
       if (result.success) successCount++;
       setResults([...newResults]);
+      // Small delay between sends
       await new Promise(r => setTimeout(r, 300));
     }
 
     if (successCount === targetGuests.length) {
-      toast.success(`✅ Sent to all ${successCount} guests!`);
+      toast.success(`Sent to all ${successCount} guests`);
     } else if (successCount > 0) {
-      toast(`⚠️ Sent to ${successCount} of ${targetGuests.length} guests. ${targetGuests.length - successCount} failed.`, {
-        icon: '⚠️',
+      toast(`Sent to ${successCount} of ${targetGuests.length} guests`, {
+        icon: <AlertTriangle size={18} className="text-amber-500" />,
         duration: 5000,
       });
     } else {
-      toast.error(`❌ Failed to send to any guests.`);
+      toast.error('Failed to send to any guests');
     }
 
     setSending(false);
-    
-    const guestsRes = await fetch(`/api/events/${eventId}/guests`, { credentials: 'include' });
-    const guestsData = await guestsRes.json();
-    setGuests(guestsData);
+    await loadData();
   };
 
   // ─── Send to specific channel ──────────────────────────────────────────
@@ -261,8 +268,9 @@ export default function SendInvitationsPage() {
   // ─── Loading state ─────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <p className="text-sm text-gray-400">Loading invitations...</p>
       </div>
     );
   }
@@ -271,7 +279,7 @@ export default function SendInvitationsPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
           <Link
             href={`/client/events/${eventId}`}
@@ -308,7 +316,6 @@ export default function SendInvitationsPage() {
 
       {/* ─── Channel Toggle & Message Editor ─── */}
       <div className="mb-6">
-        {/* Toggle */}
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveChannel('sms')}
@@ -343,13 +350,14 @@ export default function SendInvitationsPage() {
             <p className="text-xs text-gray-400 mb-3">
               Write your SMS message below. Use placeholders to personalize for each guest.
               <br />
-              Available placeholders: <code className="bg-gray-100 px-1 rounded text-[10px]">{'{fullName}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{event}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{date}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{venue}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{cardNumber}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{smsCode}'}</code>{' '}
-              <code className="bg-gray-100 px-1 rounded text-[10px]">{'{name}'}</code>
+              Available placeholders:{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{fullName}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{event}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{date}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{venue}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{cardNumber}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{smsCode}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{name}'}</code>
             </p>
             <textarea
               value={customMessage}
@@ -360,8 +368,8 @@ export default function SendInvitationsPage() {
             />
             <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
               <span>{customMessage.length} characters</span>
-              <span className="text-[#0D4F4F] font-medium">
-                {customMessage.includes('{fullName}') ? '✅ Personalized' : '⚠️ Add {fullName} placeholder'}
+              <span className={`font-medium ${customMessage.includes('{fullName}') ? 'text-[#0D4F4F]' : 'text-amber-500'}`}>
+                {customMessage.includes('{fullName}') ? 'Personalized' : 'No {fullName} placeholder'}
               </span>
             </div>
           </div>
@@ -373,7 +381,7 @@ export default function SendInvitationsPage() {
             <div className="flex items-center gap-2 mb-2">
               <MessageCircle size={18} className="text-green-600" />
               <h2 className="font-semibold text-green-800">WhatsApp Template</h2>
-              <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full">✓ Pre-approved</span>
+              <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
             </div>
             <p className="text-sm text-green-700 mb-3">
               WhatsApp invitations use the pre-approved template <strong>"LittleWed"</strong>.
@@ -389,15 +397,12 @@ export default function SendInvitationsPage() {
                 <p>Venue: <span className="text-[#0D4F4F] font-medium">{'{venue}'}</span> at <span className="text-[#0D4F4F] font-medium">{'{time}'}</span></p>
                 <p>Card: <span className="text-[#0D4F4F] font-medium">{'{cardNumber}'}</span> <span className="text-[#0D4F4F] font-medium">{'{cardType}'}</span></p>
                 <div className="mt-2 pt-2 border-t border-green-100">
-                  <a 
-                    href="#" 
-                    className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 border border-green-200"
-                  >
+                  <span className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 border border-green-200">
                     <span>🔗</span> View Full Invite
-                  </a>
+                  </span>
                 </div>
                 <p className="text-[10px] text-green-500 mt-2 flex items-center gap-1">
-                  <CheckCircle size={10} /> This template is approved by WhatsApp and ready to send
+                  <CheckCircle size={10} /> This template is approved and ready to send
                 </p>
               </div>
             </div>
@@ -546,7 +551,7 @@ export default function SendInvitationsPage() {
             </span>
             <button
               onClick={broadcast}
-              disabled={sending || filteredGuests.length === 0}
+              disabled={sending || filteredGuests.length === 0 || loadingGuests}
               className="px-4 py-1.5 bg-[#0D4F4F] text-white rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -556,7 +561,11 @@ export default function SendInvitationsPage() {
         </div>
 
         <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-          {filteredGuests.length === 0 ? (
+          {loadingGuests ? (
+            <div className="flex justify-center py-12">
+              <Loader2 size={24} className="animate-spin text-[#0D4F4F]" />
+            </div>
+          ) : filteredGuests.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users size={48} className="mx-auto mb-3 text-gray-300" />
               <p className="font-medium">No guests match your filters</p>
@@ -691,7 +700,7 @@ export default function SendInvitationsPage() {
                         {guest.checkedIn && (
                           <div className="flex items-center gap-2 text-sm text-blue-600">
                             <CheckCircle size={14} />
-                            <span>Checked In ✅</span>
+                            <span>Checked In</span>
                           </div>
                         )}
                       </div>

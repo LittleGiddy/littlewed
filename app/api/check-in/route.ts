@@ -40,46 +40,52 @@ function getCheckInStartTime(
   eventDate: Date,
   customStartTime: Date | null
 ): Date {
-  // If custom check-in start time is set, use it
   if (customStartTime) {
     return new Date(customStartTime);
   }
 
-  // Otherwise, use the event date at midnight (or use a default time)
   const startTime = new Date(eventDate);
-  // Set to midnight by default - you can adjust this
   startTime.setHours(0, 0, 0, 0);
-  
   return startTime;
 }
 
 // ─── GET Handler ─────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const guestId = req.nextUrl.searchParams.get('guestId');
-  if (!guestId) {
-    return NextResponse.redirect(new URL('/login', req.url));
-  }
+  try {
+    const { searchParams } = new URL(req.url);
+    const eventId = searchParams.get('eventId');
 
-  const guest = await prisma.guest.findUnique({ where: { id: guestId } });
-  if (!guest) {
-    return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
-  }
+    if (!eventId) {
+      return NextResponse.json({ error: 'Event ID required' }, { status: 400 });
+    }
 
-  if (guest.checkedIn) {
-    return NextResponse.redirect(
-      new URL(`/check-in/success?name=${encodeURIComponent(guest.name)}`, req.url)
+    const guests = await prisma.guest.findMany({
+      where: { eventId },
+      select: {
+        id: true,
+        name: true,
+        title: true,
+        cardNumber: true,
+        guestType: true,
+        checkInCount: true,
+        checkedIn: true,
+        checkedInAt: true,
+        phone: true,
+        routingChannel: true,
+        createdAt: true,
+      },
+      orderBy: { cardNumber: 'asc' },
+    });
+
+    return NextResponse.json(guests);
+  } catch (error: any) {
+    console.error('Error fetching guests:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch guests' },
+      { status: 500 }
     );
   }
-
-  await prisma.guest.update({
-    where: { id: guestId },
-    data: { checkedIn: true, checkedInAt: new Date() },
-  });
-
-  return NextResponse.redirect(
-    new URL(`/check-in/success?name=${encodeURIComponent(guest.name)}`, req.url)
-  );
 }
 
 // ─── POST Handler ────────────────────────────────────────────────────
@@ -94,9 +100,13 @@ export async function POST(req: NextRequest) {
     const guestIdFromQuery = req.nextUrl.searchParams.get('guestId');
     let guest = null;
 
+    // ─── If guestId is provided directly ──────────────────────────────
     if (guestIdFromQuery) {
-      guest = await prisma.guest.findUnique({ where: { id: guestIdFromQuery } });
+      guest = await prisma.guest.findUnique({
+        where: { id: guestIdFromQuery },
+      });
     } else {
+      // ─── Parse request body ──────────────────────────────────────────
       let body;
       try {
         body = await req.json();
@@ -104,25 +114,32 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
       }
 
-      const { token, smsCode } = body;
+      const { token, cardNumber } = body;
 
+      // ─── Find by QR token (contains card number) ────────────────────
       if (token) {
-        guest = await prisma.guest.findFirst({ where: { qrToken: token } });
-
-        if (!guest) {
-          const guestIdMatch = token.match(/guestId=([^&]+)/);
-          if (guestIdMatch) {
-            guest = await prisma.guest.findUnique({
-              where: { id: guestIdMatch[1] },
-            });
-          }
+        const scannedCardNumber = token.trim();
+        if (scannedCardNumber) {
+          guest = await prisma.guest.findFirst({
+            where: { cardNumber: scannedCardNumber },
+          });
         }
-      } else if (smsCode) {
-        guest = await prisma.guest.findUnique({ where: { smsCode } });
-      } else {
+      }
+
+      // ─── Find by manual card number entry ────────────────────────────
+      if (!guest && cardNumber) {
+        const cleanCardNumber = cardNumber.trim().padStart(5, '0');
+        if (cleanCardNumber) {
+          guest = await prisma.guest.findFirst({
+            where: { cardNumber: cleanCardNumber },
+          });
+        }
+      }
+
+      if (!guest) {
         return NextResponse.json(
-          { error: 'Missing guestId, token, or smsCode' },
-          { status: 400 }
+          { error: 'Guest not found. Please check the card number.' },
+          { status: 404 }
         );
       }
     }
@@ -146,7 +163,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Determine when check-in becomes available
     const checkInAvailableAt = getCheckInStartTime(
       event.date,
       event.checkInStartTime
@@ -154,7 +170,6 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
 
-    // ─── Block check-in if event hasn't started ──────────────────────
     if (now < checkInAvailableAt) {
       const timeUntil = getTimeUntil(checkInAvailableAt);
       const formattedTime = formatCheckInTime(checkInAvailableAt);
@@ -167,20 +182,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Check if already checked in ──────────────────────────────────
-    if (guest.checkedIn) {
+    // ─── DOUBLE CHECK-IN LOGIC ──────────────────────────────────────
+    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const currentCount = guest.checkInCount || 0;
+
+    // ─── Check if already checked in maximum times ──────────────────
+    if (currentCount >= maxCheckIns) {
       return NextResponse.json(
-        { error: 'Guest already checked in' },
+        {
+          error: `Guest already checked in ${currentCount} time${currentCount > 1 ? 's' : ''}. Maximum: ${maxCheckIns}`,
+          checkedIn: true,
+          checkInCount: currentCount,
+          maxCheckIns: maxCheckIns,
+        },
         { status: 400 }
       );
     }
 
     // ─── Mark as checked in ────────────────────────────────────────────
-    await prisma.guest.update({
+    const newCount = currentCount + 1;
+    const isFullyCheckedIn = newCount >= maxCheckIns;
+
+    const updated = await prisma.guest.update({
       where: { id: guest.id },
-      data: { checkedIn: true, checkedInAt: new Date() },
+      data: {
+        checkInCount: newCount,
+        checkedIn: isFullyCheckedIn,
+        checkedInAt: new Date(),
+      },
     });
 
+    // ─── If called with guestId, redirect to success page ─────────────
     if (guestIdFromQuery) {
       return NextResponse.redirect(
         new URL(`/check-in/success?name=${encodeURIComponent(guest.name)}`, req.url)
@@ -192,13 +224,18 @@ export async function POST(req: NextRequest) {
       {
         success: true,
         guest: {
-          id: guest.id,
-          name: guest.name,
-          guestType: guest.guestType || null,
-          email: guest.email || null,
-          phone: guest.phone || null,
-          checkedIn: true,
+          id: updated.id,
+          name: updated.name,
+          cardNumber: updated.cardNumber,
+          guestType: updated.guestType || 'SINGLE',
+          checkInCount: newCount,
+          maxCheckIns: maxCheckIns,
+          fullyCheckedIn: isFullyCheckedIn,
+          checkedInAt: updated.checkedInAt,
         },
+        message: isFullyCheckedIn
+          ? `${updated.name} fully checked in (${newCount}/${maxCheckIns})`
+          : `${updated.name} checked in (${newCount}/${maxCheckIns}) - ${maxCheckIns - newCount} more allowed`,
       },
       {
         headers: {

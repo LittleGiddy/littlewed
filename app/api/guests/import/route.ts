@@ -6,49 +6,42 @@ import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
 
-// ─── Helper: Check WhatsApp using NexSMS ──────────────────────────────
-async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  // Since NexSMS doesn't have a direct WhatsApp check endpoint,
-  // we assume WhatsApp is available and let the send API handle errors.
-  // This is the safest approach - if the number doesn't have WhatsApp,
-  // the send API will return an error and we can fallback to SMS.
-  
-  // For now, return true (will use WhatsApp if available, SMS as fallback)
-  return { hasWhatsApp: true };
-  
-  // If NexSMS adds a number context API in the future, use it here:
-  // try {
-  //   const cleanPhone = phone.replace(/^\+/, '').replace(/\D/g, '');
-  //   const response = await fetch('https://messaging-service.co.tz/api/whatsapp/v2/number/context', {
-  //     method: 'POST',
-  //     headers: {
-  //       'Authorization': `Bearer ${process.env.NEXTSMS_TOKEN}`,
-  //       'Content-Type': 'application/json',
-  //     },
-  //     body: JSON.stringify({ to: [cleanPhone] }),
-  //   });
-  //   const data = await response.json();
-  //   return { hasWhatsApp: data.status === 'valid', waId: data.waId };
-  // } catch (error: any) {
-  //   return { hasWhatsApp: false, error: error.message };
-  // }
+// ─── Helper: Get the next available card number ──────────────────────────
+async function getNextCardNumber(eventId: string): Promise<string> {
+  const guests = await prisma.guest.findMany({
+    where: { eventId },
+    select: { cardNumber: true },
+  });
+
+  const numbers: number[] = [];
+  for (const guest of guests) {
+    if (guest.cardNumber !== null) {
+      const num = parseInt(guest.cardNumber, 10);
+      if (!isNaN(num)) {
+        numbers.push(num);
+      }
+    }
+  }
+
+  numbers.sort((a, b) => a - b);
+
+  let nextNumber = 1;
+  for (const num of numbers) {
+    if (num === nextNumber) {
+      nextNumber++;
+    } else if (num > nextNumber) {
+      break;
+    }
+  }
+
+  return nextNumber.toString().padStart(5, '0');
 }
 
 // ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
 async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const result = await checkWhatsAppNumber(phone);
-      return result;
-    } catch (error: any) {
-      if (i === retries - 1) {
-        return { hasWhatsApp: false, error: error.message };
-      }
-      // Wait before retry
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-  return { hasWhatsApp: false, error: 'Max retries exceeded' };
+  // Since NexSMS doesn't have a direct check endpoint, assume WhatsApp is available
+  // This will use WhatsApp if available, SMS as fallback
+  return { hasWhatsApp: true };
 }
 
 export async function POST(req: NextRequest) {
@@ -73,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // ─── Validate phone numbers and normalize ────────────────────────
+    // ─── Validate phone numbers and normalize ──────────────────────────
     const validGuests: any[] = [];
     let invalidCount = 0;
 
@@ -101,7 +94,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check guest limit ────────────────────────────────────────────
+    // ─── Check guest limit ──────────────────────────────────────────────
     if (!event.tenant?.bypassPayment && event.guestCount) {
       const currentGuests = await prisma.guest.count({ where: { eventId } });
       if (currentGuests + validGuests.length > event.guestCount) {
@@ -112,7 +105,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Duplicate detection using phone ────────────────────────────
+    // ─── Duplicate detection using phone ──────────────────────────────
     const phoneNumbers = validGuests.map((g: any) => g.phone);
     const existingGuests = await prisma.guest.findMany({
       where: {
@@ -145,6 +138,11 @@ export async function POST(req: NextRequest) {
     // ─── Detect WhatsApp for each guest (if enabled) ──────────────────
     let whatsappCount = 0;
     let smsCount = 0;
+
+    // ─── Get next available card number ──────────────────────────────────
+    let nextCardNumber = await getNextCardNumber(eventId);
+    let currentNumber = parseInt(nextCardNumber, 10);
+
     const guestsToInsert = [];
 
     for (const g of uniqueGuests) {
@@ -160,7 +158,6 @@ export async function POST(req: NextRequest) {
             smsCount++;
           }
         } catch (error) {
-          // If check fails, default to SMS
           smsCount++;
           console.log(`WhatsApp check failed for ${g.name}:`, error);
         }
@@ -168,20 +165,29 @@ export async function POST(req: NextRequest) {
         smsCount++;
       }
 
+      // ─── Assign card number ──────────────────────────────────────────────
+      // Use provided card number or generate next available
+      let cardNumber = g.cardNumber || null;
+      if (!cardNumber) {
+        cardNumber = currentNumber.toString().padStart(5, '0');
+        currentNumber++;
+      }
+
       guestsToInsert.push({
         name: g.name.trim(),
         phone: g.phone,
         title: g.title || '',
-        cardNumber: g.cardNumber || null,
+        cardNumber: cardNumber, // ✅ 5-digit numeric
         guestType: g.guestType || 'SINGLE',
         email: null,
         eventId,
         routingChannel,
-        smsCode: randomBytes(4).toString('hex').toUpperCase(),
         qrToken: randomBytes(16).toString('hex'),
+        // ❌ smsCode removed
       });
     }
 
+    // ─── Insert guests in batches ──────────────────────────────────────
     const result = await prisma.guest.createMany({
       data: guestsToInsert,
       skipDuplicates: true,

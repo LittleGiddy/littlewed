@@ -1,14 +1,15 @@
+// app/api/invitations/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateGuestToken, generateQRBuffer, compositeQROnCard } from '@/lib/qr';
+import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
 import { put } from '@vercel/blob';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
-  const title = guest.title || 'Mr';
-  return `${title} ${guest.name}`;
+  const title = guest.title || '';
+  return title ? `${title} ${guest.name}` : guest.name;
 }
 
 export async function POST(req: NextRequest) {
@@ -92,17 +93,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const results = [];
+    const results: { guestId: string; name: string; success: boolean; error?: string; cardUrl?: string }[] = [];
     let completed = 0;
     let failed = 0;
 
     for (const guest of event.guests) {
       try {
-        const token = generateGuestToken(guest.id, eventId);
-        const qrBuffer = await generateQRBuffer(token, qrPosition.size);
+        // ─── 1. Get card number (use guest.cardNumber or generate one) ──
+        const cardNumber = guest.cardNumber || '00000';
+        
+        // ─── 2. Generate QR from card number ────────────────────────────
+        const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size);
+        
+        // ─── 3. Get guest details ──────────────────────────────────────
         const fullName = getGuestFullName(guest);
-        const cardNumber = guest.cardNumber || '';
 
+        // ─── 4. Composite QR on card ───────────────────────────────────
         const finalCardBuffer = await compositeQROnCard(
           cardBuffer,
           qrBuffer,
@@ -112,18 +118,26 @@ export async function POST(req: NextRequest) {
           cardNumber
         );
 
+        // ─── 5. Upload to Vercel Blob ──────────────────────────────────
         const key = `guests/${event.tenantId}/${guest.id}.png`;
         const blob = await put(key, finalCardBuffer, {
           access: 'public',
           contentType: 'image/png',
+          allowOverwrite: true,
         });
 
+        // ─── 6. Update database ────────────────────────────────────────
         await prisma.guest.update({
           where: { id: guest.id },
-          data: { invitationCard: blob.url, qrToken: token },
+          data: { invitationCard: blob.url },
         });
 
-        results.push({ guestId: guest.id, name: fullName, success: true });
+        results.push({ 
+          guestId: guest.id, 
+          name: fullName, 
+          success: true,
+          cardUrl: blob.url,
+        });
         completed++;
       } catch (error: any) {
         console.error(`Failed for ${guest.name}:`, error);
@@ -131,7 +145,7 @@ export async function POST(req: NextRequest) {
           guestId: guest.id,
           name: guest.name,
           success: false,
-          error: error.message,
+          error: error.message || 'Unknown error',
         });
         failed++;
       }

@@ -1,12 +1,33 @@
 'use client';
-import { useRef, useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { QrCode, Key, Loader2, CheckCircle, User, Users, Clock } from 'lucide-react';
+import { 
+  QrCode, Key, Loader2, CheckCircle, XCircle, User, Users, 
+  ArrowLeft, Camera, Smartphone, AlertCircle, Scan, Hash,
+  Info, Clock, Calendar, MapPin, Sparkles, Trash2, Eye, 
+  ChevronRight, Search, Download, UserPlus, UserCheck,
+  CheckCheck, RefreshCw, PartyPopper, Hand, UserRound
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 
-// ─── Sound effects using Web Audio API ────────────────────────────────
+interface Guest {
+  id: string;
+  name: string;
+  title: string | null;
+  cardNumber: string | null;
+  guestType: string | null;
+  checkInCount: number;
+  checkedIn: boolean;
+  checkedInAt: string | null;
+  phone: string | null;
+  routingChannel: string;
+  createdAt: string;
+}
+
+// ─── Sound effects ──────────────────────────────────────────────────────
 const playSound = (type: 'success' | 'fail') => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const oscillator = audioCtx.createOscillator();
@@ -44,31 +65,106 @@ const playSound = (type: 'success' | 'fail') => {
   }
 };
 
+// ─── Helper: Get guest display name ──────────────────────────────────
+const getFullName = (guest: Guest) => {
+  return guest.title ? `${guest.title} ${guest.name}` : guest.name;
+};
+
+// ─── Helper: Get guest type label ─────────────────────────────────────
+const getGuestTypeLabel = (type: string | null) => {
+  if (!type) return 'SINGLE';
+  return type.toUpperCase();
+};
+
+// ─── Helper: Get check-in status ──────────────────────────────────────
+const getCheckInStatus = (guest: Guest) => {
+  const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+  const count = guest.checkInCount || 0;
+  
+  if (count >= maxCheckIns) {
+    return { label: 'Fully Checked In', color: 'text-green-600 bg-green-50', icon: CheckCheck };
+  } else if (count > 0) {
+    return { label: `Partial (${count}/${maxCheckIns})`, color: 'text-amber-600 bg-amber-50', icon: UserCheck };
+  }
+  return { label: 'Not Scanned', color: 'text-gray-400 bg-gray-50', icon: User };
+};
+
 export default function CheckInPage() {
   const searchParams = useSearchParams();
   const eventId = searchParams.get('event');
-  const [mode, setMode] = useState<'qr' | 'manual'>('qr');
-  const [code, setCode] = useState('');
+  const router = useRouter();
+  
+  const [activeTab, setActiveTab] = useState<'scan' | 'data'>('scan');
+  const [cardNumber, setCardNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [guestName, setGuestName] = useState('');
-  const [guestType, setGuestType] = useState('');
-  const [checkedIn, setCheckedIn] = useState(false);
+  const [scannedGuest, setScannedGuest] = useState<Guest | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [blockedMessage, setBlockedMessage] = useState('');
-  const [availableAt, setAvailableAt] = useState('');
-  const [countdown, setCountdown] = useState('');
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [eventInfo, setEventInfo] = useState<{ name: string; venue: string; date: string } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [forceCheckinGuest, setForceCheckinGuest] = useState<Guest | null>(null);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // QR Scanner
+  // ─── Load Data ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (mode !== 'qr') return;
+    if (eventId) {
+      loadEventInfo();
+      loadGuests();
+    }
+  }, [eventId]);
+
+  const loadEventInfo = async () => {
+    try {
+      const res = await fetch(`/api/events/${eventId}`, { credentials: 'include' });
+      const data = await res.json();
+      if (data.event) {
+        setEventInfo({
+          name: data.event.name,
+          venue: data.event.venue,
+          date: new Date(data.event.date).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load event info');
+    }
+  };
+
+  const loadGuests = async () => {
+    setLoadingGuests(true);
+    try {
+      const res = await fetch(`/api/check-in?eventId=${eventId}`, { credentials: 'include' });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setGuests(data);
+      }
+    } catch (error) {
+      toast.error('Failed to load guests');
+    } finally {
+      setLoadingGuests(false);
+    }
+  };
+
+  // ─── QR Scanner ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'scan') return;
     let stream: MediaStream | null = null;
 
     const startCamera = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.setAttribute('playsinline', 'true');
@@ -76,8 +172,7 @@ export default function CheckInPage() {
           setScanning(true);
         }
       } catch (err) {
-        toast.error('Camera access denied or not available');
-        setMode('manual');
+        toast.error('Camera access denied');
       }
     };
     startCamera();
@@ -88,7 +183,7 @@ export default function CheckInPage() {
       }
       setScanning(false);
     };
-  }, [mode]);
+  }, [activeTab]);
 
   const scanFrame = () => {
     if (!videoRef.current || !canvasRef.current || !scanning) return;
@@ -107,11 +202,10 @@ export default function CheckInPage() {
     const qr = jsQR(imageData.data, canvas.width, canvas.height);
     if (qr) {
       if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
       setScanning(false);
-      processCheckinWithToken(qr.data);
+      processCheckin(qr.data);
     } else {
       requestAnimationFrame(scanFrame);
     }
@@ -123,85 +217,81 @@ export default function CheckInPage() {
     }
   }, [scanning]);
 
-  // ─── Countdown Timer ────────────────────────────────────────────────
-  useEffect(() => {
-    if (!availableAt) {
-      setCountdown('');
-      return;
-    }
-
-    const timer = setInterval(() => {
-      const target = new Date(availableAt);
-      const now = new Date();
-      const diff = target.getTime() - now.getTime();
-
-      if (diff <= 0) {
-        setCountdown('🟢 Available now! Refresh to check in.');
-        clearInterval(timer);
-        return;
-      }
-
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown(
-        `${hours.toString().padStart(2, '0')}:${minutes
-          .toString()
-          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [availableAt]);
-
-  // ─── Core Functions ──────────────────────────────────────────────────
-  const processCheckinWithToken = async (token: string) => {
+  // ─── Process Check-in ──────────────────────────────────────────────
+  const processCheckin = async (value: string) => {
     setLoading(true);
     setMessage('');
-    setBlockedMessage('');
-    setAvailableAt('');
-    setCheckedIn(false);
+    setShowSuccess(false);
+    setScannedGuest(null);
+    
     try {
+      const cleanValue = value.trim().padStart(5, '0');
+      
       const res = await fetch('/api/check-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ cardNumber: cleanValue }),
         credentials: 'include',
       });
+      
       const data = await res.json();
-
-      // ─── Event hasn't started yet ──────────────────────────────────────
-      if (res.status === 403 && data.availableAt) {
-        setBlockedMessage(data.error);
-        setAvailableAt(data.availableAt);
-        playSound('fail');
-        toast.error('Check-in not available yet');
-        return;
-      }
-
+      
       if (res.ok) {
+        const guest = data.guest;
+        const isFullyCheckedIn = guest.fullyCheckedIn;
+        const maxCheckIns = guest.maxCheckIns || 1;
+        const currentCount = guest.checkInCount || 1;
+        const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
         playSound('success');
-        setCheckedIn(true);
-        setGuestName(data.guest.name);
-        setGuestType(data.guest.guestType || '—');
-        setMessage('✅ Checked in');
-        toast.success(`Welcome, ${data.guest.name}!`);
+        setScannedGuest(guest);
+        setShowSuccess(true);
+        setMessage(data.message || 'Checked in successfully');
+        
+        // ─── Modern toast with Lucide icons ──────────────────────────────
+        if (isFullyCheckedIn && maxCheckIns > 1) {
+          toast.success(`${fullName} fully checked in (${currentCount}/${maxCheckIns})`, {
+            duration: 4000,
+            icon: <CheckCheck size={20} className="text-green-600" />,
+          });
+        } else if (maxCheckIns > 1 && !isFullyCheckedIn) {
+          toast.success(`${fullName} checked in (${currentCount}/${maxCheckIns})`, {
+            duration: 4000,
+            icon: <UserCheck size={20} className="text-amber-500" />,
+          });
+        } else {
+          toast.success(`Welcome ${fullName}`, {
+            duration: 4000,
+            icon: <Hand size={20} className="text-green-600" />,
+          });
+        }
+        
+        loadGuests();
+        
         setTimeout(() => {
-          setCheckedIn(false);
+          setShowSuccess(false);
+          setScannedGuest(null);
           setMessage('');
-          setGuestName('');
-          setGuestType('');
-        }, 5000);
+          setCardNumber('');
+          if (activeTab === 'scan') {
+            setScanning(true);
+            requestAnimationFrame(scanFrame);
+          }
+        }, 4000);
       } else {
         playSound('fail');
-        setMessage(`❌ ${data.error}`);
-        toast.error(data.error);
+        setMessage(data.error || 'Check-in failed');
+        toast.error(data.error || 'Check-in failed', {
+          icon: <XCircle size={20} className="text-red-500" />,
+        });
+        setShowSuccess(false);
       }
-    } catch {
+    } catch (error) {
       playSound('fail');
-      setMessage('❌ Network error');
-      toast.error('Network error');
+      setMessage('Network error');
+      toast.error('Network error', {
+        icon: <AlertCircle size={20} className="text-red-500" />,
+      });
     } finally {
       setLoading(false);
     }
@@ -209,229 +299,522 @@ export default function CheckInPage() {
 
   const handleManualCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code) return;
-    setLoading(true);
-    setMessage('');
-    setBlockedMessage('');
-    setAvailableAt('');
-    setCheckedIn(false);
+    if (!cardNumber || cardNumber.length !== 5) {
+      toast.error('Please enter a valid 5-digit card number', {
+        icon: <AlertCircle size={18} className="text-amber-500" />,
+      });
+      return;
+    }
+    await processCheckin(cardNumber);
+    setCardNumber('');
+  };
+
+  // ─── Force Check-in ──────────────────────────────────────────────────
+  const handleForceCheckin = async (guest: Guest) => {
+    if (!guest) return;
+    
     try {
-      const res = await fetch('/api/check-in', {
-        method: 'POST',
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smsCode: code }),
+        body: JSON.stringify({ checkedIn: true }),
         credentials: 'include',
       });
-      const data = await res.json();
-
-      // ─── Event hasn't started yet ──────────────────────────────────────
-      if (res.status === 403 && data.availableAt) {
-        setBlockedMessage(data.error);
-        setAvailableAt(data.availableAt);
-        playSound('fail');
-        toast.error('Check-in not available yet');
-        setCode('');
-        return;
-      }
-
+      
       if (res.ok) {
-        playSound('success');
-        setCheckedIn(true);
-        setGuestName(data.guest.name);
-        setGuestType(data.guest.guestType || '—');
-        setMessage('✅ Checked in');
-        toast.success(`Welcome, ${data.guest.name}!`);
-        setCode('');
-        setTimeout(() => {
-          setCheckedIn(false);
-          setMessage('');
-          setGuestName('');
-          setGuestType('');
-        }, 5000);
+        const fullName = getFullName(guest);
+        toast.success(`${fullName} force checked in`, {
+          icon: <UserCheck size={18} className="text-amber-500" />,
+        });
+        loadGuests();
+        setForceCheckinGuest(null);
       } else {
-        playSound('fail');
-        setMessage(`❌ ${data.error}`);
-        toast.error(data.error);
+        const data = await res.json();
+        toast.error(data.error || 'Failed to force check in', {
+          icon: <XCircle size={18} className="text-red-500" />,
+        });
       }
-    } catch {
-      playSound('fail');
-      setMessage('❌ Network error');
-      toast.error('Network error');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      toast.error('Network error', {
+        icon: <AlertCircle size={18} className="text-red-500" />,
+      });
     }
   };
 
-  if (!eventId) return <div className="p-4 text-center">Missing event ID</div>;
+  // ─── Delete Guest ──────────────────────────────────────────────────
+  const handleDeleteGuest = async (guest: Guest) => {
+    try {
+      const res = await fetch(`/api/guests/${guest.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      if (res.ok) {
+        const fullName = getFullName(guest);
+        toast.success(`${fullName} deleted`, {
+          icon: <Trash2 size={18} className="text-red-500" />,
+        });
+        loadGuests();
+        setSelectedGuest(null);
+        setShowDeleteConfirm(false);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete guest', {
+          icon: <XCircle size={18} className="text-red-500" />,
+        });
+      }
+    } catch (error) {
+      toast.error('Network error', {
+        icon: <AlertCircle size={18} className="text-red-500" />,
+      });
+    }
+  };
+
+  // ─── Filter guests ──────────────────────────────────────────────────
+  const filteredGuests = guests.filter(g => {
+    const name = getFullName(g).toLowerCase();
+    const card = g.cardNumber || '';
+    return name.includes(searchTerm.toLowerCase()) || card.includes(searchTerm);
+  });
+
+  // ─── Stats ──────────────────────────────────────────────────────────
+  const totalGuests = guests.length;
+  const fullyCheckedIn = guests.filter(g => {
+    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    return (g.checkInCount || 0) >= max;
+  }).length;
+  const partiallyCheckedIn = guests.filter(g => {
+    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    return (g.checkInCount || 0) > 0 && (g.checkInCount || 0) < max;
+  }).length;
+  const notCheckedIn = totalGuests - fullyCheckedIn - partiallyCheckedIn;
+
+  if (!eventId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
+        <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm text-center">
+          <AlertCircle size={48} className="text-red-500 mx-auto mb-3" />
+          <h2 className="font-semibold text-lg text-gray-800">Missing Event ID</h2>
+          <p className="text-sm text-gray-500 mt-1">Please select an event first.</p>
+          <button
+            onClick={() => router.push('/client/dashboard')}
+            className="mt-4 px-6 py-2 bg-[#0D4F4F] text-white rounded-xl font-medium"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
-      <Link
-        href={`/client/events/${eventId}`}
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
-      >
-        ← Back to Event
-      </Link>
-
-      <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 mb-2">
-        Venue Check‑in
-      </h1>
-      <p className="text-gray-500 text-sm mb-6">
-        Scan guest QR code or enter 6‑digit SMS code
-      </p>
-
-      {/* Mode Toggle */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setMode('qr')}
-          className={`flex-1 py-2 rounded-xl font-semibold transition ${
-            mode === 'qr'
-              ? 'bg-[#0D4F4F] text-white shadow-md'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-lg mx-auto px-4 py-6">
+        {/* ─── Back Button ─── */}
+        <Link
+          href={`/client/events/${eventId}`}
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.06)] mb-4"
         >
-          <QrCode size={16} className="inline mr-1" /> QR Scanner
-        </button>
-        <button
-          onClick={() => setMode('manual')}
-          className={`flex-1 py-2 rounded-xl font-semibold transition ${
-            mode === 'manual'
-              ? 'bg-[#0D4F4F] text-white shadow-md'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          <Key size={16} className="inline mr-1" /> Manual Code
-        </button>
-      </div>
+          <ArrowLeft size={14} /> Back to Event
+        </Link>
 
-      {/* QR Scanner */}
-      {mode === 'qr' && (
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 overflow-hidden">
-          <div className="relative rounded-xl overflow-hidden bg-black aspect-video">
-            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
-            <canvas ref={canvasRef} className="hidden" />
-            {!scanning && !loading && (
-              <div className="absolute inset-0 flex items-center justify-center text-white bg-black/40">
-                <Loader2 size={32} className="animate-spin" />
+        {/* ─── Event Info ─── */}
+        {eventInfo && (
+          <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 shadow-sm">
+            <div className="flex items-center gap-2 text-sm">
+              <Sparkles size={14} className="text-[#E8A598]" />
+              <span className="font-semibold text-gray-800 truncate">{eventInfo.name}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 mt-0.5">
+              <span className="flex items-center gap-1"><Calendar size={11} /> {eventInfo.date}</span>
+              <span className="flex items-center gap-1"><MapPin size={11} /> {eventInfo.venue}</span>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Tabs ─── */}
+        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-4 shadow-sm">
+          <button
+            onClick={() => setActiveTab('scan')}
+            className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-2 ${
+              activeTab === 'scan' 
+                ? 'bg-[#0D4F4F] text-white shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <Scan size={16} /> Scan
+          </button>
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-2 ${
+              activeTab === 'data' 
+                ? 'bg-[#0D4F4F] text-white shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            <Users size={16} /> Data
+          </button>
+        </div>
+
+        {/* ─── Scan Tab ─── */}
+        {activeTab === 'scan' && (
+          <>
+            {/* QR Scanner */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+              <div className="relative rounded-xl overflow-hidden bg-black aspect-square">
+                <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
+                <canvas ref={canvasRef} className="hidden" />
+                {!scanning && !loading && (
+                  <div className="absolute inset-0 flex items-center justify-center text-white bg-black/40">
+                    <Camera size={32} className="animate-pulse" />
+                  </div>
+                )}
+                {loading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <Loader2 size={32} className="animate-spin text-white" />
+                  </div>
+                )}
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-white/50 rounded-lg">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#E8A598] rounded-tl" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#E8A598] rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#E8A598] rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#E8A598] rounded-br" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-center text-sm text-gray-500 mt-3">
+                Position QR code in the frame
+              </p>
+            </div>
+
+            {/* Manual Entry */}
+            <div className="mt-4 bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Key size={16} className="text-[#0D4F4F]" />
+                <span className="font-medium text-sm text-gray-700">Manual Entry</span>
+              </div>
+              <form onSubmit={handleManualCheckIn} className="flex gap-2">
+                <input
+                  type="text"
+                  value={cardNumber}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 5);
+                    setCardNumber(val);
+                  }}
+                  className="flex-1 p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                  placeholder="00000"
+                  maxLength={5}
+                />
+                <button
+                  type="submit"
+                  disabled={loading || cardNumber.length !== 5}
+                  className="px-4 py-2 bg-[#0D4F4F] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  Check In
+                </button>
+              </form>
+            </div>
+
+            {/* ─── Success Message ─── */}
+            {message && (
+              <div
+                className={`mt-4 p-4 rounded-2xl text-center font-medium transition-all ${
+                  showSuccess
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}
+              >
+                {message}
               </div>
             )}
-          </div>
-          {scanning && (
-            <p className="text-center text-sm text-gray-500 mt-2">
-              Position QR code in the frame
-            </p>
-          )}
-        </div>
-      )}
 
-      {/* Manual Code Entry */}
-      {mode === 'manual' && (
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-          <form onSubmit={handleManualCheckIn} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                6‑digit code
-              </label>
+            {/* ─── Scanned Guest Details ─── */}
+            {scannedGuest && showSuccess && (
+              <div className="mt-4 bg-white rounded-2xl shadow-lg border border-green-200 p-4 animate-fadeInUp">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle size={20} className="text-green-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-800 truncate">{getFullName(scannedGuest)}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="font-mono">#{scannedGuest.cardNumber}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        scannedGuest.guestType?.toUpperCase() === 'DOUBLE' 
+                          ? 'bg-purple-100 text-purple-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {getGuestTypeLabel(scannedGuest.guestType)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right text-xs">
+                    <span className="text-green-600 font-medium">
+                      {scannedGuest.checkInCount || 1}/{scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ─── Data Tab ─── */}
+        {activeTab === 'data' && (
+          <>
+            {/* ─── Stats ─── */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-2.5 text-center shadow-sm">
+                <p className="text-lg font-bold text-gray-800">{totalGuests}</p>
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-2.5 text-center shadow-sm">
+                <p className="text-lg font-bold text-green-600">{fullyCheckedIn}</p>
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Fully In</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-2.5 text-center shadow-sm">
+                <p className="text-lg font-bold text-amber-500">{partiallyCheckedIn}</p>
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Partial</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-2.5 text-center shadow-sm">
+                <p className="text-lg font-bold text-gray-400">{notCheckedIn}</p>
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Not In</p>
+              </div>
+            </div>
+
+            {/* ─── Search ─── */}
+            <div className="relative mb-4">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                value={code}
-                onChange={(e) =>
-                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                }
-                className="w-full p-3 text-center text-2xl tracking-widest font-mono border rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                placeholder="000000"
-                maxLength={6}
-                required
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by name or card number..."
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent text-sm"
               />
             </div>
-            <button
-              type="submit"
-              disabled={loading || code.length !== 6}
-              className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
-              {loading ? 'Checking...' : 'Check In'}
-            </button>
-          </form>
-        </div>
-      )}
 
-      {/* Result Message */}
-      {message && (
-        <div
-          className={`mt-6 p-4 rounded-2xl text-center font-medium transition-all duration-500 ${
-            message.includes('✅')
-              ? 'bg-green-100 text-green-800 border border-green-300'
-              : 'bg-red-100 text-red-800 border border-red-300'
-          }`}
-        >
-          {message}
-        </div>
-      )}
+            {/* ─── Guest List ─── */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              {loadingGuests ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 size={24} className="animate-spin text-[#0D4F4F]" />
+                </div>
+              ) : filteredGuests.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <Users size={32} className="mx-auto mb-2 text-gray-300" />
+                  <p className="font-medium">No guests found</p>
+                  <p className="text-sm text-gray-400">Try adjusting your search</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
+                  {filteredGuests.map((guest) => {
+                    const status = getCheckInStatus(guest);
+                    const StatusIcon = status.icon;
+                    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+                    const count = guest.checkInCount || 0;
+                    const isFullyCheckedIn = count >= maxCheckIns;
 
-      {/* ─── Blocked Message - Event hasn't started ──────────────────── */}
-      {blockedMessage && availableAt && (
-        <div className="mt-6 p-6 rounded-2xl text-center bg-amber-50 border border-amber-200">
-          <div className="flex flex-col items-center gap-3">
-            <Clock size={48} className="text-amber-500" />
-            <h3 className="text-lg font-bold text-amber-800">
-              Check-in Not Available Yet
-            </h3>
-            <p className="text-amber-700">{blockedMessage}</p>
-            {countdown && (
-              <>
-                <p className="text-3xl font-mono font-bold text-amber-800">
-                  {countdown}
-                </p>
-                <p className="text-sm text-amber-600">until check-in opens</p>
-              </>
-            )}
-            <p className="text-sm text-amber-600 mt-2">
-              ⏰ Please wait until the event starts to check in.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Guest Details on Check‑in Success */}
-      {checkedIn && (
-        <div className="mt-6 bg-white rounded-2xl shadow-lg border border-gray-100 p-6 animate-fadeInUp">
-          <div className="flex items-center gap-3 mb-2">
-            <CheckCircle size={28} className="text-green-600" />
-            <h2 className="text-xl font-bold text-gray-800">Welcome!</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-              <User size={20} className="text-[#0D4F4F]" />
-              <span className="font-medium">{guestName}</span>
+                    return (
+                      <div
+                        key={guest.id}
+                        className={`px-3 py-2.5 hover:bg-gray-50 transition cursor-pointer ${
+                          isFullyCheckedIn ? 'bg-green-50/30' : ''
+                        }`}
+                        onClick={() => setSelectedGuest(guest)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                            {guest.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-800 text-sm truncate">
+                              {getFullName(guest)}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-mono text-gray-400">#{guest.cardNumber}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                guest.guestType?.toUpperCase() === 'DOUBLE' 
+                                  ? 'bg-purple-100 text-purple-700' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {getGuestTypeLabel(guest.guestType)}
+                              </span>
+                              {guest.routingChannel === 'whatsapp' && (
+                                <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                  WA
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${status.color}`}>
+                              <StatusIcon size={10} />
+                              {isFullyCheckedIn ? '✓✓' : count > 0 ? `${count}/${maxCheckIns}` : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-              <Users size={20} className="text-[#0D4F4F]" />
-              <span className="font-medium">
-                {guestType === 'single' ? 'Single' : guestType === 'double' ? 'Double' : guestType || '—'}
-              </span>
+          </>
+        )}
+      </div>
+
+      {/* ─── Guest Detail Modal ─── */}
+      {selectedGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedGuest(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-800">Guest Details</h3>
+              <button onClick={() => setSelectedGuest(null)} className="text-gray-400 hover:text-gray-600">
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                  {selectedGuest.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-gray-800">{getFullName(selectedGuest)}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="font-mono">#{selectedGuest.cardNumber}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      selectedGuest.guestType?.toUpperCase() === 'DOUBLE' 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {getGuestTypeLabel(selectedGuest.guestType)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-400">Check-in Status</p>
+                  <p className="font-medium">
+                    {selectedGuest.checkInCount || 0}/{selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-400">Channel</p>
+                  <p className="font-medium capitalize">{selectedGuest.routingChannel || 'SMS'}</p>
+                </div>
+                {selectedGuest.phone && (
+                  <div className="bg-gray-50 rounded-lg p-2 col-span-2">
+                    <p className="text-[10px] text-gray-400">Phone</p>
+                    <p className="font-medium text-sm">{selectedGuest.phone}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setForceCheckinGuest(selectedGuest);
+                    setSelectedGuest(null);
+                  }}
+                  className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5"
+                >
+                  <UserCheck size={14} /> Force Check-in
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(true);
+                    setSelectedGuest(null);
+                  }}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              </div>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">
-            Checked in successfully – enjoy the event!
-          </p>
+        </div>
+      )}
+
+      {/* ─── Force Check-in Confirm ─── */}
+      {forceCheckinGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
+                <UserCheck size={24} className="text-amber-600" />
+              </div>
+              <h3 className="font-bold text-gray-800">Force Check-in?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
+                <br />
+                <span className="text-xs text-gray-400">This will mark them as checked in regardless of card type.</span>
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => setForceCheckinGuest(null)}
+                  className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleForceCheckin(forceCheckinGuest)}
+                  className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Delete Confirm ─── */}
+      {showDeleteConfirm && selectedGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+                <Trash2 size={24} className="text-red-600" />
+              </div>
+              <h3 className="font-bold text-gray-800">Delete Guest?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Are you sure you want to delete <span className="font-semibold">{getFullName(selectedGuest)}</span>?
+                <br />
+                <span className="text-xs text-red-500">This action cannot be undone.</span>
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setSelectedGuest(null);
+                  }}
+                  className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteGuest(selectedGuest)}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       <style jsx global>{`
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fadeInUp {
-          animation: fadeInUp 0.4s ease-out forwards;
-        }
+        .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; }
       `}</style>
     </div>
   );

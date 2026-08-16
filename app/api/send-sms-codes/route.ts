@@ -1,77 +1,145 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { sendSMS } from '@/lib/sms/index';
 
-async function generateUniqueCode(): Promise<string> {
-  let code = '';
-  let exists = true;
-  while (exists) {
-    code = Math.floor(100000 + Math.random() * 900000).toString();
-    const existing = await prisma.guest.findUnique({ where: { smsCode: code } });
-    exists = !!existing;
-  }
-  return code;
-}
-
-export async function POST(req: NextRequest) {
-  const AT_USERNAME = process.env.AT_USERNAME;
-  const AT_API_KEY = process.env.AT_API_KEY;
-  const AT_SENDER_ID = process.env.AT_SENDER_ID;
-
-  if (!AT_USERNAME || !AT_API_KEY || !AT_SENDER_ID) {
-    console.error('Missing Africa\'s Talking credentials');
-    return NextResponse.json({ error: 'SMS service not configured' }, { status: 500 });
-  }
-
-  const africastalking = require('africastalking');
-  const at = africastalking({ username: AT_USERNAME, apiKey: AT_API_KEY });
-  const sms = at.SMS;
-
-  const session = await getServerSession();
-  if (!session || (session.user as any).role !== 'CLIENT') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const tenantId = (session.user as any).tenantId;
-  const { eventId } = await req.json();
-
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, tenantId },
-    include: { guests: true },
+// ─── Helper: Generate a unique 5-digit card number ──────────────────────
+async function generateUniqueCardNumber(eventId: string): Promise<string> {
+  const guests = await prisma.guest.findMany({
+    where: { eventId },
+    select: { cardNumber: true },
   });
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-  const customMessage = event.customMessage || "You're invited!";
-
-  const results = [];
-  for (const guest of event.guests) {
-    if (guest.phone && !guest.smsCode) {
-      try {
-        const smsCode = await generateUniqueCode();
-        await prisma.guest.update({ where: { id: guest.id }, data: { smsCode } });
-
-        const message = `${customMessage} Hello ${guest.name}, your entry code for ${event.name} is: ${smsCode}. Please show this at the entrance.`;
-        const formattedPhone = guest.phone.startsWith('+') ? guest.phone : `+${guest.phone}`;
-
-        const result: any = await sms.send({
-          to: formattedPhone,
-          message,
-          from: AT_SENDER_ID,
-        });
-
-        const recipient = result?.SMSMessageData?.Recipients?.[0];
-        if (!recipient || recipient.status !== 'Success') {
-          throw new Error(recipient?.status || result?.SMSMessageData?.Message || 'SMS failed');
-        }
-
-        results.push({ guestId: guest.id, success: true });
-      } catch (error: any) {
-        console.error(`Failed for ${guest.name}:`, error.message);
-        results.push({ guestId: guest.id, success: false, error: error.message });
+  const numbers: number[] = [];
+  for (const guest of guests) {
+    if (guest.cardNumber !== null) {
+      const num = parseInt(guest.cardNumber, 10);
+      if (!isNaN(num)) {
+        numbers.push(num);
       }
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
 
-  return NextResponse.json({ success: true, results });
+  numbers.sort((a, b) => a - b);
+
+  let nextNumber = 1;
+  for (const num of numbers) {
+    if (num === nextNumber) {
+      nextNumber++;
+    } else if (num > nextNumber) {
+      break;
+    }
+  }
+
+  return nextNumber.toString().padStart(5, '0');
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const tenantId = (session.user as any).tenantId;
+    const { eventId } = await req.json();
+
+    if (!eventId) {
+      return NextResponse.json({ error: 'Event ID required' }, { status: 400 });
+    }
+
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, tenantId },
+      include: { guests: true },
+    });
+
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    const customMessage = event.customMessage || "You're invited!";
+
+    // ─── Filter guests without card numbers ──────────────────────────────
+    const guestsWithoutCard = event.guests.filter(g => !g.cardNumber);
+
+    if (guestsWithoutCard.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'All guests already have card numbers',
+        results: [],
+      });
+    }
+
+    const results = [];
+
+    for (const guest of guestsWithoutCard) {
+      if (!guest.phone) {
+        results.push({
+          guestId: guest.id,
+          name: guest.name,
+          success: false,
+          error: 'No phone number',
+        });
+        continue;
+      }
+
+      try {
+        // ─── Generate unique card number ──────────────────────────────────
+        const cardNumber = await generateUniqueCardNumber(eventId);
+
+        // ─── Update guest with card number ────────────────────────────────
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { cardNumber },
+        });
+
+        // ─── Prepare message ──────────────────────────────────────────────
+        const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+        const message = `${customMessage} Hello ${fullName}, your entry card number for ${event.name} is: ${cardNumber}. Please show this at the entrance.`;
+
+        // ─── Send SMS via NexSMS ──────────────────────────────────────────
+        const result = await sendSMS({
+          to: guest.phone,
+          message: message,
+        });
+
+        if (result.success) {
+          results.push({
+            guestId: guest.id,
+            name: guest.name,
+            cardNumber: cardNumber,
+            success: true,
+          });
+        } else {
+          throw new Error(result.error || 'SMS sending failed');
+        }
+      } catch (error: any) {
+        console.error(`Failed for ${guest.name}:`, error.message);
+        results.push({
+          guestId: guest.id,
+          name: guest.name,
+          success: false,
+          error: error.message || 'Unknown error',
+        });
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    const successCount = results.filter(r => r.success).length;
+
+    return NextResponse.json({
+      success: true,
+      message: `Sent ${successCount} of ${results.length} card numbers`,
+      results,
+    });
+  } catch (error: any) {
+    console.error('Send SMS codes error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to send SMS codes' },
+      { status: 500 }
+    );
+  }
 }

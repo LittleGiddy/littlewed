@@ -132,7 +132,6 @@ model Event {
   time        String?  // e.g., "5:00 PM"
   imageUrl    String?  // Header image URL
 
-  
   // Invitation card fields
   templateCardUrl  String?
   qrPlacementX     Float?
@@ -209,8 +208,9 @@ model Guest {
   attending      String    @default("pending")
   checkedIn      Boolean   @default(false)
   checkedInAt    DateTime?
-  smsCode        String?   @unique
   invitationCard String?
+  checkInCount   Int       @default(0)  // ✅ Track number of check-ins
+  maxCheckIns    Int       @default(1)  // ✅ 1 for SINGLE, 2 for DOUBLE
   qrToken        String?
   routingChannel String    @default("sms") @map("routing_channel")
   eventId        String
@@ -221,17 +221,17 @@ model Guest {
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
-  guestType  String?  // 'single', 'double', or any custom value
+  guestType  String?       // 'single', 'double', or any custom value
   title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
-  cardNumber     String?   @unique       // e.g., "G-001", "G-002"
+  cardNumber     String?   @unique       // ✅ 5-digit numeric code (e.g., "00001", "23790")
   waId           String?   // WhatsApp ID from Meta
 
   // ─── Relations ──────────────────────────────────────────────────────────
-  messageLogs MessageLog[]  // ✅ ADDED: Relation to message logs
-  
+  messageLogs MessageLog[]
+
   @@index([eventId])
   @@index([phone])
-  @@index([smsCode])
+  @@index([cardNumber])  // ✅ Added index for faster lookups
 }
 
 model UsageRecord {
@@ -306,7 +306,7 @@ model IncomingEmail {
 
 model MessageLog {
   id          String   @id @default(cuid())
-  messageId   String   @unique  // The ID from NexSMS/WhatsApp
+  messageId   String   @unique
   guestId     String?
   guest       Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
   type        String   // WHATSAPP, SMS

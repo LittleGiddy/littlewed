@@ -6,7 +6,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Eye, EyeOff, Undo, Redo,
   Lock, Unlock, BringToFront, SendToBack, Grid, ChevronDown, ChevronRight,
-  Settings, QrCode, User, Users, UserCheck, Hash
+  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -83,23 +83,15 @@ export default function InvitationDesigner() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [overlayColor, setOverlayColor] = useState('#000000');
   const [overlayOpacity, setOverlayOpacity] = useState(0.2);
-
-  // QR
   const [qrX, setQrX] = useState(100);
   const [qrY, setQrY] = useState(100);
   const [qrSize, setQrSize] = useState(200);
   const [qrColor, setQrColor] = useState('#000000');
-
-  // Layers
   const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null);
-
-  // Undo/Redo
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const MAX_HISTORY = 30;
-
-  // UI state
   const [showGrid, setShowGrid] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -109,7 +101,6 @@ export default function InvitationDesigner() {
     overlay: false,
     qr: false,
   });
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -127,7 +118,6 @@ export default function InvitationDesigner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── History helpers ──────────────────────────────────────────────────
-
   const pushHistory = useCallback((newLayers: any[]) => {
     const snapshot = JSON.parse(JSON.stringify(newLayers));
     const newHistory = history.slice(0, historyIndex + 1);
@@ -158,23 +148,16 @@ export default function InvitationDesigner() {
   }, [historyIndex, history]);
 
   // ─── Keyboard shortcuts ──────────────────────────────────────────────
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault();
-        undo();
-      } else if (e.ctrlKey && e.key === 'y') {
-        e.preventDefault();
-        redo();
-      }
+      if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+      else if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
   // ─── Load data ──────────────────────────────────────────────────────────
-
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -227,7 +210,6 @@ export default function InvitationDesigner() {
   }, [eventId]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
-
   const selectTemplate = (template: any) => {
     setSelectedTemplateId(template.id);
     setTemplateUrl(template.imageUrl);
@@ -246,6 +228,7 @@ export default function InvitationDesigner() {
       if (res.ok) {
         setTemplateUrl(data.url);
         setSelectedTemplateId(null);
+        toast.success('Background uploaded successfully');
       } else toast.error('Upload failed');
     } catch { toast.error('Network error'); }
     setUploading(false);
@@ -273,7 +256,7 @@ export default function InvitationDesigner() {
         }),
       });
       if (res.ok) {
-        toast.success('Settings saved');
+        toast.success('Settings saved successfully');
         router.push(`/client/invitations/send/${eventId}`);
       } else {
         const data = await res.json();
@@ -284,7 +267,6 @@ export default function InvitationDesigner() {
   };
 
   // ─── Layer operations with history ──────────────────────────────────
-
   const setLayersWithHistory = (newLayers: any[]) => {
     setLayers(newLayers);
     pushHistory(newLayers);
@@ -302,7 +284,7 @@ export default function InvitationDesigner() {
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
-    toast.success('Guest name layer added!');
+    toast.success('Guest name layer added');
   };
 
   const addGuestTitleLayer = () => {
@@ -310,7 +292,7 @@ export default function InvitationDesigner() {
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
-    toast.success('Guest title layer added!');
+    toast.success('Guest title layer added');
   };
 
   const addCardNumberLayer = () => {
@@ -318,7 +300,7 @@ export default function InvitationDesigner() {
     const newLayers = [...layers, newLayer];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(newLayers.length - 1);
-    toast.success('Card number layer added!');
+    toast.success('Card number layer added');
   };
 
   const addRectLayer = () => {
@@ -336,11 +318,14 @@ export default function InvitationDesigner() {
   };
 
   const deleteLayer = (index: number) => {
+    if (layers[index]?.locked) {
+      toast.error('Layer is locked');
+      return;
+    }
     const newLayers = [...layers];
     newLayers.splice(index, 1);
     setLayersWithHistory(newLayers);
-    if (selectedLayerIndex === index) setSelectedLayerIndex(null);
-    else if (selectedLayerIndex !== null && selectedLayerIndex > index) setSelectedLayerIndex(selectedLayerIndex - 1);
+    setSelectedLayerIndex(null);
   };
 
   const duplicateLayer = (index: number) => {
@@ -406,7 +391,6 @@ export default function InvitationDesigner() {
   };
 
   // ─── Drag handlers ──────────────────────────────────────────────────
-
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     if (!canvasRef.current) return;
@@ -492,7 +476,6 @@ export default function InvitationDesigner() {
   const endDrag = () => setDragging(null);
 
   // ─── Resize handlers ──────────────────────────────────────────────────
-
   const startResize = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     e.stopPropagation();
@@ -539,7 +522,6 @@ export default function InvitationDesigner() {
   const endResize = () => setResizing(null);
 
   // ─── Render layer ─────────────────────────────────────────────────────
-
   const renderLayer = (layer: any, index: number) => {
     if (!layer.visible) return null;
     const isSelected = index === selectedLayerIndex;
@@ -698,8 +680,14 @@ export default function InvitationDesigner() {
   };
 
   // ─── Render ────────────────────────────────────────────────────────────
-
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" /></div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <p className="text-sm text-gray-400">Loading designer...</p>
+      </div>
+    );
+  }
 
   const selectedLayer = selectedLayerIndex !== null ? layers[selectedLayerIndex] : null;
 
@@ -725,239 +713,296 @@ export default function InvitationDesigner() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="font-serif text-3xl font-black text-gray-900">Invitation Designer</h1>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h1 className="font-serif text-3xl font-black text-gray-900">Invitation Designer</h1>
+          <p className="text-sm text-gray-500">Design your card with text, shapes, and QR code</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`p-2 rounded-lg ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100'}`}
+            className={`p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             title="Toggle grid"
           >
             <Grid size={18} />
           </button>
           <button
             onClick={() => setSnapToGrid(!snapToGrid)}
-            className={`p-2 rounded-lg ${snapToGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100'}`}
+            className={`p-2 rounded-lg transition ${snapToGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             title="Snap to grid"
           >
             <Grid size={18} />
           </button>
-          <button onClick={undo} disabled={historyIndex <= 0} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-40"><Undo size={18} /></button>
-          <button onClick={redo} disabled={historyIndex >= history.length - 1} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-40"><Redo size={18} /></button>
+          <button
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo size={18} />
+          </button>
+          <button
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo size={18} />
+          </button>
         </div>
       </div>
-      <p className="text-gray-500 mb-6">Design your card with text, shapes, and QR code. Drag to position, click to edit.</p>
 
       {/* Template Gallery */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-800 flex items-center gap-2"><ImageIcon size={18} className="text-[#0D4F4F]" /> Choose a Template</h2>
-          <div className="flex gap-2">
-            <label className="cursor-pointer bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+            <ImageIcon size={18} className="text-[#0D4F4F]" /> Choose a Template
+          </h2>
+          <div className="flex gap-2 flex-wrap">
+            <label className="cursor-pointer bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-2">
               <Upload size={14} /> Upload
               <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" ref={fileInputRef} />
             </label>
+            {uploading && <Loader2 size={18} className="animate-spin text-[#0D4F4F]" />}
             {templateUrl && (
-              <button onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }} className="bg-gray-100 text-gray-600 px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-gray-200 transition flex items-center gap-1">
+              <button
+                onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
+                className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 transition flex items-center gap-2"
+              >
                 <Trash2 size={14} /> Remove
               </button>
             )}
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {templates.map((t) => (
-            <div
-              key={t.id}
-              onClick={() => selectTemplate(t)}
-              className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'}`}
-            >
-              <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                <p className="text-white text-xs font-medium">{t.name}</p>
-              </div>
-              {selectedTemplateId === t.id && (
-                <div className="absolute top-2 right-2 bg-[#0D4F4F] rounded-full p-1">
-                  <Check size={12} className="text-white" />
+        {templates.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
+            <p>No templates available. Upload your own background.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {templates.map((t) => (
+              <div
+                key={t.id}
+                onClick={() => selectTemplate(t)}
+                className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'}`}
+              >
+                <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                  <p className="text-white text-xs font-medium truncate">{t.name}</p>
                 </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {templateUrl && !templates.some(t => t.imageUrl === templateUrl) && <p className="text-xs text-gray-500 mt-2">Custom uploaded card</p>}
+                {selectedTemplateId === t.id && (
+                  <div className="absolute top-2 right-2 bg-[#0D4F4F] rounded-full p-1">
+                    <Check size={12} className="text-white" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {templateUrl && !templates.some(t => t.imageUrl === templateUrl) && (
+          <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+            <Check size={12} className="text-green-600" /> Custom uploaded card
+          </p>
+        )}
       </div>
 
       {/* Main Content: Preview + Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
         {/* ─── Preview ─── */}
-        <div className="lg:col-span-4 sticky top-0 z-10 bg-white lg:static lg:bg-transparent lg:z-auto max-h-[50vh] lg:max-h-none overflow-hidden border-b lg:border-b-0 border-gray-200 shadow-sm lg:shadow-none">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-            <h2 className="font-semibold mb-3 flex items-center gap-2">
-              <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
-            </h2>
-            <div
-              ref={canvasRef}
-              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
-              onMouseUp={() => { endDrag(); endResize(); }}
-              onMouseLeave={() => { endDrag(); endResize(); }}
-              onTouchEnd={() => { endDrag(); endResize(); }}
-              onTouchCancel={() => { endDrag(); endResize(); }}
-              onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-              onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-            >
-              {templateUrl ? (
-                <>
-                  <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+        <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <h2 className="font-semibold mb-3 flex items-center gap-2">
+            <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
+          </h2>
+          <div
+            ref={canvasRef}
+            className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
+            onMouseUp={() => { endDrag(); endResize(); }}
+            onMouseLeave={() => { endDrag(); endResize(); }}
+            onTouchEnd={() => { endDrag(); endResize(); }}
+            onTouchCancel={() => { endDrag(); endResize(); }}
+            onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
+            onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
+          >
+            {templateUrl ? (
+              <>
+                <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
-                  {layers.map((layer, idx) => renderLayer(layer, idx))}
+                {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* QR Code */}
-                  <div
-                    className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
-                    style={{
-                      left: `${qrX}%`,
-                      top: `${qrY}%`,
-                      width: qrSize,
-                      height: qrSize,
-                      transform: 'translate(-50%, -50%)',
-                      backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
-                    }}
-                    onMouseDown={(e) => {
-                      const rect = canvasRef.current!.getBoundingClientRect();
-                      const clientX = e.clientX;
-                      const clientY = e.clientY;
-                      setDragOffset({
-                        x: clientX - rect.left - (qrX / 100) * rect.width,
-                        y: clientY - rect.top - (qrY / 100) * rect.height,
-                      });
-                      setDragging({ type: 'qr', index: -1 });
-                      e.preventDefault();
-                    }}
-                    onTouchStart={(e) => {
-                      const touch = e.touches[0];
-                      const rect = canvasRef.current!.getBoundingClientRect();
-                      setDragOffset({
-                        x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                        y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                      });
-                      setDragging({ type: 'qr', index: -1 });
-                      e.preventDefault();
-                    }}
-                  >
-                    QR
-                  </div>
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                  <div className="text-center"><ImageIcon size={40} className="mx-auto mb-2" /><p>Select a template or upload your own</p></div>
+                {/* QR Code */}
+                <div
+                  className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
+                  style={{
+                    left: `${qrX}%`,
+                    top: `${qrY}%`,
+                    width: qrSize,
+                    height: qrSize,
+                    transform: 'translate(-50%, -50%)',
+                    backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
+                  }}
+                  onMouseDown={(e) => {
+                    const rect = canvasRef.current!.getBoundingClientRect();
+                    const clientX = e.clientX;
+                    const clientY = e.clientY;
+                    setDragOffset({
+                      x: clientX - rect.left - (qrX / 100) * rect.width,
+                      y: clientY - rect.top - (qrY / 100) * rect.height,
+                    });
+                    setDragging({ type: 'qr', index: -1 });
+                    e.preventDefault();
+                  }}
+                  onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    const rect = canvasRef.current!.getBoundingClientRect();
+                    setDragOffset({
+                      x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                      y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                    });
+                    setDragging({ type: 'qr', index: -1 });
+                    e.preventDefault();
+                  }}
+                >
+                  <QrCode size={24} />
                 </div>
-              )}
-            </div>
-            <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                <div className="text-center">
+                  <ImageIcon size={40} className="mx-auto mb-2 opacity-50" />
+                  <p>Select a template or upload your own</p>
+                </div>
+              </div>
+            )}
           </div>
+          <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
         </div>
 
         {/* ─── Controls ─── */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Quick Add Guest Name, Title & Card Number */}
+          {/* Quick Add */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm flex items-center gap-1"><User size={14} className="text-[#0D4F4F]" /> Guest Name</span>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles size={14} className="text-[#0D4F4F]" /> Quick Add
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={addGuestNameLayer}
-                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
               >
-                <Plus size={14} /> Add
+                <User size={14} /> Guest Name
               </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm flex items-center gap-1"><UserCheck size={14} className="text-[#0D4F4F]" /> Guest Title (Mr/Miss)</span>
               <button
                 onClick={addGuestTitleLayer}
-                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
               >
-                <Plus size={14} /> Add
+                <UserCheck size={14} /> Title
               </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-sm flex items-center gap-1"><Hash size={14} className="text-[#0D4F4F]" /> Card Number</span>
               <button
                 onClick={addCardNumberLayer}
-                className="bg-[#0D4F4F] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1"
+                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
               >
-                <Plus size={14} /> Add
+                <Hash size={14} /> Card No.
+              </button>
+              <button
+                onClick={addTextLayer}
+                className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5"
+              >
+                <Type size={14} /> Custom Text
               </button>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <Section title="Add Layer" section="addLayer" icon={<Plus size={16} />}>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={addTextLayer} className="flex-1 bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"><Type size={14} /> Text</button>
-                <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-800 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1"><Square size={14} /> Rectangle</button>
-                <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-800 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1"><Minus size={14} /> Line</button>
+            <Section title="Shapes" section="addLayer" icon={<Square size={16} />}>
+              <div className="flex gap-2">
+                <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5">
+                  <Square size={14} /> Rectangle
+                </button>
+                <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5">
+                  <Minus size={14} /> Line
+                </button>
               </div>
             </Section>
 
             <Section title="Layers" section="layers" icon={<Layers size={16} />}>
-              {layers.length === 0 && <p className="text-gray-400 text-sm">No layers. Add one!</p>}
-              {layers.map((layer, idx) => (
-                <div
-                  key={layer.id}
-                  className={`flex items-center justify-between p-2 rounded cursor-pointer hover:bg-gray-50 ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
-                  onClick={() => setSelectedLayerIndex(idx)}
-                >
-                  <span className="text-sm truncate">
-                    {layer.type === 'text' ? `📝 ${layer.text.substring(0, 20)}` : layer.type === 'rect' ? '⬛ Rectangle' : '━ Line'}
-                    {layer.isGuestName && ' ✨'}
-                    {layer.isGuestType && ' 🏷️'}
-                    {layer.isCardNumber && ' 🔢'}
-                  </span>
-                  <div className="flex gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded">
-                      {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded">
-                      {layer.locked ? <Lock size={12} /> : <Unlock size={12} />}
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded"><Copy size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded"><ArrowUp size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded"><ArrowDown size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); bringToFront(idx); }} className="p-1 hover:bg-gray-200 rounded"><BringToFront size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); sendToBack(idx); }} className="p-1 hover:bg-gray-200 rounded"><SendToBack size={12} /></button>
-                    <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500"><Trash2 size={12} /></button>
-                  </div>
+              {layers.length === 0 && (
+                <div className="text-center py-6 text-gray-400 text-sm">
+                  <Layers size={24} className="mx-auto mb-2 opacity-30" />
+                  No layers. Add one above!
                 </div>
-              ))}
+              )}
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {layers.map((layer, idx) => (
+                  <div
+                    key={layer.id}
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
+                    onClick={() => setSelectedLayerIndex(idx)}
+                  >
+                    <span className="text-sm truncate flex items-center gap-1.5">
+                      {layer.type === 'text' && <Type size={12} />}
+                      {layer.type === 'rect' && <Square size={12} />}
+                      {layer.type === 'line' && <Minus size={12} />}
+                      {layer.isGuestName && <User size={12} className="text-[#0D4F4F]" />}
+                      {layer.isGuestType && <UserCheck size={12} className="text-[#0D4F4F]" />}
+                      {layer.isCardNumber && <Hash size={12} className="text-[#0D4F4F]" />}
+                      <span className="truncate max-w-[80px]">
+                        {layer.type === 'text' ? layer.text.substring(0, 15) : layer.type === 'rect' ? 'Rectangle' : 'Line'}
+                      </span>
+                    </span>
+                    <div className="flex gap-0.5">
+                      <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle visibility">
+                        {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle lock">
+                        {layer.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
+                        <Copy size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move up">
+                        <ArrowUp size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move down">
+                        <ArrowDown size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </Section>
 
             <Section title="Properties" section="properties" icon={<Settings size={16} />}>
               {selectedLayer ? (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-64 overflow-y-auto">
                   {selectedLayer.type === 'text' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium">Text</label>
+                        <label className="block text-xs font-medium text-gray-700">Text</label>
                         <textarea
-                          className="w-full p-1 border rounded text-sm"
-                          rows={3}
+                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          rows={2}
                           value={selectedLayer.text}
                           onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                         />
                         {selectedLayer.isGuestName && (
-                          <p className="text-xs text-[#0D4F4F] mt-1">✨ This will be replaced with each guest's name</p>
+                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><User size={12} /> Replaced with each guest's name</p>
                         )}
                         {selectedLayer.isGuestType && (
-                          <p className="text-xs text-[#0D4F4F] mt-1">🏷️ This will be replaced with each guest's title (Mr/Miss)</p>
+                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><UserCheck size={12} /> Replaced with each guest's title</p>
                         )}
                         {selectedLayer.isCardNumber && (
-                          <p className="text-xs text-[#0D4F4F] mt-1">🔢 This will be replaced with each guest's card number</p>
+                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><Hash size={12} /> Replaced with each guest's card number</p>
                         )}
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Font Family</label>
+                        <label className="block text-xs font-medium text-gray-700">Font</label>
                         <select
-                          className="w-full p-1 border rounded text-sm"
+                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                           value={selectedLayer.fontFamily}
                           onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
                         >
@@ -965,24 +1010,43 @@ export default function InvitationDesigner() {
                         </select>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Font Size</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="8" max="100" value={selectedLayer.fontSize} onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-16 p-1 border rounded text-sm" value={selectedLayer.fontSize} onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })} min="8" max="100" />
+                        <label className="block text-xs font-medium text-gray-700">Size</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="8"
+                            max="100"
+                            value={selectedLayer.fontSize}
+                            onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.fontSize}
+                            onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
+                            min="8"
+                            max="100"
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Color</label>
-                        <input type="color" value={selectedLayer.color} onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })} className="w-full" />
+                        <label className="block text-xs font-medium text-gray-700">Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.color}
+                          onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Alignment</label>
+                        <label className="block text-xs font-medium text-gray-700">Alignment</label>
                         <div className="flex gap-1">
                           {['left', 'center', 'right'].map(a => (
                             <button
                               key={a}
                               onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
-                              className={`p-1 border rounded flex-1 ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100'}`}
+                              className={`flex-1 p-1.5 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
                             >
                               {a === 'left' ? <AlignLeft size={14} /> : a === 'center' ? <AlignCenter size={14} /> : <AlignRight size={14} />}
                             </button>
@@ -990,222 +1054,149 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Rotation (°)</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="-180" max="180" value={selectedLayer.rotation || 0} onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-16 p-1 border rounded text-sm" value={selectedLayer.rotation || 0} onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })} min="-180" max="180" />
+                        <label className="block text-xs font-medium text-gray-700">Rotation</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            min="-180"
+                            max="180"
+                          />
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Enable Shadow
-                          </label>
-                        </div>
-                        {selectedLayer.shadow && (
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <div>
-                              <label className="text-xs">Color</label>
-                              <input type="color" value={selectedLayer.shadow.color || '#000000'} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, color: e.target.value } })} className="w-full" />
-                            </div>
-                            <div>
-                              <label className="text-xs">Blur</label>
-                              <div className="flex gap-2 items-center">
-                                <input type="range" min="0" max="20" value={selectedLayer.shadow.blur || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, blur: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" />
-                                <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.shadow.blur || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, blur: Number(e.target.value) } })} min="0" max="20" />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="text-xs">Offset X</label>
-                              <div className="flex gap-2 items-center">
-                                <input type="range" min="-10" max="10" value={selectedLayer.shadow.offsetX || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetX: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" />
-                                <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.shadow.offsetX || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetX: Number(e.target.value) } })} min="-10" max="10" />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="text-xs">Offset Y</label>
-                              <div className="flex gap-2 items-center">
-                                <input type="range" min="-10" max="10" value={selectedLayer.shadow.offsetY || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetY: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" />
-                                <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.shadow.offsetY || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetY: Number(e.target.value) } })} min="-10" max="10" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Position</label>
-                        <div className="flex gap-1">
-                          {ALIGN_H.map(a => (
-                            <button key={a.value} onClick={() => updateLayer(selectedLayerIndex!, { x: a.value })} className="p-1 border rounded flex-1">{a.label}</button>
-                          ))}
-                        </div>
-                        <div className="flex gap-1 mt-1">
-                          {ALIGN_V.map(a => (
-                            <button key={a.value} onClick={() => updateLayer(selectedLayerIndex!, { y: a.value })} className="p-1 border rounded flex-1">{a.label}</button>
-                          ))}
-                        </div>
+                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                          />
+                          Shadow
+                        </label>
                       </div>
                     </>
                   )}
 
                   {selectedLayer.type === 'rect' && (
-                    <div className="space-y-3">
+                    <>
                       <div>
-                        <label className="flex justify-between text-sm">Fill</label>
-                        <input type="color" value={selectedLayer.fill || '#ffffff'} onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })} className="w-full" />
+                        <label className="block text-xs font-medium text-gray-700">Fill Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.fill || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Border Color</label>
-                        <input type="color" value={selectedLayer.borderColor || '#ffffff'} onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })} className="w-full" />
+                        <label className="block text-xs font-medium text-gray-700">Border Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.borderColor || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Border Width</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="0" max="10" value={selectedLayer.borderWidth || 0} onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.borderWidth || 0} onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })} min="0" max="10" />
+                        <label className="block text-xs font-medium text-gray-700">Border Width</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            value={selectedLayer.borderWidth || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.borderWidth || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
+                            min="0"
+                            max="10"
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Width</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="5" max="100" value={selectedLayer.width || 30} onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.width || 30} onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })} min="5" max="100" />
+                        <label className="block text-xs font-medium text-gray-700">Width / Height</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={selectedLayer.width || 30}
+                            onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.width || 30}
+                            onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
+                            min="5"
+                            max="100"
+                          />
+                          <span className="text-xs text-gray-400">×</span>
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={selectedLayer.height || 20}
+                            onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.height || 20}
+                            onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
+                            min="5"
+                            max="100"
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Height</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="5" max="100" value={selectedLayer.height || 20} onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.height || 20} onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })} min="5" max="100" />
+                        <label className="block text-xs font-medium text-gray-700">Rotation</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            min="-180"
+                            max="180"
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="flex justify-between text-sm">Rotation (°)</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="-180" max="180" value={selectedLayer.rotation || 0} onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-16 p-1 border rounded text-sm" value={selectedLayer.rotation || 0} onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })} min="-180" max="180" />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Enable Shadow
-                          </label>
-                        </div>
-                        {selectedLayer.shadow && (
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <div><label className="text-xs">Color</label><input type="color" value={selectedLayer.shadow.color || '#000000'} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, color: e.target.value } })} className="w-full" /></div>
-                            <div><label className="text-xs">Blur</label><input type="range" min="0" max="20" value={selectedLayer.shadow.blur || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, blur: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" /></div>
-                            <div><label className="text-xs">Offset X</label><input type="range" min="-10" max="10" value={selectedLayer.shadow.offsetX || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetX: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" /></div>
-                            <div><label className="text-xs">Offset Y</label><input type="range" min="-10" max="10" value={selectedLayer.shadow.offsetY || 0} onChange={e => updateLayer(selectedLayerIndex!, { shadow: { ...selectedLayer.shadow, offsetY: Number(e.target.value) } })} className="flex-1 accent-[#0D4F4F]" /></div>
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Position</label>
-                        <div className="flex gap-1">{ALIGN_H.map(a => (<button key={a.value} onClick={() => updateLayer(selectedLayerIndex!, { x: a.value })} className="p-1 border rounded flex-1">{a.label}</button>))}</div>
-                        <div className="flex gap-1 mt-1">{ALIGN_V.map(a => (<button key={a.value} onClick={() => updateLayer(selectedLayerIndex!, { y: a.value })} className="p-1 border rounded flex-1">{a.label}</button>))}</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedLayer.type === 'line' && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="flex justify-between text-sm">Stroke Color</label>
-                        <input type="color" value={selectedLayer.strokeColor || '#ffffff'} onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })} className="w-full" />
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Stroke Width</label>
-                        <div className="flex gap-2 items-center">
-                          <input type="range" min="1" max="10" value={selectedLayer.strokeWidth || 2} onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.strokeWidth || 2} onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })} min="1" max="10" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Dash Style</label>
-                        <select
-                          className="w-full p-1 border rounded text-sm"
-                          value={selectedLayer.dashArray || 'solid'}
-                          onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
-                        >
-                          <option value="solid">Solid</option>
-                          <option value="dashed">Dashed</option>
-                          <option value="dotted">Dotted</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Arrow Start</label>
-                        <select
-                          className="w-full p-1 border rounded text-sm"
-                          value={selectedLayer.arrowStart || 'none'}
-                          onChange={e => updateLayer(selectedLayerIndex!, { arrowStart: e.target.value })}
-                        >
-                          <option value="none">None</option>
-                          <option value="arrow">Arrow</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Arrow End</label>
-                        <select
-                          className="w-full p-1 border rounded text-sm"
-                          value={selectedLayer.arrowEnd || 'none'}
-                          onChange={e => updateLayer(selectedLayerIndex!, { arrowEnd: e.target.value })}
-                        >
-                          <option value="none">None</option>
-                          <option value="arrow">Arrow</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">Start Position</label>
-                        <div className="flex gap-2 items-center">
-                          <span className="text-xs">X</span>
-                          <input type="range" min="0" max="100" value={selectedLayer.startX || 10} onChange={e => updateLayer(selectedLayerIndex!, { startX: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.startX || 10} onChange={e => updateLayer(selectedLayerIndex!, { startX: Number(e.target.value) })} min="0" max="100" />
-                          <span className="text-xs">Y</span>
-                          <input type="range" min="0" max="100" value={selectedLayer.startY || 50} onChange={e => updateLayer(selectedLayerIndex!, { startY: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.startY || 50} onChange={e => updateLayer(selectedLayerIndex!, { startY: Number(e.target.value) })} min="0" max="100" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="flex justify-between text-sm">End Position</label>
-                        <div className="flex gap-2 items-center">
-                          <span className="text-xs">X</span>
-                          <input type="range" min="0" max="100" value={selectedLayer.endX || 90} onChange={e => updateLayer(selectedLayerIndex!, { endX: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.endX || 90} onChange={e => updateLayer(selectedLayerIndex!, { endX: Number(e.target.value) })} min="0" max="100" />
-                          <span className="text-xs">Y</span>
-                          <input type="range" min="0" max="100" value={selectedLayer.endY || 50} onChange={e => updateLayer(selectedLayerIndex!, { endY: Number(e.target.value) })} className="flex-1 accent-[#0D4F4F]" />
-                          <input type="number" className="w-12 p-1 border rounded text-sm" value={selectedLayer.endY || 50} onChange={e => updateLayer(selectedLayerIndex!, { endY: Number(e.target.value) })} min="0" max="100" />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm">
+                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
                           <input
                             type="checkbox"
                             checked={!!selectedLayer.shadow}
@@ -1219,26 +1210,110 @@ export default function InvitationDesigner() {
                               }
                             }}
                           />
-                          Enable Shadow
+                          Shadow
                         </label>
                       </div>
-                    </div>
+                    </>
+                  )}
+
+                  {selectedLayer.type === 'line' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700">Stroke Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.strokeColor || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700">Stroke Width</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={selectedLayer.strokeWidth || 2}
+                            onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            value={selectedLayer.strokeWidth || 2}
+                            onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
+                            min="1"
+                            max="10"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700">Dash Style</label>
+                        <select
+                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          value={selectedLayer.dashArray || 'solid'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
+                        >
+                          <option value="solid">Solid</option>
+                          <option value="dashed">Dashed</option>
+                          <option value="dotted">Dotted</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                          />
+                          Shadow
+                        </label>
+                      </div>
+                    </>
                   )}
                 </div>
               ) : (
-                <div className="text-center text-gray-400 text-sm">Select a layer to edit its properties</div>
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  <Settings size={24} className="mx-auto mb-2 opacity-30" />
+                  Select a layer to edit properties
+                </div>
               )}
             </Section>
 
             <Section title="Overlay" section="overlay" icon={<Palette size={16} />}>
               <div className="space-y-3">
                 <div>
-                  <label className="flex justify-between text-sm">Color</label>
-                  <input type="color" value={overlayColor} onChange={e => setOverlayColor(e.target.value)} className="w-full h-10 border rounded" />
+                  <label className="block text-xs font-medium text-gray-700">Color</label>
+                  <input
+                    type="color"
+                    value={overlayColor}
+                    onChange={e => setOverlayColor(e.target.value)}
+                    className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                  />
                 </div>
                 <div>
-                  <label className="flex justify-between text-sm">Opacity <span>{Math.round(overlayOpacity * 100)}%</span></label>
-                  <input type="range" min="0" max="1" step="0.05" value={overlayOpacity} onChange={e => setOverlayOpacity(parseFloat(e.target.value))} className="w-full accent-[#0D4F4F]" />
+                  <label className="block text-xs font-medium text-gray-700">Opacity</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={overlayOpacity}
+                      onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
+                      className="flex-1 accent-[#0D4F4F]"
+                    />
+                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(overlayOpacity * 100)}%</span>
+                  </div>
                 </div>
               </div>
             </Section>
@@ -1246,20 +1321,56 @@ export default function InvitationDesigner() {
             <Section title="QR Code" section="qr" icon={<QrCode size={16} />}>
               <div className="space-y-3">
                 <div>
-                  <label className="flex justify-between text-sm">Horizontal <span>{Math.round(qrX)}%</span></label>
-                  <input type="range" min="0" max="100" value={qrX} onChange={e => setQrX(Number(e.target.value))} className="w-full accent-[#0D4F4F]" />
+                  <label className="block text-xs font-medium text-gray-700">Horizontal Position</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={qrX}
+                      onChange={e => setQrX(Number(e.target.value))}
+                      className="flex-1 accent-[#0D4F4F]"
+                    />
+                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(qrX)}%</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="flex justify-between text-sm">Vertical <span>{Math.round(qrY)}%</span></label>
-                  <input type="range" min="0" max="100" value={qrY} onChange={e => setQrY(Number(e.target.value))} className="w-full accent-[#0D4F4F]" />
+                  <label className="block text-xs font-medium text-gray-700">Vertical Position</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={qrY}
+                      onChange={e => setQrY(Number(e.target.value))}
+                      className="flex-1 accent-[#0D4F4F]"
+                    />
+                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(qrY)}%</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="flex justify-between text-sm">Size <span>{qrSize}px</span></label>
-                  <input type="range" min="80" max="300" step="10" value={qrSize} onChange={e => setQrSize(Number(e.target.value))} className="w-full accent-[#0D4F4F]" />
+                  <label className="block text-xs font-medium text-gray-700">Size</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="80"
+                      max="300"
+                      step="10"
+                      value={qrSize}
+                      onChange={e => setQrSize(Number(e.target.value))}
+                      className="flex-1 accent-[#0D4F4F]"
+                    />
+                    <span className="text-xs text-gray-500 w-12 text-right">{qrSize}px</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="flex justify-between text-sm">Color</label>
-                  <input type="color" value={qrColor} onChange={e => setQrColor(e.target.value)} className="w-full" />
+                  <label className="block text-xs font-medium text-gray-700">Color</label>
+                  <input
+                    type="color"
+                    value={qrColor}
+                    onChange={e => setQrColor(e.target.value)}
+                    className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                  />
                 </div>
               </div>
             </Section>
@@ -1269,7 +1380,7 @@ export default function InvitationDesigner() {
           <button
             onClick={handleSave}
             disabled={saving || !templateUrl}
-            className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2"
           >
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
             {saving ? 'Saving...' : 'Save & Continue'}

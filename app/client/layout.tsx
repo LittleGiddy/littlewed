@@ -3,7 +3,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Menu, X, Info } from 'lucide-react';
+import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Info } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -11,7 +11,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Mobile drawer open/closed
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Desktop sidebar collapsed/expanded (persistent, pushes content)
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
 
   useEffect(() => {
@@ -47,6 +51,28 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  // Close mobile drawer on Escape
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sidebarOpen]);
+
+  // Single toggle handler that does the right thing per screen size
+  const toggleSidebar = () => {
+    if (isLargeScreen) {
+      setDesktopSidebarOpen((o) => !o);
+    } else {
+      setSidebarOpen((o) => !o);
+    }
+  };
+
+  // Whether the hamburger should render as an "X" (i.e. something is currently open)
+  const isMenuOpenState = isLargeScreen ? desktopSidebarOpen : sidebarOpen;
 
   if (status === 'loading') {
     return (
@@ -113,6 +139,26 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     </div>
   );
 
+  const HamburgerIcon = () => (
+    <div className="cl-hamburger">
+      <motion.span
+        className="cl-hamburger-line"
+        animate={isMenuOpenState ? { rotate: 45, y: 6 } : { rotate: 0, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      />
+      <motion.span
+        className="cl-hamburger-line"
+        animate={isMenuOpenState ? { opacity: 0, x: -6 } : { opacity: 1, x: 0 }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
+      />
+      <motion.span
+        className="cl-hamburger-line"
+        animate={isMenuOpenState ? { rotate: -45, y: -6 } : { rotate: 0, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeInOut' }}
+      />
+    </div>
+  );
+
   return (
     <div className="cl-layout">
       <style>{`
@@ -125,7 +171,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           font-family: 'DM Sans', 'Segoe UI', sans-serif;
         }
 
-        /* ── Desktop sidebar (always in DOM at lg+, fixed) ── */
+        /* ── Desktop sidebar (always in DOM at lg+, fixed, collapsible) ── */
         .cl-desktop-sidebar {
           display: none;
         }
@@ -137,12 +183,18 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             background: white;
             border-right: 1.5px solid #E2EAF0;
             box-shadow: 2px 0 12px rgba(0,0,0,0.03);
+            overflow: hidden;
+            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .cl-desktop-sidebar.collapsed {
+            transform: translateX(-272px);
           }
         }
 
         .cl-sidebar-inner {
           display: flex; flex-direction: column; height: 100%;
           padding: 24px 18px;
+          width: 272px;
         }
 
         .cl-logo-wrap {
@@ -214,7 +266,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           min-height: 100vh;
         }
         @media (min-width: 1024px) {
-          .cl-main-wrap { margin-left: 272px; }
+          .cl-main-wrap {
+            margin-left: 272px;
+            transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .cl-main-wrap.sidebar-collapsed {
+            margin-left: 0;
+          }
         }
 
         /* Top header */
@@ -235,8 +293,22 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           transition: border-color 0.15s, background 0.15s;
         }
         .cl-menu-btn:hover { border-color: #0D4F4F; background: rgba(13,79,79,0.04); }
-        @media (min-width: 1024px) {
-          .cl-menu-btn { display: none; }
+
+        .cl-hamburger {
+          width: 18px;
+          height: 14px;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .cl-hamburger-line {
+          display: block;
+          width: 100%;
+          height: 2px;
+          border-radius: 2px;
+          background: #0D1B1B;
+          transform-origin: center;
         }
 
         .cl-topbar-logo { height: 30px; width: auto; object-fit: contain; }
@@ -264,8 +336,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
       `}</style>
 
-      {/* Desktop sidebar — always visible at lg+, never overlaps mobile drawer */}
-      <aside className="cl-desktop-sidebar">
+      {/* Desktop sidebar — collapsible via the hamburger, slides fully off-canvas */}
+      <aside className={`cl-desktop-sidebar${!desktopSidebarOpen ? ' collapsed' : ''}`}>
         <SidebarContent />
       </aside>
 
@@ -294,12 +366,17 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         )}
       </AnimatePresence>
 
-      {/* Main content — margin-left only at lg+, drawer overlays rather than pushing on mobile */}
-      <div className="cl-main-wrap">
+      {/* Main content — margin-left collapses with the desktop sidebar; drawer overlays on mobile */}
+      <div className={`cl-main-wrap${isLargeScreen && !desktopSidebarOpen ? ' sidebar-collapsed' : ''}`}>
         <div className="cl-topbar">
           <div className="cl-topbar-left">
-            <button className="cl-menu-btn" onClick={() => setSidebarOpen(o => !o)}>
-              {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+            <button
+              className="cl-menu-btn"
+              onClick={toggleSidebar}
+              aria-label={isMenuOpenState ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMenuOpenState}
+            >
+              <HamburgerIcon />
             </button>
             <img src="/Little Wed Logo_.svg" alt="Little Wed" className="cl-topbar-logo" />
           </div>

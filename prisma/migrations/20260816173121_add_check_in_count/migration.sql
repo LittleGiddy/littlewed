@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Guest" ADD COLUMN     "checkInCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "maxCheckIns" INTEGER NOT NULL DEFAULT 1;
