@@ -124,7 +124,7 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'LittleWed', // Or use UUID: 'b8519b7d-c820-4c7b-914e-36302b245725'
+    template: 'invitation_reminder', // Or use UUID: 'b8519b7d-c820-4c7b-914e-36302b245725'
     personalisation: [
       {
         "var1": data.name,
