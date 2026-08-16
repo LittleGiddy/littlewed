@@ -1,52 +1,89 @@
-// app/api/test-whatsapp/route.ts
+// app/api/invitations/send-template/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { sendHelloWorld, sendSimpleTestMessage, sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
-    const { phone, type } = await req.json();
-
-    if (!phone) {
-      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let result;
+    const tenantId = (session.user as any).tenantId;
+    const { guestId, eventId } = await req.json();
 
-    switch (type) {
-      case 'wedding':
-        // ✅ Remove imageUrl
-        result = await sendWeddingInvitation(phone, {
-          name: 'GIDEON FELIX',
-          hostFamily: 'Mr & Mrs Allan Swai',
-          person1: 'Agape',
-          person2: 'Gladness',
-          date: '15 Septemba 2026',
-          venue: 'Tazara',
-          time: '5:00 PM',
-          cardNumber: '108',
-          cardType: 'SINGLE',
-          // ❌ imageUrl removed
-          inviteLink: 'example123',
-        });
-        break;
-
-      case 'simple':
-        result = await sendSimpleTestMessage(phone, {
-          name: 'GIDEON FELIX',
-          cardNumber: '108',
-        });
-        break;
-
-      default:
-        result = await sendHelloWorld(phone);
-        break;
+    if (!guestId || !eventId) {
+      return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
-    return NextResponse.json(result);
+    const guest = await prisma.guest.findFirst({
+      where: { id: guestId, event: { tenantId } },
+    });
+
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, tenantId },
+    });
+
+    if (!guest || !event) {
+      return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
+    }
+
+    // ─── THIS IS WHERE THE ERROR IS THROWN ──────────────────────────────
+    if (!guest.phone) {
+      return NextResponse.json({ 
+        error: 'Phone number is required' 
+      }, { status: 400 });
+    }
+
+    // ─── Check if guest has WhatsApp routing ──────────────────────────────
+    if (guest.routingChannel !== 'whatsapp') {
+      return NextResponse.json({
+        error: `Guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
+      }, { status: 400 });
+    }
+
+    // ─── Send the invitation ──────────────────────────────────────────────
+    const result = await sendWeddingInvitation(guest.phone, {
+      name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
+      hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
+      person1: event.person1 || 'Agape',
+      person2: event.person2 || 'Gladness',
+      date: new Date(event.date).toLocaleDateString('sw-TZ', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+      venue: event.venue || 'The Embassy Hall',
+      time: event.time || '5:00 PM',
+      cardNumber: guest.cardNumber || '108',
+      cardType: guest.guestType || 'SINGLE',
+      inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
+    });
+
+    if (result.success) {
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: { invitationSentAt: new Date() },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Invitation sent successfully!',
+        data: result.data,
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+      }, { status: 500 });
+    }
   } catch (error: any) {
-    console.error('[Test] Error:', error);
+    console.error('Send template error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to send test message' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
