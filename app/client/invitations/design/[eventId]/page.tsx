@@ -26,18 +26,6 @@ const FONTS = [
   'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
 ];
 
-// ─── Icons for alignment ─────────────────────────────────────────────────
-const ALIGN_H = [
-  { label: <AlignLeft size={14} />, value: 0 },
-  { label: <AlignCenter size={14} />, value: 50 },
-  { label: <AlignRight size={14} />, value: 100 },
-];
-const ALIGN_V = [
-  { label: <AlignStartVertical size={14} />, value: 0 },
-  { label: <AlignCenterVertical size={14} />, value: 50 },
-  { label: <AlignEndVertical size={14} />, value: 100 },
-];
-
 // ─── Layer creators ──────────────────────────────────────────────────────
 const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false, isCardNumber = false) => ({
   id: generateId(),
@@ -117,7 +105,7 @@ export default function InvitationDesigner() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -222,11 +210,10 @@ export default function InvitationDesigner() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // ─── File size validation: 3MB limit ──────────────────────────────
-    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB in bytes
+    const MAX_FILE_SIZE = 3 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       toast.error('File size exceeds 3MB limit. Please compress your image and try again.');
-      e.target.value = ''; // Reset input
+      e.target.value = '';
       return;
     }
 
@@ -248,7 +235,7 @@ export default function InvitationDesigner() {
       toast.error('Network error');
     }
     setUploading(false);
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
 
   const handleSave = async () => {
@@ -732,54 +719,55 @@ export default function InvitationDesigner() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      {/* ─── Header ─── */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
-          <h1 className="font-serif text-3xl font-black text-gray-900">Invitation Designer</h1>
-          <p className="text-sm text-gray-500">Design your card with text, shapes, and QR code</p>
+          <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900">Invitation Designer</h1>
+          <p className="text-xs sm:text-sm text-gray-500">Design your card with text, shapes, and QR code</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1 sm:gap-2 flex-wrap">
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             title="Toggle grid"
           >
-            <Grid size={18} />
+            <Grid size={16} className="sm:text-lg" />
           </button>
           <button
             onClick={() => setSnapToGrid(!snapToGrid)}
-            className={`p-2 rounded-lg transition ${snapToGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${snapToGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             title="Snap to grid"
           >
-            <Grid size={18} />
+            <Grid size={16} className="sm:text-lg" />
           </button>
           <button
             onClick={undo}
             disabled={historyIndex <= 0}
-            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+            className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
             title="Undo (Ctrl+Z)"
           >
-            <Undo size={18} />
+            <Undo size={16} className="sm:text-lg" />
           </button>
           <button
             onClick={redo}
             disabled={historyIndex >= history.length - 1}
-            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+            className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
             title="Redo (Ctrl+Y)"
           >
-            <Redo size={18} />
+            <Redo size={16} className="sm:text-lg" />
           </button>
         </div>
       </div>
 
-      {/* Template Gallery */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-            <ImageIcon size={18} className="text-[#0D4F4F]" /> Choose a Template
+      {/* ─── Template Gallery ─── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 sm:mb-4">
+          <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+            <ImageIcon size={16} className="sm:text-lg text-[#0D4F4F]" /> Choose a Template
           </h2>
           <div className="flex gap-2 flex-wrap">
-            <label className="cursor-pointer bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-2">
+            <label className="cursor-pointer bg-[#0D4F4F] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1.5 sm:gap-2">
               <Upload size={14} /> Upload
               <input 
                 type="file" 
@@ -789,25 +777,25 @@ export default function InvitationDesigner() {
                 ref={fileInputRef} 
               />
             </label>
-            {uploading && <Loader2 size={18} className="animate-spin text-[#0D4F4F]" />}
+            {uploading && <Loader2 size={16} className="animate-spin text-[#0D4F4F]" />}
             {templateUrl && (
               <button
                 onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
-                className="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-100 transition flex items-center gap-2"
+                className="bg-red-50 text-red-600 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-red-100 transition flex items-center gap-1.5 sm:gap-2"
               >
                 <Trash2 size={14} /> Remove
               </button>
             )}
           </div>
         </div>
-        <p className="text-xs text-gray-400 mb-3">Max file size: 3MB</p>
+        <p className="text-xs text-gray-400 mb-2 sm:mb-3">Max file size: 3MB</p>
         {templates.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
-            <p>No templates available. Upload your own background.</p>
+          <div className="text-center py-6 sm:py-8 text-gray-400">
+            <ImageIcon size={28} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No templates available. Upload your own background.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
             {templates.map((t) => (
               <div
                 key={t.id}
@@ -815,12 +803,12 @@ export default function InvitationDesigner() {
                 className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'}`}
               >
                 <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                  <p className="text-white text-xs font-medium truncate">{t.name}</p>
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 sm:p-2">
+                  <p className="text-white text-[10px] sm:text-xs font-medium truncate">{t.name}</p>
                 </div>
                 {selectedTemplateId === t.id && (
-                  <div className="absolute top-2 right-2 bg-[#0D4F4F] rounded-full p-1">
-                    <Check size={12} className="text-white" />
+                  <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-[#0D4F4F] rounded-full p-0.5 sm:p-1">
+                    <Check size={10} className="sm:text-xs text-white" />
                   </div>
                 )}
               </div>
@@ -834,21 +822,23 @@ export default function InvitationDesigner() {
         )}
       </div>
 
-      {/* Main Content: Preview + Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        {/* ─── Preview ─── */}
-        <div className="lg:col-span-3">
+      {/* ─── Main Content: Two Column Layout ─── */}
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        {/* ─── Preview Column (Sticky) ─── */}
+        <div className="lg:w-2/5 xl:w-5/12">
           <div 
-            ref={previewContainerRef}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
-            style={{ position: 'sticky', top: '20px' }}
+            ref={previewRef}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 sticky top-4"
           >
-            <h2 className="font-semibold mb-3 flex items-center gap-2">
-              <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
-            </h2>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h2 className="font-semibold flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                <Maximize2 size={16} className="sm:text-lg text-[#0D4F4F]" /> Live Preview
+              </h2>
+              <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
+            </div>
             <div
               ref={canvasRef}
-              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
+              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
               onMouseUp={() => { endDrag(); endResize(); }}
               onMouseLeave={() => { endDrag(); endResize(); }}
               onTouchEnd={() => { endDrag(); endResize(); }}
@@ -869,8 +859,8 @@ export default function InvitationDesigner() {
                     style={{
                       left: `${qrX}%`,
                       top: `${qrY}%`,
-                      width: qrSize,
-                      height: qrSize,
+                      width: Math.min(qrSize, 300),
+                      height: Math.min(qrSize, 300),
                       transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
                       backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
                     }}
@@ -896,112 +886,115 @@ export default function InvitationDesigner() {
                       e.preventDefault();
                     }}
                   >
-                    <QrCode size={Math.min(qrSize * 0.6, 48)} />
+                    <QrCode size={Math.min(Math.max(qrSize * 0.5, 20), 48)} />
                   </div>
                 </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <ImageIcon size={40} className="mx-auto mb-2 opacity-50" />
-                    <p>Select a template or upload your own</p>
+                  <div className="text-center p-4">
+                    <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+                    <p className="text-xs sm:text-sm">Select a template or upload your own</p>
                   </div>
                 </div>
               )}
             </div>
-            <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
+              Click a layer to edit properties below
+            </p>
           </div>
         </div>
 
-        {/* ─── Controls ─── */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Quick Add */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+        {/* ─── Controls Column ─── */}
+        <div className="lg:w-3/5 xl:w-7/12 space-y-3 sm:space-y-4">
+          {/* ─── Quick Add ─── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 space-y-2">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
               <Sparkles size={14} className="text-[#0D4F4F]" /> Quick Add
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
               <button
                 onClick={addGuestNameLayer}
-                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
               >
-                <User size={14} /> Guest Name
+                <User size={12} className="sm:text-sm" /> Guest Name
               </button>
               <button
                 onClick={addGuestTitleLayer}
-                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
               >
-                <UserCheck size={14} /> Title
+                <UserCheck size={12} className="sm:text-sm" /> Title
               </button>
               <button
                 onClick={addCardNumberLayer}
-                className="bg-[#0D4F4F] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1.5"
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
               >
-                <Hash size={14} /> Card No.
+                <Hash size={12} className="sm:text-sm" /> Card No.
               </button>
               <button
                 onClick={addTextLayer}
-                className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5"
+                className="bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5"
               >
-                <Type size={14} /> Custom Text
+                <Type size={12} className="sm:text-sm" /> Custom Text
               </button>
             </div>
           </div>
 
+          {/* ─── Controls Accordion ─── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <Section title="Shapes" section="addLayer" icon={<Square size={16} />}>
+            <Section title="Shapes" section="addLayer" icon={<Square size={14} className="sm:text-base" />}>
               <div className="flex gap-2">
-                <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5">
-                  <Square size={14} /> Rectangle
+                <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
+                  <Square size={12} className="sm:text-sm" /> Rectangle
                 </button>
-                <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1.5">
-                  <Minus size={14} /> Line
+                <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
+                  <Minus size={12} className="sm:text-sm" /> Line
                 </button>
               </div>
             </Section>
 
-            <Section title="Layers" section="layers" icon={<Layers size={16} />}>
+            <Section title="Layers" section="layers" icon={<Layers size={14} className="sm:text-base" />}>
               {layers.length === 0 && (
-                <div className="text-center py-6 text-gray-400 text-sm">
-                  <Layers size={24} className="mx-auto mb-2 opacity-30" />
+                <div className="text-center py-4 sm:py-6 text-gray-400 text-xs sm:text-sm">
+                  <Layers size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
                   No layers. Add one above!
                 </div>
               )}
-              <div className="max-h-48 overflow-y-auto space-y-1">
+              <div className="max-h-36 sm:max-h-48 overflow-y-auto space-y-1">
                 {layers.map((layer, idx) => (
                   <div
                     key={layer.id}
-                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
+                    className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
                     onClick={() => setSelectedLayerIndex(idx)}
                   >
-                    <span className="text-sm truncate flex items-center gap-1.5">
-                      {layer.type === 'text' && <Type size={12} />}
-                      {layer.type === 'rect' && <Square size={12} />}
-                      {layer.type === 'line' && <Minus size={12} />}
-                      {layer.isGuestName && <User size={12} className="text-[#0D4F4F]" />}
-                      {layer.isGuestType && <UserCheck size={12} className="text-[#0D4F4F]" />}
-                      {layer.isCardNumber && <Hash size={12} className="text-[#0D4F4F]" />}
-                      <span className="truncate max-w-[80px]">
-                        {layer.type === 'text' ? layer.text.substring(0, 15) : layer.type === 'rect' ? 'Rectangle' : 'Line'}
+                    <span className="text-[10px] sm:text-sm truncate flex items-center gap-1 sm:gap-1.5">
+                      {layer.type === 'text' && <Type size={10} className="sm:text-sm" />}
+                      {layer.type === 'rect' && <Square size={10} className="sm:text-sm" />}
+                      {layer.type === 'line' && <Minus size={10} className="sm:text-sm" />}
+                      {layer.isGuestName && <User size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      {layer.isGuestType && <UserCheck size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      {layer.isCardNumber && <Hash size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      <span className="truncate max-w-[50px] sm:max-w-[80px]">
+                        {layer.type === 'text' ? layer.text.substring(0, 12) : layer.type === 'rect' ? 'Rectangle' : 'Line'}
                       </span>
                     </span>
                     <div className="flex gap-0.5">
                       <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle visibility">
-                        {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                        {layer.visible ? <Eye size={10} className="sm:text-sm" /> : <EyeOff size={10} className="sm:text-sm" />}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle lock">
-                        {layer.locked ? <Lock size={12} /> : <Unlock size={12} />}
+                        {layer.locked ? <Lock size={10} className="sm:text-sm" /> : <Unlock size={10} className="sm:text-sm" />}
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
-                        <Copy size={12} />
+                        <Copy size={10} className="sm:text-sm" />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move up">
-                        <ArrowUp size={12} />
+                        <ArrowUp size={10} className="sm:text-sm" />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move down">
-                        <ArrowDown size={12} />
+                        <ArrowDown size={10} className="sm:text-sm" />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
-                        <Trash2 size={12} />
+                        <Trash2 size={10} className="sm:text-sm" />
                       </button>
                     </div>
                   </div>
@@ -1009,33 +1002,33 @@ export default function InvitationDesigner() {
               </div>
             </Section>
 
-            <Section title="Properties" section="properties" icon={<Settings size={16} />}>
+            <Section title="Properties" section="properties" icon={<Settings size={14} className="sm:text-base" />}>
               {selectedLayer ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
+                <div className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-64 overflow-y-auto">
                   {selectedLayer.type === 'text' && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Text</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Text</label>
                         <textarea
-                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                           rows={2}
                           value={selectedLayer.text}
                           onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                         />
                         {selectedLayer.isGuestName && (
-                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><User size={12} /> Replaced with each guest's name</p>
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><User size={10} className="sm:text-sm" /> Replaced with each guest's name</p>
                         )}
                         {selectedLayer.isGuestType && (
-                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><UserCheck size={12} /> Replaced with each guest's title</p>
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><UserCheck size={10} className="sm:text-sm" /> Replaced with each guest's title</p>
                         )}
                         {selectedLayer.isCardNumber && (
-                          <p className="text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><Hash size={12} /> Replaced with each guest's card number</p>
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><Hash size={10} className="sm:text-sm" /> Replaced with each guest's card number</p>
                         )}
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Font</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Font</label>
                         <select
-                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                           value={selectedLayer.fontFamily}
                           onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
                         >
@@ -1043,7 +1036,7 @@ export default function InvitationDesigner() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Size</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -1055,7 +1048,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.fontSize}
                             onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
                             min="8"
@@ -1064,30 +1057,30 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Color</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
                         <input
                           type="color"
                           value={selectedLayer.color}
                           onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Alignment</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Alignment</label>
                         <div className="flex gap-1">
                           {['left', 'center', 'right'].map(a => (
                             <button
                               key={a}
                               onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
-                              className={`flex-1 p-1.5 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
+                              className={`flex-1 p-1 sm:p-1.5 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
                             >
-                              {a === 'left' ? <AlignLeft size={14} /> : a === 'center' ? <AlignCenter size={14} /> : <AlignRight size={14} />}
+                              {a === 'left' ? <AlignLeft size={12} className="sm:text-sm" /> : a === 'center' ? <AlignCenter size={12} className="sm:text-sm" /> : <AlignRight size={12} className="sm:text-sm" />}
                             </button>
                           ))}
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Rotation</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -1099,7 +1092,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.rotation || 0}
                             onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
                             min="-180"
@@ -1108,7 +1101,7 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
                           <input
                             type="checkbox"
                             checked={!!selectedLayer.shadow}
@@ -1131,25 +1124,25 @@ export default function InvitationDesigner() {
                   {selectedLayer.type === 'rect' && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Fill Color</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Fill Color</label>
                         <input
                           type="color"
                           value={selectedLayer.fill || '#ffffff'}
                           onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Border Color</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Color</label>
                         <input
                           type="color"
                           value={selectedLayer.borderColor || '#ffffff'}
                           onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Border Width</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Width</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -1161,7 +1154,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.borderWidth || 0}
                             onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
                             min="0"
@@ -1170,8 +1163,8 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Width / Height</label>
-                        <div className="flex items-center gap-2">
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Width / Height</label>
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <input
                             type="range"
                             min="5"
@@ -1182,13 +1175,13 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.width || 30}
                             onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
                             min="5"
                             max="100"
                           />
-                          <span className="text-xs text-gray-400">×</span>
+                          <span className="text-[10px] sm:text-xs text-gray-400">×</span>
                           <input
                             type="range"
                             min="5"
@@ -1199,7 +1192,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.height || 20}
                             onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
                             min="5"
@@ -1208,7 +1201,7 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Rotation</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -1220,7 +1213,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.rotation || 0}
                             onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
                             min="-180"
@@ -1229,7 +1222,7 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
                           <input
                             type="checkbox"
                             checked={!!selectedLayer.shadow}
@@ -1252,16 +1245,16 @@ export default function InvitationDesigner() {
                   {selectedLayer.type === 'line' && (
                     <>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Stroke Color</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Color</label>
                         <input
                           type="color"
                           value={selectedLayer.strokeColor || '#ffffff'}
                           onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Stroke Width</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Width</label>
                         <div className="flex items-center gap-2">
                           <input
                             type="range"
@@ -1273,7 +1266,7 @@ export default function InvitationDesigner() {
                           />
                           <input
                             type="number"
-                            className="w-16 p-1 border border-gray-200 rounded-lg text-sm text-center"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
                             value={selectedLayer.strokeWidth || 2}
                             onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
                             min="1"
@@ -1282,9 +1275,9 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700">Dash Style</label>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Dash Style</label>
                         <select
-                          className="w-full p-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                           value={selectedLayer.dashArray || 'solid'}
                           onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
                         >
@@ -1294,7 +1287,7 @@ export default function InvitationDesigner() {
                         </select>
                       </div>
                       <div>
-                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
                           <input
                             type="checkbox"
                             checked={!!selectedLayer.shadow}
@@ -1315,26 +1308,26 @@ export default function InvitationDesigner() {
                   )}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  <Settings size={24} className="mx-auto mb-2 opacity-30" />
+                <div className="text-center py-6 sm:py-8 text-gray-400 text-xs sm:text-sm">
+                  <Settings size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
                   Select a layer to edit properties
                 </div>
               )}
             </Section>
 
-            <Section title="Overlay" section="overlay" icon={<Palette size={16} />}>
-              <div className="space-y-3">
+            <Section title="Overlay" section="overlay" icon={<Palette size={14} className="sm:text-base" />}>
+              <div className="space-y-2 sm:space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Color</label>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
                   <input
                     type="color"
                     value={overlayColor}
                     onChange={e => setOverlayColor(e.target.value)}
-                    className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
+                    className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Opacity</label>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Opacity</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="range"
@@ -1345,47 +1338,45 @@ export default function InvitationDesigner() {
                       onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
                       className="flex-1 accent-[#0D4F4F]"
                     />
-                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(overlayOpacity * 100)}%</span>
+                    <span className="text-[10px] sm:text-xs text-gray-500 w-10 sm:w-12 text-right">{Math.round(overlayOpacity * 100)}%</span>
                   </div>
                 </div>
               </div>
             </Section>
 
-            <Section title="QR Code" section="qr" icon={<QrCode size={16} />}>
-              <div className="space-y-4">
-                {/* Position controls */}
+            <Section title="QR Code" section="qr" icon={<QrCode size={14} className="sm:text-base" />}>
+              <div className="space-y-2 sm:space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Position</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Position</label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                     <div>
-                      <label className="block text-xs text-gray-500">X Position</label>
+                      <label className="block text-[10px] text-gray-500">X</label>
                       <input
                         type="number"
                         min="0"
                         max="100"
                         value={Math.round(qrX)}
                         onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500">Y Position</label>
+                      <label className="block text-[10px] text-gray-500">Y</label>
                       <input
                         type="number"
                         min="0"
                         max="100"
                         value={Math.round(qrY)}
                         onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Size controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Size</label>
-                  <div className="flex items-center gap-3">
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex-1">
                       <input
                         type="range"
@@ -1397,7 +1388,7 @@ export default function InvitationDesigner() {
                         className="w-full accent-[#0D4F4F]"
                       />
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 sm:gap-1">
                       <input
                         type="number"
                         min="20"
@@ -1405,31 +1396,16 @@ export default function InvitationDesigner() {
                         step="5"
                         value={qrSize}
                         onChange={e => setQrSize(Math.min(400, Math.max(20, Number(e.target.value))))}
-                        className="w-20 p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                       />
-                      <span className="text-xs text-gray-500">px</span>
+                      <span className="text-[10px] sm:text-xs text-gray-500">px</span>
                     </div>
-                  </div>
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      onClick={() => setQrSize(Math.max(20, qrSize - 20))}
-                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition"
-                    >
-                      −20px
-                    </button>
-                    <button
-                      onClick={() => setQrSize(Math.min(400, qrSize + 20))}
-                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition"
-                    >
-                      +20px
-                    </button>
                   </div>
                 </div>
 
-                {/* Rotation controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Rotation</label>
-                  <div className="flex items-center gap-3">
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex-1">
                       <input
                         type="range"
@@ -1441,57 +1417,41 @@ export default function InvitationDesigner() {
                         className="w-full accent-[#0D4F4F]"
                       />
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5 sm:gap-1">
                       <input
                         type="number"
                         min="-180"
                         max="180"
                         value={qrRotation}
                         onChange={e => setQrRotation(Math.min(180, Math.max(-180, Number(e.target.value))))}
-                        className="w-20 p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                       />
-                      <span className="text-xs text-gray-500">°</span>
+                      <span className="text-[10px] sm:text-xs text-gray-500">°</span>
                     </div>
-                  </div>
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      onClick={() => setQrRotation(qrRotation - 45)}
-                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-1"
-                    >
-                      <RotateCw size={12} /> −45°
-                    </button>
-                    <button
-                      onClick={() => setQrRotation(qrRotation + 45)}
-                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-1"
-                    >
-                      <RotateCw size={12} /> +45°
-                    </button>
                   </div>
                 </div>
 
-                {/* Color controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
-                  <div className="flex items-center gap-3">
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <input
                       type="color"
                       value={qrColor}
                       onChange={e => setQrColor(e.target.value)}
-                      className="h-10 w-full rounded-lg cursor-pointer border border-gray-200"
+                      className="h-8 sm:h-10 w-full rounded-lg cursor-pointer border border-gray-200"
                     />
                     <input
                       type="text"
                       value={qrColor}
                       onChange={e => setQrColor(e.target.value)}
-                      className="w-28 p-1.5 border border-gray-200 rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      className="w-20 sm:w-28 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                     />
                   </div>
                 </div>
 
-                {/* Preset sizes */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Quick Presets</label>
-                  <div className="flex gap-2">
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Quick Presets</label>
+                  <div className="flex gap-1 sm:gap-2">
                     {[
                       { label: 'Tiny', size: 40 },
                       { label: 'Small', size: 80 },
@@ -1502,7 +1462,7 @@ export default function InvitationDesigner() {
                       <button
                         key={preset.label}
                         onClick={() => setQrSize(preset.size)}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        className={`flex-1 py-1 sm:py-1.5 rounded-lg text-[8px] sm:text-xs font-semibold transition ${
                           qrSize === preset.size
                             ? 'bg-[#0D4F4F] text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1517,13 +1477,13 @@ export default function InvitationDesigner() {
             </Section>
           </div>
 
-          {/* Save button */}
+          {/* ─── Save Button ─── */}
           <button
             onClick={handleSave}
             disabled={saving || !templateUrl}
-            className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 sm:py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm sm:text-base"
           >
-            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            {saving ? <Loader2 size={16} className="sm:text-lg animate-spin" /> : <Save size={16} className="sm:text-lg" />}
             {saving ? 'Saving...' : 'Save & Continue'}
           </button>
         </div>
