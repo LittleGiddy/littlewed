@@ -218,6 +218,15 @@ export default function InvitationDesigner() {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // ─── File size validation: 3MB limit ──────────────────────────────
+    const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB in bytes
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error('File size exceeds 3MB limit. Please compress your image and try again.');
+      e.target.value = ''; // Reset input
+      return;
+    }
+
     setUploading(true);
     const formData = new FormData();
     formData.append('image', file);
@@ -229,9 +238,14 @@ export default function InvitationDesigner() {
         setTemplateUrl(data.url);
         setSelectedTemplateId(null);
         toast.success('Background uploaded successfully');
-      } else toast.error('Upload failed');
-    } catch { toast.error('Network error'); }
+      } else {
+        toast.error(data.error || 'Upload failed');
+      }
+    } catch {
+      toast.error('Network error');
+    }
     setUploading(false);
+    e.target.value = ''; // Reset input
   };
 
   const handleSave = async () => {
@@ -262,7 +276,9 @@ export default function InvitationDesigner() {
         const data = await res.json();
         toast.error(data.error || 'Save failed');
       }
-    } catch { toast.error('Network error'); }
+    } catch {
+      toast.error('Network error');
+    }
     setSaving(false);
   };
 
@@ -761,7 +777,13 @@ export default function InvitationDesigner() {
           <div className="flex gap-2 flex-wrap">
             <label className="cursor-pointer bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-2">
               <Upload size={14} /> Upload
-              <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" ref={fileInputRef} />
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+                className="hidden" 
+                ref={fileInputRef} 
+              />
             </label>
             {uploading && <Loader2 size={18} className="animate-spin text-[#0D4F4F]" />}
             {templateUrl && (
@@ -774,6 +796,7 @@ export default function InvitationDesigner() {
             )}
           </div>
         </div>
+        <p className="text-xs text-gray-400 mb-3">Max file size: 3MB</p>
         {templates.length === 0 ? (
           <div className="text-center py-8 text-gray-400">
             <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
@@ -810,73 +833,75 @@ export default function InvitationDesigner() {
       {/* Main Content: Preview + Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
         {/* ─── Preview ─── */}
-        <div className="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
-          </h2>
-          <div
-            ref={canvasRef}
-            className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
-            onMouseUp={() => { endDrag(); endResize(); }}
-            onMouseLeave={() => { endDrag(); endResize(); }}
-            onTouchEnd={() => { endDrag(); endResize(); }}
-            onTouchCancel={() => { endDrag(); endResize(); }}
-            onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-            onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-          >
-            {templateUrl ? (
-              <>
-                <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+        <div className="lg:col-span-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sticky top-4">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
+              <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
+            </h2>
+            <div
+              ref={canvasRef}
+              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
+              onMouseUp={() => { endDrag(); endResize(); }}
+              onMouseLeave={() => { endDrag(); endResize(); }}
+              onTouchEnd={() => { endDrag(); endResize(); }}
+              onTouchCancel={() => { endDrag(); endResize(); }}
+              onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
+              onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
+            >
+              {templateUrl ? (
+                <>
+                  <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
-                {layers.map((layer, idx) => renderLayer(layer, idx))}
+                  {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                {/* QR Code */}
-                <div
-                  className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
-                  style={{
-                    left: `${qrX}%`,
-                    top: `${qrY}%`,
-                    width: qrSize,
-                    height: qrSize,
-                    transform: 'translate(-50%, -50%)',
-                    backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
-                  }}
-                  onMouseDown={(e) => {
-                    const rect = canvasRef.current!.getBoundingClientRect();
-                    const clientX = e.clientX;
-                    const clientY = e.clientY;
-                    setDragOffset({
-                      x: clientX - rect.left - (qrX / 100) * rect.width,
-                      y: clientY - rect.top - (qrY / 100) * rect.height,
-                    });
-                    setDragging({ type: 'qr', index: -1 });
-                    e.preventDefault();
-                  }}
-                  onTouchStart={(e) => {
-                    const touch = e.touches[0];
-                    const rect = canvasRef.current!.getBoundingClientRect();
-                    setDragOffset({
-                      x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                      y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                    });
-                    setDragging({ type: 'qr', index: -1 });
-                    e.preventDefault();
-                  }}
-                >
-                  <QrCode size={24} />
+                  {/* QR Code */}
+                  <div
+                    className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
+                    style={{
+                      left: `${qrX}%`,
+                      top: `${qrY}%`,
+                      width: qrSize,
+                      height: qrSize,
+                      transform: 'translate(-50%, -50%)',
+                      backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
+                    }}
+                    onMouseDown={(e) => {
+                      const rect = canvasRef.current!.getBoundingClientRect();
+                      const clientX = e.clientX;
+                      const clientY = e.clientY;
+                      setDragOffset({
+                        x: clientX - rect.left - (qrX / 100) * rect.width,
+                        y: clientY - rect.top - (qrY / 100) * rect.height,
+                      });
+                      setDragging({ type: 'qr', index: -1 });
+                      e.preventDefault();
+                    }}
+                    onTouchStart={(e) => {
+                      const touch = e.touches[0];
+                      const rect = canvasRef.current!.getBoundingClientRect();
+                      setDragOffset({
+                        x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                        y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                      });
+                      setDragging({ type: 'qr', index: -1 });
+                      e.preventDefault();
+                    }}
+                  >
+                    <QrCode size={24} />
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                  <div className="text-center">
+                    <ImageIcon size={40} className="mx-auto mb-2 opacity-50" />
+                    <p>Select a template or upload your own</p>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                <div className="text-center">
-                  <ImageIcon size={40} className="mx-auto mb-2 opacity-50" />
-                  <p>Select a template or upload your own</p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+            <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
           </div>
-          <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
         </div>
 
         {/* ─── Controls ─── */}
