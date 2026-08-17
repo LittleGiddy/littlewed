@@ -52,24 +52,17 @@ export async function POST(req: NextRequest) {
     // ─── Build guest full name with title ──────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Build host family name ─────────────────────────────────────────
-    const hostFamily = event.hostFamily || 'Mr & Mrs Wambura';
-
-    // ─── Build person names (groom and bride) ──────────────────────────
-    const person1 = event.person1 || 'John Wambura';
-    const person2 = event.person2 || 'Mary Wambura';
-
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
-      guestName: guestFullName,           // ✅ var1: "Mr Gideon"
-      hostFamily: hostFamily,             // ✅ var2: "Mr & Mrs Wambura"
-      person1: person1,                   // ✅ var3: "John Wambura"
-      person2: person2,                   // ✅ var4: "Mary Wambura"
-      date: formattedDate,                // ✅ var5: "25 Oktoba, 2026"
-      venue: event.venue || 'TAZARA',     // ✅ var6: "TAZARA"
-      time: event.time || '5:00 PM',      // ✅ var7: "5:00 PM"
-      cardNumber: guest.cardNumber || '11092', // ✅ var8: "11092"
-      cardType: guest.guestType || 'SINGLE',   // ✅ var9: "SINGLE"
+      guestName: guestFullName,              // ✅ var1: Guest name
+      hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',  // ✅ var2: Host family
+      person1: event.person1 || 'Agape',     // ✅ var3: Person 1 (Groom)
+      person2: event.person2 || 'Gladness',  // ✅ var4: Person 2 (Bride)
+      date: formattedDate,                   // ✅ var5: Formatted date
+      venue: event.venue || 'The Embassy Hall', // ✅ var6: Venue
+      time: event.time || '5:00 PM',         // ✅ var7: Time
+      cardNumber: guest.cardNumber || '108', // ✅ var8: Card number
+      cardType: guest.guestType || 'SINGLE', // ✅ var9: Card type
       imageUrl: guest.invitationCard || event.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
       inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
     });

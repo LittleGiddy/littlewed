@@ -102,18 +102,19 @@ export async function sendWhatsAppTemplate({
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-    guestName: string;           // Full name with title
-    hostFamily: string;          // Family name (e.g., "Mr & Mrs Wambura")
-    person1: string;             // Groom's full name
-    person2: string;             // Bride's full name
-    date: string;                // Formatted date
-    venue: string;               // Venue name
-    time: string;                // Time
-    cardNumber: string;          // Guest's card number
-    cardType: string;            // SINGLE or DOUBLE
-    imageUrl?: string;           // Card image URL
-    inviteLink?: string;         // Invitation link
-  }
+    guestName: string;    // ✅ not "name"
+  hostFamily: string;
+  person1: string;
+  person2: string;
+  date: string;
+  venue: string;
+  time: string;
+  cardNumber: string;
+  cardType: string;
+  imageUrl?: string;
+  inviteLink?: string;
+}
+
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
