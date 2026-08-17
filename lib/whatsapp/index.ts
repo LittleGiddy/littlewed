@@ -102,23 +102,22 @@ export async function sendWhatsAppTemplate({
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-    name: string;
-    hostFamily: string;
-    person1: string;
-    person2: string;
-    date: string;
-    venue: string;
-    time: string;
-    cardNumber: string;
-    cardType: string;
-    imageUrl?: string;
-    inviteLink?: string;
+    guestName: string;           // Full name with title
+    hostFamily: string;          // Family name (e.g., "Mr & Mrs Wambura")
+    person1: string;             // Groom's full name
+    person2: string;             // Bride's full name
+    date: string;                // Formatted date
+    venue: string;               // Venue name
+    time: string;                // Time
+    cardNumber: string;          // Guest's card number
+    cardType: string;            // SINGLE or DOUBLE
+    imageUrl?: string;           // Card image URL
+    inviteLink?: string;         // Invitation link
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
   // ─── Header with image ────────────────────────────────────────────────
-  // Use the guest's generated card if available, otherwise use a default
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -139,20 +138,22 @@ export async function sendWeddingInvitation(
     },
   };
 
+  // ─── Send template with proper variable mapping ──────────────────────
+  // Template variables (var1 - var9) must match the template in NexSMS
   return sendWhatsAppTemplate({
     to: phone,
     template: 'swahili invitation',
     personalisation: [
       {
-        "var1": data.name,          // ✅ Guest name
-        "var2": data.hostFamily,    // ✅ Host family
-        "var3": data.person1,       // ✅ Person 1 (Groom/Bride)
-        "var4": data.person2,       // ✅ Person 2 (Bride/Groom)
-        "var5": data.date,          // ✅ Event date (properly formatted)
-        "var6": data.venue,         // ✅ Venue
-        "var7": data.time,          // ✅ Time
-        "var8": data.cardNumber,    // ✅ Card number
-        "var9": data.cardType,      // ✅ Card type (SINGLE/DOUBLE)
+        "var1": data.guestName,      // ✅ Guest name with title (e.g., "Mr Gideon")
+        "var2": data.hostFamily,     // ✅ Host family (e.g., "Mr & Mrs Wambura")
+        "var3": data.person1,        // ✅ Person 1 full name (e.g., "John Wambura")
+        "var4": data.person2,        // ✅ Person 2 full name (e.g., "Mary Wambura")
+        "var5": data.date,           // ✅ Event date (e.g., "25 Oktoba, 2026")
+        "var6": data.venue,          // ✅ Venue (e.g., "TAZARA")
+        "var7": data.time,           // ✅ Time (e.g., "5:00 PM")
+        "var8": data.cardNumber,     // ✅ Card number (e.g., "11092")
+        "var9": data.cardType,       // ✅ Card type (e.g., "SINGLE" or "DOUBLE")
       }
     ],
     header,

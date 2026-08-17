@@ -44,23 +44,32 @@ export async function POST(req: NextRequest) {
 
     // ─── Format date properly ──────────────────────────────────────────
     const formattedDate = new Date(event.date).toLocaleDateString('sw-TZ', {
-      weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
 
+    // ─── Build guest full name with title ──────────────────────────────
+    const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
+    // ─── Build host family name ─────────────────────────────────────────
+    const hostFamily = event.hostFamily || 'Mr & Mrs Wambura';
+
+    // ─── Build person names (groom and bride) ──────────────────────────
+    const person1 = event.person1 || 'John Wambura';
+    const person2 = event.person2 || 'Mary Wambura';
+
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
-      name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
-      hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
-      person1: event.person1 || 'Agape',
-      person2: event.person2 || 'Gladness',
-      date: formattedDate, // ✅ Properly formatted date
-      venue: event.venue || 'The Embassy Hall',
-      time: event.time || '5:00 PM',
-      cardNumber: guest.cardNumber || '108',
-      cardType: guest.guestType || 'SINGLE',
+      guestName: guestFullName,           // ✅ var1: "Mr Gideon"
+      hostFamily: hostFamily,             // ✅ var2: "Mr & Mrs Wambura"
+      person1: person1,                   // ✅ var3: "John Wambura"
+      person2: person2,                   // ✅ var4: "Mary Wambura"
+      date: formattedDate,                // ✅ var5: "25 Oktoba, 2026"
+      venue: event.venue || 'TAZARA',     // ✅ var6: "TAZARA"
+      time: event.time || '5:00 PM',      // ✅ var7: "5:00 PM"
+      cardNumber: guest.cardNumber || '11092', // ✅ var8: "11092"
+      cardType: guest.guestType || 'SINGLE',   // ✅ var9: "SINGLE"
       imageUrl: guest.invitationCard || event.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
       inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
     });
