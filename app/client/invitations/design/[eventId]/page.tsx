@@ -6,7 +6,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, Layers, Eye, EyeOff, Undo, Redo,
   Lock, Unlock, BringToFront, SendToBack, Grid, ChevronDown, ChevronRight,
-  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle
+  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -87,6 +87,7 @@ export default function InvitationDesigner() {
   const [qrY, setQrY] = useState(100);
   const [qrSize, setQrSize] = useState(200);
   const [qrColor, setQrColor] = useState('#000000');
+  const [qrRotation, setQrRotation] = useState(0);
   const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -200,6 +201,7 @@ export default function InvitationDesigner() {
         setQrY(settings.qrPlacementY ?? 100);
         setQrSize(settings.qrSize ?? 200);
         setQrColor(settings.qrColor ?? '#000000');
+        setQrRotation(settings.qrRotation ?? 0);
       } catch {
         toast.error('Failed to load data');
       } finally {
@@ -266,6 +268,7 @@ export default function InvitationDesigner() {
           qrPlacementY: qrY,
           qrSize,
           qrColor,
+          qrRotation,
           designLayers: layers,
         }),
       });
@@ -855,7 +858,7 @@ export default function InvitationDesigner() {
 
                   {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* QR Code */}
+                  {/* QR Code with rotation support */}
                   <div
                     className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
                     style={{
@@ -863,7 +866,7 @@ export default function InvitationDesigner() {
                       top: `${qrY}%`,
                       width: qrSize,
                       height: qrSize,
-                      transform: 'translate(-50%, -50%)',
+                      transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
                       backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
                     }}
                     onMouseDown={(e) => {
@@ -888,7 +891,7 @@ export default function InvitationDesigner() {
                       e.preventDefault();
                     }}
                   >
-                    <QrCode size={24} />
+                    <QrCode size={Math.min(qrSize * 0.6, 48)} />
                   </div>
                 </>
               ) : (
@@ -1344,58 +1347,166 @@ export default function InvitationDesigner() {
             </Section>
 
             <Section title="QR Code" section="qr" icon={<QrCode size={16} />}>
-              <div className="space-y-3">
+              <div className="space-y-4">
+                {/* Position controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Horizontal Position</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={qrX}
-                      onChange={e => setQrX(Number(e.target.value))}
-                      className="flex-1 accent-[#0D4F4F]"
-                    />
-                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(qrX)}%</span>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Position</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500">X Position</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={Math.round(qrX)}
+                        onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Y Position</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={Math.round(qrY)}
+                        onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                    </div>
                   </div>
                 </div>
+
+                {/* Size controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Vertical Position</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={qrY}
-                      onChange={e => setQrY(Number(e.target.value))}
-                      className="flex-1 accent-[#0D4F4F]"
-                    />
-                    <span className="text-xs text-gray-500 w-12 text-right">{Math.round(qrY)}%</span>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Size</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min="20"
+                        max="400"
+                        step="5"
+                        value={qrSize}
+                        onChange={e => setQrSize(Number(e.target.value))}
+                        className="w-full accent-[#0D4F4F]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="20"
+                        max="400"
+                        step="5"
+                        value={qrSize}
+                        onChange={e => setQrSize(Math.min(400, Math.max(20, Number(e.target.value))))}
+                        className="w-20 p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                      <span className="text-xs text-gray-500">px</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setQrSize(Math.max(20, qrSize - 20))}
+                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition"
+                    >
+                      −20px
+                    </button>
+                    <button
+                      onClick={() => setQrSize(Math.min(400, qrSize + 20))}
+                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition"
+                    >
+                      +20px
+                    </button>
                   </div>
                 </div>
+
+                {/* Rotation controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Size</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range"
-                      min="80"
-                      max="300"
-                      step="10"
-                      value={qrSize}
-                      onChange={e => setQrSize(Number(e.target.value))}
-                      className="flex-1 accent-[#0D4F4F]"
-                    />
-                    <span className="text-xs text-gray-500 w-12 text-right">{qrSize}px</span>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Rotation</label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="range"
+                        min="-180"
+                        max="180"
+                        step="1"
+                        value={qrRotation}
+                        onChange={e => setQrRotation(Number(e.target.value))}
+                        className="w-full accent-[#0D4F4F]"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="-180"
+                        max="180"
+                        value={qrRotation}
+                        onChange={e => setQrRotation(Math.min(180, Math.max(-180, Number(e.target.value))))}
+                        className="w-20 p-1.5 border border-gray-200 rounded-lg text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                      <span className="text-xs text-gray-500">°</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setQrRotation(qrRotation - 45)}
+                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-1"
+                    >
+                      <RotateCw size={12} /> −45°
+                    </button>
+                    <button
+                      onClick={() => setQrRotation(qrRotation + 45)}
+                      className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-1"
+                    >
+                      <RotateCw size={12} /> +45°
+                    </button>
                   </div>
                 </div>
+
+                {/* Color controls */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700">Color</label>
-                  <input
-                    type="color"
-                    value={qrColor}
-                    onChange={e => setQrColor(e.target.value)}
-                    className="w-full h-8 rounded-lg cursor-pointer border border-gray-200"
-                  />
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Color</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={qrColor}
+                      onChange={e => setQrColor(e.target.value)}
+                      className="h-10 w-full rounded-lg cursor-pointer border border-gray-200"
+                    />
+                    <input
+                      type="text"
+                      value={qrColor}
+                      onChange={e => setQrColor(e.target.value)}
+                      className="w-28 p-1.5 border border-gray-200 rounded-lg text-sm text-center font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                {/* Preset sizes */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Quick Presets</label>
+                  <div className="flex gap-2">
+                    {[
+                      { label: 'Tiny', size: 40 },
+                      { label: 'Small', size: 80 },
+                      { label: 'Medium', size: 150 },
+                      { label: 'Large', size: 250 },
+                      { label: 'XL', size: 350 },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setQrSize(preset.size)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          qrSize === preset.size
+                            ? 'bg-[#0D4F4F] text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </Section>

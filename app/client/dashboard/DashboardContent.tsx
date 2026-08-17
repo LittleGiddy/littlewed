@@ -232,10 +232,7 @@ export default function DashboardContent({
               {firstName} 👋
             </h1>
           </div>
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-serif font-bold text-white text-lg"
-            style={{ background: ACCENT }}>
-            {firstName?.[0]?.toUpperCase() ?? 'U'}
-          </div>
+        
         </motion.div>
 
         {/* ─── Carousel ─── */}
