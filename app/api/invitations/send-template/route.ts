@@ -31,21 +31,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
     }
 
-    // ─── THIS IS WHERE THE ERROR IS THROWN ──────────────────────────────
     if (!guest.phone) {
-      return NextResponse.json({ 
-        error: 'Phone number is required' 
-      }, { status: 400 });
+      return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
     }
 
-    // ─── Check if guest has WhatsApp routing ──────────────────────────────
     if (guest.routingChannel !== 'whatsapp') {
       return NextResponse.json({
         error: `Guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
       }, { status: 400 });
     }
 
-    // ─── Send the invitation ──────────────────────────────────────────────
+    // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
       name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
       hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
@@ -60,6 +56,7 @@ export async function POST(req: NextRequest) {
       time: event.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
+      imageUrl: 'https://www.gstatic.com/webp/gallery/1.png',
       inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
     });
 
@@ -73,6 +70,7 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Invitation sent successfully!',
         data: result.data,
+        messageId: result.messageId,
       });
     } else {
       return NextResponse.json({

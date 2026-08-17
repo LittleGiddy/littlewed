@@ -60,10 +60,8 @@ export async function sendWhatsAppTemplate({
     body.button = button;
   }
 
-  console.log('[WhatsApp] ====== SENDING MESSAGE ======');
-  console.log('[WhatsApp] Template:', template);
+  console.log('[WhatsApp] Sending template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
-  console.log('[WhatsApp] To:', cleanTo);
   console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
 
   try {
@@ -90,18 +88,16 @@ export async function sendWhatsAppTemplate({
       throw new Error(errorMsg);
     }
 
-    console.log('[WhatsApp] ✅ Message accepted by NexSMS');
-    
     const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
 
     return { success: true, messageId: String(messageId), data };
   } catch (error: any) {
-    console.error('[WhatsApp] ❌ Error sending template:', error.message);
+    console.error('[WhatsApp] Error sending template:', error.message);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
 
-// ─── Wedding Invitation (NO HEADER) ────────────────────────────────────
+// ─── Wedding Invitation Template ──────────────────────────────────────
 
 export async function sendWeddingInvitation(
   phone: string,
@@ -115,16 +111,37 @@ export async function sendWeddingInvitation(
     time: string;
     cardNumber: string;
     cardType: string;
+    imageUrl?: string;
     inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
+  console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
-  const linkSuffix = data.inviteLink || 'default';
+  // ─── Header with image ────────────────────────────────────────────────
+  const header = {
+    image: {
+      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
+      name: 'Wedding Invitation',
+    }
+  };
+
+  // ─── Button with dynamic URL ──────────────────────────────────────────
+  // Extract the slug from the invite link
+  const slug = data.inviteLink 
+    ? toLinkSuffix(data.inviteLink) 
+    : 'default';
+
+  const button = {
+    personalisation: {
+      url_link: {
+        parameters: [slug],
+      },
+    },
+  };
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'invitation_reminder', // Or use UUID: 'b8519b7d-c820-4c7b-914e-36302b245725'
+    template: 'swahilli invitation', // Your approved template name
     personalisation: [
       {
         "var1": data.name,
@@ -138,48 +155,12 @@ export async function sendWeddingInvitation(
         "var9": data.cardType,
       }
     ],
-    // ❌ No header - template doesn't have image
-    button: {
-      personalisation: {
-        url_link: {
-          parameters: [linkSuffix],
-        },
-      },
-    },
+    header,
+    button,
   });
 }
 
-// ─── Simple Test Template ──────────────────────────────────────────────
-
-export async function sendSimpleTestMessage(
-  phone: string,
-  data: {
-    name: string;
-    cardNumber: string;
-  }
-): Promise<SendWhatsAppResult> {
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'test_simple',
-    personalisation: [
-      {
-        "var1": data.name,
-        "var2": data.cardNumber,
-      }
-    ],
-  });
-}
-
-// ─── Hello World ──────────────────────────────────────────────────────
-
-export async function sendHelloWorld(
-  phone: string
-): Promise<SendWhatsAppResult> {
-  return sendWhatsAppTemplate({
-    to: phone,
-    template: 'hello_world',
-  });
-}
+// ─── Helper: Convert full URL to slug ──────────────────────────────────
 
 export function toLinkSuffix(value: string): string {
   try {

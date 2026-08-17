@@ -5,22 +5,6 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
 
-// Helper: NextSMS wants only the dynamic suffix for a "Dynamic Link" button,
-// not the full URL (the static prefix is baked into the approved template).
-// This strips a full https://littlewed.co.tz/invite/<suffix> URL down to
-// <suffix> if a full URL is passed in; if it's already just a suffix, it's
-// returned unchanged.
-function toLinkSuffix(value: string): string {
-  try {
-    const url = new URL(value);
-    const parts = url.pathname.split('/').filter(Boolean);
-    return parts[parts.length - 1] || value;
-  } catch {
-    // Not a full URL — assume it's already a suffix
-    return value;
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -54,29 +38,27 @@ export async function POST(req: NextRequest) {
       result = await sendWhatsAppTemplate({
         to: guest.phone,
         template: 'thank_you',
-        personalisation: [{ "1": guest.name }],
+        personalisation: [{ "var1": guest.name }],
       });
     } else if (template) {
       // Send custom template
       result = await sendWhatsAppTemplate({
         to: guest.phone,
         template: template,
-        personalisation: [{ "1": guest.name }],
+        personalisation: [{ "var1": guest.name }],
         header: imageUrl ? { image: { file: imageUrl, name: 'Invitation' } } : undefined,
-        button: buttonUrl
-          ? {
-              personalisation: {
-                url_link: {
-                  parameters: [toLinkSuffix(buttonUrl)],
-                },
-              },
-            }
-          : undefined,
+        button: buttonUrl ? {
+          personalisation: {
+            url_link: {
+              parameters: [buttonUrl],
+            },
+          },
+        } : undefined,
       });
     } else {
       // Send wedding invitation
       result = await sendWeddingInvitation(guest.phone, {
-        name: guest.name,
+        name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
         hostFamily: guest.event.hostFamily || 'Mr & Mrs Allan Swai',
         person1: guest.event.person1 || 'Agape',
         person2: guest.event.person2 || 'Gladness',
@@ -89,7 +71,8 @@ export async function POST(req: NextRequest) {
         time: guest.event.time || '5:00 PM',
         cardNumber: guest.cardNumber || '108',
         cardType: guest.guestType || 'SINGLE',
-        inviteLink: buttonUrl ? toLinkSuffix(buttonUrl) : guest.id,
+        imageUrl: imageUrl || guest.event.imageUrl,
+        inviteLink: buttonUrl || `https://littlewed.co.tz/invite/${guest.id}`,
       });
     }
 

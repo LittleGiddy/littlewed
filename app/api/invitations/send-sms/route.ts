@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
+import { sendSMS } from '@/lib/sms/index';
 
 // ─── Helper: Get full name ──────────────────────────────────────────────
 function getFullName(guest: any): string {
@@ -24,7 +24,6 @@ function personalizeMessage(message: string, guest: any, event: any): string {
     .replace(/{name}/g, guest.name)
     .replace(/{fullName}/g, fullName)
     .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
-    .replace(/{smsCode}/g, guest.smsCode || 'N/A')
     .replace(/{event}/g, event.name)
     .replace(/{date}/g, formattedDate)
     .replace(/{venue}/g, event.venue)
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     // ─── Personalize the message ──────────────────────────────────────────
     const personalizedMessage = personalizeMessage(
-      message || "You're invited to {event}! Check-in code: {smsCode}",
+      message || "Hello {fullName}, you're invited to {event}! Card: {cardNumber}",
       guest,
       event
     );

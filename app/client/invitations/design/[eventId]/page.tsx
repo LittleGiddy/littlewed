@@ -94,7 +94,8 @@ export default function InvitationDesigner() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
-  const [isPreviewSticky, setIsPreviewSticky] = useState(false);
+  const [isSticky, setIsSticky] = useState(false);
+  const [previewHeight, setPreviewHeight] = useState(0);
 
   // Drag state
   const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
@@ -107,29 +108,53 @@ export default function InvitationDesigner() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  const stickyContainerRef = useRef<HTMLDivElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
 
-  // ─── Intersection Observer for sticky preview ────────────────────────
+  // ─── Sticky Preview Logic ─────────────────────────────────────────────
   useEffect(() => {
-    if (!sentinelRef.current) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        // When the sentinel is no longer visible (scrolled past), make preview sticky
-        setIsPreviewSticky(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        rootMargin: '0px 0px 0px 0px',
+    const handleScroll = () => {
+      if (!stickyContainerRef.current) return;
+      
+      const rect = stickyContainerRef.current.getBoundingClientRect();
+      const shouldStick = rect.top <= 0;
+      
+      if (shouldStick !== isSticky) {
+        setIsSticky(shouldStick);
+        
+        // Update spacer height when becoming sticky
+        if (shouldStick && previewRef.current && spacerRef.current) {
+          const height = previewRef.current.offsetHeight;
+          spacerRef.current.style.height = `${height}px`;
+        } else if (!shouldStick && spacerRef.current) {
+          spacerRef.current.style.height = '0px';
+        }
       }
-    );
+    };
 
-    observer.observe(sentinelRef.current);
+    // Use requestAnimationFrame for smooth updates
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    
+    // Initial check
+    setTimeout(handleScroll, 100);
 
     return () => {
-      observer.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
     };
-  }, []);
+  }, [isSticky]);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -846,23 +871,29 @@ export default function InvitationDesigner() {
         )}
       </div>
 
-      {/* ─── Main Content ─── */}
-      <div className="relative">
-        {/* ─── Sentinel for sticky detection ─── */}
-        <div ref={sentinelRef} className="absolute top-0 left-0 w-full h-px pointer-events-none" />
+      {/* ─── Spacer ─── */}
+      <div ref={spacerRef} style={{ height: 0, transition: 'height 0.2s ease' }} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* ─── Preview Column ─── */}
-          <div className="lg:col-span-2">
+      {/* ─── Main Content ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* ─── Preview Column ─── */}
+        <div className="lg:col-span-2">
+          <div 
+            ref={stickyContainerRef}
+            className="relative"
+          >
             <div 
               ref={previewRef}
-              className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 transition-shadow ${
-                isPreviewSticky ? 'shadow-lg border-t-0 rounded-t-none' : ''
+              className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 transition-all duration-200 ${
+                isSticky ? 'fixed top-0 left-0 right-0 z-50 max-w-7xl mx-auto rounded-none shadow-lg border-x-0 border-t-0' : ''
               }`}
               style={{
-                position: isPreviewSticky ? 'sticky' : 'relative',
-                top: isPreviewSticky ? '0px' : 'auto',
-                zIndex: isPreviewSticky ? 40 : 'auto',
+                width: isSticky ? '100%' : '100%',
+                maxWidth: isSticky ? 'calc(100% - 2rem)' : '100%',
+                marginLeft: isSticky ? 'auto' : '',
+                marginRight: isSticky ? 'auto' : '',
+                left: isSticky ? '50%' : '',
+                transform: isSticky ? 'translateX(-50%)' : 'none',
               }}
             >
               <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -940,590 +971,590 @@ export default function InvitationDesigner() {
               </p>
             </div>
           </div>
+        </div>
 
-          {/* ─── Controls Column ─── */}
-          <div className="lg:col-span-3 space-y-3 sm:space-y-4">
-            {/* ─── Quick Add ─── */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 space-y-2">
-              <p className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
-                <Sparkles size={14} className="text-[#0D4F4F]" /> Quick Add
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                <button
-                  onClick={addGuestNameLayer}
-                  className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
-                >
-                  <User size={12} className="sm:text-sm" /> Guest Name
+        {/* ─── Controls Column ─── */}
+        <div className="lg:col-span-3 space-y-3 sm:space-y-4">
+          {/* ─── Quick Add ─── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 space-y-2">
+            <p className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+              <Sparkles size={14} className="text-[#0D4F4F]" /> Quick Add
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+              <button
+                onClick={addGuestNameLayer}
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
+              >
+                <User size={12} className="sm:text-sm" /> Guest Name
+              </button>
+              <button
+                onClick={addGuestTitleLayer}
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
+              >
+                <UserCheck size={12} className="sm:text-sm" /> Title
+              </button>
+              <button
+                onClick={addCardNumberLayer}
+                className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
+              >
+                <Hash size={12} className="sm:text-sm" /> Card No.
+              </button>
+              <button
+                onClick={addTextLayer}
+                className="bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5"
+              >
+                <Type size={12} className="sm:text-sm" /> Custom Text
+              </button>
+            </div>
+          </div>
+
+          {/* ─── Controls Accordion ─── */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <Section title="Shapes" section="addLayer" icon={<Square size={14} className="sm:text-base" />}>
+              <div className="flex gap-2">
+                <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
+                  <Square size={12} className="sm:text-sm" /> Rectangle
                 </button>
-                <button
-                  onClick={addGuestTitleLayer}
-                  className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
-                >
-                  <UserCheck size={12} className="sm:text-sm" /> Title
-                </button>
-                <button
-                  onClick={addCardNumberLayer}
-                  className="bg-[#0D4F4F] text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1 sm:gap-1.5"
-                >
-                  <Hash size={12} className="sm:text-sm" /> Card No.
-                </button>
-                <button
-                  onClick={addTextLayer}
-                  className="bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[10px] sm:text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5"
-                >
-                  <Type size={12} className="sm:text-sm" /> Custom Text
+                <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
+                  <Minus size={12} className="sm:text-sm" /> Line
                 </button>
               </div>
-            </div>
+            </Section>
 
-            {/* ─── Controls Accordion ─── */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <Section title="Shapes" section="addLayer" icon={<Square size={14} className="sm:text-base" />}>
-                <div className="flex gap-2">
-                  <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
-                    <Square size={12} className="sm:text-sm" /> Rectangle
-                  </button>
-                  <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 sm:gap-1.5">
-                    <Minus size={12} className="sm:text-sm" /> Line
-                  </button>
+            <Section title="Layers" section="layers" icon={<Layers size={14} className="sm:text-base" />}>
+              {layers.length === 0 && (
+                <div className="text-center py-4 sm:py-6 text-gray-400 text-xs sm:text-sm">
+                  <Layers size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
+                  No layers. Add one above!
                 </div>
-              </Section>
-
-              <Section title="Layers" section="layers" icon={<Layers size={14} className="sm:text-base" />}>
-                {layers.length === 0 && (
-                  <div className="text-center py-4 sm:py-6 text-gray-400 text-xs sm:text-sm">
-                    <Layers size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
-                    No layers. Add one above!
-                  </div>
-                )}
-                <div className="max-h-36 sm:max-h-48 overflow-y-auto space-y-1">
-                  {layers.map((layer, idx) => (
-                    <div
-                      key={layer.id}
-                      className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
-                      onClick={() => setSelectedLayerIndex(idx)}
-                    >
-                      <span className="text-[10px] sm:text-sm truncate flex items-center gap-1 sm:gap-1.5">
-                        {layer.type === 'text' && <Type size={10} className="sm:text-sm" />}
-                        {layer.type === 'rect' && <Square size={10} className="sm:text-sm" />}
-                        {layer.type === 'line' && <Minus size={10} className="sm:text-sm" />}
-                        {layer.isGuestName && <User size={10} className="sm:text-sm text-[#0D4F4F]" />}
-                        {layer.isGuestType && <UserCheck size={10} className="sm:text-sm text-[#0D4F4F]" />}
-                        {layer.isCardNumber && <Hash size={10} className="sm:text-sm text-[#0D4F4F]" />}
-                        <span className="truncate max-w-[50px] sm:max-w-[80px]">
-                          {layer.type === 'text' ? layer.text.substring(0, 12) : layer.type === 'rect' ? 'Rectangle' : 'Line'}
-                        </span>
+              )}
+              <div className="max-h-36 sm:max-h-48 overflow-y-auto space-y-1">
+                {layers.map((layer, idx) => (
+                  <div
+                    key={layer.id}
+                    className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
+                    onClick={() => setSelectedLayerIndex(idx)}
+                  >
+                    <span className="text-[10px] sm:text-sm truncate flex items-center gap-1 sm:gap-1.5">
+                      {layer.type === 'text' && <Type size={10} className="sm:text-sm" />}
+                      {layer.type === 'rect' && <Square size={10} className="sm:text-sm" />}
+                      {layer.type === 'line' && <Minus size={10} className="sm:text-sm" />}
+                      {layer.isGuestName && <User size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      {layer.isGuestType && <UserCheck size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      {layer.isCardNumber && <Hash size={10} className="sm:text-sm text-[#0D4F4F]" />}
+                      <span className="truncate max-w-[50px] sm:max-w-[80px]">
+                        {layer.type === 'text' ? layer.text.substring(0, 12) : layer.type === 'rect' ? 'Rectangle' : 'Line'}
                       </span>
-                      <div className="flex gap-0.5">
-                        <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle visibility">
-                          {layer.visible ? <Eye size={10} className="sm:text-sm" /> : <EyeOff size={10} className="sm:text-sm" />}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle lock">
-                          {layer.locked ? <Lock size={10} className="sm:text-sm" /> : <Unlock size={10} className="sm:text-sm" />}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
-                          <Copy size={10} className="sm:text-sm" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move up">
-                          <ArrowUp size={10} className="sm:text-sm" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move down">
-                          <ArrowDown size={10} className="sm:text-sm" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
-                          <Trash2 size={10} className="sm:text-sm" />
-                        </button>
-                      </div>
+                    </span>
+                    <div className="flex gap-0.5">
+                      <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle visibility">
+                        {layer.visible ? <Eye size={10} className="sm:text-sm" /> : <EyeOff size={10} className="sm:text-sm" />}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle lock">
+                        {layer.locked ? <Lock size={10} className="sm:text-sm" /> : <Unlock size={10} className="sm:text-sm" />}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
+                        <Copy size={10} className="sm:text-sm" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move up">
+                        <ArrowUp size={10} className="sm:text-sm" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Move down">
+                        <ArrowDown size={10} className="sm:text-sm" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
+                        <Trash2 size={10} className="sm:text-sm" />
+                      </button>
                     </div>
-                  ))}
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Properties" section="properties" icon={<Settings size={14} className="sm:text-base" />}>
+              {selectedLayer ? (
+                <div className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-64 overflow-y-auto">
+                  {selectedLayer.type === 'text' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Text</label>
+                        <textarea
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          rows={2}
+                          value={selectedLayer.text}
+                          onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
+                        />
+                        {selectedLayer.isGuestName && (
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><User size={10} className="sm:text-sm" /> Replaced with each guest's name</p>
+                        )}
+                        {selectedLayer.isGuestType && (
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><UserCheck size={10} className="sm:text-sm" /> Replaced with each guest's title</p>
+                        )}
+                        {selectedLayer.isCardNumber && (
+                          <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><Hash size={10} className="sm:text-sm" /> Replaced with each guest's card number</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Font</label>
+                        <select
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          value={selectedLayer.fontFamily}
+                          onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
+                        >
+                          {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="8"
+                            max="100"
+                            value={selectedLayer.fontSize}
+                            onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.fontSize}
+                            onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
+                            min="8"
+                            max="100"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.color}
+                          onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Alignment</label>
+                        <div className="flex gap-1">
+                          {['left', 'center', 'right'].map(a => (
+                            <button
+                              key={a}
+                              onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
+                              className={`flex-1 p-1 sm:p-1.5 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
+                            >
+                              {a === 'left' ? <AlignLeft size={12} className="sm:text-sm" /> : a === 'center' ? <AlignCenter size={12} className="sm:text-sm" /> : <AlignRight size={12} className="sm:text-sm" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            min="-180"
+                            max="180"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                          />
+                          Shadow
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedLayer.type === 'rect' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Fill Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.fill || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.borderColor || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Width</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            value={selectedLayer.borderWidth || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.borderWidth || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
+                            min="0"
+                            max="10"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Width / Height</label>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={selectedLayer.width || 30}
+                            onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.width || 30}
+                            onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
+                            min="5"
+                            max="100"
+                          />
+                          <span className="text-[10px] sm:text-xs text-gray-400">×</span>
+                          <input
+                            type="range"
+                            min="5"
+                            max="100"
+                            value={selectedLayer.height || 20}
+                            onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.height || 20}
+                            onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
+                            min="5"
+                            max="100"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.rotation || 0}
+                            onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
+                            min="-180"
+                            max="180"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                          />
+                          Shadow
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedLayer.type === 'line' && (
+                    <>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Color</label>
+                        <input
+                          type="color"
+                          value={selectedLayer.strokeColor || '#ffffff'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
+                          className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Width</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={selectedLayer.strokeWidth || 2}
+                            onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
+                            className="flex-1 accent-[#0D4F4F]"
+                          />
+                          <input
+                            type="number"
+                            className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
+                            value={selectedLayer.strokeWidth || 2}
+                            onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
+                            min="1"
+                            max="10"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Dash Style</label>
+                        <select
+                          className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          value={selectedLayer.dashArray || 'solid'}
+                          onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
+                        >
+                          <option value="solid">Solid</option>
+                          <option value="dashed">Dashed</option>
+                          <option value="dotted">Dotted</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                          />
+                          Shadow
+                        </label>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </Section>
+              ) : (
+                <div className="text-center py-6 sm:py-8 text-gray-400 text-xs sm:text-sm">
+                  <Settings size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
+                  Select a layer to edit properties
+                </div>
+              )}
+            </Section>
 
-              <Section title="Properties" section="properties" icon={<Settings size={14} className="sm:text-base" />}>
-                {selectedLayer ? (
-                  <div className="space-y-2 sm:space-y-3 max-h-48 sm:max-h-64 overflow-y-auto">
-                    {selectedLayer.type === 'text' && (
-                      <>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Text</label>
-                          <textarea
-                            className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                            rows={2}
-                            value={selectedLayer.text}
-                            onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
-                          />
-                          {selectedLayer.isGuestName && (
-                            <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><User size={10} className="sm:text-sm" /> Replaced with each guest's name</p>
-                          )}
-                          {selectedLayer.isGuestType && (
-                            <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><UserCheck size={10} className="sm:text-sm" /> Replaced with each guest's title</p>
-                          )}
-                          {selectedLayer.isCardNumber && (
-                            <p className="text-[10px] sm:text-xs text-[#0D4F4F] mt-1 flex items-center gap-1"><Hash size={10} className="sm:text-sm" /> Replaced with each guest's card number</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Font</label>
-                          <select
-                            className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                            value={selectedLayer.fontFamily}
-                            onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
-                          >
-                            {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="8"
-                              max="100"
-                              value={selectedLayer.fontSize}
-                              onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.fontSize}
-                              onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
-                              min="8"
-                              max="100"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
-                          <input
-                            type="color"
-                            value={selectedLayer.color}
-                            onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                            className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Alignment</label>
-                          <div className="flex gap-1">
-                            {['left', 'center', 'right'].map(a => (
-                              <button
-                                key={a}
-                                onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
-                                className={`flex-1 p-1 sm:p-1.5 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
-                              >
-                                {a === 'left' ? <AlignLeft size={12} className="sm:text-sm" /> : a === 'center' ? <AlignCenter size={12} className="sm:text-sm" /> : <AlignRight size={12} className="sm:text-sm" />}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              min="-180"
-                              max="180"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Shadow
-                          </label>
-                        </div>
-                      </>
-                    )}
-
-                    {selectedLayer.type === 'rect' && (
-                      <>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Fill Color</label>
-                          <input
-                            type="color"
-                            value={selectedLayer.fill || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                            className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Color</label>
-                          <input
-                            type="color"
-                            value={selectedLayer.borderColor || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                            className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Border Width</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="0"
-                              max="10"
-                              value={selectedLayer.borderWidth || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.borderWidth || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
-                              min="0"
-                              max="10"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Width / Height</label>
-                          <div className="flex items-center gap-1 sm:gap-2">
-                            <input
-                              type="range"
-                              min="5"
-                              max="100"
-                              value={selectedLayer.width || 30}
-                              onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.width || 30}
-                              onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
-                              min="5"
-                              max="100"
-                            />
-                            <span className="text-[10px] sm:text-xs text-gray-400">×</span>
-                            <input
-                              type="range"
-                              min="5"
-                              max="100"
-                              value={selectedLayer.height || 20}
-                              onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.height || 20}
-                              onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
-                              min="5"
-                              max="100"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              min="-180"
-                              max="180"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Shadow
-                          </label>
-                        </div>
-                      </>
-                    )}
-
-                    {selectedLayer.type === 'line' && (
-                      <>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Color</label>
-                          <input
-                            type="color"
-                            value={selectedLayer.strokeColor || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                            className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Stroke Width</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="1"
-                              max="10"
-                              value={selectedLayer.strokeWidth || 2}
-                              onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 sm:w-16 p-1 border border-gray-200 rounded-lg text-xs sm:text-sm text-center"
-                              value={selectedLayer.strokeWidth || 2}
-                              onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
-                              min="1"
-                              max="10"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Dash Style</label>
-                          <select
-                            className="w-full p-1.5 sm:p-2 border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                            value={selectedLayer.dashArray || 'solid'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
-                          >
-                            <option value="solid">Solid</option>
-                            <option value="dashed">Dashed</option>
-                            <option value="dotted">Dotted</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-medium text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.1)', blur: 2, offsetX: 0, offsetY: 0 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Shadow
-                          </label>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 sm:py-8 text-gray-400 text-xs sm:text-sm">
-                    <Settings size={20} className="sm:text-2xl mx-auto mb-2 opacity-30" />
-                    Select a layer to edit properties
-                  </div>
-                )}
-              </Section>
-
-              <Section title="Overlay" section="overlay" icon={<Palette size={14} className="sm:text-base" />}>
-                <div className="space-y-2 sm:space-y-3">
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
+            <Section title="Overlay" section="overlay" icon={<Palette size={14} className="sm:text-base" />}>
+              <div className="space-y-2 sm:space-y-3">
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
+                  <input
+                    type="color"
+                    value={overlayColor}
+                    onChange={e => setOverlayColor(e.target.value)}
+                    className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Opacity</label>
+                  <div className="flex items-center gap-2">
                     <input
-                      type="color"
-                      value={overlayColor}
-                      onChange={e => setOverlayColor(e.target.value)}
-                      className="w-full h-7 sm:h-8 rounded-lg cursor-pointer border border-gray-200"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={overlayOpacity}
+                      onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
+                      className="flex-1 accent-[#0D4F4F]"
                     />
+                    <span className="text-[10px] sm:text-xs text-gray-500 w-10 sm:w-12 text-right">{Math.round(overlayOpacity * 100)}%</span>
                   </div>
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Opacity</label>
-                    <div className="flex items-center gap-2">
+                </div>
+              </div>
+            </Section>
+
+            <Section title="QR Code" section="qr" icon={<QrCode size={14} className="sm:text-base" />}>
+              <div className="space-y-2 sm:space-y-3">
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Position</label>
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-500">X</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={Math.round(qrX)}
+                        onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500">Y</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={Math.round(qrY)}
+                        onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex-1">
                       <input
                         type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={overlayOpacity}
-                        onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
-                        className="flex-1 accent-[#0D4F4F]"
+                        min="20"
+                        max="400"
+                        step="5"
+                        value={qrSize}
+                        onChange={e => setQrSize(Number(e.target.value))}
+                        className="w-full accent-[#0D4F4F]"
                       />
-                      <span className="text-[10px] sm:text-xs text-gray-500 w-10 sm:w-12 text-right">{Math.round(overlayOpacity * 100)}%</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 sm:gap-1">
+                      <input
+                        type="number"
+                        min="20"
+                        max="400"
+                        step="5"
+                        value={qrSize}
+                        onChange={e => setQrSize(Math.min(400, Math.max(20, Number(e.target.value))))}
+                        className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                      <span className="text-[10px] sm:text-xs text-gray-500">px</span>
                     </div>
                   </div>
                 </div>
-              </Section>
 
-              <Section title="QR Code" section="qr" icon={<QrCode size={14} className="sm:text-base" />}>
-                <div className="space-y-2 sm:space-y-3">
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Position</label>
-                    <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-500">X</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={Math.round(qrX)}
-                          onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500">Y</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={Math.round(qrY)}
-                          onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                          className="w-full p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Size</label>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex-1">
-                        <input
-                          type="range"
-                          min="20"
-                          max="400"
-                          step="5"
-                          value={qrSize}
-                          onChange={e => setQrSize(Number(e.target.value))}
-                          className="w-full accent-[#0D4F4F]"
-                        />
-                      </div>
-                      <div className="flex items-center gap-0.5 sm:gap-1">
-                        <input
-                          type="number"
-                          min="20"
-                          max="400"
-                          step="5"
-                          value={qrSize}
-                          onChange={e => setQrSize(Math.min(400, Math.max(20, Number(e.target.value))))}
-                          className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                        />
-                        <span className="text-[10px] sm:text-xs text-gray-500">px</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex-1">
-                        <input
-                          type="range"
-                          min="-180"
-                          max="180"
-                          step="1"
-                          value={qrRotation}
-                          onChange={e => setQrRotation(Number(e.target.value))}
-                          className="w-full accent-[#0D4F4F]"
-                        />
-                      </div>
-                      <div className="flex items-center gap-0.5 sm:gap-1">
-                        <input
-                          type="number"
-                          min="-180"
-                          max="180"
-                          value={qrRotation}
-                          onChange={e => setQrRotation(Math.min(180, Math.max(-180, Number(e.target.value))))}
-                          className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                        />
-                        <span className="text-[10px] sm:text-xs text-gray-500">°</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
-                    <div className="flex items-center gap-2 sm:gap-3">
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Rotation</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex-1">
                       <input
-                        type="color"
-                        value={qrColor}
-                        onChange={e => setQrColor(e.target.value)}
-                        className="h-8 sm:h-10 w-full rounded-lg cursor-pointer border border-gray-200"
-                      />
-                      <input
-                        type="text"
-                        value={qrColor}
-                        onChange={e => setQrColor(e.target.value)}
-                        className="w-20 sm:w-28 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        type="range"
+                        min="-180"
+                        max="180"
+                        step="1"
+                        value={qrRotation}
+                        onChange={e => setQrRotation(Number(e.target.value))}
+                        className="w-full accent-[#0D4F4F]"
                       />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Quick Presets</label>
-                    <div className="flex gap-1 sm:gap-2">
-                      {[
-                        { label: 'Tiny', size: 40 },
-                        { label: 'Small', size: 80 },
-                        { label: 'Medium', size: 150 },
-                        { label: 'Large', size: 250 },
-                        { label: 'XL', size: 350 },
-                      ].map(preset => (
-                        <button
-                          key={preset.label}
-                          onClick={() => setQrSize(preset.size)}
-                          className={`flex-1 py-1 sm:py-1.5 rounded-lg text-[8px] sm:text-xs font-semibold transition ${
-                            qrSize === preset.size
-                              ? 'bg-[#0D4F4F] text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                    <div className="flex items-center gap-0.5 sm:gap-1">
+                      <input
+                        type="number"
+                        min="-180"
+                        max="180"
+                        value={qrRotation}
+                        onChange={e => setQrRotation(Math.min(180, Math.max(-180, Number(e.target.value))))}
+                        className="w-14 sm:w-20 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      />
+                      <span className="text-[10px] sm:text-xs text-gray-500">°</span>
                     </div>
                   </div>
                 </div>
-              </Section>
-            </div>
 
-            {/* ─── Save Button ─── */}
-            <button
-              onClick={handleSave}
-              disabled={saving || !templateUrl}
-              className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 sm:py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm sm:text-base"
-            >
-              {saving ? <Loader2 size={16} className="sm:text-lg animate-spin" /> : <Save size={16} className="sm:text-lg" />}
-              {saving ? 'Saving...' : 'Save & Continue'}
-            </button>
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Color</label>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <input
+                      type="color"
+                      value={qrColor}
+                      onChange={e => setQrColor(e.target.value)}
+                      className="h-8 sm:h-10 w-full rounded-lg cursor-pointer border border-gray-200"
+                    />
+                    <input
+                      type="text"
+                      value={qrColor}
+                      onChange={e => setQrColor(e.target.value)}
+                      className="w-20 sm:w-28 p-1 sm:p-1.5 border border-gray-200 rounded-lg text-xs sm:text-sm text-center font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] sm:text-xs font-medium text-gray-700">Quick Presets</label>
+                  <div className="flex gap-1 sm:gap-2">
+                    {[
+                      { label: 'Tiny', size: 40 },
+                      { label: 'Small', size: 80 },
+                      { label: 'Medium', size: 150 },
+                      { label: 'Large', size: 250 },
+                      { label: 'XL', size: 350 },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setQrSize(preset.size)}
+                        className={`flex-1 py-1 sm:py-1.5 rounded-lg text-[8px] sm:text-xs font-semibold transition ${
+                          qrSize === preset.size
+                            ? 'bg-[#0D4F4F] text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Section>
           </div>
+
+          {/* ─── Save Button ─── */}
+          <button
+            onClick={handleSave}
+            disabled={saving || !templateUrl}
+            className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 sm:py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+          >
+            {saving ? <Loader2 size={16} className="sm:text-lg animate-spin" /> : <Save size={16} className="sm:text-lg" />}
+            {saving ? 'Saving...' : 'Save & Continue'}
+          </button>
         </div>
       </div>
     </div>

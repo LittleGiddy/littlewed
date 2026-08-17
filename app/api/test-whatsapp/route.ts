@@ -1,6 +1,6 @@
 // app/api/test-whatsapp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { sendHelloWorld } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +10,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
     }
 
-    const result = await sendHelloWorld(phone);
+    // ─── Send a test wedding invitation ──────────────────────────────────
+    const result = await sendWeddingInvitation(phone, {
+      name: 'Test Guest',
+      hostFamily: 'Mr & Mrs Test Family',
+      person1: 'Agape',
+      person2: 'Gladness',
+      date: new Date().toLocaleDateString('sw-TZ', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+      venue: 'Test Venue',
+      time: '5:00 PM',
+      cardNumber: '00001',
+      cardType: 'SINGLE',
+      imageUrl: 'https://www.gstatic.com/webp/gallery/1.png',
+      inviteLink: 'test-invite-123',
+    });
+
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('[Test] Error:', error);
