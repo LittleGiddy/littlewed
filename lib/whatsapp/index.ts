@@ -102,7 +102,7 @@ export async function sendWhatsAppTemplate({
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-    guestName: string;    // ✅ not "name"
+  guestName: string;    // ✅ not "name"
   hostFamily: string;
   person1: string;
   person2: string;

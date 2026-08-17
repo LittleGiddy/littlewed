@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Send wedding invitation
       result = await sendWeddingInvitation(guest.phone, {
-        name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
+        guestName: guest.title ? `${guest.title} ${guest.name}` : guest.name,
         hostFamily: guest.event.hostFamily || 'Mr & Mrs Allan Swai',
         person1: guest.event.person1 || 'Agape',
         person2: guest.event.person2 || 'Gladness',
