@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
-      guestName: guestFullName,  // ✅ FIXED: 'guestName' instead of 'name'
+      guestName: guestFullName,
       hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
       person1: guest.event?.person1 || 'Agape',
       person2: guest.event?.person2 || 'Gladness',
