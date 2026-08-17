@@ -118,6 +118,7 @@ export async function sendWeddingInvitation(
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
   // ─── Header with image ────────────────────────────────────────────────
+  // Use the guest's generated card if available, otherwise use a default
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -126,7 +127,6 @@ export async function sendWeddingInvitation(
   };
 
   // ─── Button with dynamic URL ──────────────────────────────────────────
-  // Extract the slug from the invite link
   const slug = data.inviteLink 
     ? toLinkSuffix(data.inviteLink) 
     : 'default';
@@ -141,18 +141,18 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili invitation', // Your approved template name
+    template: 'LittleWed',
     personalisation: [
       {
-        "var1": data.name,
-        "var2": data.hostFamily,
-        "var3": data.person1,
-        "var4": data.person2,
-        "var5": data.date,
-        "var6": data.venue,
-        "var7": data.time,
-        "var8": data.cardNumber,
-        "var9": data.cardType,
+        "var1": data.name,          // ✅ Guest name
+        "var2": data.hostFamily,    // ✅ Host family
+        "var3": data.person1,       // ✅ Person 1 (Groom/Bride)
+        "var4": data.person2,       // ✅ Person 2 (Bride/Groom)
+        "var5": data.date,          // ✅ Event date (properly formatted)
+        "var6": data.venue,         // ✅ Venue
+        "var7": data.time,          // ✅ Time
+        "var8": data.cardNumber,    // ✅ Card number
+        "var9": data.cardType,      // ✅ Card type (SINGLE/DOUBLE)
       }
     ],
     header,

@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
+    // ─── Fetch guest and event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
     });
@@ -41,22 +42,26 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── Format date properly ──────────────────────────────────────────
+    const formattedDate = new Date(event.date).toLocaleDateString('sw-TZ', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
       name: guest.title ? `${guest.title} ${guest.name}` : guest.name,
       hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
       person1: event.person1 || 'Agape',
       person2: event.person2 || 'Gladness',
-      date: new Date(event.date).toLocaleDateString('sw-TZ', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      }),
+      date: formattedDate, // ✅ Properly formatted date
       venue: event.venue || 'The Embassy Hall',
       time: event.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
-      imageUrl: 'https://www.gstatic.com/webp/gallery/1.png',
+      imageUrl: guest.invitationCard || event.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
       inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
     });
 
