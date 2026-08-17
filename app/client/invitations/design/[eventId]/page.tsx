@@ -838,12 +838,10 @@ export default function InvitationDesigner() {
       </div>
 
       {/* Main Content: Preview + Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* ─── Preview ─── */}
-        <div className="lg:col-span-3 relative">
-          <div
-            className="lg:sticky lg:top-4 lg:self-start bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-10 max-h-[calc(100vh-2rem)] overflow-y-auto"
-          >
+        <div className="lg:col-span-3 lg:self-start">
+          <div className="lg:sticky lg:top-6 lg:self-start bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-10">
             <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
             </h2>
