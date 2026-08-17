@@ -141,7 +141,7 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'LittleWed',
+    template: 'swahili invitation',
     personalisation: [
       {
         "var1": data.name,          // ✅ Guest name
