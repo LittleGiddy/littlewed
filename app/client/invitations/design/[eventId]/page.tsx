@@ -118,11 +118,6 @@ export default function InvitationDesigner() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ─── JS-driven sticky preview (immune to ancestor overflow issues) ───
-  const previewColRef = useRef<HTMLDivElement>(null);
-  const previewCardRef = useRef<HTMLDivElement>(null);
-  const [stickyStyle, setStickyStyle] = useState<React.CSSProperties>({});
-
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
     const snapshot = JSON.parse(JSON.stringify(newLayers));
@@ -163,71 +158,10 @@ export default function InvitationDesigner() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // ─── Manual "sticky" positioning for the live preview ─────────────────
-  // CSS `position: sticky` breaks silently if ANY ancestor element has
-  // overflow-x-hidden / overflow-hidden / overflow-auto / overflow-scroll
-  // set on it (very common on a root layout to prevent horizontal
-  // scrollbars). Rather than depend on that, we compute the position
-  // ourselves on scroll/resize and pin the panel with position: fixed,
-  // switching to position: absolute once the bottom of its column comes
-  // into view (so it doesn't float below the panel it's supposed to sit
-  // beside). This only affects layout on desktop (lg breakpoint) since
-  // the columns stack vertically below that.
-  useEffect(() => {
-    const TOP_OFFSET = 16; // px, matches the old `top-4`
-    let ticking = false;
-
-    const updateStickyPosition = () => {
-      ticking = false;
-      const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
-      const col = previewColRef.current;
-      const card = previewCardRef.current;
-      if (!isDesktop || !col || !card) {
-        setStickyStyle({});
-        return;
-      }
-
-      const colRect = col.getBoundingClientRect();
-      const cardHeight = card.offsetHeight;
-
-      // Column hasn't scrolled up to the pin point yet — normal flow.
-      if (colRect.top > TOP_OFFSET) {
-        setStickyStyle({});
-        return;
-      }
-
-      // Bottom of the column has scrolled past where the card would end
-      // — stop pinning to the viewport and rest at the column's bottom.
-      if (colRect.bottom < TOP_OFFSET + cardHeight) {
-        setStickyStyle({ position: 'absolute', top: 'auto', bottom: 0, left: 0, right: 0 });
-        return;
-      }
-
-      // Otherwise, pin to the viewport.
-      setStickyStyle({
-        position: 'fixed',
-        top: TOP_OFFSET,
-        left: colRect.left,
-        width: colRect.width,
-      });
-    };
-
-    const onScrollOrResize = () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(updateStickyPosition);
-      }
-    };
-
-    updateStickyPosition();
-    window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize);
-    return () => {
-      window.removeEventListener('scroll', onScrollOrResize);
-      window.removeEventListener('resize', onScrollOrResize);
-    };
-  }, [loading, templateUrl, layers.length]);
-
+  // ─── Live preview uses CSS position: sticky ─────────────────────────
+  // The preview stays pinned near the top of the viewport while the
+  // controls column is being scrolled. It automatically stops at the
+  // bottom of the grid row.
   // ─── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
@@ -904,28 +838,11 @@ export default function InvitationDesigner() {
       </div>
 
       {/* Main Content: Preview + Controls */}
-      {/*
-        NOTE ON STICKY PREVIEW:
-        This grid intentionally uses the default `align-items: stretch`
-        (no `items-start`) so the left column div is stretched to match
-        the height of the taller right column. That gives the sticky
-        child room to "stick" as the page scrolls. Do NOT add
-        `items-start` here or the sticky preview will stop working.
-
-        If it still doesn't stick after this change, the cause is almost
-        always outside this component: check any parent layout/page
-        wrapper for `overflow-x-hidden`, `overflow-hidden`, `overflow-auto`,
-        or `overflow-scroll` — setting overflow on either axis on any
-        ancestor between this element and the viewport breaks
-        position: sticky for all its descendants.
-      */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ─── Preview ─── */}
-        <div className="lg:col-span-3 relative" ref={previewColRef}>
+        <div className="lg:col-span-3 relative">
           <div
-            ref={previewCardRef}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-10 max-h-[calc(100vh-2rem)] overflow-y-auto"
-            style={stickyStyle}
+            className="lg:sticky lg:top-4 lg:self-start bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-10 max-h-[calc(100vh-2rem)] overflow-y-auto"
           >
             <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
