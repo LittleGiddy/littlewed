@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { guestId, eventId, message, type } = await req.json();
+    const { guestId, eventId, type } = await req.json();
 
     if (!guestId || !eventId) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    let result;
+    // ─── Format date properly ──────────────────────────────────────────
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
           day: 'numeric',
@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
     // ─── Build guest full name ──────────────────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Send wedding invitation ──────────────────────────────────────
-    result = await sendWeddingInvitation(guest.phone, {
-      guestName: guestFullName,              // ✅ Fixed: changed from 'name' to 'guestName'
+    // ─── Send WhatsApp invitation ──────────────────────────────────────
+    const result = await sendWeddingInvitation(guest.phone, {
+      guestName: guestFullName,  // ✅ FIXED: 'guestName' instead of 'name'
       hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
       person1: guest.event?.person1 || 'Agape',
       person2: guest.event?.person2 || 'Gladness',
