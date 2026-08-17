@@ -1,6 +1,5 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Upload, Move, Maximize2, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
@@ -118,6 +117,7 @@ export default function InvitationDesigner() {
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -158,143 +158,6 @@ export default function InvitationDesigner() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
-
-  // ─── Bulletproof sticky preview ───────────────────────────────────────
-  // The preview is rendered through a portal on desktop. This avoids the
-  // common problem where a parent layout has overflow/transform styles that
-  // silently break CSS position: sticky or change the containing block of
-  // position: fixed. We also listen to every scrollable ancestor, not only
-  // window, so it works when the dashboard itself is the scroll container.
-  const previewAnchorRef = useRef<HTMLDivElement>(null);
-  const previewPortalRef = useRef<HTMLDivElement>(null);
-  const [previewDesktop, setPreviewDesktop] = useState(false);
-  const [previewHeight, setPreviewHeight] = useState(0);
-  const [previewStyle, setPreviewStyle] = useState<React.CSSProperties>({
-    position: 'fixed',
-    top: 16,
-    left: 0,
-    width: 0,
-    visibility: 'hidden',
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const desktopQuery = window.matchMedia('(min-width: 1024px)');
-    const updateDesktop = () => setPreviewDesktop(desktopQuery.matches);
-    updateDesktop();
-
-    if (desktopQuery.addEventListener) {
-      desktopQuery.addEventListener('change', updateDesktop);
-    } else {
-      desktopQuery.addListener(updateDesktop);
-    }
-
-    return () => {
-      if (desktopQuery.removeEventListener) {
-        desktopQuery.removeEventListener('change', updateDesktop);
-      } else {
-        desktopQuery.removeListener(updateDesktop);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!previewDesktop) {
-      setPreviewStyle({
-        position: 'fixed',
-        top: 16,
-        left: 0,
-        width: 0,
-        visibility: 'hidden',
-      });
-      return;
-    }
-
-    const anchor = previewAnchorRef.current;
-    const card = previewPortalRef.current;
-    if (!anchor || !card) return;
-
-    const TOP_OFFSET = 16;
-    let frame = 0;
-
-    const getScrollParents = (element: HTMLElement) => {
-      const parents: HTMLElement[] = [];
-      let parent = element.parentElement;
-
-      while (parent && parent !== document.body) {
-        const style = window.getComputedStyle(parent);
-        const overflow = `${style.overflow} ${style.overflowY} ${style.overflowX}`;
-        if (/(auto|scroll|overlay)/.test(overflow)) {
-          parents.push(parent);
-        }
-        parent = parent.parentElement;
-      }
-
-      return parents;
-    };
-
-    const update = () => {
-      frame = 0;
-
-      const anchorRect = anchor.getBoundingClientRect();
-      const height = card.offsetHeight;
-      const width = anchorRect.width;
-
-      if (!width || !height) return;
-
-      setPreviewHeight(height);
-
-      // Before the anchor reaches the sticky point, keep the preview exactly
-      // where it would normally appear in the grid.
-      if (anchorRect.top > TOP_OFFSET) {
-        setPreviewStyle({
-          position: 'fixed',
-          top: anchorRect.top,
-          left: anchorRect.left,
-          width,
-          visibility: 'visible',
-        });
-        return;
-      }
-
-      // Once the bottom of the preview column approaches the preview card,
-      // move the card up with the column instead of letting it escape it.
-      const bottomLimit = anchorRect.bottom - height;
-      const top = Math.min(TOP_OFFSET, bottomLimit);
-
-      setPreviewStyle({
-        position: 'fixed',
-        top: Math.max(0, top),
-        left: anchorRect.left,
-        width,
-        visibility: 'visible',
-      });
-    };
-
-    const requestUpdate = () => {
-      if (!frame) frame = window.requestAnimationFrame(update);
-    };
-
-    const parents = getScrollParents(anchor);
-    window.addEventListener('scroll', requestUpdate, { passive: true });
-    window.addEventListener('resize', requestUpdate);
-    parents.forEach(parent => parent.addEventListener('scroll', requestUpdate, { passive: true }));
-
-    const resizeObserver = new ResizeObserver(requestUpdate);
-    resizeObserver.observe(anchor);
-    resizeObserver.observe(card);
-
-    requestUpdate();
-
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', requestUpdate);
-      window.removeEventListener('resize', requestUpdate);
-      parents.forEach(parent => parent.removeEventListener('scroll', requestUpdate));
-      resizeObserver.disconnect();
-    };
-  }, [previewDesktop, loading, templateUrl, layers.length, collapsedSections]);
 
   // ─── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -974,17 +837,12 @@ export default function InvitationDesigner() {
       {/* Main Content: Preview + Controls */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* ─── Preview ─── */}
-        <div
-          ref={previewAnchorRef}
-          className="lg:col-span-3 self-start"
-          style={{ minHeight: previewDesktop && previewHeight ? previewHeight : undefined }}
-        >
-          {/* On mobile/tablet the preview stays in normal document flow. */}
-          {!previewDesktop && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-10">
-              <h2 className="font-semibold mb-3 flex items-center gap-2">
-                <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
-              </h2>
+        <div className="lg:col-span-3">
+          <div 
+            ref={previewContainerRef}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
+            style={{ position: 'sticky', top: '20px' }}
+          >
             <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
             </h2>
@@ -1051,81 +909,7 @@ export default function InvitationDesigner() {
               )}
             </div>
             <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
-            </div>
-          )}
-
-          {/* Desktop preview is portaled to <body> so no parent overflow/transform
-              can break the sticky/fixed behavior. */}
-          {previewDesktop && typeof document !== 'undefined' && createPortal(
-            <div
-              ref={previewPortalRef}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 z-[100]"
-              style={previewStyle}
-            >
-              <h2 className="font-semibold mb-3 flex items-center gap-2">
-                <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
-              </h2>
-              <div
-                ref={canvasRef}
-                className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[600px] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
-                onMouseUp={() => { endDrag(); endResize(); }}
-                onMouseLeave={() => { endDrag(); endResize(); }}
-                onTouchEnd={() => { endDrag(); endResize(); }}
-                onTouchCancel={() => { endDrag(); endResize(); }}
-                onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-                onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-              >
-                {templateUrl ? (
-                  <>
-                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
-                    {layers.map((layer, idx) => renderLayer(layer, idx))}
-                    <div
-                      className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
-                      style={{
-                        left: `${qrX}%`,
-                        top: `${qrY}%`,
-                        width: qrSize,
-                        height: qrSize,
-                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                        backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
-                      }}
-                      onMouseDown={(e) => {
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        setDragOffset({
-                          x: e.clientX - rect.left - (qrX / 100) * rect.width,
-                          y: e.clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                      onTouchStart={(e) => {
-                        const touch = e.touches[0];
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        setDragOffset({
-                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                    >
-                      <QrCode size={Math.min(qrSize * 0.6, 48)} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                    <div className="text-center">
-                      <ImageIcon size={40} className="mx-auto mb-2 opacity-50" />
-                      <p>Select a template or upload your own</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 text-center mt-3">Drag layers to reposition. Click a layer to edit properties.</p>
-            </div>,
-            document.body
-          )}
+          </div>
         </div>
 
         {/* ─── Controls ─── */}
