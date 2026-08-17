@@ -94,7 +94,8 @@ export default function InvitationDesigner() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
-  const [isPreviewSticky, setIsPreviewSticky] = useState(false);
+  const [previewHeight, setPreviewHeight] = useState(0);
+  const [isPreviewFixed, setIsPreviewFixed] = useState(false);
 
   // Drag state
   const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
@@ -107,20 +108,42 @@ export default function InvitationDesigner() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const previewWrapperRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const spacerRef = useRef<HTMLDivElement>(null);
 
   // ─── Sticky Preview Logic ─────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
-      if (!previewWrapperRef.current) return;
-      const rect = previewWrapperRef.current.getBoundingClientRect();
-      // Check if preview is at the top of viewport
-      setIsPreviewSticky(rect.top <= 0);
+      if (!previewContainerRef.current) return;
+      const rect = previewContainerRef.current.getBoundingClientRect();
+      const shouldFix = rect.top <= 0;
+      
+      if (shouldFix !== isPreviewFixed) {
+        setIsPreviewFixed(shouldFix);
+      }
+      
+      // Update spacer height when fixed
+      if (spacerRef.current && previewRef.current) {
+        if (shouldFix) {
+          const height = previewRef.current.offsetHeight;
+          spacerRef.current.style.height = `${height}px`;
+        } else {
+          spacerRef.current.style.height = '0px';
+        }
+      }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    window.addEventListener('resize', handleScroll, { passive: true });
+    
+    // Initial calculation
+    setTimeout(handleScroll, 100);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [isPreviewFixed, loading]);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -837,92 +860,109 @@ export default function InvitationDesigner() {
         )}
       </div>
 
-      {/* ─── Main Content: Two Column Layout with Sticky Preview ─── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* ─── Preview Column (Sticky) ─── */}
-        <div className="lg:col-span-2">
+      {/* ─── Main Content ─── */}
+      <div>
+        {/* ─── Spacer for fixed preview ─── */}
+        <div ref={spacerRef} style={{ height: 0, transition: 'height 0.3s ease' }} />
+
+        {/* ─── Preview Container ─── */}
+        <div 
+          ref={previewContainerRef}
+          className="mb-6"
+        >
           <div 
-            ref={previewWrapperRef}
-            className="sticky top-4"
+            ref={previewRef}
+            className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 transition-all duration-300 ${
+              isPreviewFixed 
+                ? 'fixed top-0 left-0 right-0 z-50 mx-auto max-w-7xl rounded-none shadow-lg border-x-0 border-t-0' 
+                : ''
+            }`}
+            style={{
+              maxWidth: isPreviewFixed ? 'calc(100% - 2rem)' : '100%',
+              marginLeft: isPreviewFixed ? 'auto' : '',
+              marginRight: isPreviewFixed ? 'auto' : '',
+              left: isPreviewFixed ? '50%' : '',
+              transform: isPreviewFixed ? 'translateX(-50%)' : '',
+            }}
           >
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <h2 className="font-semibold flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
-                  <Maximize2 size={16} className="sm:text-lg text-[#0D4F4F]" /> Live Preview
-                </h2>
-                <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
-              </div>
-              <div
-                ref={canvasRef}
-                className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] mx-auto ${showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''}`}
-                onMouseUp={() => { endDrag(); endResize(); }}
-                onMouseLeave={() => { endDrag(); endResize(); }}
-                onTouchEnd={() => { endDrag(); endResize(); }}
-                onTouchCancel={() => { endDrag(); endResize(); }}
-                onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-                onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-              >
-                {templateUrl ? (
-                  <>
-                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
-
-                    {layers.map((layer, idx) => renderLayer(layer, idx))}
-
-                    {/* QR Code with rotation support */}
-                    <div
-                      className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
-                      style={{
-                        left: `${qrX}%`,
-                        top: `${qrY}%`,
-                        width: Math.min(qrSize, 300),
-                        height: Math.min(qrSize, 300),
-                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                        backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
-                      }}
-                      onMouseDown={(e) => {
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        const clientX = e.clientX;
-                        const clientY = e.clientY;
-                        setDragOffset({
-                          x: clientX - rect.left - (qrX / 100) * rect.width,
-                          y: clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                      onTouchStart={(e) => {
-                        const touch = e.touches[0];
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        setDragOffset({
-                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                    >
-                      <QrCode size={Math.min(Math.max(qrSize * 0.5, 20), 48)} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                    <div className="text-center p-4">
-                      <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
-                      <p className="text-xs sm:text-sm">Select a template or upload your own</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
-                Click a layer to edit properties below
-              </p>
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <h2 className="font-semibold flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
+                <Maximize2 size={16} className="sm:text-lg text-[#0D4F4F]" /> Live Preview
+              </h2>
+              <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
             </div>
+            <div
+              ref={canvasRef}
+              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[50vh] sm:max-h-[60vh] lg:max-h-[70vh] mx-auto ${
+                showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''
+              }`}
+              onMouseUp={() => { endDrag(); endResize(); }}
+              onMouseLeave={() => { endDrag(); endResize(); }}
+              onTouchEnd={() => { endDrag(); endResize(); }}
+              onTouchCancel={() => { endDrag(); endResize(); }}
+              onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
+              onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
+            >
+              {templateUrl ? (
+                <>
+                  <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                  <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+
+                  {layers.map((layer, idx) => renderLayer(layer, idx))}
+
+                  {/* QR Code with rotation support */}
+                  <div
+                    className="absolute border-2 border-white rounded-md bg-black/40 backdrop-blur-sm flex items-center justify-center text-white text-xs font-mono cursor-move touch-none select-none pointer-events-auto"
+                    style={{
+                      left: `${qrX}%`,
+                      top: `${qrY}%`,
+                      width: Math.min(qrSize, 300),
+                      height: Math.min(qrSize, 300),
+                      transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                      backgroundColor: qrColor === '#000000' ? 'rgba(0,0,0,0.4)' : qrColor,
+                    }}
+                    onMouseDown={(e) => {
+                      const rect = canvasRef.current!.getBoundingClientRect();
+                      const clientX = e.clientX;
+                      const clientY = e.clientY;
+                      setDragOffset({
+                        x: clientX - rect.left - (qrX / 100) * rect.width,
+                        y: clientY - rect.top - (qrY / 100) * rect.height,
+                      });
+                      setDragging({ type: 'qr', index: -1 });
+                      e.preventDefault();
+                    }}
+                    onTouchStart={(e) => {
+                      const touch = e.touches[0];
+                      const rect = canvasRef.current!.getBoundingClientRect();
+                      setDragOffset({
+                        x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                        y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                      });
+                      setDragging({ type: 'qr', index: -1 });
+                      e.preventDefault();
+                    }}
+                  >
+                    <QrCode size={Math.min(Math.max(qrSize * 0.5, 20), 48)} />
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                  <div className="text-center p-4">
+                    <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+                    <p className="text-xs sm:text-sm">Select a template or upload your own</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
+              Click a layer to edit properties below
+            </p>
           </div>
         </div>
 
-        {/* ─── Controls Column ─── */}
-        <div className="lg:col-span-3 space-y-3 sm:space-y-4">
+        {/* ─── Controls ─── */}
+        <div className="space-y-3 sm:space-y-4">
           {/* ─── Quick Add ─── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 space-y-2">
             <p className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
