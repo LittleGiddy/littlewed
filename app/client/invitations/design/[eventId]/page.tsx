@@ -834,10 +834,25 @@ export default function InvitationDesigner() {
       </div>
 
       {/* Main Content: Preview + Controls */}
+      {/*
+        NOTE ON STICKY PREVIEW:
+        This grid intentionally uses the default `align-items: stretch`
+        (no `items-start`) so the left column div is stretched to match
+        the height of the taller right column. That gives the sticky
+        child room to "stick" as the page scrolls. Do NOT add
+        `items-start` here or the sticky preview will stop working.
+
+        If it still doesn't stick after this change, the cause is almost
+        always outside this component: check any parent layout/page
+        wrapper for `overflow-x-hidden`, `overflow-hidden`, `overflow-auto`,
+        or `overflow-scroll` — setting overflow on either axis on any
+        ancestor between this element and the viewport breaks
+        position: sticky for all its descendants.
+      */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* ─── Preview ─── */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sticky top-4 z-10 max-h-[calc(100vh-2rem)] overflow-y-auto">
             <h2 className="font-semibold mb-3 flex items-center gap-2">
               <Maximize2 size={18} className="text-[#0D4F4F]" /> Live Preview
             </h2>
