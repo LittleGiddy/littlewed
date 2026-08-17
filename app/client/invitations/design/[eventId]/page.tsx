@@ -94,8 +94,8 @@ export default function InvitationDesigner() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
-  const [previewHeight, setPreviewHeight] = useState(0);
   const [isPreviewFixed, setIsPreviewFixed] = useState(false);
+  const [previewRect, setPreviewRect] = useState({ width: 0, height: 0 });
 
   // Drag state
   const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
@@ -114,36 +114,60 @@ export default function InvitationDesigner() {
   // ─── Sticky Preview Logic ─────────────────────────────────────────────
   useEffect(() => {
     const handleScroll = () => {
-      if (!previewContainerRef.current) return;
-      const rect = previewContainerRef.current.getBoundingClientRect();
-      const shouldFix = rect.top <= 0;
+      if (!previewContainerRef.current || !previewRef.current) return;
+      
+      const containerRect = previewContainerRef.current.getBoundingClientRect();
+      const previewHeight = previewRef.current.offsetHeight;
+      
+      // Check if preview should be fixed (when container top reaches 0)
+      const shouldFix = containerRect.top <= 0;
+      
+      // Store preview dimensions for fixed positioning
+      if (!isPreviewFixed && shouldFix) {
+        setPreviewRect({
+          width: previewRef.current.offsetWidth,
+          height: previewHeight
+        });
+      }
       
       if (shouldFix !== isPreviewFixed) {
         setIsPreviewFixed(shouldFix);
-      }
-      
-      // Update spacer height when fixed
-      if (spacerRef.current && previewRef.current) {
-        if (shouldFix) {
-          const height = previewRef.current.offsetHeight;
-          spacerRef.current.style.height = `${height}px`;
-        } else {
-          spacerRef.current.style.height = '0px';
+        
+        // Update spacer height
+        if (spacerRef.current) {
+          if (shouldFix) {
+            spacerRef.current.style.height = `${previewHeight}px`;
+            spacerRef.current.style.display = 'block';
+          } else {
+            spacerRef.current.style.height = '0px';
+          }
         }
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleScroll, { passive: true });
+    // Use requestAnimationFrame for smoother updates
+    let ticking = false;
+    const throttledScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          handleScroll();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', throttledScroll, { passive: true });
+    window.addEventListener('resize', throttledScroll, { passive: true });
     
     // Initial calculation
-    setTimeout(handleScroll, 100);
+    setTimeout(handleScroll, 200);
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleScroll);
+      window.removeEventListener('scroll', throttledScroll);
+      window.removeEventListener('resize', throttledScroll);
     };
-  }, [isPreviewFixed, loading]);
+  }, [isPreviewFixed]);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -860,29 +884,26 @@ export default function InvitationDesigner() {
         )}
       </div>
 
+      {/* ─── Spacer for fixed preview ─── */}
+      <div ref={spacerRef} style={{ height: 0, transition: 'height 0.2s ease' }} />
+
       {/* ─── Main Content ─── */}
       <div>
-        {/* ─── Spacer for fixed preview ─── */}
-        <div ref={spacerRef} style={{ height: 0, transition: 'height 0.3s ease' }} />
-
         {/* ─── Preview Container ─── */}
-        <div 
-          ref={previewContainerRef}
-          className="mb-6"
-        >
+        <div ref={previewContainerRef} className="mb-6">
           <div 
             ref={previewRef}
-            className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4 transition-all duration-300 ${
-              isPreviewFixed 
-                ? 'fixed top-0 left-0 right-0 z-50 mx-auto max-w-7xl rounded-none shadow-lg border-x-0 border-t-0' 
-                : ''
-            }`}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 sm:p-4"
             style={{
-              maxWidth: isPreviewFixed ? 'calc(100% - 2rem)' : '100%',
-              marginLeft: isPreviewFixed ? 'auto' : '',
-              marginRight: isPreviewFixed ? 'auto' : '',
-              left: isPreviewFixed ? '50%' : '',
-              transform: isPreviewFixed ? 'translateX(-50%)' : '',
+              width: isPreviewFixed ? `${previewRect.width}px` : '100%',
+              position: isPreviewFixed ? 'fixed' : 'relative',
+              top: isPreviewFixed ? '0px' : 'auto',
+              left: isPreviewFixed ? '50%' : 'auto',
+              transform: isPreviewFixed ? 'translateX(-50%)' : 'none',
+              zIndex: isPreviewFixed ? 50 : 'auto',
+              maxHeight: isPreviewFixed ? '90vh' : 'none',
+              overflow: isPreviewFixed ? 'auto' : 'visible',
+              transition: 'width 0.2s ease, position 0.2s ease',
             }}
           >
             <div className="flex items-center justify-between mb-2 sm:mb-3">
