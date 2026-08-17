@@ -141,7 +141,7 @@ export async function sendWeddingInvitation(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahilli invitation', // Your approved template name
+    template: 'swahili invitation', // Your approved template name
     personalisation: [
       {
         "var1": data.name,
