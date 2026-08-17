@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     // ─── Send a test wedding invitation ──────────────────────────────────
     const result = await sendWeddingInvitation(phone, {
-      name: 'Test Guest',
+      guestName: 'Test Guest',
       hostFamily: 'Mr & Mrs Test Family',
       person1: 'Agape',
       person2: 'Gladness',
