@@ -1,4 +1,4 @@
-// app/api/invitations/send-template/route.ts
+// app/api/invitations/send-whatsapp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -13,23 +13,20 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { guestId, eventId } = await req.json();
+    const { guestId, eventId, message, type } = await req.json();
 
     if (!guestId || !eventId) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
-    // ─── Fetch guest and event ──────────────────────────────────────────
+    // ─── Fetch guest with event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
+      include: { event: true },
     });
 
-    const event = await prisma.event.findFirst({
-      where: { id: eventId, tenantId },
-    });
-
-    if (!guest || !event) {
-      return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
+    if (!guest) {
+      return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
     if (!guest.phone) {
@@ -42,28 +39,30 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Format date properly ──────────────────────────────────────────
-    const formattedDate = new Date(event.date).toLocaleDateString('sw-TZ', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    let result;
+    const formattedDate = guest.event?.date
+      ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '';
 
-    // ─── Build guest full name with title ──────────────────────────────
+    // ─── Build guest full name ──────────────────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Send WhatsApp invitation ──────────────────────────────────────
-    const result = await sendWeddingInvitation(guest.phone, {
-      guestName: guestFullName,              // ✅ var1: Guest name
-      hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',  // ✅ var2: Host family
-      person1: event.person1 || 'Agape',     // ✅ var3: Person 1 (Groom)
-      person2: event.person2 || 'Gladness',  // ✅ var4: Person 2 (Bride)
-      date: formattedDate,                   // ✅ var5: Formatted date
-      venue: event.venue || 'The Embassy Hall', // ✅ var6: Venue
-      time: event.time || '5:00 PM',         // ✅ var7: Time
-      cardNumber: guest.cardNumber || '108', // ✅ var8: Card number
-      cardType: guest.guestType || 'SINGLE', // ✅ var9: Card type
-      imageUrl: guest.invitationCard || event.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
+    // ─── Send wedding invitation ──────────────────────────────────────
+    result = await sendWeddingInvitation(guest.phone, {
+      guestName: guestFullName,              // ✅ Fixed: changed from 'name' to 'guestName'
+      hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
+      person1: guest.event?.person1 || 'Agape',
+      person2: guest.event?.person2 || 'Gladness',
+      date: formattedDate,
+      venue: guest.event?.venue || 'The Embassy Hall',
+      time: guest.event?.time || '5:00 PM',
+      cardNumber: guest.cardNumber || '108',
+      cardType: guest.guestType || 'SINGLE',
+      imageUrl: guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
       inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
     });
 
@@ -86,7 +85,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
   } catch (error: any) {
-    console.error('Send template error:', error);
+    console.error('Send WhatsApp error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
