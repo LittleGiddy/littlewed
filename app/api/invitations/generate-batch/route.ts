@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { createCanvas, loadImage } from 'canvas';
+import sharp from 'sharp';
 import QRCode from 'qrcode';
 
 export async function POST(req: NextRequest) {
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── Generate personalized card ──────────────────────────────────────────
+// ─── Generate personalized card using Sharp ────────────────────────────
 async function generatePersonalizedCard({
   templateUrl,
   guest,
@@ -153,24 +153,38 @@ async function generatePersonalizedCard({
   qrColor: string;
   qrRotation: number;
 }): Promise<string> {
-  // ─── Load the template image ──────────────────────────────────────────
+  // ─── Fetch template image ──────────────────────────────────────────────
   const response = await fetch(templateUrl);
-  const buffer = await response.arrayBuffer();
+  const templateBuffer = await response.arrayBuffer();
   
-  // ─── Create canvas with the template ──────────────────────────────────
-  const image = await loadImage(Buffer.from(buffer));
-  const canvas = createCanvas(image.width, image.height);
-  const ctx = canvas.getContext('2d');
+  let image = sharp(Buffer.from(templateBuffer));
+  const metadata = await image.metadata();
+  
+  const width = metadata.width || 800;
+  const height = metadata.height || 1200;
 
-  // ─── Draw template ──────────────────────────────────────────────────
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  // ─── Create composited image ──────────────────────────────────────────
+  const layers: sharp.OverlayOptions[] = [
+    // Template layer
+    {
+      input: Buffer.from(templateBuffer),
+      top: 0,
+      left: 0,
+    },
+  ];
 
-  // ─── Apply overlay ──────────────────────────────────────────────────
+  // ─── Add overlay ──────────────────────────────────────────────────────
   if (overlayOpacity > 0) {
-    ctx.fillStyle = overlayColor;
-    ctx.globalAlpha = overlayOpacity;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 1;
+    const overlayBuffer = Buffer.from(
+      `<svg width="${width}" height="${height}">
+        <rect width="${width}" height="${height}" fill="${overlayColor}" opacity="${overlayOpacity}" />
+      </svg>`
+    );
+    layers.push({
+      input: overlayBuffer,
+      top: 0,
+      left: 0,
+    });
   }
 
   // ─── Process design layers ────────────────────────────────────────────
@@ -184,8 +198,8 @@ async function generatePersonalizedCard({
   for (const layer of designLayers) {
     if (!layer.visible) continue;
 
-    const x = (layer.x / 100) * canvas.width;
-    const y = (layer.y / 100) * canvas.height;
+    const x = (layer.x / 100) * width;
+    const y = (layer.y / 100) * height;
 
     if (layer.type === 'text') {
       let text = layer.text;
@@ -198,7 +212,6 @@ async function generatePersonalizedCard({
       } else if (layer.isCardNumber) {
         text = guest.cardNumber || '';
       } else {
-        // Replace any remaining placeholders
         text = text
           .replace(/{guestName}/g, guestName)
           .replace(/{guestTitle}/g, guest.title || '')
@@ -210,84 +223,105 @@ async function generatePersonalizedCard({
 
       const fontSize = layer.fontSize || 24;
       const fontFamily = layer.fontFamily || 'Playfair Display';
+      const color = layer.color || '#ffffff';
       
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate((layer.rotation || 0) * Math.PI / 180);
-      ctx.textAlign = layer.align || 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `bold ${fontSize}px "${fontFamily}"`;
-      
-      // ─── Shadow ──────────────────────────────────────────────────────
-      if (layer.shadow) {
-        ctx.shadowColor = layer.shadow.color || 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = layer.shadow.blur || 4;
-        ctx.shadowOffsetX = layer.shadow.offsetX || 0;
-        ctx.shadowOffsetY = layer.shadow.offsetY || 2;
-      }
-      
-      ctx.fillStyle = layer.color || '#ffffff';
-      
-      // ─── Multi-line text support ────────────────────────────────────
+      // ─── Create text SVG ──────────────────────────────────────────────
       const lines = text.split('\n');
       const lineHeight = fontSize * 1.4;
-      const totalHeight = lines.length * lineHeight;
-      const startY = -(totalHeight / 2) + (lineHeight / 2);
+      
+      let textSvg = `<text x="${x}" y="${y}" font-family="${fontFamily}" font-size="${fontSize}" font-weight="bold" fill="${color}" text-anchor="${layer.align || 'center'}" dominant-baseline="middle" transform="rotate(${layer.rotation || 0}, ${x}, ${y})">`;
       
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], 0, startY + i * lineHeight);
+        const dy = i === 0 ? 0 : lineHeight;
+        textSvg += `<tspan x="${x}" dy="${dy}">${lines[i]}</tspan>`;
       }
-      
-      ctx.restore();
+      textSvg += '</text>';
+
+      // ─── Add shadow if needed ──────────────────────────────────────
+      let fullSvg = '';
+      if (layer.shadow) {
+        const blur = layer.shadow.blur || 4;
+        const offsetX = layer.shadow.offsetX || 0;
+        const offsetY = layer.shadow.offsetY || 2;
+        const shadowColor = layer.shadow.color || 'rgba(0,0,0,0.3)';
+        fullSvg = `
+          <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="${offsetX}" dy="${offsetY}" stdDeviation="${blur}" flood-color="${shadowColor}" />
+              </filter>
+            </defs>
+            <g filter="url(#shadow)">
+              ${textSvg}
+            </g>
+          </svg>
+        `;
+      } else {
+        fullSvg = `
+          <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+            ${textSvg}
+          </svg>
+        `;
+      }
+
+      const textBuffer = Buffer.from(fullSvg);
+      layers.push({
+        input: textBuffer,
+        top: 0,
+        left: 0,
+      });
     }
 
     if (layer.type === 'rect') {
-      const width = (layer.width / 100) * canvas.width;
-      const height = (layer.height / 100) * canvas.height;
+      const rectWidth = (layer.width / 100) * width;
+      const rectHeight = (layer.height / 100) * height;
       
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate((layer.rotation || 0) * Math.PI / 180);
-      
-      if (layer.fill) {
-        ctx.fillStyle = layer.fill;
-        ctx.fillRect(-width/2, -height/2, width, height);
-      }
+      let rectSvg = `<rect x="${x - rectWidth/2}" y="${y - rectHeight/2}" width="${rectWidth}" height="${rectHeight}" fill="${layer.fill || 'rgba(255,255,255,0.2)'}" transform="rotate(${layer.rotation || 0}, ${x}, ${y})" />`;
       
       if (layer.borderWidth > 0 && layer.borderColor) {
-        ctx.strokeStyle = layer.borderColor;
-        ctx.lineWidth = layer.borderWidth;
-        ctx.strokeRect(-width/2, -height/2, width, height);
+        rectSvg += `<rect x="${x - rectWidth/2}" y="${y - rectHeight/2}" width="${rectWidth}" height="${rectHeight}" fill="none" stroke="${layer.borderColor}" stroke-width="${layer.borderWidth}" transform="rotate(${layer.rotation || 0}, ${x}, ${y})" />`;
       }
       
-      ctx.restore();
+      const rectBuffer = Buffer.from(
+        `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          ${rectSvg}
+        </svg>`
+      );
+      
+      layers.push({
+        input: rectBuffer,
+        top: 0,
+        left: 0,
+      });
     }
 
     if (layer.type === 'line') {
-      const startX = (layer.startX / 100) * canvas.width;
-      const startY = (layer.startY / 100) * canvas.height;
-      const endX = (layer.endX / 100) * canvas.width;
-      const endY = (layer.endY / 100) * canvas.height;
+      const startX = (layer.startX / 100) * width;
+      const startY = (layer.startY / 100) * height;
+      const endX = (layer.endX / 100) * width;
+      const endY = (layer.endY / 100) * height;
       
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(startX, startY);
-      ctx.lineTo(endX, endY);
-      ctx.strokeStyle = layer.strokeColor || '#ffffff';
-      ctx.lineWidth = layer.strokeWidth || 2;
+      let dashArray = '';
+      if (layer.dashArray === 'dashed') dashArray = ' stroke-dasharray="5,5"';
+      else if (layer.dashArray === 'dotted') dashArray = ' stroke-dasharray="2,4"';
       
-      if (layer.dashArray === 'dashed') {
-        ctx.setLineDash([5, 5]);
-      } else if (layer.dashArray === 'dotted') {
-        ctx.setLineDash([2, 4]);
-      }
+      const lineSvg = `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="${layer.strokeColor || '#ffffff'}" stroke-width="${layer.strokeWidth || 2}"${dashArray} transform="rotate(${layer.rotation || 0}, ${(startX + endX)/2}, ${(startY + endY)/2})" />`;
       
-      ctx.stroke();
-      ctx.restore();
+      const lineBuffer = Buffer.from(
+        `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          ${lineSvg}
+        </svg>`
+      );
+      
+      layers.push({
+        input: lineBuffer,
+        top: 0,
+        left: 0,
+      });
     }
   }
 
-  // ─── Generate and add QR Code ────────────────────────────────────────
+  // ─── Generate QR Code ──────────────────────────────────────────────────
   const qrCodeDataUrl = await generateQRCode({
     guestId: guest.id,
     eventId: event.id,
@@ -297,29 +331,34 @@ async function generatePersonalizedCard({
   });
 
   if (qrCodeDataUrl) {
-    try {
-      const qrImage = await loadImage(Buffer.from(qrCodeDataUrl.split(',')[1], 'base64'));
-      const qrWidth = Math.min(qrSize, 300);
-      const qrHeight = Math.min(qrSize, 300);
-      const qrXPos = (qrX / 100) * canvas.width;
-      const qrYPos = (qrY / 100) * canvas.height;
-      
-      ctx.save();
-      ctx.translate(qrXPos, qrYPos);
-      ctx.rotate((qrRotation || 0) * Math.PI / 180);
-      ctx.drawImage(qrImage, -qrWidth/2, -qrHeight/2, qrWidth, qrHeight);
-      ctx.restore();
-    } catch (error) {
-      console.error('QR Code drawing error:', error);
-    }
+    const qrBuffer = Buffer.from(qrCodeDataUrl.split(',')[1], 'base64');
+    const qrWidth = Math.min(qrSize, 300);
+    const qrHeight = Math.min(qrSize, 300);
+    const qrXPos = (qrX / 100) * width - qrWidth / 2;
+    const qrYPos = (qrY / 100) * height - qrHeight / 2;
+    
+    layers.push({
+      input: qrBuffer,
+      top: qrYPos,
+      left: qrXPos,
+    });
   }
 
-  // ─── Convert to PNG and upload ──────────────────────────────────────
-  const pngBuffer = canvas.toBuffer('image/png');
-  
-  // ─── Upload to storage ──────────────────────────────────────────────
-  // For now, return base64 for testing
-  return `data:image/png;base64,${pngBuffer.toString('base64')}`;
+  // ─── Composite all layers ──────────────────────────────────────────────
+  const compositeBuffer = await sharp({
+    create: {
+      width,
+      height,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+  .composite(layers)
+  .png()
+  .toBuffer();
+
+  // ─── Return base64 for testing ─────────────────────────────────────────
+  return `data:image/png;base64,${compositeBuffer.toString('base64')}`;
 }
 
 // ─── Generate QR Code ──────────────────────────────────────────────────
@@ -344,23 +383,17 @@ async function generateQRCode({
       checkInUrl: `https://littlewed.co.tz/check-in?guest=${guestId}&event=${eventId}`,
     });
 
-    // ─── Fix: Use toCanvas instead of toDataURL for better type support ──
-    const canvas = createCanvas(
-      Math.min(qrSize * 2, 400),
-      Math.min(qrSize * 2, 400)
-    );
-    
-    await QRCode.toCanvas(canvas, data, {
+    const qrOptions = {
       width: Math.min(qrSize * 2, 400),
       color: {
         dark: qrColor || '#000000',
         light: '#ffffff',
       },
-      errorCorrectionLevel: 'H',
-    });
+      errorCorrectionLevel: 'H' as QRCode.QRCodeErrorCorrectionLevel,
+    };
 
-    // Convert canvas to data URL
-    return canvas.toDataURL('image/png');
+    const qrDataUrl = await QRCode.toDataURL(data, qrOptions);
+    return qrDataUrl;
   } catch (error) {
     console.error('QR Code generation error:', error);
     return null;
