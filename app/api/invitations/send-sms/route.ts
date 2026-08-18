@@ -3,32 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendSMS } from '@/lib/sms/index';
-
-// ─── Helper: Get full name ──────────────────────────────────────────────
-function getFullName(guest: any): string {
-  return guest.title ? `${guest.title} ${guest.name}` : guest.name;
-}
-
-// ─── Helper: Replace placeholders ────────────────────────────────────────
-function personalizeMessage(message: string, guest: any, event: any): string {
-  const fullName = getFullName(guest);
-  const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-
-  return message
-    .replace(/{title}/g, guest.title || '')
-    .replace(/{name}/g, guest.name)
-    .replace(/{fullName}/g, fullName)
-    .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
-    .replace(/{event}/g, event.name)
-    .replace(/{date}/g, formattedDate)
-    .replace(/{venue}/g, event.venue)
-    .replace(/{address}/g, event.address || '');
-}
+import { sendSMS } from '@/lib/sms';
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,42 +19,83 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
+    // ─── Fetch guest with event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
+      include: { event: true },
     });
 
-    const event = await prisma.event.findFirst({
-      where: { id: eventId, tenantId },
-    });
-
-    if (!guest || !event) {
-      return NextResponse.json({ error: 'Guest or Event not found' }, { status: 404 });
+    if (!guest) {
+      return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
     if (!guest.phone) {
       return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
     }
 
-    if (guest.routingChannel !== 'sms') {
-      return NextResponse.json({
-        error: `Guest is not configured for SMS. Channel: ${guest.routingChannel}`,
-      }, { status: 400 });
+    // ─── Build guest full name ──────────────────────────────────────────
+    const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    const formattedDate = guest.event?.date
+      ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : '';
+
+    // ─── Build SMS message (no link) ────────────────────────────────────
+    let smsMessage = `Habari ${guestFullName},
+
+Familia ya ${guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${guest.event?.person1 || 'Agape'} na ${guest.event?.person2 || 'Gladness'} tarehe ${formattedDate}.
+
+Venue: ${guest.event?.venue || 'The Embassy Hall'}, saa ${guest.event?.time || '5:00 PM'}.
+
+Card No: ${guest.cardNumber || '108'} • ${guest.guestType || 'SINGLE'}
+
+Tafadhali onyesha kadi hii wakati wa kuingia.
+Karibu na ufurahie sherehe!
+
+Ahsante.`;
+
+    // ─── If custom message provided, use it ─────────────────────────────
+    if (message) {
+      smsMessage = message
+        .replace(/{title}/g, guest.title || '')
+        .replace(/{name}/g, guest.name)
+        .replace(/{fullName}/g, guestFullName)
+        .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
+        .replace(/{passCode}/g, guest.passCode || 'N/A')
+        .replace(/{event}/g, guest.event?.name || '')
+        .replace(/{date}/g, formattedDate)
+        .replace(/{venue}/g, guest.event?.venue || '')
+        .replace(/{address}/g, guest.event?.address || '')
+        .replace(/{hostFamily}/g, guest.event?.hostFamily || '')
+        .replace(/{person1}/g, guest.event?.person1 || '')
+        .replace(/{person2}/g, guest.event?.person2 || '')
+        .replace(/{time}/g, guest.event?.time || '');
     }
 
-    // ─── Personalize the message ──────────────────────────────────────────
-    const personalizedMessage = personalizeMessage(
-      message || "Hello {fullName}, you're invited to {event}! Card: {cardNumber}",
-      guest,
-      event
-    );
-
-    // ─── Send SMS via NexSMS ──────────────────────────────────────────────
+    // ─── Send SMS ──────────────────────────────────────────────────────
     const result = await sendSMS({
       to: guest.phone,
-      message: personalizedMessage,
+      message: smsMessage,
     });
 
     if (result.success) {
+      // ─── Create MessageLog for tracking ──────────────────────────────
+      if (result.messageId) {
+        await prisma.messageLog.create({
+          data: {
+            messageId: result.messageId,
+            guestId: guest.id,
+            type: 'SMS',
+            template: 'custom',
+            status: 'SENT',
+            rawData: result.data,
+          },
+        });
+      }
+
       await prisma.guest.update({
         where: { id: guest.id },
         data: { invitationSentAt: new Date() },
@@ -88,9 +104,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'SMS sent successfully!',
-        data: result,
+        data: result.data,
+        messageId: result.messageId,
       });
     } else {
+      // ─── Log the failure ──────────────────────────────────────────────
+      console.error('[SMS] Failed to send to', guest.phone, result.error);
+
       return NextResponse.json({
         success: false,
         error: result.error || 'Failed to send SMS',

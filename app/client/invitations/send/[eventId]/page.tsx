@@ -25,6 +25,7 @@ interface Guest {
   invitationSentAt: string | null;
   whatsappDetected?: boolean;
   checkedIn?: boolean;
+  passCode?: string | null;
 }
 
 interface EventData {
@@ -67,6 +68,7 @@ export default function SendInvitationsPage() {
   const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp'>('sms');
   const [loadingGuests, setLoadingGuests] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [generatingCards, setGeneratingCards] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -75,24 +77,22 @@ export default function SendInvitationsPage() {
   const hasCard = guests.some(g => g.invitationCard);
   const failedCount = results.filter(r => !r.success).length;
   const successCount = results.filter(r => r.success).length;
+  const guestsWithoutPassCode = guests.filter(g => !g.passCode).length;
 
   // ─── Load Data ──────────────────────────────────────────────────────────
   const loadData = async () => {
     setLoadingGuests(true);
     try {
-      const [eventRes, guestsRes, settingsRes] = await Promise.all([
+      const [eventRes, guestsRes] = await Promise.all([
         fetch(`/api/events/${eventId}`, { credentials: 'include' }),
         fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }),
-        fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }),
       ]);
 
       const eventData = await eventRes.json();
       const guestsData = await guestsRes.json();
-      const settings = await settingsRes.json();
 
       setEvent(eventData.event || eventData);
       setGuests(guestsData || []);
-      setCustomMessage(settings.customMessage || "Hello {fullName},\n\nYou're invited to {event}! 🎉\n\n📍 Venue: {venue}\n📅 Date: {date}\n🎟️ Card: {cardNumber}\n\nWe look forward to celebrating with you!");
     } catch (error) {
       console.error('Load error:', error);
       toast.error('Failed to load data');
@@ -106,29 +106,44 @@ export default function SendInvitationsPage() {
     loadData();
   }, [eventId]);
 
-  // ─── Helper: Replace placeholders in SMS message ──────────────────────
-  const personalizeMessage = (message: string, guest: Guest, eventData: EventData): string => {
-    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    const formattedDate = new Date(eventData.date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  // ─── Generate Cards (Pass Codes) ──────────────────────────────────────
+  const handleGenerateCards = async () => {
+    const pendingGuests = guests.filter(g => !g.passCode);
+    
+    if (pendingGuests.length === 0) {
+      toast.success('All guests already have cards');
+      return;
+    }
 
-    return message
-      .replace(/{title}/g, guest.title || '')
-      .replace(/{name}/g, guest.name)
-      .replace(/{fullName}/g, fullName)
-      .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
-      .replace(/{smsCode}/g, guest.smsCode || 'N/A')
-      .replace(/{event}/g, eventData.name)
-      .replace(/{date}/g, formattedDate)
-      .replace(/{venue}/g, eventData.venue)
-      .replace(/{address}/g, eventData.address || '')
-      .replace(/{hostFamily}/g, eventData.hostFamily || '')
-      .replace(/{person1}/g, eventData.person1 || '')
-      .replace(/{person2}/g, eventData.person2 || '')
-      .replace(/{time}/g, eventData.time || '');
+    setGeneratingCards(true);
+    
+    try {
+      const res = await fetch('/api/invitations/generate-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          guestIds: pendingGuests.map(g => g.id)
+        }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.completed > 0) {
+        toast.success(`Generated ${data.completed} cards successfully!`);
+        await loadData();
+      } else if (data.completed === 0 && data.failed > 0) {
+        toast.error(`Failed to generate cards. ${data.failed} guests failed.`);
+      } else {
+        toast.success('All guests already have cards!');
+      }
+    } catch (err) {
+      console.error('Generation error:', err);
+      toast.error('Network error while generating cards');
+    } finally {
+      setGeneratingCards(false);
+    }
   };
 
   // ─── Broadcast to all guests using batch API ──────────────────────────
@@ -139,8 +154,10 @@ export default function SendInvitationsPage() {
       return;
     }
 
-    if (!customMessage.trim() && targetGuests.some(g => g.routingChannel === 'sms')) {
-      toast.error('Please write an SMS message');
+    // Check if any SMS guests need a message
+    const smsGuests = targetGuests.filter(g => g.routingChannel === 'sms');
+    if (smsGuests.length > 0 && !customMessage.trim()) {
+      toast.error('Please write an SMS message for SMS guests');
       return;
     }
 
@@ -150,26 +167,14 @@ export default function SendInvitationsPage() {
     try {
       const guestIds = targetGuests.map(g => g.id);
       
-      // Check if we're sending to all WhatsApp or mixed
-      const allWhatsApp = targetGuests.every(g => g.routingChannel === 'whatsapp');
-      const allSms = targetGuests.every(g => g.routingChannel === 'sms');
-      
-      let endpoint = '/api/invitations/send-batch';
-      let body: any = { 
-        eventId, 
-        guestIds,
-      };
-
-      // If sending SMS, include the custom message
-      if (allSms || !allWhatsApp) {
-        endpoint = '/api/invitations/send-sms-batch';
-        body.message = customMessage;
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/invitations/send-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ 
+          eventId, 
+          guestIds,
+          message: customMessage || undefined,
+        }),
         credentials: 'include',
       });
 
@@ -179,11 +184,11 @@ export default function SendInvitationsPage() {
         setResults(data.results || []);
         
         if (data.successCount === data.total) {
-          toast.success(`✅ Successfully sent to all ${data.total} guests!`);
+          toast.success(`✅ Sent to all ${data.total} guests!`);
         } else if (data.successCount > 0) {
           toast(`${data.successCount} of ${data.total} guests received the message. ${data.failCount} failed.`, {
             icon: <AlertTriangle size={18} className="text-amber-500" />,
-            duration: 6000,
+            duration: 5000,
           });
         } else {
           toast.error(`❌ Failed to send to any guests.`);
@@ -201,66 +206,56 @@ export default function SendInvitationsPage() {
     }
   };
 
-// ─── Retry Failed Messages ────────────────────────────────────────────
-const retryFailed = async () => {
-  const failedGuestIds = results
-    .filter(r => !r.success)
-    .map(r => r.guestId);
+  // ─── Retry Failed Messages ────────────────────────────────────────────
+  const retryFailed = async () => {
+    const failedGuestIds = results
+      .filter(r => !r.success)
+      .map(r => r.guestId);
 
-  if (failedGuestIds.length === 0) {
-    toast('No failed messages to retry', {
-      icon: <Info size={18} className="text-blue-500" />,
-      duration: 3000,
-    });
-    return;
-  }
-
-  setRetrying(true);
-  
-  try {
-    const failedGuests = guests.filter(g => failedGuestIds.includes(g.id));
-    const allWhatsApp = failedGuests.every(g => g.routingChannel === 'whatsapp');
-    
-    let endpoint = '/api/invitations/send-batch';
-    let body: any = { 
-      eventId, 
-      guestIds: failedGuestIds,
-    };
-
-    if (!allWhatsApp) {
-      endpoint = '/api/invitations/send-sms-batch';
-      body.message = customMessage;
-    }
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      credentials: 'include',
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      // Merge new results with old ones
-      const newResults = results.map(r => {
-        const updated = data.results?.find((ur: any) => ur.guestId === r.guestId);
-        return updated || r;
+    if (failedGuestIds.length === 0) {
+      toast('No failed messages to retry', {
+        icon: <Info size={18} className="text-blue-500" />,
+        duration: 3000,
       });
-      setResults(newResults);
-      
-      toast.success(`Retried ${data.successCount} failed messages. ${data.failCount} still failed.`);
-      await loadData();
-    } else {
-      toast.error(data.error || 'Failed to retry');
+      return;
     }
-  } catch (error) {
-    console.error('Retry error:', error);
-    toast.error('Network error');
-  } finally {
-    setRetrying(false);
-  }
-};
+
+    setRetrying(true);
+    
+    try {
+      const res = await fetch('/api/invitations/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          eventId, 
+          guestIds: failedGuestIds,
+          message: customMessage || undefined,
+          retry: true,
+        }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const newResults = results.map(r => {
+          const updated = data.results?.find((ur: any) => ur.guestId === r.guestId);
+          return updated || r;
+        });
+        setResults(newResults);
+        
+        toast.success(`Retried ${data.successCount} failed messages. ${data.failCount} still failed.`);
+        await loadData();
+      } else {
+        toast.error(data.error || 'Failed to retry');
+      }
+    } catch (error) {
+      console.error('Retry error:', error);
+      toast.error('Network error');
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   // ─── Send to specific channel ──────────────────────────────────────────
   const sendToChannel = async (channel: 'whatsapp' | 'sms') => {
@@ -347,6 +342,14 @@ const retryFailed = async () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
+            onClick={handleGenerateCards}
+            disabled={generatingCards || guests.length === 0}
+            className="px-4 py-2 bg-amber-600 text-white rounded-xl font-semibold text-sm hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {generatingCards ? 'Generating...' : `Cards (${guestsWithoutPassCode})`}
+          </button>
+          <button
             onClick={() => sendToChannel('whatsapp')}
             disabled={sending || whatsappCount === 0}
             className="px-4 py-2 bg-[#0D4F4F] text-white rounded-xl font-semibold text-sm hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
@@ -417,8 +420,10 @@ const retryFailed = async () => {
               <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{date}'}</code>{' '}
               <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{venue}'}</code>{' '}
               <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{cardNumber}'}</code>{' '}
-              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{smsCode}'}</code>{' '}
-              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{name}'}</code>
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{name}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{hostFamily}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{person1}'}</code>{' '}
+              <code className="bg-gray-100 px-1.5 py-0.5 rounded text-[10px] font-mono">{'{person2}'}</code>
             </p>
             <textarea
               value={customMessage}
@@ -445,8 +450,9 @@ const retryFailed = async () => {
               <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
             </div>
             <p className="text-sm text-green-700 mb-3">
-              WhatsApp invitations use the pre-approved template <strong>"swahili invitation"</strong>.
+              WhatsApp invitations use the pre-approved template <strong>"swahiliinvitation"</strong>.
               No custom message is needed - the template will be sent automatically with guest details.
+              The invitation card image will be rendered directly in the message.
             </p>
             <div className="bg-white rounded-xl p-4 border border-green-200">
               <p className="font-medium text-[#0D4F4F] text-sm flex items-center gap-2">
@@ -457,10 +463,9 @@ const retryFailed = async () => {
                 <p>Familia ya <span className="text-[#0D4F4F] font-medium">{'{var2}'}</span> inapenda kukualika katika sherehe ya harusi ya <span className="text-[#0D4F4F] font-medium">{'{var3}'}</span> na <span className="text-[#0D4F4F] font-medium">{'{var4}'}</span> itakayofanyika tarehe <span className="text-[#0D4F4F] font-medium">{'{var5}'}</span>.</p>
                 <p>Reception itafanyika katika ukumbi wa <span className="text-[#0D4F4F] font-medium">{'{var6}'}</span>, kuanzia saa <span className="text-[#0D4F4F] font-medium">{'{var7}'}</span>.</p>
                 <p>Card No: <span className="text-[#0D4F4F] font-medium">{'{var8}'}</span> <span className="text-[#0D4F4F] font-medium">{'{var9}'}</span></p>
-                <p className="text-xs text-gray-500 mt-2">Tafadhali onyesha kadi hii wakati wa kuingia. Karibu na ufurahie sherehe!</p>
                 <div className="mt-2 pt-2 border-t border-green-100">
                   <span className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 border border-green-200">
-                    <span>🔗</span> Bonyeza link hapa chini kwa maelezo kamili
+                    <ImageIcon size={14} /> Card image will be displayed here
                   </span>
                 </div>
                 <p className="text-[10px] text-green-500 mt-2 flex items-center gap-1">
@@ -500,7 +505,7 @@ const retryFailed = async () => {
             <ImageIcon size={16} className="text-amber-600" />
             <span className="text-sm font-medium text-gray-600">With Card</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{guests.filter(g => g.invitationCard).length}</p>
+          <p className="text-2xl font-bold text-gray-900">{guests.filter(g => g.passCode).length}</p>
         </div>
       </div>
 
@@ -669,26 +674,14 @@ const retryFailed = async () => {
                         {guest.cardNumber && (
                           <span className="text-xs text-gray-400 font-mono">#{guest.cardNumber}</span>
                         )}
+                        {guest.passCode && (
+                          <span className="text-xs text-purple-600 font-mono bg-purple-50 px-2 py-0.5 rounded-full">
+                            {guest.passCode}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-400 mt-0.5">
                         {guest.phone && <span>{guest.phone}</span>}
-                        {guest.smsCode && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              copyToClipboard(guest.smsCode!, guest.id);
-                            }}
-                            className="flex items-center gap-1 hover:text-[#0D4F4F] transition"
-                          >
-                            <Hash size={10} />
-                            {guest.smsCode}
-                            {copiedCode === guest.id ? (
-                              <Check size={10} className="text-green-600" />
-                            ) : (
-                              <Copy size={10} />
-                            )}
-                          </button>
-                        )}
                         {guest.invitationSentAt && (
                           <span className="text-green-600 flex items-center gap-1">
                             <CheckCircle size={10} />
@@ -720,16 +713,6 @@ const retryFailed = async () => {
                   {/* ─── Expanded Content ─── */}
                   {isExpanded && (
                     <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {guest.invitationCard && (
-                        <div className="bg-gray-50 rounded-xl p-3 text-center">
-                          <p className="text-xs text-gray-500 mb-2">Invitation Card</p>
-                          <img
-                            src={guest.invitationCard}
-                            alt="Card"
-                            className="max-w-[120px] max-h-[160px] mx-auto rounded-lg shadow-sm object-contain"
-                          />
-                        </div>
-                      )}
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 text-sm">
                           <User size={14} className="text-gray-400" />
@@ -747,10 +730,10 @@ const retryFailed = async () => {
                             <span className="text-gray-600 font-mono">{guest.cardNumber}</span>
                           </div>
                         )}
-                        {guest.smsCode && (
+                        {guest.passCode && (
                           <div className="flex items-center gap-2 text-sm">
                             <QrCode size={14} className="text-gray-400" />
-                            <span className="text-gray-600 font-mono">{guest.smsCode}</span>
+                            <span className="text-gray-600 font-mono">{guest.passCode}</span>
                           </div>
                         )}
                         {guest.invitationSentAt && (
@@ -763,6 +746,33 @@ const retryFailed = async () => {
                           <div className="flex items-center gap-2 text-sm text-blue-600">
                             <CheckCircle size={14} />
                             <span>Checked In</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-3 text-center flex flex-col items-center justify-center">
+                        <p className="text-xs text-gray-500 mb-2">Card Preview</p>
+                        {guest.passCode ? (
+                          <img
+                            src={`/api/og/card?code=${guest.passCode}`}
+                            alt="Card"
+                            className="max-w-[120px] max-h-[160px] mx-auto rounded-lg shadow-sm object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/120x160?text=Card+Not+Generated';
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-gray-400 text-xs">
+                            <ImageIcon size={24} />
+                            <span>No card generated</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateCards();
+                              }}
+                              className="px-3 py-1 bg-amber-600 text-white rounded-lg text-xs hover:bg-amber-700 transition"
+                            >
+                              Generate
+                            </button>
                           </div>
                         )}
                       </div>

@@ -1,70 +1,83 @@
 // lib/sms/index.ts
 
-const API_KEY = process.env.NEXT_SMS_API_KEY!;
-const SENDER_ID = process.env.NEXT_SMS_SENDER_ID!;
-const BASE_URL = process.env.NEXT_SMS_BASE_URL! || 'https://messaging-service.co.tz/api/sms/v2';
+const SMS_API_URL = process.env.SMS_API_URL || 'https://messaging-service.co.tz/api/sms/v1/send';
+const SMS_API_KEY = process.env.SMS_API_KEY!;
+const SMS_SENDER_ID = process.env.SMS_SENDER_ID || 'LittleWed';
 
-export interface SendSMSOptions {
-  to: string;
-  message: string;
-  sender?: string;
-  flash?: 0 | 1;
-  reference?: string;
+export interface SendSMSResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  data?: any;
 }
 
-export async function sendSMS({ to, message, sender = SENDER_ID, flash = 0, reference }: SendSMSOptions): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  if (!API_KEY) {
-    throw new Error('NEXT_SMS_API_KEY is not set');
+export async function sendSMS({
+  to,
+  message,
+}: {
+  to: string;
+  message: string;
+}): Promise<SendSMSResult> {
+  if (!SMS_API_KEY) {
+    console.error('[SMS] SMS_API_KEY is not set');
+    return { success: false, error: 'SMS_API_KEY is not set' };
   }
 
-  const endpoint = `${BASE_URL}/text/single`;
-  const ref = reference || `ref_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-  // Remove leading '+' from phone number
-  const cleanTo = to.replace(/^\+/, '');
-
-  console.log('[SMS] Sending to:', endpoint);
-  console.log('[SMS] Payload:', { from: sender, to: cleanTo, text: message, flash, reference: ref });
+  // Clean phone number (remove + and non-numeric)
+  const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(SMS_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${SMS_API_KEY}`,
       },
       body: JSON.stringify({
-        from: sender,
         to: cleanTo,
-        text: message,
-        flash,
-        reference: ref,
+        from: SMS_SENDER_ID,
+        message: message,
       }),
     });
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('[SMS] Non-JSON response:', {
-        status: response.status,
-        body: text.slice(0, 500),
-      });
-      throw new Error(`Server returned non-JSON (${response.status}).`);
-    }
-
     const data = await response.json();
 
+    console.log('[SMS] Response Status:', response.status);
+    console.log('[SMS] Response Data:', JSON.stringify(data, null, 2));
+
     if (!response.ok) {
-      const errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      throw new Error(errorMsg);
+      let errorMsg = data.message || data.error || `HTTP ${response.status}`;
+      
+      if (response.status === 400) {
+        console.error('[SMS] ❌ Bad Request - Check phone number and message');
+        errorMsg = data.errors?.map((e: any) => e.message || e).join(', ') || errorMsg;
+      } else if (response.status === 401) {
+        console.error('[SMS] ❌ Authentication failed - Check SMS_API_KEY');
+        errorMsg = 'Authentication failed. Please check your API key.';
+      } else if (response.status === 429) {
+        console.error('[SMS] ❌ Rate limit exceeded - Too many messages');
+        errorMsg = 'Rate limit exceeded. Please wait and try again.';
+      }
+      
+      return { 
+        success: false, 
+        error: errorMsg,
+        data: data,
+      };
     }
 
-    const messageId = data.data?.messageId || data.messageId || data.id || ref;
+    const messageId = data.messageId || data.id || data.message_id || `sms_${Date.now()}`;
 
-    return { success: true, messageId };
+    return { 
+      success: true, 
+      messageId: String(messageId),
+      data: data,
+    };
   } catch (error: any) {
-    console.error('[SMS] Error sending SMS:', error);
-    return { success: false, error: error.message || 'Unknown error' };
+    console.error('[SMS] Error sending SMS:', error.message);
+    return { 
+      success: false, 
+      error: error.message || 'Network error',
+    };
   }
 }

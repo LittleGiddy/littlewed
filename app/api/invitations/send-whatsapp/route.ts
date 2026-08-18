@@ -39,17 +39,6 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check if already sent recently ──────────────────────────────────
-    if (guest.invitationSentAt) {
-      const timeSinceLastSend = Date.now() - new Date(guest.invitationSentAt).getTime();
-      if (timeSinceLastSend < 60000) {
-        return NextResponse.json({
-          success: false,
-          error: 'Invitation already sent recently. Please wait before resending.',
-        }, { status: 429 });
-      }
-    }
-
     // ─── Format date properly ──────────────────────────────────────────
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
@@ -62,7 +51,12 @@ export async function POST(req: NextRequest) {
     // ─── Build guest full name ──────────────────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Send WhatsApp invitation ──────────────────────────────────────
+    // ─── Build dynamic card URL using pass code ─────────────────────────
+    const cardImageUrl = guest.passCode 
+      ? `https://littlewed.co.tz/api/og/card?code=${guest.passCode}`
+      : guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png';
+
+    // ─── Send WhatsApp invitation (no link button) ──────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
       hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
@@ -73,8 +67,8 @@ export async function POST(req: NextRequest) {
       time: guest.event?.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
-      imageUrl: guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
-      inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
+      imageUrl: cardImageUrl,  // ✅ Card image rendered in WhatsApp
+      // No inviteLink - removed!
     });
 
     if (result.success) {
@@ -102,6 +96,7 @@ export async function POST(req: NextRequest) {
         message: 'Invitation sent successfully!',
         data: result.data,
         messageId: result.messageId,
+        cardImageUrl,
       });
     } else {
       // ─── Log the failure ──────────────────────────────────────────────

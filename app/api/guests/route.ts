@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
+import { generateUniquePassCode } from '@/lib/utils';
 
 // ─── Helper: Get the next available card number ──────────────────────────
 async function getNextCardNumber(eventId: string): Promise<string> {
@@ -132,24 +133,34 @@ export async function POST(req: NextRequest) {
       finalCardNumber = await getNextCardNumber(eventId);
     }
 
+    // ─── Generate unique pass code ──────────────────────────────────────
+    const passCode = await generateUniquePassCode(prisma);
+
     // ─── Create guest ────────────────────────────────────────────────────
     const guest = await prisma.guest.create({
       data: {
         title: title || 'Mr',
         name: name.trim(),
         phone: normalized,
-        cardNumber: finalCardNumber, // ✅ 5-digit numeric
+        cardNumber: finalCardNumber,
         email: email?.trim() || null,
         eventId,
         routingChannel,
         waId: waId || null,
-        // ❌ smsCode removed
+        passCode, // ✅ Store the unique pass code
         qrToken: randomBytes(16).toString('hex'),
       },
     });
 
+    // ─── Build the dynamic card URL ──────────────────────────────────────
+    const cardImageUrl = `https://littlewed.co.tz/api/og/card?code=${passCode}`;
+    const inviteLink = `https://littlewed.co.tz/invite/${passCode}`;
+
     return NextResponse.json({
       ...guest,
+      passCode,
+      cardImageUrl,
+      inviteLink,
       whatsappDetected: whatsappVerified,
       routingChannel,
     });

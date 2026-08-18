@@ -131,7 +131,7 @@ export async function sendWeddingInvitation(
     cardNumber: string;
     cardType: string;
     imageUrl?: string;
-    inviteLink?: string;
+    // No inviteLink - removed for cleaner flow
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
@@ -144,43 +144,44 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ─── Button with dynamic URL ──────────────────────────────────────────
-  let button = undefined;
-  if (data.inviteLink) {
-    const slug = toLinkSuffix(data.inviteLink);
-    button = {
-      personalisation: {
-        url_link: {
-          parameters: [slug],
-        },
-      },
-    };
-  }
+  // ─── NO BUTTON - removed for cleaner approval ─────────────────────────
+  // If you need a button, uncomment and use this:
+  // let button = undefined;
+  // if (data.inviteLink) {
+  //   const slug = toLinkSuffix(data.inviteLink);
+  //   button = {
+  //     personalisation: {
+  //       url_link: {
+  //         parameters: [slug],
+  //       },
+  //     },
+  //   };
+  // }
 
   // ─── Send template with proper variable mapping ──────────────────────
+  // Template name: 'swahiliinvitation' (must match your NexSMS template)
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili invitation',
+    template: 'swahiliinvitation', // ✅ Your approved template name
     personalisation: [
       {
-        "var1": data.guestName,      // Guest name with title
-        "var2": data.hostFamily,     // Host family
-        "var3": data.person1,        // Person 1
-        "var4": data.person2,        // Person 2
-        "var5": data.date,           // Event date
-        "var6": data.venue,          // Venue
-        "var7": data.time,           // Time
-        "var8": data.cardNumber,     // Card number
-        "var9": data.cardType,       // Card type
+        "1": data.guestName,      // Guest name with title
+        "2": data.hostFamily,     // Host family
+        "3": data.person1,        // Person 1 (Groom)
+        "4": data.person2,        // Person 2 (Bride)
+        "5": data.date,           // Event date
+        "6": data.venue,          // Venue
+        "7": data.time,           // Time
+        "8": data.cardNumber,     // Card number
+        "9": data.cardType,       // Card type (SINGLE/DOUBLE)
       }
     ],
     header,
-    button,
+    // button, // No button
   });
 }
 
-// ─── Helper: Convert full URL to slug ──────────────────────────────────
-
+// ─── Helper: Convert full URL to slug (kept for future use) ──────────
 export function toLinkSuffix(value: string): string {
   try {
     const url = new URL(value);

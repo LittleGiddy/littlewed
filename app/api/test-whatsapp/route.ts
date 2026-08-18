@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       cardNumber: '00001',
       cardType: 'SINGLE',
       imageUrl: 'https://www.gstatic.com/webp/gallery/1.png',
-      inviteLink: 'test-invite-123',
+      
     });
 
     return NextResponse.json(result);

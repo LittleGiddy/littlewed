@@ -227,12 +227,16 @@ model Guest {
   cardNumber     String?   @unique       // ✅ 5-digit numeric code (e.g., "00001", "23790")
   waId           String?   // WhatsApp ID from Meta
 
+    // ─── NEW: Pass Code for dynamic card generation ──────────────────────
+  passCode       String?   @unique  // e.g., "WED-8F92"
+
   // ─── Relations ──────────────────────────────────────────────────────────
   messageLogs MessageLog[]
 
   @@index([eventId])
   @@index([phone])
   @@index([cardNumber])  // ✅ Added index for faster lookups
+  @@index([passCode])  // ✅ Add index for faster lookups
 }
 
 model UsageRecord {
