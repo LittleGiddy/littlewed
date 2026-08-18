@@ -124,6 +124,7 @@ model Event {
   reminderSent  Boolean  @default(false) // track if 24h reminder was sent
   expiredNotified Boolean @default(false) // track if expiration email was sent
   checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
+  qrRotation       Float?   @default(0)  // ✅ Add this field
 
   // ─── Wedding-specific fields ─────────────────────────────────────────
   hostFamily  String?  // e.g., "Mr & Mrs Allan Swai"

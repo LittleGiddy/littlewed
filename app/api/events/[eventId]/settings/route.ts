@@ -1,3 +1,4 @@
+// app/api/events/[eventId]/settings/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -19,42 +20,35 @@ export async function GET(
     where: { id: eventId, tenantId },
     select: {
       templateCardUrl: true,
-      // QR
       qrPlacementX: true,
       qrPlacementY: true,
       qrSize: true,
       qrColor: true,
-      // Guest name
+      qrRotation: true, // ✅ Added
       includeName: true,
       namePlacementX: true,
       namePlacementY: true,
       nameFontSize: true,
       nameFontColor: true,
-      // Event name overlay
       showEventName: true,
       eventNameX: true,
       eventNameY: true,
       eventNameSize: true,
       eventNameColor: true,
-      // Date overlay
       showDate: true,
       dateX: true,
       dateY: true,
       dateSize: true,
       dateColor: true,
-      // Venue overlay
       showVenue: true,
       venueX: true,
       venueY: true,
       venueSize: true,
       venueColor: true,
-      // Artistic overlay
       overlayColor: true,
       overlayOpacity: true,
-      // Custom message
       customMessage: true,
       designLayers: true,
-      // ✅ Thanks Card — corrected field name
       thankYouCardUrl: true,
     },
   });
@@ -87,6 +81,7 @@ export async function PUT(
   if (body.qrPlacementY !== undefined) updateData.qrPlacementY = body.qrPlacementY;
   if (body.qrSize !== undefined) updateData.qrSize = body.qrSize;
   if (body.qrColor !== undefined) updateData.qrColor = body.qrColor;
+  if (body.qrRotation !== undefined) updateData.qrRotation = body.qrRotation; // ✅ Added
 
   // Guest Name
   if (body.includeName !== undefined) updateData.includeName = body.includeName;
@@ -124,7 +119,7 @@ export async function PUT(
   if (body.customMessage !== undefined) updateData.customMessage = body.customMessage;
   if (body.designLayers !== undefined) updateData.designLayers = body.designLayers;
 
-  // ✅ Thanks Card — corrected field name
+  // Thank You Card
   if (body.thankYouCardUrl !== undefined) updateData.thankYouCardUrl = body.thankYouCardUrl;
 
   await prisma.event.updateMany({

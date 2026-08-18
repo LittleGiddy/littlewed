@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "qrRotation" DOUBLE PRECISION DEFAULT 0;

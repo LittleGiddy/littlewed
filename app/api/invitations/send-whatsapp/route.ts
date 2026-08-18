@@ -3,23 +3,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWhatsAppTemplate, sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
+    if (!session || (session.user as any).role !== 'CLIENT') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { guestId, eventId, type, message, template, imageUrl, buttonUrl } = await req.json();
+    const tenantId = (session.user as any).tenantId;
+    const { guestId, eventId } = await req.json();
 
     if (!guestId || !eventId) {
-      return NextResponse.json({ error: 'Missing guestId or eventId' }, { status: 400 });
+      return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
     }
 
+    // ─── Fetch guest with event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
-      where: { id: guestId },
+      where: { id: guestId, event: { tenantId } },
       include: { event: true },
     });
 
@@ -31,73 +33,75 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
     }
 
-    let result;
+    if (guest.routingChannel !== 'whatsapp') {
+      return NextResponse.json({
+        error: `Guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
+      }, { status: 400 });
+    }
 
-    if (type === 'thanks') {
-      // Send thank you message
-      result = await sendWhatsAppTemplate({
-        to: guest.phone,
-        template: 'thank_you',
-        personalisation: [{ "var1": guest.name }],
-      });
-    } else if (template) {
-      // Send custom template
-      result = await sendWhatsAppTemplate({
-        to: guest.phone,
-        template: template,
-        personalisation: [{ "var1": guest.name }],
-        header: imageUrl ? { image: { file: imageUrl, name: 'Invitation' } } : undefined,
-        button: buttonUrl ? {
-          personalisation: {
-            url_link: {
-              parameters: [buttonUrl],
-            },
-          },
-        } : undefined,
-      });
-    } else {
-      // Send wedding invitation
-      result = await sendWeddingInvitation(guest.phone, {
-        guestName: guest.title ? `${guest.title} ${guest.name}` : guest.name,
-        hostFamily: guest.event.hostFamily || 'Mr & Mrs Allan Swai',
-        person1: guest.event.person1 || 'Agape',
-        person2: guest.event.person2 || 'Gladness',
-        date: guest.event.date ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
+    // ─── Format date properly ──────────────────────────────────────────
+    const formattedDate = guest.event?.date
+      ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
-        }) : '8 Agosti 2026',
-        venue: guest.event.venue || 'The Embassy Hall',
-        time: guest.event.time || '5:00 PM',
-        cardNumber: guest.cardNumber || '108',
-        cardType: guest.guestType || 'SINGLE',
-        imageUrl: imageUrl || guest.event.imageUrl,
-        inviteLink: buttonUrl || `https://littlewed.co.tz/invite/${guest.id}`,
+        })
+      : '';
+
+    // ─── Build guest full name ──────────────────────────────────────────
+    const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
+    // ─── Send WhatsApp invitation ──────────────────────────────────────
+    const result = await sendWeddingInvitation(guest.phone, {
+      guestName: guestFullName,
+      hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
+      person1: guest.event?.person1 || 'Agape',
+      person2: guest.event?.person2 || 'Gladness',
+      date: formattedDate,
+      venue: guest.event?.venue || 'The Embassy Hall',
+      time: guest.event?.time || '5:00 PM',
+      cardNumber: guest.cardNumber || '108',
+      cardType: guest.guestType || 'SINGLE',
+      imageUrl: guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
+      inviteLink: `https://littlewed.co.tz/invite/${guest.id}`,
+    });
+
+    if (result.success) {
+      // ─── Create MessageLog for tracking ──────────────────────────────
+      if (result.messageId) {
+        await prisma.messageLog.create({
+          data: {
+            messageId: result.messageId,
+            guestId: guest.id,
+            type: 'WHATSAPP',
+            template: 'swahili invitation',
+            status: 'SENT',
+            rawData: result.data,
+          },
+        });
+      }
+
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: { invitationSentAt: new Date() },
       });
+
+      return NextResponse.json({
+        success: true,
+        message: 'Invitation sent successfully!',
+        data: result.data,
+        messageId: result.messageId,
+      });
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: result.error,
+      }, { status: 500 });
     }
-
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 });
-    }
-
-    // Update guest record
-    await prisma.guest.update({
-      where: { id: guestId },
-      data: {
-        invitationSentAt: new Date(),
-        ...(type === 'thanks' ? { thanksSentAt: new Date() } : {}),
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      messageId: result.messageId,
-      message: 'WhatsApp message sent successfully',
-    });
   } catch (error: any) {
     console.error('Send WhatsApp error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to send WhatsApp message' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
