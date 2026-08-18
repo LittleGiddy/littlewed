@@ -162,7 +162,7 @@ export async function sendWeddingInvitation(
   // Template name: 'swahiliinvitation' (must match your NexSMS template)
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahiliinvitation', // ✅ Your approved template name
+    template: 'swahili invitation', // ✅ Your approved template name
     personalisation: [
       {
         "1": data.guestName,      // Guest name with title
