@@ -6,7 +6,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
   Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw,
-  X, Maximize, Minimize
+  X, Maximize, Minimize, ArrowRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -95,6 +95,7 @@ export default function InvitationDesigner() {
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
   const [isFullPreview, setIsFullPreview] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Drag state
   const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
@@ -262,8 +263,8 @@ export default function InvitationDesigner() {
         }),
       });
       if (res.ok) {
-        toast.success('Settings saved successfully');
-        router.push(`/client/events/${eventId}`);
+        toast.success('Design saved successfully!');
+        setShowSuccessModal(true);
       } else {
         const data = await res.json();
         toast.error(data.error || 'Save failed');
@@ -1416,11 +1417,57 @@ export default function InvitationDesigner() {
               className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-              {saving ? 'Saving...' : 'Save & Continue'}
+              {saving ? 'Saving...' : 'Save Design'}
             </button>
           </div>
         )}
       </div>
+
+      {/* ─── Success Modal ─── */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fadeInUp">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <Check size={32} className="text-green-600" />
+              </div>
+              <h2 className="font-serif text-2xl font-bold text-gray-900 mb-2">Design Saved! 🎉</h2>
+              <p className="text-gray-600 text-sm mb-6">
+                Your invitation design has been saved successfully. 
+                Now it's time to generate personalized cards for your guests.
+              </p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    router.push(`/client/events/${eventId}`);
+                  }}
+                  className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={18} />
+                  Go Generate Cards
+                </button>
+                <button
+                  onClick={() => setShowSuccessModal(false)}
+                  className="w-full text-gray-500 text-sm hover:text-gray-700 transition"
+                >
+                  Continue Editing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }
