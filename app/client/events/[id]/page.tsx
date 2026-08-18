@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import {
-  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft,
-  Upload, Plus, Palette, Send, Smartphone, CheckCircle, Trash2, CheckSquare,
-  Square, ArrowUp, Heart, X, Image as ImageIcon, ExternalLink, Bell,
-  Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
+  Calendar, MapPin, Users, QrCode, MessageCircle, Phone, ArrowLeft, ArrowRight,
+  Upload, Plus, Palette, Send, CheckCircle, Trash2, CheckSquare,
+  Square, ArrowUp, Heart, X, Image as ImageIcon, Bell,
+  Search, Download, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
-  Check, Coins, Sparkles, Hash, FileText, Loader2, Menu, MoreVertical,
-  UserCheck, UserPlus, Copy, Filter, Grid3x3, List, TrendingUp, Home, Eye, Share2,
-  Printer, Link2, Copy as CopyIcon
+  Check, Coins, Sparkles, Hash, Loader2, MoreVertical,
+  Grid3x3, List, Eye, Share2, Printer, Link2,
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -30,9 +29,9 @@ interface Guest {
   reminderCount: number;
   invitationCard: string | null;
   title?: string | null;
-  cardNumber?: string | null;    // ✅ Added
-  guestType?: string | null;     // ✅ Added
-  event?: EventData;             // ✅ Added for nested access
+  cardNumber?: string | null;
+  guestType?: string | null;
+  event?: EventData;
 }
 
 interface EventData {
@@ -52,6 +51,15 @@ interface EventData {
   expiredNotified: boolean;
   resumedBy: string | null;
 }
+
+type FlowStep = 'guests' | 'design' | 'generate' | 'send';
+
+const STEPS: { id: FlowStep; label: string; short: string; icon: React.ReactNode }[] = [
+  { id: 'guests', label: 'Guests', short: '1', icon: <Users size={16} /> },
+  { id: 'design', label: 'Design', short: '2', icon: <Palette size={16} /> },
+  { id: 'generate', label: 'Cards', short: '3', icon: <Sparkles size={16} /> },
+  { id: 'send', label: 'Send', short: '4', icon: <Send size={16} /> },
+];
 
 // ─── Countdown Timer ──────────────────────────────────────────────────
 const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) => {
@@ -104,28 +112,26 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
 
   if (status === 'LIVE') {
     return (
-      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-full border border-green-200">
-        <AlarmClock size={16} className="animate-pulse" />
-        <span className="font-bold text-sm">Event is happening now!</span>
+      <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+        <AlarmClock size={13} className="animate-pulse" />
+        <span className="font-bold text-xs">Happening now</span>
       </div>
     );
   }
 
   if (status === 'REMINDER') {
     return (
-      <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full border border-amber-200 animate-pulse">
-        <Timer size={16} />
-        <span className="font-bold text-sm">{formattedTime}</span>
-        <span className="text-xs font-medium">— Coming in 24 hours</span>
+      <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+        <Timer size={13} />
+        <span className="font-bold text-xs">{formattedTime}</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-3 py-1.5 rounded-full border border-[rgba(13,79,79,0.15)]">
-      <CalendarClock size={16} />
-      <span className="font-bold text-sm">{formattedTime}</span>
-      <span className="text-xs font-medium text-gray-500">until event</span>
+    <div className="flex items-center gap-1.5 text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2.5 py-1 rounded-full border border-[rgba(13,79,79,0.15)]">
+      <CalendarClock size={13} />
+      <span className="font-bold text-xs">{formattedTime}</span>
     </div>
   );
 });
@@ -145,7 +151,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [credits, setCredits] = useState<number | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [countdownKey, setCountdownKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'cards' | 'guests'>('overview');
+  const [activeStep, setActiveStep] = useState<FlowStep>('guests');
   const [generatingCards, setGeneratingCards] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
@@ -162,12 +168,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [kumbushaMessage, setKumbushaMessage] = useState('');
   const [sendingKumbusha, setSendingKumbusha] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: '',
-    venue: '',
-    address: '',
-    date: '',
-  });
+  const [editForm, setEditForm] = useState({ name: '', venue: '', address: '', date: '' });
   const [editing, setEditing] = useState(false);
   const [showEditGuestModal, setShowEditGuestModal] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
@@ -177,44 +178,40 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
   const [selectedCardGuest, setSelectedCardGuest] = useState<Guest | null>(null);
   const [showCardModal, setShowCardModal] = useState(false);
+  const [showManageMenu, setShowManageMenu] = useState(false);
+  const manageMenuRef = useRef<HTMLDivElement | null>(null);
 
   // ─── Auth Check ──────────────────────────────────────────────────────
   useEffect(() => {
     if (sessionStatus === 'loading') return;
-    if (!session) {
-      router.push('/login');
-      return;
-    }
+    if (!session) { router.push('/login'); return; }
     const role = (session.user as any)?.role;
-    if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') {
-      router.push('/login');
-      return;
-    }
+    if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') { router.push('/login'); return; }
   }, [session, sessionStatus, router]);
+
+  // ─── Close manage menu on outside click ─────────────────────────────
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (manageMenuRef.current && !manageMenuRef.current.contains(e.target as Node)) {
+        setShowManageMenu(false);
+      }
+    };
+    if (showManageMenu) document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [showManageMenu]);
 
   // ─── Resume Event ────────────────────────────────────────────────────
   const handleResumeEvent = async () => {
     if (!eventId) return;
     if (!confirm('Resume this event? It will become active again for 7 days.')) return;
-
     try {
       const res = await fetch(`/api/events/${eventId}/resume`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       });
-
       const data = await res.json();
-      if (res.ok) {
-        toast.success('Event resumed successfully!');
-        fetchData(eventId);
-        setCountdownKey(prev => prev + 1);
-      } else {
-        toast.error(data.error || 'Failed to resume event');
-      }
-    } catch {
-      toast.error('Network error');
-    }
+      if (res.ok) { toast.success('Event resumed successfully!'); fetchData(eventId); setCountdownKey(prev => prev + 1); }
+      else toast.error(data.error || 'Failed to resume event');
+    } catch { toast.error('Network error'); }
   };
 
   // ─── Fetch Data ──────────────────────────────────────────────────────
@@ -224,10 +221,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          router.push('/login');
-          return;
-        }
+        if (res.status === 401 || res.status === 403) { router.push('/login'); return; }
         let detail = `HTTP ${res.status}`;
         try { const b = await res.json(); detail = b?.error || b?.message || detail; } catch { }
         throw new Error(detail);
@@ -237,16 +231,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
       setCurrentPage(1);
-      if (data.event.status !== 'LIVE') {
-        hasReportedLive.current = false;
-      }
+      if (data.event.status !== 'LIVE') hasReportedLive.current = false;
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
       toast.error(`Could not load event: ${msg}`);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [router]);
 
   const fetchCredits = async () => {
@@ -324,42 +314,24 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleSaveGuest = async () => {
     if (!editingGuest) return;
-    if (!editGuestForm.name.trim() || !editGuestForm.phone.trim()) {
-      toast.error('Name and phone are required');
-      return;
-    }
-
+    if (!editGuestForm.name.trim() || !editGuestForm.phone.trim()) { toast.error('Name and phone are required'); return; }
     setSavingGuest(true);
     try {
       const res = await fetch(`/api/guests/${editingGuest.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editGuestForm.name.trim(),
-          phone: editGuestForm.phone.trim(),
-        }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() }),
         credentials: 'include',
       });
-
       const data = await res.json();
       if (res.ok) {
         toast.success('Guest updated successfully!');
-        setGuests(prev => prev.map(g =>
-          g.id === editingGuest.id
-            ? { ...g, name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() }
-            : g
-        ));
+        setGuests(prev => prev.map(g => g.id === editingGuest.id ? { ...g, name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() } : g));
         setShowEditGuestModal(false);
         setEditingGuest(null);
         fetchData(eventId!);
-      } else {
-        toast.error(data.error || 'Failed to update guest');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setSavingGuest(false);
-    }
+      } else toast.error(data.error || 'Failed to update guest');
+    } catch { toast.error('Network error'); }
+    finally { setSavingGuest(false); }
   };
 
   // ─── Scroll to Top ──────────────────────────────────────────────────
@@ -370,10 +342,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const filteredGuests = useMemo(() => {
     if (!searchTerm.trim()) return guests;
     const term = searchTerm.trim().toLowerCase();
-    return guests.filter(g =>
-      g.name.toLowerCase().includes(term) ||
-      (g.phone && g.phone.includes(term))
-    );
+    return guests.filter(g => g.name.toLowerCase().includes(term) || (g.phone && g.phone.includes(term)));
   }, [guests, searchTerm]);
 
   const totalPages = Math.ceil(filteredGuests.length / pageSize);
@@ -396,17 +365,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setBackupLoading(true);
       try {
         const res = await fetch('/api/guests/all', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setAllGuests(data.guests || []);
-        } else {
-          toast.error('Failed to load all guests');
-        }
-      } catch {
-        toast.error('Network error');
-      } finally {
-        setBackupLoading(false);
-      }
+        if (res.ok) { const data = await res.json(); setAllGuests(data.guests || []); }
+        else toast.error('Failed to load all guests');
+      } catch { toast.error('Network error'); }
+      finally { setBackupLoading(false); }
     }
   };
 
@@ -430,6 +392,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (checkedInCount === 0) { toast.error('No WhatsApp-checked-in guests to thank.'); return; }
     setThanksMessage(`Thank you for attending ${event?.name}! We hope you enjoyed the event.`);
     setShowThanksModal(true);
+    setShowManageMenu(false);
   };
 
   const sendThanks = async () => {
@@ -465,6 +428,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (kumbushaCount === 0) { toast.error('No SMS guests pending check-in.'); return; }
     setKumbushaMessage(`Karibu ${event?.name}! Tafadhali kumbuka kuleta mchango wako.`);
     setShowKumbushaModal(true);
+    setShowManageMenu(false);
   };
 
   const sendKumbusha = async () => {
@@ -483,7 +447,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         if (data.successCount === kumbushaGuests.length) toast.success(`Ukumbusho ulitumwa kwa wageni ${data.successCount} wote.`);
         else { toast.success(`Ukumbusho ulitumwa kwa ${data.successCount} kati ya ${kumbushaGuests.length} wageni.`); if (data.errors?.length) toast.error('Baadhi ya ujumbe haukutuma.'); }
         fetchCredits(); fetchData(eventId!); setShowKumbushaModal(false);
-      } else { toast.error('Imeshindwa kutuma ukumbusho.'); }
+      } else toast.error('Imeshindwa kutuma ukumbusho.');
     } catch { toast.error('Tatizo la mtandao. Tafadhali jaribu tena.'); }
     finally { setSendingKumbusha(false); }
   };
@@ -491,7 +455,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Edit Event ──────────────────────────────────────────────────────
   const openEditModal = () => {
     if (!event) return;
-
     const eventDate = new Date(event.date);
     const year = eventDate.getFullYear();
     const month = String(eventDate.getMonth() + 1).padStart(2, '0');
@@ -499,14 +462,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     const hours = String(eventDate.getHours()).padStart(2, '0');
     const minutes = String(eventDate.getMinutes()).padStart(2, '0');
     const localDateStr = `${year}-${month}-${day}T${hours}:${minutes}`;
-
-    setEditForm({
-      name: event.name,
-      venue: event.venue,
-      address: event.address || '',
-      date: localDateStr,
-    });
+    setEditForm({ name: event.name, venue: event.venue, address: event.address || '', date: localDateStr });
     setShowEditModal(true);
+    setShowManageMenu(false);
   };
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,30 +476,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     setEditing(true);
     try {
       const res = await fetch(`/api/events/${eventId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: editForm.name,
-          venue: editForm.venue,
-          address: editForm.address,
-          date: editForm.date,
-        }),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editForm.name, venue: editForm.venue, address: editForm.address, date: editForm.date }),
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok) {
-        toast.success('Event updated successfully!');
-        setShowEditModal(false);
-        fetchData(eventId!);
-        setCountdownKey(prev => prev + 1);
-      } else {
-        toast.error(data.error || 'Failed to update event');
-      }
-    } catch {
-      toast.error('Network error');
-    } finally {
-      setEditing(false);
-    }
+      if (res.ok) { toast.success('Event updated successfully!'); setShowEditModal(false); fetchData(eventId!); setCountdownKey(prev => prev + 1); }
+      else toast.error(data.error || 'Failed to update event');
+    } catch { toast.error('Network error'); }
+    finally { setEditing(false); }
   };
 
   // ─── Status Change Handler ──────────────────────────────────────────
@@ -558,6 +501,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
   const checkedInAll = guests.filter(g => g.checkedIn).length;
+  const sentCount = guests.filter(g => g.invitationSentAt).length;
 
   const isExpired = event?.status === 'EXPIRED';
   const isArchived = event?.status === 'ARCHIVED';
@@ -573,47 +517,47 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const isEventDisabled = isExpired || isArchived;
 
   const getStatusBadge = () => {
-    if (isArchived) {
-      return { icon: <AlarmClockOff size={16} />, label: 'Archived', className: 'bg-gray-100 text-gray-600 border-gray-200' };
-    }
+    if (isArchived) return { icon: <AlarmClockOff size={13} />, label: 'Archived', className: 'bg-gray-100 text-gray-600 border-gray-200' };
     if (isExpired) {
-      if (canResume) {
-        return { icon: <Timer size={16} />, label: `Paused (${daysRemainingToResume.toFixed(0)} days left)`, className: 'bg-amber-50 text-amber-700 border-amber-200' };
-      }
-      return { icon: <AlarmClockOff size={16} />, label: 'Expired', className: 'bg-red-50 text-red-700 border-red-200' };
+      if (canResume) return { icon: <Timer size={13} />, label: `Paused (${daysRemainingToResume.toFixed(0)}d left)`, className: 'bg-amber-50 text-amber-700 border-amber-200' };
+      return { icon: <AlarmClockOff size={13} />, label: 'Expired', className: 'bg-red-50 text-red-700 border-red-200' };
     }
-    if (isLive) {
-      return { icon: <AlarmClock size={16} className="animate-pulse" />, label: 'Live Now!', className: 'bg-green-50 text-green-700 border-green-200' };
-    }
+    if (isLive) return { icon: <AlarmClock size={13} className="animate-pulse" />, label: 'Live Now!', className: 'bg-green-50 text-green-700 border-green-200' };
     if (isActive) {
       const hoursUntil = differenceInHours(new Date(event!.date), new Date());
-      if (hoursUntil <= 24 && hoursUntil > 0) {
-        return { icon: <Timer size={16} className="animate-pulse" />, label: 'Coming in 24 hours', className: 'bg-amber-50 text-amber-700 border-amber-200' };
-      }
-      return { icon: <CalendarClock size={16} />, label: `Active (${formatDistanceToNow(new Date(event!.date), { addSuffix: true })})`, className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]' };
+      if (hoursUntil <= 24 && hoursUntil > 0) return { icon: <Timer size={13} className="animate-pulse" />, label: 'In 24 hours', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+      return { icon: <CalendarClock size={13} />, label: formatDistanceToNow(new Date(event!.date), { addSuffix: true }), className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]' };
     }
-    if (isDraft) {
-      return { icon: <AlertCircle size={16} />, label: 'Draft', className: 'bg-gray-100 text-gray-500 border-gray-200' };
-    }
-    return { icon: <AlertCircle size={16} />, label: event?.status || 'Unknown', className: 'bg-gray-100 text-gray-500 border-gray-200' };
+    if (isDraft) return { icon: <AlertCircle size={13} />, label: 'Draft', className: 'bg-gray-100 text-gray-500 border-gray-200' };
+    return { icon: <AlertCircle size={13} />, label: event?.status || 'Unknown', className: 'bg-gray-100 text-gray-500 border-gray-200' };
   };
 
   const statusBadge = getStatusBadge();
 
+  const guestsWithCards = guests.filter(g => g.invitationCard);
+  const guestsWithoutCards = guests.filter(g => !g.invitationCard);
+
+  // ─── Step completion (drives the progress rail) ──────────────────────
+  const stepComplete: Record<FlowStep, boolean> = {
+    guests: guests.length > 0,
+    design: guestsWithCards.length > 0, // best signal we have that a design was produced
+    generate: guests.length > 0 && guestsWithoutCards.length === 0,
+    send: guests.length > 0 && sentCount === guests.length,
+  };
+
+  const stepIndex = STEPS.findIndex(s => s.id === activeStep);
+  const goToStep = (step: FlowStep) => {
+    setActiveStep(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const goNextStep = () => { if (stepIndex < STEPS.length - 1) goToStep(STEPS[stepIndex + 1].id); };
+
   // ─── Generate Cards Handler ────────────────────────────────────────────
   const handleGenerateCards = async () => {
     if (!event) return;
-
     const pendingGuests = guests.filter(g => !g.invitationCard);
-
-    if (pendingGuests.length === 0) {
-      toast.success('All guests already have cards');
-      return;
-    }
-
-    if (pendingGuests.length > 50) {
-      toast(`Generating ${pendingGuests.length} cards. This may take a few minutes.`, { duration: 5000 });
-    }
+    if (pendingGuests.length === 0) { toast.success('All guests already have cards'); return; }
+    if (pendingGuests.length > 50) toast(`Generating ${pendingGuests.length} cards. This may take a few minutes.`, { duration: 5000 });
 
     setGeneratingCards(true);
     let completed = 0;
@@ -622,37 +566,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     try {
       const BATCH_SIZE = 10;
       const batches = [];
-
-      for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) {
-        batches.push(pendingGuests.slice(i, i + BATCH_SIZE));
-      }
+      for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) batches.push(pendingGuests.slice(i, i + BATCH_SIZE));
 
       let currentToast = toast.loading(`Generating cards (0/${pendingGuests.length})...`);
 
       for (let i = 0; i < batches.length; i++) {
         const batch = batches[i];
-
         try {
           const res = await fetch('/api/invitations/generate-batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              eventId: event.id,
-              guestIds: batch.map(g => g.id)
-            }),
-            credentials: 'include',
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId: event.id, guestIds: batch.map(g => g.id) }), credentials: 'include',
           });
-
           const data = await res.json();
-
           if (res.ok && data.results) {
             completed += data.completed || 0;
             failed += data.failed || 0;
-
             const progress = Math.min(completed + failed, pendingGuests.length);
-            toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, {
-              id: currentToast
-            });
+            toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, { id: currentToast });
           } else {
             console.error('Batch error response:', data);
             toast.error(`Batch ${i + 1} failed: ${data.error || 'Unknown error'}`, { id: currentToast });
@@ -662,46 +592,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           console.error(`Batch ${i + 1} error:`, err);
           failed += batch.length;
         }
-
-        if (i < batches.length - 1) {
-          await new Promise(r => setTimeout(r, 500));
-        }
+        if (i < batches.length - 1) await new Promise(r => setTimeout(r, 500));
       }
 
-      // Refresh data to get updated card URLs
       await fetchData(eventId!);
 
       if (completed === pendingGuests.length) {
         toast.success(`All ${completed} cards generated successfully!`, { id: currentToast, duration: 3000 });
-
-        // ─── Show Send Invitations Toast ───
         toast.custom((t) => (
           <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}>
             <div className="p-4 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D]">
-              <h3 className="text-white font-semibold flex items-center gap-2">
-                <Send size={18} />
-                Cards Generated Successfully!
-              </h3>
+              <h3 className="text-white font-semibold flex items-center gap-2"><Send size={18} /> Cards Generated Successfully!</h3>
             </div>
             <div className="p-4">
-              <p className="text-gray-600 text-sm mb-4">
-                {completed} invitation cards have been generated. Would you like to send them now?
-              </p>
+              <p className="text-gray-600 text-sm mb-4">{completed} invitation cards have been generated. Ready to send them?</p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    toast.dismiss(t.id);
-                    router.push(`/client/invitations/send/${event.id}`);
-                  }}
+                  onClick={() => { toast.dismiss(t.id); goToStep('send'); }}
                   className="flex-1 bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-2"
                 >
-                  <Send size={16} />
-                  Send Invitations
+                  <Send size={16} /> Go to Send
                 </button>
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 transition"
-                >
+                <button onClick={() => toast.dismiss(t.id)} className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">
                   Later
                 </button>
               </div>
@@ -716,168 +628,91 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } catch (err) {
       console.error('Generation error:', err);
       toast.error('Network error while generating cards');
-    } finally {
-      setGeneratingCards(false);
-    }
+    } finally { setGeneratingCards(false); }
   };
 
-  // ─── Render Guest Card ────────────────────────────────────────────────
+  // ─── Render Guest Row ────────────────────────────────────────────────
   const renderGuestCard = (guest: Guest) => {
-  const isSelected = selectedGuests.has(guest.id);
-  const isWhatsApp = guest.routingChannel === 'whatsapp';
-  const isCheckedIn = guest.checkedIn;
-  const hasThanks = guest.thanksSentAt;
-  const reminderCount = guest.reminderCount;
-  const hasCard = guest.invitationCard;
-  const cardDisplay = guest.cardNumber || 'No Card';
+    const isSelected = selectedGuests.has(guest.id);
+    const isWhatsApp = guest.routingChannel === 'whatsapp';
+    const isCheckedIn = guest.checkedIn;
+    const hasThanks = guest.thanksSentAt;
+    const reminderCount = guest.reminderCount;
+    const hasCard = guest.invitationCard;
+    const cardDisplay = guest.cardNumber || 'No Card';
 
-  return (
-    <div
-      key={guest.id}
-      className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
-    >
-      <div className="flex items-center p-3 gap-3">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => toggleSelectGuest(guest.id)}
-          className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
-        />
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-          {guest.name.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="font-semibold text-gray-800 text-sm truncate">
-              {guest.title ? `${guest.title} ${guest.name}` : guest.name}
-            </p>
-            {guest.cardNumber && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                <Hash size={10} /> #{cardDisplay}
-              </span>
-            )}
-            {isCheckedIn && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                <CheckCircle size={12} /> Checked In
-              </span>
-            )}
-            {hasThanks && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
-                <Heart size={12} /> Thanks
-              </span>
-            )}
-            {hasCard ? (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                <ImageIcon size={12} /> Card
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                <Clock size={12} /> No Card
-              </span>
-            )}
+    return (
+      <div key={guest.id} className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}>
+        <div className="flex items-center p-3 gap-3">
+          <input type="checkbox" checked={isSelected} onChange={() => toggleSelectGuest(guest.id)}
+            className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0" />
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+            {guest.name.charAt(0).toUpperCase()}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
-              {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
-              {isWhatsApp ? 'WhatsApp' : 'SMS'}
-            </span>
-            {guest.phone && (
-              <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
-            )}
-            {reminderCount > 0 && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold text-gray-800 text-sm truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
+              {guest.cardNumber && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full"><Hash size={10} /> #{cardDisplay}</span>
+              )}
+              {isCheckedIn && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full"><CheckCircle size={12} /> Checked In</span>
+              )}
+              {hasThanks && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full"><Heart size={12} /> Thanks</span>
+              )}
+              {hasCard ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"><ImageIcon size={12} /> Card</span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full"><Clock size={12} /> No Card</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
+              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
+                {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
+                {isWhatsApp ? 'WhatsApp' : 'SMS'}
               </span>
-            )}
+              {guest.phone && <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>}
+              {reminderCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}</span>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {guest.invitationCard && (
-            <button
-              onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
-              className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
-              title="View Card"
-            >
-              <ImageIcon size={15} />
-            </button>
-          )}
-          <button
-            onClick={() => deleteGuest(guest.id)}
-            className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
-            title="Delete guest"
-          >
-            <Trash2 size={15} />
-          </button>
-          <button
-            onClick={() => openEditGuestModal(guest)}
-            className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
-            title="Edit guest"
-          >
-            <Edit2 size={15} />
-          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {guest.invitationCard && (
+              <button onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }} className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded" title="View Card"><ImageIcon size={15} /></button>
+            )}
+            <button onClick={() => deleteGuest(guest.id)} className="p-1.5 text-gray-400 hover:text-red-500 transition rounded" title="Delete guest"><Trash2 size={15} /></button>
+            <button onClick={() => openEditGuestModal(guest)} className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded" title="Edit guest"><Edit2 size={15} /></button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   // ─── Render Card Grid Item ────────────────────────────────────────────
   const renderCardItem = (guest: Guest) => {
     if (!guest.invitationCard) return null;
-
     return (
       <div key={guest.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition group">
-        <div
-          className="relative aspect-[3/4] bg-gray-50 cursor-pointer"
-          onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
-        >
-          <img
-            src={guest.invitationCard}
-            alt={`${guest.name}'s invitation`}
-            className="w-full h-full object-cover"
-          />
+        <div className="relative aspect-[3/4] bg-gray-50 cursor-pointer" onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}>
+          <img src={guest.invitationCard} alt={`${guest.name}'s invitation`} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
             <div className="flex gap-2">
-              <button
-                onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }}
-                className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition"
-                title="View Card"
-              >
-                <Eye size={18} className="text-gray-700" />
-              </button>
+              <button onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }} className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition" title="View Card"><Eye size={18} className="text-gray-700" /></button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (navigator.share) {
-                    navigator.share({
-                      title: `${guest.name}'s Invitation`,
-                      url: guest.invitationCard || '',
-                    }).catch(() => { });
-                  } else {
-                    navigator.clipboard.writeText(guest.invitationCard || '');
-                    toast.success('Card link copied to clipboard!');
-                  }
+                  if (navigator.share) navigator.share({ title: `${guest.name}'s Invitation`, url: guest.invitationCard || '' }).catch(() => { });
+                  else { navigator.clipboard.writeText(guest.invitationCard || ''); toast.success('Card link copied to clipboard!'); }
                 }}
-                className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition"
-                title="Share Card"
-              >
-                <Share2 size={18} className="text-gray-700" />
-              </button>
-              <a
-                href={guest.invitationCard}
-                download={`${guest.name}-invitation.png`}
-                onClick={(e) => e.stopPropagation()}
-                className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition"
-                title="Download Card"
-              >
-                <Download size={18} className="text-gray-700" />
-              </a>
+                className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition" title="Share Card"
+              ><Share2 size={18} className="text-gray-700" /></button>
+              <a href={guest.invitationCard} download={`${guest.name}-invitation.png`} onClick={(e) => e.stopPropagation()} className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition" title="Download Card"><Download size={18} className="text-gray-700" /></a>
             </div>
           </div>
           <div className="absolute top-2 right-2">
-            <span className="text-xs font-medium bg-[#0D4F4F] text-white px-2 py-0.5 rounded-full">
-              #{guest.cardNumber || guest.id.slice(0, 6)}
-            </span>
+            <span className="text-xs font-medium bg-[#0D4F4F] text-white px-2 py-0.5 rounded-full">#{guest.cardNumber || guest.id.slice(0, 6)}</span>
           </div>
         </div>
         <div className="p-3">
@@ -890,11 +725,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp' ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
                 {guest.routingChannel === 'whatsapp' ? 'WA' : 'SMS'}
               </span>
-              {guest.checkedIn && (
-                <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
-                  ✓
-                </span>
-              )}
+              {guest.checkedIn && <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">✓</span>}
             </div>
           </div>
         </div>
@@ -934,587 +765,416 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const guestsWithCards = guests.filter(g => g.invitationCard);
-  const guestsWithoutCards = guests.filter(g => !g.invitationCard);
-
   // ─── Main JSX ──────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        .modal-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
-          display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
-          animation: fadeIn 0.2s ease both;
-        }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; animation: fadeIn 0.2s ease both; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .modal-content {
-          background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 90vh;
-          overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2);
-          animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
-        }
+        .modal-content { background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2); animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both; }
         @keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .modal-header {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;
-        }
+        .modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0; }
         .modal-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 900; color: #0D1B1B; }
         .modal-title span { color: #E8A598; }
         .modal-body { padding: 20px 24px 24px; }
-        .modal-close {
-          width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
-          background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
-          color: #9BAAB8; transition: border-color 0.15s, color 0.15s;
-        }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #9BAAB8; transition: border-color 0.15s, color 0.15s; }
         .modal-close:hover { border-color: #C0392B; color: #C0392B; }
         .field-label { display: block; font-size: 13px; font-weight: 600; color: #4A6072; margin-bottom: 5px; }
-        .field-input {
-          width: 100%; padding: 12px 14px; border: 1.5px solid #E2EAF0; border-radius: 11px;
-          font-size: 14px; outline: none; color: #0D1B1B; background: white; font-weight: 500;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
+        .field-input { width: 100%; padding: 12px 14px; border: 1.5px solid #E2EAF0; border-radius: 11px; font-size: 14px; outline: none; color: #0D1B1B; background: white; font-weight: 500; transition: border-color 0.2s, box-shadow 0.2s; }
         .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
-        .btn-primary {
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D); color: white;
-          padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
-          border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,79,79,0.32); transition: transform 0.15s, box-shadow 0.15s;
-        }
+        .btn-primary { background: linear-gradient(135deg, #0D4F4F, #0A3D3D); color: white; padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(13,79,79,0.32); transition: transform 0.15s, box-shadow 0.15s; }
         .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
         .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn-secondary {
-          padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
-          border: 1.5px solid #E2EAF0; background: white; color: #4A6072;
-          cursor: pointer; transition: border-color 0.15s, color 0.15s;
-        }
+        .btn-secondary { padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px; border: 1.5px solid #E2EAF0; background: white; color: #4A6072; cursor: pointer; transition: border-color 0.15s, color 0.15s; }
         .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; }
-        .tab-button {
-          display: flex; align-items: center; justify-content: center; gap: 8px;
-          flex: 1; padding: 10px 12px; border-radius: 10px; font-weight: 600; font-size: 13px;
-          transition: all 0.2s; cursor: pointer; border: none; background: transparent; color: #9BAAB8;
-        }
-        .tab-button.active {
-          background: #0D4F4F; color: white; box-shadow: 0 4px 12px rgba(13,79,79,0.25);
-        }
-        .tab-button:hover:not(.active) { color: #0D4F4F; background: rgba(13,79,79,0.05); }
-        .card-modal-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
-          display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
-          animation: fadeIn 0.3s ease both;
-        }
-        .card-modal-content {
-          background: transparent; max-width: 90vh; max-height: 90vh; width: 100%;
-          position: relative;
-        }
-        .card-modal-content img {
-          width: 100%; height: 100%; object-fit: contain; border-radius: 12px;
-          box-shadow: 0 24px 64px rgba(0,0,0,0.3);
-        }
+        .card-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; animation: fadeIn 0.3s ease both; }
+        .card-modal-content { background: transparent; max-width: 90vh; max-height: 90vh; width: 100%; position: relative; }
+        .card-modal-content img { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.3); }
+        .step-pill { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; padding: 8px 2px; cursor: pointer; position: relative; }
+        .step-circle { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; transition: all 0.2s; border: 2px solid #E2EAF0; background: white; color: #9BAAB8; }
+        .step-pill.done .step-circle { background: #0D4F4F; border-color: #0D4F4F; color: white; }
+        .step-pill.active .step-circle { background: #0D4F4F; border-color: #0D4F4F; color: white; box-shadow: 0 0 0 4px rgba(13,79,79,0.15); }
+        .step-label { font-size: 11px; font-weight: 600; color: #9BAAB8; }
+        .step-pill.active .step-label, .step-pill.done .step-label { color: #0D4F4F; }
+        .step-line { position: absolute; top: 17px; left: 50%; width: 100%; height: 2px; background: #E2EAF0; z-index: -1; }
+        .step-pill.done .step-line { background: #0D4F4F; }
+        .step-pill:first-child .step-line { display: none; }
+        .action-tile { display: flex; align-items: center; gap: 12px; background: white; border: 1.5px solid #E9EEF0; border-radius: 16px; padding: 16px; transition: all 0.15s; text-align: left; width: 100%; }
+        .action-tile:hover { border-color: #0D4F4F; box-shadow: 0 4px 14px rgba(13,79,79,0.1); transform: translateY(-1px); }
+        .action-tile-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
       `}</style>
 
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4">
+      <div className="min-h-screen bg-gray-50 pb-24">
+        <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4">
 
           {/* ─── Top Navigation ─── */}
           <div className="flex items-center justify-between mb-4">
-            <Link
-              href="/client/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.06)]"
-            >
+            <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.06)]">
               <ArrowLeft size={14} /> Back
             </Link>
-            <div className="flex items-center gap-2">
-              {!isArchived && (
-                <button
-                  onClick={openEditModal}
-                  className="p-2 text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl hover:bg-[rgba(13,79,79,0.06)] transition"
-                  title="Edit Event"
-                >
-                  <Pencil size={16} />
-                </button>
-              )}
-              {isEventDisabled && canResume && (
-                <button
-                  onClick={handleResumeEvent}
-                  className="p-2 text-green-700 bg-white border border-green-200 rounded-xl hover:bg-green-50 transition"
-                  title="Resume Event"
-                >
-                  <RotateCw size={16} />
-                </button>
-              )}
+
+            <div className="relative" ref={manageMenuRef}>
               <button
-                onClick={async () => {
-                  if (!confirm('Delete this event and ALL its guests? This action cannot be undone.')) return;
-                  const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
-                  if (res.ok) { toast.success('Event deleted'); router.push('/client/events'); }
-                  else { const data = await res.json(); toast.error(data.error || 'Failed to delete event'); }
-                }}
-                className="p-2 text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 transition"
-                title="Delete Event"
+                onClick={() => setShowManageMenu(v => !v)}
+                className="p-2 text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+                title="Manage"
               >
-                <Trash2 size={16} />
+                <MoreVertical size={18} />
               </button>
+              {showManageMenu && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-20">
+                  <p className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Manage event</p>
+                  {!isArchived && (
+                    <button onClick={openEditModal} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                      <Pencil size={15} className="text-gray-400" /> Edit event details
+                    </button>
+                  )}
+                  <button onClick={() => { setShowManageMenu(false); router.push(`/client/check-in?event=${event.id}`); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                    <QrCode size={15} className="text-gray-400" /> Check-in guests
+                  </button>
+                  <button onClick={openKumbushaModal} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                    <Bell size={15} className="text-gray-400" /> Remind guests {kumbushaCount > 0 && <span className="ml-auto text-xs text-amber-600 font-bold">{kumbushaCount}</span>}
+                  </button>
+                  {checkedInCount > 0 && (
+                    <button onClick={openThanksModal} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                      <Heart size={15} className="text-gray-400" /> Send thank-you
+                    </button>
+                  )}
+                  {isEventDisabled && canResume && (
+                    <button onClick={() => { setShowManageMenu(false); handleResumeEvent(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 transition">
+                      <RotateCw size={15} /> Resume event
+                    </button>
+                  )}
+                  <div className="border-t border-gray-100" />
+                  <button
+                    onClick={async () => {
+                      setShowManageMenu(false);
+                      if (!confirm('Delete this event and ALL its guests? This action cannot be undone.')) return;
+                      const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
+                      if (res.ok) { toast.success('Event deleted'); router.push('/client/events'); }
+                      else { const data = await res.json(); toast.error(data.error || 'Failed to delete event'); }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                  >
+                    <Trash2 size={15} /> Delete event
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
           {/* ─── Event Header ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 mb-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate">{event.name}</h1>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge.className}`}>
-                    {statusBadge.icon}
-                    {statusBadge.label}
+                  <h1 className="font-serif text-lg sm:text-xl font-black text-gray-900 truncate">{event.name}</h1>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border ${statusBadge.className}`}>
+                    {statusBadge.icon}{statusBadge.label}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500 mt-1">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={14} className="text-[#0D4F4F]" />
-                    {format(new Date(event.date), 'PPP')}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin size={14} className="text-[#0D4F4F]" />
-                    {event.venue}
-                  </span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
+                  <span className="flex items-center gap-1"><Calendar size={12} className="text-[#0D4F4F]" />{format(new Date(event.date), 'PPP')}</span>
+                  <span className="flex items-center gap-1"><MapPin size={12} className="text-[#0D4F4F]" />{event.venue}</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5 truncate">{event.address}</p>
               </div>
-
               {!isEventDisabled && eventDate && (
-                <div className="flex-shrink-0">
-                  <EventCountdown
-                    key={countdownKey}
-                    targetDate={event.date}
-                    onStatusChange={handleStatusChange}
-                  />
-                </div>
+                <EventCountdown key={countdownKey} targetDate={event.date} onStatusChange={handleStatusChange} />
               )}
             </div>
 
             {isExpired && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
-                <p className="text-sm font-bold text-red-700 flex items-center gap-2">
-                  <AlertCircle size={16} />
-                  {canResume
-                    ? `This event is paused. You have ${daysRemainingToResume.toFixed(0)} days left to resume it.`
-                    : 'This event has been permanently archived and cannot be resumed.'
-                  }
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                <p className="text-xs font-bold text-red-700 flex items-center gap-2">
+                  <AlertCircle size={14} />
+                  {canResume ? `Paused — ${daysRemainingToResume.toFixed(0)} days left to resume.` : 'Archived and cannot be resumed.'}
                 </p>
               </div>
             )}
-          </div>
 
-          {/* ─── Quick Stats ─── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
-              <p className="text-lg font-bold text-gray-900">{guests.length}</p>
-              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
-              <p className="text-lg font-bold text-green-600">{checkedInAll}</p>
-              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Checked In</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
-              <p className="text-lg font-bold text-[#0D4F4F]">{guestsWithCards.length}</p>
-              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Cards</p>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
-              <p className="text-lg font-bold text-amber-600">{guestsWithoutCards.length}</p>
-              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">No Card</p>
+            {/* Quick glance stats */}
+            <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-50">
+              <div className="text-center"><p className="text-base font-bold text-gray-900">{guests.length}</p><p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Guests</p></div>
+              <div className="text-center"><p className="text-base font-bold text-[#0D4F4F]">{guestsWithCards.length}</p><p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Cards</p></div>
+              <div className="text-center"><p className="text-base font-bold text-blue-600">{sentCount}</p><p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Sent</p></div>
+              <div className="text-center"><p className="text-base font-bold text-green-600">{checkedInAll}</p><p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Checked In</p></div>
             </div>
           </div>
 
-          {/* ─── Tab Navigation ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5 sm:p-2 mb-4 overflow-x-auto">
-            <div className="flex gap-1 min-w-max">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
-              >
-                <Sparkles size={16} /> Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('cards')}
-                className={`tab-button ${activeTab === 'cards' ? 'active' : ''}`}
-              >
-                <ImageIcon size={16} /> Cards
-                {guestsWithCards.length > 0 && (
-                  <span className="text-xs bg-white/20 text-white px-1.5 py-0.5 rounded-full">
-                    {guestsWithCards.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('guests')}
-                className={`tab-button ${activeTab === 'guests' ? 'active' : ''}`}
-              >
-                <Users size={16} /> Guests
-                <span className="text-xs bg-white/20 text-white px-1.5 py-0.5 rounded-full">
-                  {guests.length}
-                </span>
-              </button>
+          {isEventDisabled ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
+              <AlertCircle size={24} className="text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500 font-medium text-sm">
+                This event is {event.status === 'ARCHIVED' ? 'archived' : 'paused'}, so the setup flow is disabled.
+                {canResume && ' Use the menu above to resume it.'}
+              </p>
             </div>
-          </div>
-
-          {/* ─── Overview Tab ─── */}
-          {activeTab === 'overview' && (
-            <div className="space-y-4">
-              {isEventDisabled ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center">
-                  <AlertCircle size={24} className="text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500 font-medium">
-                    This event is {event.status === 'ARCHIVED' ? 'archived' : 'paused'}. Actions are disabled.
-                    {canResume && ' You can resume it using the Resume button above.'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link
-                      href={`/client/invitations/send/${event.id}`}
-                      className="col-span-2 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
+          ) : (
+            <>
+              {/* ─── Step Rail ─── */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3 py-3 mb-4">
+                <div className="flex items-start">
+                  {STEPS.map((s) => (
+                    <div
+                      key={s.id}
+                      className={`step-pill ${activeStep === s.id ? 'active' : ''} ${stepComplete[s.id] ? 'done' : ''}`}
+                      onClick={() => goToStep(s.id)}
                     >
-                      <Send size={16} /> Send Invitations
-                    </Link>
-
-                    <button
-                      onClick={openKumbushaModal}
-                      className="bg-amber-50 border border-amber-200 text-amber-700 py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Bell size={16} /> Remind ({kumbushaCount})
-                    </button>
-
-                    <button
-                      onClick={handleGenerateCards}
-                      disabled={generatingCards || guests.length === 0}
-                      className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                    >
-                      {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />}
-                      {generatingCards ? 'Generating...' : `Cards (${guestsWithoutCards.length})`}
-                    </button>
-
-                    <Link
-                      href={`/client/guests/import/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Upload size={16} /> Import
-                    </Link>
-
-                    <Link
-                      href={`/client/guests/add/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Plus size={16} /> Add Guest
-                    </Link>
-
-                    <Link
-                      href={`/client/invitations/design/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Palette size={16} /> Design
-                    </Link>
-
-                    <Link
-                      href={`/client/check-in?event=${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <QrCode size={16} /> Check-In
-                    </Link>
-                  </div>
-
-                  {checkedInCount > 0 && (
-                    <button
-                      onClick={openThanksModal}
-                      className="w-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Heart size={16} /> Send Thanks ({checkedInCount})
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ─── Cards Tab ─── */}
-          {activeTab === 'cards' && (
-            <div className="space-y-4">
-              {/* Cards Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={handleGenerateCards}
-                    disabled={generatingCards || guests.length === 0}
-                    className="bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                    {generatingCards ? 'Generating...' : `Generate (${guestsWithoutCards.length})`}
-                  </button>
-                  <span className="text-xs text-gray-400">
-                    {guestsWithCards.length} cards
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCardView('grid')}
-                    className={`p-2 rounded-lg transition ${cardView === 'grid' ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    title="Grid View"
-                  >
-                    <Grid3x3 size={16} />
-                  </button>
-                  <button
-                    onClick={() => setCardView('list')}
-                    className={`p-2 rounded-lg transition ${cardView === 'list' ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    title="List View"
-                  >
-                    <List size={16} />
-                  </button>
+                      <div className="step-line" />
+                      <div className="step-circle">{stepComplete[s.id] && activeStep !== s.id ? <Check size={16} /> : s.icon}</div>
+                      <span className="step-label">{s.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Cards Display */}
-              {guestsWithCards.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
-                  <ImageIcon size={48} className="text-gray-300 mx-auto mb-3" />
-                  <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No Cards Generated</h3>
-                  <p className="text-sm text-gray-400 mb-4">Generate invitation cards for your guests</p>
-                  <button
-                    onClick={handleGenerateCards}
-                    disabled={generatingCards || guests.length === 0}
-                    className="bg-[#0D4F4F] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#0A3D3D] transition disabled:opacity-50 inline-flex items-center gap-2 text-sm"
-                  >
-                    {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                    {generatingCards ? 'Generating...' : 'Generate Cards'}
-                  </button>
-                </div>
-              ) : cardView === 'grid' ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                  {guestsWithCards.map(renderCardItem)}
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                  <div className="divide-y divide-gray-100">
-                    {guestsWithCards.map((guest) => (
-                      <div key={guest.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}>
-                        <img
-                          src={guest.invitationCard!}
-                          alt={guest.name}
-                          className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-800 truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <span className="truncate">{guest.phone}</span>
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100">
-                              {guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }}
-                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
-                            title="View Card"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (navigator.share) {
-                                navigator.share({
-                                  title: `${guest.name}'s Invitation`,
-                                  url: guest.invitationCard || '',
-                                }).catch(() => { });
-                              } else {
-                                navigator.clipboard.writeText(guest.invitationCard || '');
-                                toast.success('Card link copied!');
-                              }
-                            }}
-                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-                            title="Share Card"
-                          >
-                            <Share2 size={16} />
-                          </button>
-                          <a
-                            href={guest.invitationCard!}
-                            download={`${guest.name}-invitation.png`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
-                            title="Download Card"
-                          >
-                            <Download size={16} />
-                          </a>
-                        </div>
+              {/* ─── Step 1: Guests ─── */}
+              {activeStep === 'guests' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Link href={`/client/guests/import/${event.id}`} className="action-tile">
+                      <div className="action-tile-icon bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]"><Upload size={20} /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-800">Import guest list</p>
+                        <p className="text-xs text-gray-400">Upload a spreadsheet of guests</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── Guests Tab ─── */}
-          {activeTab === 'guests' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* Search & Actions */}
-              <div className="flex flex-wrap items-center gap-2 p-3 border-b border-gray-100">
-                <div className="flex-1 min-w-[120px] relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                    placeholder="Search guests..."
-                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                  />
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="p-2 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-50 transition"
-                    title="Select All"
-                  >
-                    {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
-                  </button>
-                  {selectedGuests.size > 0 && (
-                    <button
-                      onClick={deleteSelected}
-                      disabled={deleting}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                      title="Delete Selected"
-                    >
-                      {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button>
-                  )}
-                  <button
-                    onClick={openBackupModal}
-                    className="p-2 text-[#0D4F4F] hover:bg-[rgba(13,79,79,0.08)] rounded-lg transition"
-                    title="View All Guests"
-                  >
-                    <Download size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Guest List */}
-              {guests.length === 0 ? (
-                <div className="py-12 text-center">
-                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
-                  <p className="text-sm text-gray-400">Import a guest list or add guests manually.</p>
-                </div>
-              ) : (
-                <div>
-                  <div
-                    id="guest-list-container"
-                    className={`divide-y divide-gray-100 max-h-[500px] overflow-y-auto scroll-smooth p-1 ${isEventDisabled ? 'opacity-60' : ''}`}
-                    onScroll={handleScroll}
-                  >
-                    {paginatedGuests.map(renderGuestCard)}
+                      <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                    </Link>
+                    <Link href={`/client/guests/add/${event.id}`} className="action-tile">
+                      <div className="action-tile-icon bg-amber-50 text-amber-600"><Plus size={20} /></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-800">Add a single guest</p>
+                        <p className="text-xs text-gray-400">Enter one guest by hand</p>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                    </Link>
                   </div>
 
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                      <span className="text-xs text-gray-500">
-                        {(currentPage - 1) * pageSize + 1} – {Math.min(currentPage * pageSize, filteredGuests.length)} of {filteredGuests.length}
-                      </span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => goToPage(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
-                        >
-                          Previous
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-2 p-3 border-b border-gray-100">
+                      <div className="flex-1 min-w-[120px] relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text" value={searchTerm}
+                          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                          placeholder="Search guests..."
+                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={toggleSelectAll} className="p-2 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-50 transition" title="Select All">
+                          {selectedGuests.size === guests.length && guests.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
                         </button>
-                        <span className="px-3 py-1 text-sm font-semibold text-gray-700">
-                          {currentPage} / {totalPages}
-                        </span>
-                        <button
-                          onClick={() => goToPage(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
-                        >
-                          Next
+                        {selectedGuests.size > 0 && (
+                          <button onClick={deleteSelected} disabled={deleting} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50" title="Delete Selected">
+                            {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                          </button>
+                        )}
+                        <button onClick={openBackupModal} className="p-2 text-[#0D4F4F] hover:bg-[rgba(13,79,79,0.08)] rounded-lg transition" title="View All Guests">
+                          <Download size={16} />
                         </button>
                       </div>
                     </div>
+
+                    {guests.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
+                        <p className="text-sm text-gray-400">Import a guest list or add guests manually to get started.</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div id="guest-list-container" className="divide-y divide-gray-100 max-h-[420px] overflow-y-auto scroll-smooth p-1" onScroll={handleScroll}>
+                          {paginatedGuests.map(renderGuestCard)}
+                        </div>
+
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                            <span className="text-xs text-gray-500">{(currentPage - 1) * pageSize + 1} – {Math.min(currentPage * pageSize, filteredGuests.length)} of {filteredGuests.length}</span>
+                            <div className="flex gap-1">
+                              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition">Previous</button>
+                              <span className="px-3 py-1 text-sm font-semibold text-gray-700">{currentPage} / {totalPages}</span>
+                              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition">Next</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {showBackToTop && (
+                          <button onClick={scrollToTop} className="fixed bottom-24 right-6 bg-[#0D4F4F] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3D3D] transition z-10">
+                            <ArrowUp size={20} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Step 2: Design ─── */}
+              {activeStep === 'design' && (
+                <div className="space-y-4">
+                  <Link href={`/client/invitations/design/${event.id}`} className="action-tile">
+                    <div className="action-tile-icon bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]"><Palette size={20} /></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-gray-800">Open the card designer</p>
+                      <p className="text-xs text-gray-400">Choose a template and customize colors, text and photos</p>
+                    </div>
+                    <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                  </Link>
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
+                    <Sparkles size={28} className="text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">
+                      Design one invitation template — it gets used to generate a personalized card for every guest in the next step.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Step 3: Generate ─── */}
+              {activeStep === 'generate' && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-sm text-gray-800">{guestsWithoutCards.length} guest{guestsWithoutCards.length !== 1 ? 's' : ''} still need a card</p>
+                        <p className="text-xs text-gray-400">{guestsWithCards.length} generated so far</p>
+                      </div>
+                      <button
+                        onClick={handleGenerateCards}
+                        disabled={generatingCards || guests.length === 0 || guestsWithoutCards.length === 0}
+                        className="bg-[#0D4F4F] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                        {generatingCards ? 'Generating...' : guestsWithoutCards.length === 0 ? 'All done' : `Generate ${guestsWithoutCards.length} card${guestsWithoutCards.length !== 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  </div>
+
+                  {guestsWithCards.length > 0 && (
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => setCardView('grid')} className={`p-2 rounded-lg transition ${cardView === 'grid' ? 'bg-[#0D4F4F] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} title="Grid View"><Grid3x3 size={16} /></button>
+                      <button onClick={() => setCardView('list')} className={`p-2 rounded-lg transition ${cardView === 'list' ? 'bg-[#0D4F4F] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`} title="List View"><List size={16} /></button>
+                    </div>
                   )}
 
-                  {showBackToTop && (
-                    <button
-                      onClick={scrollToTop}
-                      className="fixed bottom-6 right-6 bg-[#0D4F4F] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3D3D] transition z-10"
-                    >
-                      <ArrowUp size={20} />
-                    </button>
+                  {guestsWithCards.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                      <ImageIcon size={40} className="text-gray-300 mx-auto mb-3" />
+                      <h3 className="font-serif text-base font-bold text-gray-800 mb-1">No cards yet</h3>
+                      <p className="text-sm text-gray-400">Generate personalized invitation cards for your guests.</p>
+                    </div>
+                  ) : cardView === 'grid' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {guestsWithCards.map(renderCardItem)}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                      <div className="divide-y divide-gray-100">
+                        {guestsWithCards.map((guest) => (
+                          <div key={guest.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}>
+                            <img src={guest.invitationCard!} alt={guest.name} className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-gray-800 truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span className="truncate">{guest.phone}</span>
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100">{guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition" title="View Card"><Eye size={16} /></button>
+                              <a href={guest.invitationCard!} download={`${guest.name}-invitation.png`} onClick={(e) => e.stopPropagation()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition" title="Download Card"><Download size={16} /></a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
-            </div>
+
+              {/* ─── Step 4: Send ─── */}
+              {activeStep === 'send' && (
+                <div className="space-y-4">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      <div className="text-center bg-gray-50 rounded-xl py-3"><p className="text-lg font-bold text-gray-900">{guests.length}</p><p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Guests</p></div>
+                      <div className="text-center bg-gray-50 rounded-xl py-3"><p className="text-lg font-bold text-[#0D4F4F]">{whatsappCount}</p><p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">WhatsApp</p></div>
+                      <div className="text-center bg-gray-50 rounded-xl py-3"><p className="text-lg font-bold text-gray-600">{smsCount}</p><p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">SMS</p></div>
+                    </div>
+                    {guestsWithoutCards.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2">
+                        <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
+                        <p className="text-xs font-medium text-amber-700">{guestsWithoutCards.length} guest{guestsWithoutCards.length !== 1 ? 's' : ''} still don't have a card generated.</p>
+                      </div>
+                    )}
+                    <Link
+                      href={`/client/invitations/send/${event.id}`}
+                      className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
+                    >
+                      <Send size={16} /> {sentCount > 0 ? 'Continue sending' : 'Send invitations'}
+                    </Link>
+                  </div>
+
+                  {sentCount > 0 && (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0"><CheckCircle size={18} /></div>
+                      <div>
+                        <p className="font-bold text-sm text-gray-800">{sentCount} of {guests.length} invitations sent</p>
+                        <p className="text-xs text-gray-400">You can resend to anyone who hasn't received theirs yet.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── Bottom Sticky Step Navigation ─── */}
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 sm:px-6 py-3 z-30">
+                <div className="max-w-3xl mx-auto flex items-center gap-3">
+                  <button
+                    onClick={() => stepIndex > 0 && goToStep(STEPS[stepIndex - 1].id)}
+                    disabled={stepIndex === 0}
+                    className="btn-secondary flex-shrink-0 disabled:opacity-40"
+                  >
+                    <ArrowLeft size={16} />
+                  </button>
+                  <span className="flex-1 text-center text-xs font-semibold text-gray-400">Step {stepIndex + 1} of {STEPS.length} — {STEPS[stepIndex].label}</span>
+                  {stepIndex < STEPS.length - 1 ? (
+                    <button onClick={goNextStep} className="btn-primary flex-shrink-0">
+                      Continue <ArrowRight size={16} />
+                    </button>
+                  ) : (
+                    <button onClick={() => router.push('/client/dashboard')} className="btn-primary flex-shrink-0">
+                      Done <Check size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>
-
 
       {/* ─── Card Detail Modal ─── */}
       {showCardModal && selectedCardGuest && (
         <div className="card-modal-overlay" onClick={() => setShowCardModal(false)}>
           <div className="card-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="relative">
-              <button
-                onClick={() => setShowCardModal(false)}
-                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition p-2"
-              >
-                <X size={28} />
-              </button>
-              <img
-                src={selectedCardGuest.invitationCard!}
-                alt={`${selectedCardGuest.name}'s invitation card`}
-                className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
-              />
+              <button onClick={() => setShowCardModal(false)} className="absolute -top-12 right-0 text-white hover:text-gray-300 transition p-2"><X size={28} /></button>
+              <img src={selectedCardGuest.invitationCard!} alt={`${selectedCardGuest.name}'s invitation card`} className="w-full h-auto max-h-[85vh] object-contain rounded-xl" />
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 bg-black/60 backdrop-blur-sm p-2 rounded-xl">
                 <button
                   onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: `${selectedCardGuest.name}'s Invitation`,
-                        url: selectedCardGuest.invitationCard || '',
-                      }).catch(() => { });
-                    } else {
-                      navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
-                      toast.success('Card link copied!');
-                    }
+                    if (navigator.share) navigator.share({ title: `${selectedCardGuest.name}'s Invitation`, url: selectedCardGuest.invitationCard || '' }).catch(() => { });
+                    else { navigator.clipboard.writeText(selectedCardGuest.invitationCard || ''); toast.success('Card link copied!'); }
                   }}
-                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
-                  title="Share"
-                >
-                  <Share2 size={18} className="text-gray-700" />
-                </button>
-                <a
-                  href={selectedCardGuest.invitationCard!}
-                  download={`${selectedCardGuest.name}-invitation.png`}
-                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
-                  title="Download"
-                >
-                  <Download size={18} className="text-gray-700" />
-                </a>
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition" title="Share"
+                ><Share2 size={18} className="text-gray-700" /></button>
+                <a href={selectedCardGuest.invitationCard!} download={`${selectedCardGuest.name}-invitation.png`} className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition" title="Download"><Download size={18} className="text-gray-700" /></a>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
-                    toast.success('Card link copied!');
-                  }}
-                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
-                  title="Copy Link"
-                >
-                  <Link2 size={18} className="text-gray-700" />
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
-                  title="Print"
-                >
-                  <Printer size={18} className="text-gray-700" />
-                </button>
+                  onClick={() => { navigator.clipboard.writeText(selectedCardGuest.invitationCard || ''); toast.success('Card link copied!'); }}
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition" title="Copy Link"
+                ><Link2 size={18} className="text-gray-700" /></button>
+                <button onClick={() => window.print()} className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition" title="Print"><Printer size={18} className="text-gray-700" /></button>
               </div>
             </div>
           </div>
@@ -1532,12 +1192,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="modal-body">
               <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><Users size={18} /></div>
-                <div>
-                  <p className="text-xs text-gray-400">Wageni waliopo</p>
-                  <p className="font-bold text-gray-800">{kumbushaCount} SMS guests pending</p>
-                </div>
+                <div><p className="text-xs text-gray-400">Wageni waliopo</p><p className="font-bold text-gray-800">{kumbushaCount} SMS guests pending</p></div>
               </div>
-
               <div className={`rounded-xl p-4 mb-4 flex items-center gap-3 ${isFree ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'}`}>
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl">
                   {isFree ? <Check size={20} className="text-green-600" /> : <Coins size={20} className="text-amber-600" />}
@@ -1547,24 +1203,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {credits !== null && <p className="text-xs text-gray-400">Salio: {credits} TZS</p>}
                 </div>
               </div>
-
               <label className="field-label">Ujumbe wa kukumbusha</label>
-              <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
-                rows={3}
-                value={kumbushaMessage}
-                onChange={e => setKumbushaMessage(e.target.value)}
-                placeholder="Andika ujumbe hapa..."
-              />
+              <textarea className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm" rows={3} value={kumbushaMessage} onChange={e => setKumbushaMessage(e.target.value)} placeholder="Andika ujumbe hapa..." />
               <div className="text-right text-xs text-gray-400 mt-1">{kumbushaMessage.length} herufi</div>
-
               <div className="flex gap-3 mt-4">
                 <button className="flex-1 btn-secondary" onClick={() => setShowKumbushaModal(false)}>Ghairi</button>
-                <button
-                  className="flex-1 btn-primary"
-                  onClick={sendKumbusha}
-                  disabled={sendingKumbusha || !kumbushaMessage.trim() || (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost)}
-                >
+                <button className="flex-1 btn-primary" onClick={sendKumbusha} disabled={sendingKumbusha || !kumbushaMessage.trim() || (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost)}>
                   {sendingKumbusha ? <Loader2 size={18} className="animate-spin" /> : <Bell size={18} />}
                   {sendingKumbusha ? 'Inatuma...' : 'Tuma Ukumbusho'}
                 </button>
@@ -1585,12 +1229,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="modal-body">
               <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]"><Heart size={18} /></div>
-                <div>
-                  <p className="text-xs text-gray-400">Wageni wa kupokea</p>
-                  <p className="font-bold text-gray-800">{checkedInCount} WhatsApp guests</p>
-                </div>
+                <div><p className="text-xs text-gray-400">Wageni wa kupokea</p><p className="font-bold text-gray-800">{checkedInCount} WhatsApp guests</p></div>
               </div>
-
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center text-amber-600"><Coins size={20} /></div>
                 <div>
@@ -1598,7 +1238,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {credits !== null && <p className="text-xs text-gray-400">Mikopo iliyobaki: {credits} TZS</p>}
                 </div>
               </div>
-
               <div className="bg-gray-50 rounded-xl p-3 mb-4 text-center border border-gray-200">
                 {event.thankYouCardUrl ? (
                   <img src={event.thankYouCardUrl} alt="Thanks Card" className="max-h-32 mx-auto rounded-lg object-contain" />
@@ -1606,24 +1245,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <p className="text-sm text-gray-400">Hakuna kadi ya shukrani</p>
                 )}
               </div>
-
               <label className="field-label">Ujumbe wa shukrani</label>
-              <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
-                rows={3}
-                value={thanksMessage}
-                onChange={e => setThanksMessage(e.target.value)}
-                placeholder="Andika ujumbe wa shukrani..."
-              />
+              <textarea className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm" rows={3} value={thanksMessage} onChange={e => setThanksMessage(e.target.value)} placeholder="Andika ujumbe wa shukrani..." />
               <div className="text-right text-xs text-gray-400 mt-1">{thanksMessage.length} herufi</div>
-
               <div className="flex gap-3 mt-4">
                 <button className="flex-1 btn-secondary" onClick={() => setShowThanksModal(false)}>Ghairi</button>
-                <button
-                  className="flex-1 btn-primary"
-                  onClick={sendThanks}
-                  disabled={sendingThanks || !thanksMessage.trim() || (credits !== null && credits < checkedInCount * 300) || !event.thankYouCardUrl}
-                >
+                <button className="flex-1 btn-primary" onClick={sendThanks} disabled={sendingThanks || !thanksMessage.trim() || (credits !== null && credits < checkedInCount * 300) || !event.thankYouCardUrl}>
                   {sendingThanks ? <Loader2 size={18} className="animate-spin" /> : <Heart size={18} />}
                   {sendingThanks ? 'Inatuma...' : 'Tuma Shukrani'}
                 </button>
@@ -1643,22 +1270,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <form onSubmit={handleEditSubmit} className="modal-body">
               <div className="space-y-4">
-                <div>
-                  <label className="field-label">Event Name</label>
-                  <input type="text" name="name" value={editForm.name} onChange={handleEditChange} className="field-input" required />
-                </div>
-                <div>
-                  <label className="field-label">Venue</label>
-                  <input type="text" name="venue" value={editForm.venue} onChange={handleEditChange} className="field-input" required />
-                </div>
-                <div>
-                  <label className="field-label">Address</label>
-                  <input type="text" name="address" value={editForm.address} onChange={handleEditChange} className="field-input" />
-                </div>
-                <div>
-                  <label className="field-label">Date & Time</label>
-                  <input type="datetime-local" name="date" value={editForm.date} onChange={handleEditChange} className="field-input" required />
-                </div>
+                <div><label className="field-label">Event Name</label><input type="text" name="name" value={editForm.name} onChange={handleEditChange} className="field-input" required /></div>
+                <div><label className="field-label">Venue</label><input type="text" name="venue" value={editForm.venue} onChange={handleEditChange} className="field-input" required /></div>
+                <div><label className="field-label">Address</label><input type="text" name="address" value={editForm.address} onChange={handleEditChange} className="field-input" /></div>
+                <div><label className="field-label">Date & Time</label><input type="datetime-local" name="date" value={editForm.date} onChange={handleEditChange} className="field-input" required /></div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button type="button" className="flex-1 btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
@@ -1684,38 +1299,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <div className="space-y-4">
                 <div>
                   <label className="field-label">Full Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={editGuestForm.name}
-                    onChange={handleEditGuestChange}
-                    className="field-input"
-                    placeholder="Enter guest name"
-                    required
-                  />
+                  <input type="text" name="name" value={editGuestForm.name} onChange={handleEditGuestChange} className="field-input" placeholder="Enter guest name" required />
                 </div>
                 <div>
                   <label className="field-label">Phone Number</label>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={editGuestForm.phone}
-                    onChange={handleEditGuestChange}
-                    className="field-input"
-                    placeholder="+255712345678"
-                    required
-                  />
+                  <input type="text" name="phone" value={editGuestForm.phone} onChange={handleEditGuestChange} className="field-input" placeholder="+255712345678" required />
                   <p className="text-xs text-gray-400 mt-1">Include country code (e.g., +255...)</p>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button type="button" className="flex-1 btn-secondary" onClick={() => setShowEditGuestModal(false)}>Cancel</button>
-                <button
-                  type="button"
-                  className="flex-1 btn-primary"
-                  onClick={handleSaveGuest}
-                  disabled={savingGuest || !editGuestForm.name.trim() || !editGuestForm.phone.trim()}
-                >
+                <button type="button" className="flex-1 btn-primary" onClick={handleSaveGuest} disabled={savingGuest || !editGuestForm.name.trim() || !editGuestForm.phone.trim()}>
                   {savingGuest ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                   {savingGuest ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -1740,24 +1334,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <>
                   <div className="relative mb-4">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      value={backupSearch}
-                      onChange={(e) => { setBackupSearch(e.target.value); setBackupPage(1); }}
-                      placeholder="Search all guests..."
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                    />
+                    <input type="text" value={backupSearch} onChange={(e) => { setBackupSearch(e.target.value); setBackupPage(1); }} placeholder="Search all guests..." className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent" />
                   </div>
-
                   {backupPaginated.length === 0 ? (
                     <div className="text-center py-8 text-gray-400"><Users className="w-10 h-10 mx-auto mb-2 opacity-30" /><p>No guests found</p></div>
                   ) : (
                     <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
                       {backupPaginated.map(g => (
                         <div key={g.id} className="py-2.5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#0D4F4F]/10 flex items-center justify-center text-[#0D4F4F] font-bold text-sm flex-shrink-0">
-                            {g.name.charAt(0).toUpperCase()}
-                          </div>
+                          <div className="w-8 h-8 rounded-full bg-[#0D4F4F]/10 flex items-center justify-center text-[#0D4F4F] font-bold text-sm flex-shrink-0">{g.name.charAt(0).toUpperCase()}</div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm text-gray-800 truncate">{g.title ? `${g.title} ${g.name}` : g.name}</p>
                             <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -1769,14 +1354,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                               </span>
                             </div>
                           </div>
-                          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-20">
-                            {g.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
-                          </span>
+                          <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-20">{g.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}</span>
                         </div>
                       ))}
                     </div>
                   )}
-
                   {backupTotalPages > 1 && (
                     <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
                       <span className="text-xs text-gray-400">{filteredBackup.length} guests</span>
