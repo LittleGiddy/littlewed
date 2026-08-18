@@ -8,7 +8,7 @@ import {
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
   ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
-  FileText, Info, Eye, AlertTriangle
+  FileText, Info, Eye, AlertTriangle, RotateCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -34,6 +34,10 @@ interface EventData {
   venue: string;
   address: string;
   tenant: { testMode: boolean };
+  hostFamily?: string;
+  person1?: string;
+  person2?: string;
+  time?: string;
 }
 
 interface SendResult {
@@ -42,6 +46,7 @@ interface SendResult {
   success: boolean;
   error?: string;
   channel?: string;
+  messageId?: string;
 }
 
 export default function SendInvitationsPage() {
@@ -61,6 +66,7 @@ export default function SendInvitationsPage() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp'>('sms');
   const [loadingGuests, setLoadingGuests] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -101,9 +107,9 @@ export default function SendInvitationsPage() {
   }, [eventId]);
 
   // ─── Helper: Replace placeholders in SMS message ──────────────────────
-  const personalizeMessage = (message: string, guest: Guest, event: EventData): string => {
+  const personalizeMessage = (message: string, guest: Guest, eventData: EventData): string => {
     const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    const formattedDate = new Date(event.date).toLocaleDateString('en-US', {
+    const formattedDate = new Date(eventData.date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -115,61 +121,17 @@ export default function SendInvitationsPage() {
       .replace(/{fullName}/g, fullName)
       .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
       .replace(/{smsCode}/g, guest.smsCode || 'N/A')
-      .replace(/{event}/g, event.name)
+      .replace(/{event}/g, eventData.name)
       .replace(/{date}/g, formattedDate)
-      .replace(/{venue}/g, event.venue)
-      .replace(/{address}/g, event.address || '');
+      .replace(/{venue}/g, eventData.venue)
+      .replace(/{address}/g, eventData.address || '')
+      .replace(/{hostFamily}/g, eventData.hostFamily || '')
+      .replace(/{person1}/g, eventData.person1 || '')
+      .replace(/{person2}/g, eventData.person2 || '')
+      .replace(/{time}/g, eventData.time || '');
   };
 
-  // ─── Send to a single guest ────────────────────────────────────────────
-  const sendToGuest = async (guest: Guest): Promise<SendResult> => {
-    try {
-      let endpoint: string;
-      let body: any;
-
-      if (guest.routingChannel === 'whatsapp') {
-        endpoint = '/api/invitations/send-template';
-        body = { 
-          guestId: guest.id, 
-          eventId,
-        };
-      } else {
-        endpoint = '/api/invitations/send-sms';
-        const personalizedMessage = personalizeMessage(customMessage, guest, event!);
-        body = { 
-          guestId: guest.id, 
-          eventId,
-          message: personalizedMessage,
-        };
-      }
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        credentials: 'include',
-      });
-      
-      const data = await res.json();
-      return { 
-        success: res.ok, 
-        error: data.error,
-        channel: guest.routingChannel,
-        guestId: guest.id,
-        name: guest.name,
-      };
-    } catch {
-      return { 
-        success: false, 
-        error: 'Network error',
-        channel: guest.routingChannel,
-        guestId: guest.id,
-        name: guest.name,
-      };
-    }
-  };
-
-  // ─── Broadcast to all guests ────────────────────────────────────────────
+  // ─── Broadcast to all guests using batch API ──────────────────────────
   const broadcast = async () => {
     const targetGuests = getFilteredGuests();
     if (targetGuests.length === 0) {
@@ -184,32 +146,121 @@ export default function SendInvitationsPage() {
 
     setSending(true);
     setResults([]);
-    let successCount = 0;
-    const newResults: SendResult[] = [];
+    
+    try {
+      const guestIds = targetGuests.map(g => g.id);
+      
+      // Check if we're sending to all WhatsApp or mixed
+      const allWhatsApp = targetGuests.every(g => g.routingChannel === 'whatsapp');
+      const allSms = targetGuests.every(g => g.routingChannel === 'sms');
+      
+      let endpoint = '/api/invitations/send-batch';
+      let body: any = { 
+        eventId, 
+        guestIds,
+      };
 
-    for (const guest of targetGuests) {
-      const result = await sendToGuest(guest);
-      newResults.push(result);
-      if (result.success) successCount++;
-      setResults([...newResults]);
-      // Small delay between sends
-      await new Promise(r => setTimeout(r, 300));
-    }
+      // If sending SMS, include the custom message
+      if (allSms || !allWhatsApp) {
+        endpoint = '/api/invitations/send-sms-batch';
+        body.message = customMessage;
+      }
 
-    if (successCount === targetGuests.length) {
-      toast.success(`Sent to all ${successCount} guests`);
-    } else if (successCount > 0) {
-      toast(`Sent to ${successCount} of ${targetGuests.length} guests`, {
-        icon: <AlertTriangle size={18} className="text-amber-500" />,
-        duration: 5000,
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
       });
-    } else {
-      toast.error('Failed to send to any guests');
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setResults(data.results || []);
+        
+        if (data.successCount === data.total) {
+          toast.success(`✅ Successfully sent to all ${data.total} guests!`);
+        } else if (data.successCount > 0) {
+          toast(`${data.successCount} of ${data.total} guests received the message. ${data.failCount} failed.`, {
+            icon: <AlertTriangle size={18} className="text-amber-500" />,
+            duration: 6000,
+          });
+        } else {
+          toast.error(`❌ Failed to send to any guests.`);
+        }
+        
+        await loadData();
+      } else {
+        toast.error(data.error || 'Failed to send invitations');
+      }
+    } catch (error) {
+      console.error('Broadcast error:', error);
+      toast.error('Network error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+// ─── Retry Failed Messages ────────────────────────────────────────────
+const retryFailed = async () => {
+  const failedGuestIds = results
+    .filter(r => !r.success)
+    .map(r => r.guestId);
+
+  if (failedGuestIds.length === 0) {
+    toast('No failed messages to retry', {
+      icon: <Info size={18} className="text-blue-500" />,
+      duration: 3000,
+    });
+    return;
+  }
+
+  setRetrying(true);
+  
+  try {
+    const failedGuests = guests.filter(g => failedGuestIds.includes(g.id));
+    const allWhatsApp = failedGuests.every(g => g.routingChannel === 'whatsapp');
+    
+    let endpoint = '/api/invitations/send-batch';
+    let body: any = { 
+      eventId, 
+      guestIds: failedGuestIds,
+    };
+
+    if (!allWhatsApp) {
+      endpoint = '/api/invitations/send-sms-batch';
+      body.message = customMessage;
     }
 
-    setSending(false);
-    await loadData();
-  };
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include',
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      // Merge new results with old ones
+      const newResults = results.map(r => {
+        const updated = data.results?.find((ur: any) => ur.guestId === r.guestId);
+        return updated || r;
+      });
+      setResults(newResults);
+      
+      toast.success(`Retried ${data.successCount} failed messages. ${data.failCount} still failed.`);
+      await loadData();
+    } else {
+      toast.error(data.error || 'Failed to retry');
+    }
+  } catch (error) {
+    console.error('Retry error:', error);
+    toast.error('Network error');
+  } finally {
+    setRetrying(false);
+  }
+};
 
   // ─── Send to specific channel ──────────────────────────────────────────
   const sendToChannel = async (channel: 'whatsapp' | 'sms') => {
@@ -311,6 +362,16 @@ export default function SendInvitationsPage() {
             <Phone size={16} />
             SMS ({smsCount})
           </button>
+          {failedCount > 0 && (
+            <button
+              onClick={retryFailed}
+              disabled={retrying || sending}
+              className="px-4 py-2 bg-red-600 text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {retrying ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
+              Retry Failed ({failedCount})
+            </button>
+          )}
         </div>
       </div>
 
@@ -384,7 +445,7 @@ export default function SendInvitationsPage() {
               <span className="text-xs bg-green-200 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
             </div>
             <p className="text-sm text-green-700 mb-3">
-              WhatsApp invitations use the pre-approved template <strong>"LittleWed"</strong>.
+              WhatsApp invitations use the pre-approved template <strong>"swahili invitation"</strong>.
               No custom message is needed - the template will be sent automatically with guest details.
             </p>
             <div className="bg-white rounded-xl p-4 border border-green-200">
@@ -392,13 +453,14 @@ export default function SendInvitationsPage() {
                 <Eye size={14} /> Template Preview
               </p>
               <div className="mt-2 space-y-0.5 text-sm text-gray-700 border-t border-gray-100 pt-3">
-                <p>Hello <span className="text-[#0D4F4F] font-medium">{'{name}'}</span>,</p>
-                <p><span className="text-[#0D4F4F] font-medium">{'{hostFamily}'}</span> invites you to <span className="text-[#0D4F4F] font-medium">{'{person1}'}</span> &amp; <span className="text-[#0D4F4F] font-medium">{'{person2}'}</span> on <span className="text-[#0D4F4F] font-medium">{'{date}'}</span>.</p>
-                <p>Venue: <span className="text-[#0D4F4F] font-medium">{'{venue}'}</span> at <span className="text-[#0D4F4F] font-medium">{'{time}'}</span></p>
-                <p>Card: <span className="text-[#0D4F4F] font-medium">{'{cardNumber}'}</span> <span className="text-[#0D4F4F] font-medium">{'{cardType}'}</span></p>
+                <p>Habari <span className="text-[#0D4F4F] font-medium">{'{var1}'}</span>,</p>
+                <p>Familia ya <span className="text-[#0D4F4F] font-medium">{'{var2}'}</span> inapenda kukualika katika sherehe ya harusi ya <span className="text-[#0D4F4F] font-medium">{'{var3}'}</span> na <span className="text-[#0D4F4F] font-medium">{'{var4}'}</span> itakayofanyika tarehe <span className="text-[#0D4F4F] font-medium">{'{var5}'}</span>.</p>
+                <p>Reception itafanyika katika ukumbi wa <span className="text-[#0D4F4F] font-medium">{'{var6}'}</span>, kuanzia saa <span className="text-[#0D4F4F] font-medium">{'{var7}'}</span>.</p>
+                <p>Card No: <span className="text-[#0D4F4F] font-medium">{'{var8}'}</span> <span className="text-[#0D4F4F] font-medium">{'{var9}'}</span></p>
+                <p className="text-xs text-gray-500 mt-2">Tafadhali onyesha kadi hii wakati wa kuingia. Karibu na ufurahie sherehe!</p>
                 <div className="mt-2 pt-2 border-t border-green-100">
                   <span className="text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 border border-green-200">
-                    <span>🔗</span> View Full Invite
+                    <span>🔗</span> Bonyeza link hapa chini kwa maelezo kamili
                   </span>
                 </div>
                 <p className="text-[10px] text-green-500 mt-2 flex items-center gap-1">
@@ -738,11 +800,21 @@ export default function SendInvitationsPage() {
             </span>
           </div>
           {results.filter(r => !r.success).length > 0 && (
-            <div className="mt-2 text-xs text-red-500 bg-red-50 p-2 rounded-lg">
+            <div className="mt-2 text-xs text-red-500 bg-red-50 p-2 rounded-lg max-h-32 overflow-y-auto">
               {results.filter(r => !r.success).map(r => (
-                <div key={r.guestId}>{r.name}: {r.error}</div>
+                <div key={r.guestId}>• {r.name}: {r.error}</div>
               ))}
             </div>
+          )}
+          {results.filter(r => r.success).length > 0 && results.filter(r => !r.success).length > 0 && (
+            <button
+              onClick={retryFailed}
+              disabled={retrying}
+              className="mt-3 px-4 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+            >
+              {retrying ? <Loader2 size={14} className="animate-spin" /> : <RotateCw size={14} />}
+              Retry Failed Messages
+            </button>
           )}
         </div>
       )}

@@ -82,9 +82,28 @@ export async function sendWhatsAppTemplate({
 
     if (!response.ok) {
       let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      if (data.errors) {
-        console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
+      
+      // Detailed error logging
+      if (response.status === 400) {
+        console.error('[WhatsApp] ❌ Bad Request - Check template name and variables');
+        console.error('[WhatsApp] Template:', template);
+        console.error('[WhatsApp] Variables:', JSON.stringify(personalisation, null, 2));
+        
+        if (data.errors) {
+          console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
+          errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
+        }
+      } else if (response.status === 401) {
+        console.error('[WhatsApp] ❌ Authentication failed - Check NEXTSMS_TOKEN');
+        errorMsg = 'Authentication failed. Please check your API token.';
+      } else if (response.status === 429) {
+        console.error('[WhatsApp] ❌ Rate limit exceeded - Too many messages');
+        errorMsg = 'Rate limit exceeded. Please wait and try again.';
+      } else if (response.status === 403) {
+        console.error('[WhatsApp] ❌ Forbidden - Template might not be approved');
+        errorMsg = 'Template not approved or account restricted.';
       }
+      
       throw new Error(errorMsg);
     }
 
@@ -102,19 +121,18 @@ export async function sendWhatsAppTemplate({
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-  guestName: string;    // ✅ not "name"
-  hostFamily: string;
-  person1: string;
-  person2: string;
-  date: string;
-  venue: string;
-  time: string;
-  cardNumber: string;
-  cardType: string;
-  imageUrl?: string;
-  inviteLink?: string;
-}
-
+    guestName: string;
+    hostFamily: string;
+    person1: string;
+    person2: string;
+    date: string;
+    venue: string;
+    time: string;
+    cardNumber: string;
+    cardType: string;
+    imageUrl?: string;
+    inviteLink?: string;
+  }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
@@ -127,34 +145,33 @@ export async function sendWeddingInvitation(
   };
 
   // ─── Button with dynamic URL ──────────────────────────────────────────
-  const slug = data.inviteLink 
-    ? toLinkSuffix(data.inviteLink) 
-    : 'default';
-
-  const button = {
-    personalisation: {
-      url_link: {
-        parameters: [slug],
+  let button = undefined;
+  if (data.inviteLink) {
+    const slug = toLinkSuffix(data.inviteLink);
+    button = {
+      personalisation: {
+        url_link: {
+          parameters: [slug],
+        },
       },
-    },
-  };
+    };
+  }
 
   // ─── Send template with proper variable mapping ──────────────────────
-  // Template variables (var1 - var9) must match the template in NexSMS
   return sendWhatsAppTemplate({
     to: phone,
     template: 'swahili invitation',
     personalisation: [
       {
-        "var1": data.guestName,      // ✅ Guest name with title (e.g., "Mr Gideon")
-        "var2": data.hostFamily,     // ✅ Host family (e.g., "Mr & Mrs Wambura")
-        "var3": data.person1,        // ✅ Person 1 full name (e.g., "John Wambura")
-        "var4": data.person2,        // ✅ Person 2 full name (e.g., "Mary Wambura")
-        "var5": data.date,           // ✅ Event date (e.g., "25 Oktoba, 2026")
-        "var6": data.venue,          // ✅ Venue (e.g., "TAZARA")
-        "var7": data.time,           // ✅ Time (e.g., "5:00 PM")
-        "var8": data.cardNumber,     // ✅ Card number (e.g., "11092")
-        "var9": data.cardType,       // ✅ Card type (e.g., "SINGLE" or "DOUBLE")
+        "var1": data.guestName,      // Guest name with title
+        "var2": data.hostFamily,     // Host family
+        "var3": data.person1,        // Person 1
+        "var4": data.person2,        // Person 2
+        "var5": data.date,           // Event date
+        "var6": data.venue,          // Venue
+        "var7": data.time,           // Time
+        "var8": data.cardNumber,     // Card number
+        "var9": data.cardType,       // Card type
       }
     ],
     header,

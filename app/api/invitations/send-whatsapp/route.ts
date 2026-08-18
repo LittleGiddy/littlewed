@@ -39,6 +39,17 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── Check if already sent recently ──────────────────────────────────
+    if (guest.invitationSentAt) {
+      const timeSinceLastSend = Date.now() - new Date(guest.invitationSentAt).getTime();
+      if (timeSinceLastSend < 60000) {
+        return NextResponse.json({
+          success: false,
+          error: 'Invitation already sent recently. Please wait before resending.',
+        }, { status: 429 });
+      }
+    }
+
     // ─── Format date properly ──────────────────────────────────────────
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
@@ -93,9 +104,26 @@ export async function POST(req: NextRequest) {
         messageId: result.messageId,
       });
     } else {
+      // ─── Log the failure ──────────────────────────────────────────────
+      console.error('[WhatsApp] Failed to send to', guest.phone, result.error);
+      
+      if (result.messageId) {
+        await prisma.messageLog.create({
+          data: {
+            messageId: result.messageId,
+            guestId: guest.id,
+            type: 'WHATSAPP',
+            template: 'swahili invitation',
+            status: 'FAILED',
+            error: result.error || 'Unknown error',
+            rawData: result.data,
+          },
+        });
+      }
+
       return NextResponse.json({
         success: false,
-        error: result.error,
+        error: result.error || 'Failed to send WhatsApp message',
       }, { status: 500 });
     }
   } catch (error: any) {
