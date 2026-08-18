@@ -11,7 +11,8 @@ import {
   Search, Download, User, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
   Check, Coins, Sparkles, Hash, FileText, Loader2, Menu, MoreVertical,
-  UserCheck, UserPlus, Copy, Filter, Grid3x3, List, TrendingUp, Home, Eye, Share2
+  UserCheck, UserPlus, Copy, Filter, Grid3x3, List, TrendingUp, Home, Eye, Share2,
+  Printer, Link2, Copy as CopyIcon
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -141,7 +142,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [credits, setCredits] = useState<number | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [countdownKey, setCountdownKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'cards'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'cards' | 'guests'>('overview');
   const [generatingCards, setGeneratingCards] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
@@ -171,6 +172,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [savingGuest, setSavingGuest] = useState(false);
   const hasReportedLive = useRef(false);
   const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
+  const [selectedCardGuest, setSelectedCardGuest] = useState<Guest | null>(null);
+  const [showCardModal, setShowCardModal] = useState(false);
 
   // ─── Auth Check ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -781,20 +784,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
             {guest.invitationCard && (
-              <a
-                href={guest.invitationCard}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
                 className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
                 title="View Card"
               >
                 <ImageIcon size={15} />
-              </a>
-            )}
-            {event?.tenant?.testMode && (
-              <Link href={`/invite/preview/${guest.id}`} target="_blank" className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded">
-                <ExternalLink size={15} />
-              </Link>
+              </button>
             )}
             <button
               onClick={() => deleteGuest(guest.id)}
@@ -822,7 +818,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
     return (
       <div key={guest.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition group">
-        <div className="relative aspect-[3/4] bg-gray-50">
+        <div 
+          className="relative aspect-[3/4] bg-gray-50 cursor-pointer"
+          onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
+        >
           <img 
             src={guest.invitationCard} 
             alt={`${guest.name}'s invitation`}
@@ -830,17 +829,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           />
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
             <div className="flex gap-2">
-              <a
-                href={guest.invitationCard}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }}
                 className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition"
                 title="View Card"
               >
                 <Eye size={18} className="text-gray-700" />
-              </a>
+              </button>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (navigator.share) {
                     navigator.share({
                       title: `${guest.name}'s Invitation`,
@@ -859,6 +857,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <a
                 href={guest.invitationCard}
                 download={`${guest.name}-invitation.png`}
+                onClick={(e) => e.stopPropagation()}
                 className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition"
                 title="Download Card"
               >
@@ -868,36 +867,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="absolute top-2 right-2">
             <span className="text-xs font-medium bg-[#0D4F4F] text-white px-2 py-0.5 rounded-full">
-              #{guest.id.slice(0, 6)}
+              #{guest.cardNumber || guest.id.slice(0, 6)}
             </span>
           </div>
         </div>
         <div className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-sm text-gray-800">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
-              <p className="text-xs text-gray-400">{guest.phone}</p>
+              <p className="font-semibold text-sm text-gray-800 truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
+              <p className="text-xs text-gray-400 truncate">{guest.phone}</p>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => deleteGuest(guest.id)}
-                className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
-                title="Delete"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 mt-1">
-            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp' ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
-              {guest.routingChannel === 'whatsapp' ? <MessageCircle size={10} /> : <Phone size={10} />}
-              {guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
-            </span>
-            {guest.checkedIn && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                <CheckCircle size={10} /> Checked In
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp' ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
+                {guest.routingChannel === 'whatsapp' ? 'WA' : 'SMS'}
               </span>
-            )}
+              {guest.checkedIn && (
+                <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                  ✓
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -942,7 +931,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Main JSX ──────────────────────────────────────────────────────────
   return (
     <>
-      {/* ─── Modern Modal Styles ─── */}
       <style>{`
         .modal-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
@@ -992,17 +980,30 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; }
         .tab-button {
           display: flex; align-items: center; justify-content: center; gap: 8px;
-          flex: 1; padding: 10px 0; border-radius: 10px; font-weight: 600; font-size: 13px;
+          flex: 1; padding: 10px 12px; border-radius: 10px; font-weight: 600; font-size: 13px;
           transition: all 0.2s; cursor: pointer; border: none; background: transparent; color: #9BAAB8;
         }
         .tab-button.active {
           background: #0D4F4F; color: white; box-shadow: 0 4px 12px rgba(13,79,79,0.25);
         }
         .tab-button:hover:not(.active) { color: #0D4F4F; background: rgba(13,79,79,0.05); }
+        .card-modal-overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
+          display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+          animation: fadeIn 0.3s ease both;
+        }
+        .card-modal-content {
+          background: transparent; max-width: 90vh; max-height: 90vh; width: 100%;
+          position: relative;
+        }
+        .card-modal-content img {
+          width: 100%; height: 100%; object-fit: contain; border-radius: 12px;
+          box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+        }
       `}</style>
 
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 py-4">
 
           {/* ─── Top Navigation ─── */}
           <div className="flex items-center justify-between mb-4">
@@ -1047,17 +1048,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* ─── Event Header ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-5 mb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-serif text-2xl font-black text-gray-900 truncate">{event.name}</h1>
+                  <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate">{event.name}</h1>
                   <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusBadge.className}`}>
                     {statusBadge.icon}
                     {statusBadge.label}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm text-gray-500 mt-1">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1">
                     <Calendar size={14} className="text-[#0D4F4F]" />
                     {format(new Date(event.date), 'PPP')}
@@ -1067,7 +1068,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     {event.venue}
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">{event.address}</p>
+                <p className="text-xs text-gray-400 mt-0.5 truncate">{event.address}</p>
               </div>
 
               {!isEventDisabled && eventDate && (
@@ -1094,34 +1095,34 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             )}
           </div>
 
-          {/* ─── Stats Overview ─── */}
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm">
+          {/* ─── Quick Stats ─── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
               <p className="text-lg font-bold text-gray-900">{guests.length}</p>
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
+              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
               <p className="text-lg font-bold text-green-600">{checkedInAll}</p>
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Checked In</p>
+              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Checked In</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
               <p className="text-lg font-bold text-[#0D4F4F]">{guestsWithCards.length}</p>
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Cards</p>
+              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Cards</p>
             </div>
-            <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-100 p-2.5 text-center shadow-sm">
               <p className="text-lg font-bold text-amber-600">{guestsWithoutCards.length}</p>
-              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">No Card</p>
+              <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">No Card</p>
             </div>
           </div>
 
           {/* ─── Tab Navigation ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 mb-4">
-            <div className="flex gap-1">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5 sm:p-2 mb-4 overflow-x-auto">
+            <div className="flex gap-1 min-w-max">
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
               >
-                <Home size={16} /> Overview
+                <Sparkles size={16} /> Overview
               </button>
               <button
                 onClick={() => setActiveTab('cards')}
@@ -1133,6 +1134,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     {guestsWithCards.length}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => setActiveTab('guests')}
+                className={`tab-button ${activeTab === 'guests' ? 'active' : ''}`}
+              >
+                <Users size={16} /> Guests
+                <span className="text-xs bg-white/20 text-white px-1.5 py-0.5 rounded-full">
+                  {guests.length}
+                </span>
               </button>
             </div>
           </div>
@@ -1153,14 +1163,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="grid grid-cols-2 gap-2">
                     <Link
                       href={`/client/invitations/send/${event.id}`}
-                      className="col-span-2 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                      className="col-span-2 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Send size={16} /> Send Invitations
                     </Link>
 
                     <button
                       onClick={openKumbushaModal}
-                      className="bg-amber-50 border border-amber-200 text-amber-700 py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2"
+                      className="bg-amber-50 border border-amber-200 text-amber-700 py-3 rounded-xl font-bold hover:bg-amber-100 transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Bell size={16} /> Remind ({kumbushaCount})
                     </button>
@@ -1168,7 +1178,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <button
                       onClick={handleGenerateCards}
                       disabled={generatingCards || guests.length === 0}
-                      className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="bg-amber-600 text-white py-3 rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                     >
                       {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Palette size={16} />}
                       {generatingCards ? 'Generating...' : `Cards (${guestsWithoutCards.length})`}
@@ -1176,28 +1186,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
                     <Link
                       href={`/client/guests/import/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2"
+                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Upload size={16} /> Import
                     </Link>
 
                     <Link
                       href={`/client/guests/add/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2"
+                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Plus size={16} /> Add Guest
                     </Link>
 
                     <Link
                       href={`/client/invitations/design/${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2"
+                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Palette size={16} /> Design
                     </Link>
 
                     <Link
                       href={`/client/check-in?event=${event.id}`}
-                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2"
+                      className="bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.15)] py-3 rounded-xl font-bold hover:bg-[rgba(13,79,79,0.15)] transition flex items-center justify-center gap-2 text-sm"
                     >
                       <QrCode size={16} /> Check-In
                     </Link>
@@ -1206,7 +1216,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {checkedInCount > 0 && (
                     <button
                       onClick={openThanksModal}
-                      className="w-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                      className="w-full bg-gradient-to-r from-[#E8A598] to-[#D4857A] text-white py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Heart size={16} /> Send Thanks ({checkedInCount})
                     </button>
@@ -1220,18 +1230,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           {activeTab === 'cards' && (
             <div className="space-y-4">
               {/* Cards Actions */}
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-xl border border-gray-100 p-3 sm:p-4">
+                <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={handleGenerateCards}
                     disabled={generatingCards || guests.length === 0}
                     className="bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
                   >
                     {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                    {generatingCards ? 'Generating...' : `Generate Cards (${guestsWithoutCards.length})`}
+                    {generatingCards ? 'Generating...' : `Generate (${guestsWithoutCards.length})`}
                   </button>
                   <span className="text-xs text-gray-400">
-                    {guestsWithCards.length} cards generated
+                    {guestsWithCards.length} cards
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1261,49 +1271,46 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <button
                     onClick={handleGenerateCards}
                     disabled={generatingCards || guests.length === 0}
-                    className="bg-[#0D4F4F] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#0A3D3D] transition disabled:opacity-50 inline-flex items-center gap-2"
+                    className="bg-[#0D4F4F] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#0A3D3D] transition disabled:opacity-50 inline-flex items-center gap-2 text-sm"
                   >
                     {generatingCards ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                     {generatingCards ? 'Generating...' : 'Generate Cards'}
                   </button>
                 </div>
               ) : cardView === 'grid' ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                   {guestsWithCards.map(renderCardItem)}
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
                   <div className="divide-y divide-gray-100">
                     {guestsWithCards.map((guest) => (
-                      <div key={guest.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 transition">
+                      <div key={guest.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}>
                         <img 
                           src={guest.invitationCard!} 
                           alt={guest.name}
-                          className="w-16 h-16 rounded-lg object-cover border border-gray-100 flex-shrink-0"
+                          className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-800">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
+                          <p className="font-semibold text-sm text-gray-800 truncate">{guest.title ? `${guest.title} ${guest.name}` : guest.name}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <span>{guest.phone}</span>
-                            <span>•</span>
-                            <span className="inline-flex items-center gap-1">
-                              {guest.routingChannel === 'whatsapp' ? <MessageCircle size={10} /> : <Phone size={10} />}
+                            <span className="truncate">{guest.phone}</span>
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100">
                               {guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <a
-                            href={guest.invitationCard!}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedCardGuest(guest); setShowCardModal(true); }}
                             className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition"
                             title="View Card"
                           >
                             <Eye size={16} />
-                          </a>
+                          </button>
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               if (navigator.share) {
                                 navigator.share({
                                   title: `${guest.name}'s Invitation`,
@@ -1322,18 +1329,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           <a
                             href={guest.invitationCard!}
                             download={`${guest.name}-invitation.png`}
+                            onClick={(e) => e.stopPropagation()}
                             className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
                             title="Download Card"
                           >
                             <Download size={16} />
                           </a>
-                          <button
-                            onClick={() => deleteGuest(guest.id)}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
                         </div>
                       </div>
                     ))}
@@ -1342,8 +1343,173 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           )}
+
+          {/* ─── Guests Tab ─── */}
+          {activeTab === 'guests' && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Search & Actions */}
+              <div className="flex flex-wrap items-center gap-2 p-3 border-b border-gray-100">
+                <div className="flex-1 min-w-[120px] relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                    placeholder="Search guests..."
+                    className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="p-2 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-50 transition"
+                    title="Select All"
+                  >
+                    {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                  </button>
+                  {selectedGuests.size > 0 && (
+                    <button
+                      onClick={deleteSelected}
+                      disabled={deleting}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                      title="Delete Selected"
+                    >
+                      {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  )}
+                  <button
+                    onClick={openBackupModal}
+                    className="p-2 text-[#0D4F4F] hover:bg-[rgba(13,79,79,0.08)] rounded-lg transition"
+                    title="View All Guests"
+                  >
+                    <Download size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Guest List */}
+              {guests.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
+                  <p className="text-sm text-gray-400">Import a guest list or add guests manually.</p>
+                </div>
+              ) : (
+                <div>
+                  <div
+                    id="guest-list-container"
+                    className={`divide-y divide-gray-100 max-h-[500px] overflow-y-auto scroll-smooth p-1 ${isEventDisabled ? 'opacity-60' : ''}`}
+                    onScroll={handleScroll}
+                  >
+                    {paginatedGuests.map(renderGuestCard)}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                      <span className="text-xs text-gray-500">
+                        {(currentPage - 1) * pageSize + 1} – {Math.min(currentPage * pageSize, filteredGuests.length)} of {filteredGuests.length}
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => goToPage(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                        >
+                          Previous
+                        </button>
+                        <span className="px-3 py-1 text-sm font-semibold text-gray-700">
+                          {currentPage} / {totalPages}
+                        </span>
+                        <button
+                          onClick={() => goToPage(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showBackToTop && (
+                    <button
+                      onClick={scrollToTop}
+                      className="fixed bottom-6 right-6 bg-[#0D4F4F] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3D3D] transition z-10"
+                    >
+                      <ArrowUp size={20} />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ─── Card Detail Modal ─── */}
+      {showCardModal && selectedCardGuest && (
+        <div className="card-modal-overlay" onClick={() => setShowCardModal(false)}>
+          <div className="card-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="relative">
+              <button
+                onClick={() => setShowCardModal(false)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition p-2"
+              >
+                <X size={28} />
+              </button>
+              <img 
+                src={selectedCardGuest.invitationCard!} 
+                alt={`${selectedCardGuest.name}'s invitation card`}
+                className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
+              />
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 bg-black/60 backdrop-blur-sm p-2 rounded-xl">
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: `${selectedCardGuest.name}'s Invitation`,
+                        url: selectedCardGuest.invitationCard || '',
+                      }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
+                      toast.success('Card link copied!');
+                    }
+                  }}
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
+                  title="Share"
+                >
+                  <Share2 size={18} className="text-gray-700" />
+                </button>
+                <a
+                  href={selectedCardGuest.invitationCard!}
+                  download={`${selectedCardGuest.name}-invitation.png`}
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
+                  title="Download"
+                >
+                  <Download size={18} className="text-gray-700" />
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
+                    toast.success('Card link copied!');
+                  }}
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
+                  title="Copy Link"
+                >
+                  <Link2 size={18} className="text-gray-700" />
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="p-2.5 bg-white rounded-lg hover:bg-gray-100 transition"
+                  title="Print"
+                >
+                  <Printer size={18} className="text-gray-700" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Kumbusha Modal ─── */}
       {showKumbushaModal && (
