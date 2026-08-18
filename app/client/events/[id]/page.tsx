@@ -30,6 +30,9 @@ interface Guest {
   reminderCount: number;
   invitationCard: string | null;
   title?: string | null;
+  cardNumber?: string | null;    // ✅ Added
+  guestType?: string | null;     // ✅ Added
+  event?: EventData;             // ✅ Added for nested access
 }
 
 interface EventData {
@@ -670,7 +673,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       if (completed === pendingGuests.length) {
         toast.success(`All ${completed} cards generated successfully!`, { id: currentToast, duration: 3000 });
-        
+
         // ─── Show Send Invitations Toast ───
         toast.custom((t) => (
           <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}>
@@ -720,97 +723,103 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ─── Render Guest Card ────────────────────────────────────────────────
   const renderGuestCard = (guest: Guest) => {
-    const isSelected = selectedGuests.has(guest.id);
-    const isWhatsApp = guest.routingChannel === 'whatsapp';
-    const isCheckedIn = guest.checkedIn;
-    const hasThanks = guest.thanksSentAt;
-    const reminderCount = guest.reminderCount;
-    const hasCard = guest.invitationCard;
+  const isSelected = selectedGuests.has(guest.id);
+  const isWhatsApp = guest.routingChannel === 'whatsapp';
+  const isCheckedIn = guest.checkedIn;
+  const hasThanks = guest.thanksSentAt;
+  const reminderCount = guest.reminderCount;
+  const hasCard = guest.invitationCard;
+  const cardDisplay = guest.cardNumber || 'No Card';
 
-    return (
-      <div
-        key={guest.id}
-        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
-      >
-        <div className="flex items-center p-3 gap-3">
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => toggleSelectGuest(guest.id)}
-            className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
-          />
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            {guest.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-gray-800 text-sm truncate">
-                {guest.title ? `${guest.title} ${guest.name}` : guest.name}
-              </p>
-              {isCheckedIn && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                  <CheckCircle size={12} /> Checked In
-                </span>
-              )}
-              {hasThanks && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
-                  <Heart size={12} /> Thanks
-                </span>
-              )}
-              {hasCard ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                  <ImageIcon size={12} /> Card
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                  <Clock size={12} /> No Card
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
-                {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
-                {isWhatsApp ? 'WhatsApp' : 'SMS'}
+  return (
+    <div
+      key={guest.id}
+      className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'}`}
+    >
+      <div className="flex items-center p-3 gap-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => toggleSelectGuest(guest.id)}
+          className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
+        />
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          {guest.name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-semibold text-gray-800 text-sm truncate">
+              {guest.title ? `${guest.title} ${guest.name}` : guest.name}
+            </p>
+            {guest.cardNumber && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                <Hash size={10} /> #{cardDisplay}
               </span>
-              {guest.phone && (
-                <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
-              )}
-              {reminderCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                  <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {guest.invitationCard && (
-              <button
-                onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
-                className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
-                title="View Card"
-              >
-                <ImageIcon size={15} />
-              </button>
             )}
-            <button
-              onClick={() => deleteGuest(guest.id)}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
-              title="Delete guest"
-            >
-              <Trash2 size={15} />
-            </button>
-            <button
-              onClick={() => openEditGuestModal(guest)}
-              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
-              title="Edit guest"
-            >
-              <Edit2 size={15} />
-            </button>
+            {isCheckedIn && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                <CheckCircle size={12} /> Checked In
+              </span>
+            )}
+            {hasThanks && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                <Heart size={12} /> Thanks
+              </span>
+            )}
+            {hasCard ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                <ImageIcon size={12} /> Card
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                <Clock size={12} /> No Card
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]' : 'bg-gray-100 text-gray-600'}`}>
+              {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
+              {isWhatsApp ? 'WhatsApp' : 'SMS'}
+            </span>
+            {guest.phone && (
+              <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>
+            )}
+            {reminderCount > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {guest.invitationCard && (
+            <button
+              onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
+              className="p-1.5 text-blue-500 hover:text-blue-700 transition rounded"
+              title="View Card"
+            >
+              <ImageIcon size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => deleteGuest(guest.id)}
+            className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
+            title="Delete guest"
+          >
+            <Trash2 size={15} />
+          </button>
+          <button
+            onClick={() => openEditGuestModal(guest)}
+            className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
+            title="Edit guest"
+          >
+            <Edit2 size={15} />
+          </button>
+        </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // ─── Render Card Grid Item ────────────────────────────────────────────
   const renderCardItem = (guest: Guest) => {
@@ -818,12 +827,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
     return (
       <div key={guest.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition group">
-        <div 
+        <div
           className="relative aspect-[3/4] bg-gray-50 cursor-pointer"
           onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}
         >
-          <img 
-            src={guest.invitationCard} 
+          <img
+            src={guest.invitationCard}
             alt={`${guest.name}'s invitation`}
             className="w-full h-full object-cover"
           />
@@ -843,7 +852,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     navigator.share({
                       title: `${guest.name}'s Invitation`,
                       url: guest.invitationCard || '',
-                    }).catch(() => {});
+                    }).catch(() => { });
                   } else {
                     navigator.clipboard.writeText(guest.invitationCard || '');
                     toast.success('Card link copied to clipboard!');
@@ -1286,8 +1295,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="divide-y divide-gray-100">
                     {guestsWithCards.map((guest) => (
                       <div key={guest.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition cursor-pointer" onClick={() => { setSelectedCardGuest(guest); setShowCardModal(true); }}>
-                        <img 
-                          src={guest.invitationCard!} 
+                        <img
+                          src={guest.invitationCard!}
                           alt={guest.name}
                           className="w-14 h-14 rounded-lg object-cover border border-gray-100 flex-shrink-0"
                         />
@@ -1315,7 +1324,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                                 navigator.share({
                                   title: `${guest.name}'s Invitation`,
                                   url: guest.invitationCard || '',
-                                }).catch(() => {});
+                                }).catch(() => { });
                               } else {
                                 navigator.clipboard.writeText(guest.invitationCard || '');
                                 toast.success('Card link copied!');
@@ -1446,6 +1455,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
+
       {/* ─── Card Detail Modal ─── */}
       {showCardModal && selectedCardGuest && (
         <div className="card-modal-overlay" onClick={() => setShowCardModal(false)}>
@@ -1457,8 +1467,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               >
                 <X size={28} />
               </button>
-              <img 
-                src={selectedCardGuest.invitationCard!} 
+              <img
+                src={selectedCardGuest.invitationCard!}
                 alt={`${selectedCardGuest.name}'s invitation card`}
                 className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
               />
@@ -1469,7 +1479,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       navigator.share({
                         title: `${selectedCardGuest.name}'s Invitation`,
                         url: selectedCardGuest.invitationCard || '',
-                      }).catch(() => {});
+                      }).catch(() => { });
                     } else {
                       navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
                       toast.success('Card link copied!');
