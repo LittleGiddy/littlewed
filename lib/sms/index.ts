@@ -2,7 +2,7 @@
 
 const SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
 const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
-const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
+const SMS_BASE_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
 
 export interface SendSMSResult {
   success: boolean;
@@ -38,8 +38,17 @@ export async function sendSMS({
   // Clean phone number (remove + and non-numeric)
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
-  // ─── Use the /multi endpoint (confirmed working with curl) ──────────
-  const fullUrl = `${SMS_API_URL}/api/sms/v2/text/multi`;
+  // ─── Build the URL correctly - avoid duplication ──────────────────────
+  // Remove trailing slashes and check if the base already contains /api/sms/v2
+  let baseUrl = SMS_BASE_URL.replace(/\/+$/, '');
+  
+  // If the base URL already contains /api/sms/v2, don't add it again
+  let fullUrl;
+  if (baseUrl.includes('/api/sms/v2')) {
+    fullUrl = `${baseUrl}/text/multi`;
+  } else {
+    fullUrl = `${baseUrl}/api/sms/v2/text/multi`;
+  }
   
   console.log('[SMS] Sending to:', cleanTo);
   console.log('[SMS] URL:', fullUrl);
