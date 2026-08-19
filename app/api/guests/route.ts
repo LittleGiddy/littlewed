@@ -7,7 +7,6 @@ import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
 import { generateUniquePassCode } from '@/lib/utils';
 
-// ─── Helper: Get the next available card number ──────────────────────────
 async function getNextCardNumber(eventId: string): Promise<string> {
   const guests = await prisma.guest.findMany({
     where: { eventId },
@@ -47,12 +46,10 @@ export async function POST(req: NextRequest) {
 
     const { title, name, phone, cardNumber, email, eventId } = await req.json();
 
-    // ─── Validation ──────────────────────────────────────────────────────
     if (!name || !phone || !eventId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ─── Normalize phone ──────────────────────────────────────────────────
     const { normalized, isValid } = normalizePhone(phone);
     if (!isValid) {
       return NextResponse.json(
@@ -61,7 +58,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Check duplicate phone ──────────────────────────────────────────
     const existing = await prisma.guest.findFirst({
       where: { eventId, phone: normalized },
     });
@@ -72,7 +68,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Check duplicate card number ────────────────────────────────────
     if (cardNumber) {
       const existingCard = await prisma.guest.findUnique({
         where: { cardNumber: cardNumber.trim() },
@@ -85,7 +80,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Check guest limit ──────────────────────────────────────────────
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: { tenant: { select: { bypassPayment: true } } },
@@ -104,17 +98,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Generate card number ──────────────────────────────────────────
     let finalCardNumber = cardNumber?.trim() || null;
     if (!finalCardNumber) {
       finalCardNumber = await getNextCardNumber(eventId);
     }
 
-    // ─── Generate unique pass code ──────────────────────────────────────
     const passCode = await generateUniquePassCode(prisma);
 
-    // ─── Create guest with SMS as default routing ────────────────────────
-    // ✅ ALL guests go to SMS by default - no WhatsApp check at import
+    // ─── CREATE GUEST WITH SMS AS DEFAULT CHANNEL ──────────────────────
     const guest = await prisma.guest.create({
       data: {
         title: title || 'Mr',
@@ -123,13 +114,12 @@ export async function POST(req: NextRequest) {
         cardNumber: finalCardNumber,
         email: email?.trim() || null,
         eventId,
-        routingChannel: 'sms', // ✅ Always SMS by default
+        routingChannel: 'sms', // ✅ ALWAYS SMS by default
         passCode,
         qrToken: randomBytes(16).toString('hex'),
       },
     });
 
-    // ─── Build the dynamic card URL ──────────────────────────────────────
     const cardImageUrl = `https://littlewed.co.tz/api/og/card?code=${passCode}`;
     const inviteLink = `https://littlewed.co.tz/invite/${passCode}`;
 
@@ -139,7 +129,7 @@ export async function POST(req: NextRequest) {
       cardImageUrl,
       inviteLink,
       routingChannel: 'sms',
-      message: 'Guest added successfully. SMS will be used as the default channel.',
+      message: 'Guest added successfully. SMS is the default channel.',
     });
   } catch (error: any) {
     console.error('Add guest error:', error);

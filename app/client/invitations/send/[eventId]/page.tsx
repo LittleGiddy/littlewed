@@ -82,6 +82,7 @@ export default function SendInvitationsPage() {
   const [generatingCards, setGeneratingCards] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [whatsappFailed, setWhatsappFailed] = useState<{ name: string; phone: string }[]>([]);
+  const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
 
   // ─── Template Variables State ──────────────────────────────────────────
   const [smsVariables, setSmsVariables] = useState<TemplateVariables>({
@@ -121,20 +122,18 @@ export default function SendInvitationsPage() {
   const loadData = async () => {
     setLoadingGuests(true);
     try {
-      const [eventRes, guestsRes, settingsRes] = await Promise.all([
+      const [eventRes, guestsRes] = await Promise.all([
         fetch(`/api/events/${eventId}`, { credentials: 'include' }),
         fetch(`/api/events/${eventId}/guests`, { credentials: 'include' }),
-        fetch(`/api/events/${eventId}/settings`, { credentials: 'include' }),
       ]);
 
       const eventData = await eventRes.json();
       const guestsData = await guestsRes.json();
-      const settings = await settingsRes.json();
 
       const eventObj = eventData.event || eventData;
       setEvent(eventObj);
 
-      // ─── AUTO-POPULATE Variables from event data ──────────────────────
+      // ─── Auto-populate variables from event data ──────────────────────
       const formattedDate = eventObj?.date
         ? new Date(eventObj.date).toLocaleDateString('sw-TZ', {
             day: 'numeric',
@@ -144,15 +143,15 @@ export default function SendInvitationsPage() {
         : '';
 
       const defaultVars: TemplateVariables = {
-        guestName: '{Guest Name}', // This will be replaced per guest
+        guestName: '{Guest Name}', // Auto-replaced per guest
         hostFamily: eventObj?.hostFamily || '',
         person1: eventObj?.person1 || '',
         person2: eventObj?.person2 || '',
         date: formattedDate,
         venue: eventObj?.venue || '',
         time: eventObj?.time || '',
-        cardNumber: '{Card Number}', // This will be replaced per guest
-        cardType: '{Card Type}', // This will be replaced per guest
+        cardNumber: '{Card Number}', // Auto-replaced per guest
+        cardType: '{Card Type}', // Auto-replaced per guest
       };
 
       setSmsVariables(defaultVars);
@@ -170,6 +169,31 @@ export default function SendInvitationsPage() {
   useEffect(() => {
     loadData();
   }, [eventId]);
+
+  // ─── Switch Guest Channel ──────────────────────────────────────────────
+  const switchGuestChannel = async (guestId: string, newChannel: string) => {
+    setSwitchingChannel(guestId);
+    try {
+      const res = await fetch(`/api/guests/${guestId}/channel`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routingChannel: newChannel }),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        toast.success(`Switched to ${newChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+        await loadData();
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to switch channel');
+      }
+    } catch (error) {
+      toast.error('Network error');
+    } finally {
+      setSwitchingChannel(null);
+    }
+  };
 
   // ─── Generate Cards ──────────────────────────────────────────────────
   const handleGenerateCards = async () => {
@@ -262,7 +286,6 @@ Ahsante.`;
     const smsGuests = targetGuests.filter(g => g.routingChannel === 'sms');
     if (smsGuests.length > 0) {
       const missingVars = Object.entries(smsVariables).filter(([key, value]) => {
-        // Skip guestName and cardNumber as they are per-guest
         if (key === 'guestName' || key === 'cardNumber' || key === 'cardType') return false;
         return !value || value.trim() === '';
       });
@@ -613,7 +636,6 @@ Ahsante.`;
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Custom</span>
           </div>
 
-          {/* ─── Read-only fields (auto-populated from event) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
               <label className="block text-xs font-medium text-gray-500 mb-0.5">Guest Name</label>
@@ -689,7 +711,6 @@ Ahsante.`;
             </div>
           </div>
 
-          {/* ─── SMS Preview ─── */}
           {showPreview && (
             <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
               <div className="flex items-center justify-between mb-2">
@@ -715,7 +736,6 @@ Ahsante.`;
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Template</span>
           </div>
 
-          {/* ─── Read-only fields (auto-populated from event) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
               <label className="block text-xs font-medium text-gray-500 mb-0.5">Guest Name</label>
@@ -791,7 +811,6 @@ Ahsante.`;
             </div>
           </div>
 
-          {/* ─── WhatsApp Preview ─── */}
           {showPreview && (
             <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-200">
               <div className="flex items-center justify-between mb-2">
@@ -1002,6 +1021,21 @@ Ahsante.`;
                           {isWhatsApp ? <MessageCircle size={10} /> : <Phone size={10} />}
                           {isWhatsApp ? 'WhatsApp' : 'SMS'}
                         </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const newChannel = isWhatsApp ? 'sms' : 'whatsapp';
+                            switchGuestChannel(guest.id, newChannel);
+                          }}
+                          disabled={switchingChannel === guest.id}
+                          className="text-[10px] text-blue-500 hover:text-blue-700 transition font-medium disabled:opacity-50"
+                        >
+                          {switchingChannel === guest.id ? (
+                            <Loader2 size={10} className="animate-spin" />
+                          ) : (
+                            `Switch to ${isWhatsApp ? 'SMS' : 'WhatsApp'}`
+                          )}
+                        </button>
                         {guest.cardNumber && (
                           <span className="text-xs text-gray-400 font-mono">#{guest.cardNumber}</span>
                         )}
