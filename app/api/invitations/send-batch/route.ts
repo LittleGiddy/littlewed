@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
-import { sendSMS } from '@/lib/sms/index'; // ✅ Same import as working reminders
+import { sendSMS } from '@/lib/sms/index';
 import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
 
 const BATCH_SIZE = 5;
@@ -19,13 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const {
-      eventId,
-      guestIds,
-      smsVariables,
-      whatsappVariables,
-      message,
-      retry
+    const { 
+      eventId, 
+      guestIds, 
+      smsVariables, 
+      whatsappVariables, 
+      message, 
+      retry 
     } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
 
     // ─── Fetch guests with events ──────────────────────────────────────
     const guests = await prisma.guest.findMany({
-      where: {
-        id: { in: guestIds },
+      where: { 
+        id: { in: guestIds }, 
         event: { tenantId },
       },
       include: { event: true },
@@ -60,10 +60,10 @@ export async function POST(req: NextRequest) {
           const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
           const formattedDate = guest.event?.date
             ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
             : '';
 
           // ─── Ensure guest has a pass code ──────────────────────────────
@@ -105,35 +105,49 @@ export async function POST(req: NextRequest) {
           if (guest.routingChannel === 'whatsapp') {
             console.log(`[Batch] Sending WhatsApp to ${guest.name} (${guest.phone})`);
 
+            // ─── Get WhatsApp variables ──────────────────────────────────
             const vars = whatsappVariables || {};
 
+            // ─── Replace with actual guest data ──────────────────────────
+            const actualGuestName = guestFullName;
+            const actualCardNumber = guest.cardNumber || vars.cardNumber || '108';
+            const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
+
+            // ─── Send WhatsApp ────────────────────────────────────────────
             result = await sendWeddingInvitation(guest.phone!, {
-              guestName: vars.guestName || guestFullName,
+              guestName: actualGuestName,
               hostFamily: vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
               person1: vars.person1 || guest.event?.person1 || 'Agape',
               person2: vars.person2 || guest.event?.person2 || 'Gladness',
               date: vars.date || formattedDate,
               venue: vars.venue || guest.event?.venue || 'The Embassy Hall',
               time: vars.time || guest.event?.time || '5:00 PM',
-              cardNumber: vars.cardNumber || guest.cardNumber || '108',
-              cardType: vars.cardType || guest.guestType || 'SINGLE',
+              cardNumber: actualCardNumber,
+              cardType: actualCardType,
               imageUrl: cardImageUrl,
-              inviteLink: inviteLink, // Optional - only if template has button
+              inviteLink: inviteLink,
             });
 
           } else {
-            // ─── SMS - Same pattern as working reminders ──────────────
+            // ─── SMS ──────────────────────────────────────────────────────
             console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
 
+            // ─── Get SMS variables ────────────────────────────────────────
             const vars = smsVariables || {};
 
-            let smsMessage = `Habari ${vars.guestName || guestFullName},
+            // ─── Replace with actual guest data ──────────────────────────
+            const actualGuestName = guestFullName;
+            const actualCardNumber = guest.cardNumber || vars.cardNumber || '108';
+            const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
+
+            // ─── Build SMS message with actual values ────────────────────
+            let smsMessage = `Habari ${actualGuestName},
 
 Familia ya ${vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${vars.person1 || guest.event?.person1 || 'Agape'} na ${vars.person2 || guest.event?.person2 || 'Gladness'} tarehe ${vars.date || formattedDate}.
 
 Venue: ${vars.venue || guest.event?.venue || 'The Embassy Hall'}, saa ${vars.time || guest.event?.time || '5:00 PM'}.
 
-Card No: ${vars.cardNumber || guest.cardNumber || '108'} • ${vars.cardType || guest.guestType || 'SINGLE'}
+Card No: ${actualCardNumber} • ${actualCardType}
 
 Tafadhali onyesha kadi hii wakati wa kuingia.
 Karibu na ufurahie sherehe!
@@ -145,8 +159,8 @@ Ahsante.`;
               smsMessage = message
                 .replace(/{title}/g, guest.title || '')
                 .replace(/{name}/g, guest.name)
-                .replace(/{fullName}/g, guestFullName)
-                .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
+                .replace(/{fullName}/g, actualGuestName)
+                .replace(/{cardNumber}/g, actualCardNumber)
                 .replace(/{passCode}/g, guest.passCode || 'N/A')
                 .replace(/{event}/g, guest.event?.name || '')
                 .replace(/{date}/g, formattedDate)
@@ -158,7 +172,7 @@ Ahsante.`;
                 .replace(/{time}/g, guest.event?.time || '');
             }
 
-            // ✅ Use sendSMS the exact same way as reminders
+            // ─── Send SMS ──────────────────────────────────────────────────
             const smsResult = await sendSMS({
               to: guest.phone!,
               message: smsMessage,
@@ -172,6 +186,7 @@ Ahsante.`;
             };
           }
 
+          // ─── Handle result ─────────────────────────────────────────────
           if (result.success) {
             successCount++;
             await prisma.guest.update({
@@ -185,7 +200,7 @@ Ahsante.`;
                   messageId: result.messageId,
                   guestId: guest.id,
                   type: guest.routingChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
-                  template: guest.routingChannel === 'whatsapp' ? 'swahili invitation' : 'custom',
+                  template: guest.routingChannel === 'whatsapp' ? 'swahili_invitation' : 'custom',
                   status: 'SENT',
                   rawData: result.data || {},
                 },
@@ -238,7 +253,7 @@ Ahsante.`;
   } catch (error: any) {
     console.error('[Batch] Unhandled error:', error);
     return NextResponse.json(
-      {
+      { 
         error: error.message || 'Internal server error',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
