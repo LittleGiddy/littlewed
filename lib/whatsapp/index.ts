@@ -36,7 +36,7 @@ export async function sendWhatsAppTemplate({
   button,
 }: SendWhatsAppTemplateOptions): Promise<SendWhatsAppResult> {
   if (!NEXTSMS_TOKEN) {
-    throw new Error('NEXTSMS_TOKEN is not set');
+    return { success: false, error: 'NEXTSMS_TOKEN is not set' };
   }
 
   const toArray = Array.isArray(to) ? to : [to];
@@ -56,13 +56,14 @@ export async function sendWhatsAppTemplate({
     body.header = header;
   }
 
-  // ─── IMPORTANT: Button must be included if template requires it ──────
   if (button) {
     body.button = button;
   }
 
-  console.log('[WhatsApp] Sending template:', template);
+  console.log('[WhatsApp] ====== SENDING MESSAGE ======');
+  console.log('[WhatsApp] Template:', template);
   console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
+  console.log('[WhatsApp] To:', cleanTo);
   console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
 
   try {
@@ -83,41 +84,25 @@ export async function sendWhatsAppTemplate({
 
     if (!response.ok) {
       let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      
-      if (response.status === 400) {
-        console.error('[WhatsApp] ❌ Bad Request - Check template name and variables');
-        console.error('[WhatsApp] Template:', template);
-        console.error('[WhatsApp] Variables:', JSON.stringify(personalisation, null, 2));
-        console.error('[WhatsApp] Button:', JSON.stringify(button, null, 2));
-        
-        if (data.errors) {
-          console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-          errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
-        }
-      } else if (response.status === 401) {
-        console.error('[WhatsApp] ❌ Authentication failed - Check NEXTSMS_TOKEN');
-        errorMsg = 'Authentication failed. Please check your API token.';
-      } else if (response.status === 429) {
-        console.error('[WhatsApp] ❌ Rate limit exceeded - Too many messages');
-        errorMsg = 'Rate limit exceeded. Please wait and try again.';
-      } else if (response.status === 403) {
-        console.error('[WhatsApp] ❌ Forbidden - Template might not be approved');
-        errorMsg = 'Template not approved or account restricted.';
+      if (data.errors) {
+        console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
+        errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
       }
-      
-      throw new Error(errorMsg);
+      return { success: false, error: errorMsg, data };
     }
 
+    console.log('[WhatsApp] ✅ Message accepted by NexSMS');
+    
     const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
 
     return { success: true, messageId: String(messageId), data };
   } catch (error: any) {
-    console.error('[WhatsApp] Error sending template:', error.message);
+    console.error('[WhatsApp] ❌ Error sending template:', error.message);
     return { success: false, error: error.message || 'Unknown error' };
   }
 }
 
-// ─── Wedding Invitation Template ──────────────────────────────────────
+// ─── Wedding Invitation (Using Your New Template) ──────────────────────
 
 export async function sendWeddingInvitation(
   phone: string,
@@ -135,18 +120,18 @@ export async function sendWeddingInvitation(
     inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] Sending wedding invitation to:', phone);
+  console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
 
-  // ─── Header with image ────────────────────────────────────────────────
-  const header = {
-    image: {
-      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
-      name: 'Wedding Invitation',
-    }
-  };
+  // ─── Header with image (optional - test without first) ──────────────
+  // ⚠️ Let's test WITHOUT header first to isolate issues
+  // const header = {
+  //   image: {
+  //     file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
+  //     name: 'Wedding Invitation',
+  //   }
+  // };
 
   // ─── Button with dynamic URL ──────────────────────────────────────────
-  // ⚠️ IMPORTANT: This template REQUIRES a button with URL parameter
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -157,30 +142,25 @@ export async function sendWeddingInvitation(
         },
       },
     };
-    console.log('[WhatsApp] Button created with slug:', slug);
-  } else {
-    console.warn('[WhatsApp] ⚠️ No inviteLink provided - button will be missing!');
   }
 
   // ─── Send template with proper variable mapping ──────────────────────
+  // ✅ Using your NEW template - only 6 variables!
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili invitation',
+    template: 'invitation_reminder', // ⚠️ Replace with actual template name from NexSMS
     personalisation: [
       {
-        "var1": data.guestName,
-        "var2": data.hostFamily,
-        "var3": data.person1,
-        "var4": data.person2,
-        "var5": data.date,
-        "var6": data.venue,
-        "var7": data.time,
-        "var8": data.cardNumber,
-        "var9": data.cardType,
+        "var1": data.guestName,           // Hello {var1} - Guest name
+        "var2": data.hostFamily,          // {var2}'s wedding - Host family
+        "var3": data.date,                // {var3} - Date
+        "var4": data.venue,               // {var4} - Venue
+        "var5": data.time,                // {var5} - Time
+        "var6": data.cardNumber,          // {var6} - Card number
       }
     ],
-    header,
-    button, // ✅ This must be included
+    // header, // ⚠️ Remove header for now - test without it
+    button,
   });
 }
 

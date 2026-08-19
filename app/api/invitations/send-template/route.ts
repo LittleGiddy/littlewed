@@ -46,21 +46,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Ensure the card image exists ────────────────────────────────────
-    let cardImageUrl = guest.invitationCard;
-
-    if (!cardImageUrl) {
-      try {
-        cardImageUrl = await generateAndStoreCardImage(guest.id);
-      } catch (error) {
-        console.error('Failed to generate card image, using fallback:', error);
-        cardImageUrl = getCardImageUrl(guest.passCode);
-      }
-    }
-
-    if (!cardImageUrl) {
-      cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
-    }
+    // ─── Get card image URL (optional - for testing without header) ─────
+    const cardImageUrl = guest.invitationCard || getCardImageUrl(guest.passCode);
 
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
@@ -77,7 +64,6 @@ export async function POST(req: NextRequest) {
 
     // ─── Log what we're sending ──────────────────────────────────────────
     console.log('[SendTemplate] ====== SENDING TO GUEST ======');
-    console.log('[SendTemplate] Guest ID:', guest.id);
     console.log('[SendTemplate] Guest Name:', guestFullName);
     console.log('[SendTemplate] Phone:', guest.phone);
     console.log('[SendTemplate] Pass Code:', guest.passCode);
@@ -108,7 +94,7 @@ export async function POST(req: NextRequest) {
             messageId: result.messageId,
             guestId: guest.id,
             type: 'WHATSAPP',
-            template: 'swahiliinvitation',
+            template: 'YOUR_TEMPLATE_NAME_HERE', // ⚠️ Match the template name
             status: 'SENT',
             rawData: result.data || {},
           },
@@ -125,7 +111,6 @@ export async function POST(req: NextRequest) {
         message: 'Invitation sent successfully!',
         data: result.data,
         messageId: result.messageId,
-        cardImageUrl,
       });
     } else {
       console.error('[SendTemplate] Failed to send to', guest.phone, result.error);
@@ -136,7 +121,7 @@ export async function POST(req: NextRequest) {
             messageId: result.messageId,
             guestId: guest.id,
             type: 'WHATSAPP',
-            template: 'swahiliinvitation',
+            template: 'YOUR_TEMPLATE_NAME_HERE',
             status: 'FAILED',
             error: result.error || 'Unknown error',
             rawData: result.data || {},
