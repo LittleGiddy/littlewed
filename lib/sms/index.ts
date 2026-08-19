@@ -39,48 +39,33 @@ export async function sendSMS({
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
   // ─── Build the correct API URL ──────────────────────────────────────
-  const fullUrl = `${SMS_API_URL}/api/sms/v2/text/single`;
+  // ✅ Using the /multi endpoint (which also works for single messages)
+  const fullUrl = `${SMS_API_URL}/api/sms/v2/text/multi`;
   
   console.log('[SMS] Sending to:', cleanTo);
   console.log('[SMS] URL:', fullUrl);
   console.log('[SMS] Sender:', SMS_SENDER_ID);
-  console.log('[SMS] API Key:', SMS_API_KEY ? 'Set (hidden)' : 'Missing');
 
   try {
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // ⚠️ IMPORTANT: Don't include Accept header - it was working without it
+        'Accept': 'application/json',
         'Authorization': `Bearer ${SMS_API_KEY}`,
       },
       body: JSON.stringify({
-        from: SMS_SENDER_ID,
-        to: cleanTo,
-        text: message,
+        messages: [
+          {
+            from: SMS_SENDER_ID,
+            to: cleanTo,
+            text: message,
+          }
+        ],
+        // Optional: Add reference for tracking
+        reference: `invitation_${Date.now()}`,
       }),
     });
-
-    // ─── Check if response is JSON ──────────────────────────────────────
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('[SMS] ❌ Non-JSON response:', text.substring(0, 200));
-      
-      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-        return {
-          success: false,
-          error: `SMS API returned HTML. Check your API key and sender ID.`,
-          data: { htmlResponse: text.substring(0, 500) },
-        };
-      }
-      
-      return {
-        success: false,
-        error: `SMS API returned non-JSON response: ${text.substring(0, 100)}`,
-        data: { text },
-      };
-    }
 
     const data = await response.json();
 
@@ -108,7 +93,11 @@ export async function sendSMS({
       };
     }
 
-    const messageId = data.messageId || data.id || data.message_id || `sms_${Date.now()}`;
+    // Get messageId from the response
+    const messageId = data.messages?.[0]?.messageId || 
+                      data.messageId || 
+                      data.id || 
+                      `sms_${Date.now()}`;
 
     return { 
       success: true, 
