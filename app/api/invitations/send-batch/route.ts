@@ -13,17 +13,52 @@ const MESSAGE_DELAY = 500;
 
 export async function POST(req: NextRequest) {
   try {
+    // ─── Parse JSON body ──────────────────────────────────────────────
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error('[Batch] Failed to parse JSON:', parseError);
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
+
+    const { 
+      eventId, 
+      guestIds, 
+      smsVariables, 
+      whatsappVariables, 
+      message, 
+      retry 
+    } = body;
+
+    // ─── Validate required fields ──────────────────────────────────────
+    if (!eventId) {
+      return NextResponse.json(
+        { error: 'Event ID is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Guest IDs are required' },
+        { status: 400 }
+      );
+    }
+
+    // ─── Check authentication ──────────────────────────────────────────
     const session = await getServerSession(authOptions);
     if (!session || (session.user as any).role !== 'CLIENT') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { eventId, guestIds, message, retry } = await req.json();
-
-    if (!eventId || !guestIds || !Array.isArray(guestIds)) {
-      return NextResponse.json({ error: 'Event ID and guest IDs are required' }, { status: 400 });
-    }
 
     // ─── Fetch guests with events ──────────────────────────────────────
     const guests = await prisma.guest.findMany({
@@ -35,7 +70,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (guests.length === 0) {
-      return NextResponse.json({ error: 'No guests found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'No guests found' },
+        { status: 404 }
+      );
     }
 
     const results = [];
@@ -78,16 +116,13 @@ export async function POST(req: NextRequest) {
 
           if (!cardImageUrl) {
             try {
-              // Try to generate and store the image
               cardImageUrl = await generateAndStoreCardImage(guest.id);
             } catch (error) {
               console.error(`[Batch] Failed to generate card image for ${guest.name}:`, error);
-              // Fallback: Use the dynamic OG URL
               cardImageUrl = getCardImageUrl(guest.passCode);
             }
           }
 
-          // ─── If still no image, use a default ──────────────────────────
           if (!cardImageUrl) {
             cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
           }
@@ -100,38 +135,41 @@ export async function POST(req: NextRequest) {
           // ─── Send via appropriate channel ──────────────────────────
           if (guest.routingChannel === 'whatsapp') {
             console.log(`[Batch] Sending WhatsApp to ${guest.name} (${guest.phone})`);
-            
+
+            const vars = whatsappVariables || {};
+
             result = await sendWeddingInvitation(guest.phone!, {
-              guestName: guestFullName,
-              hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
-              person1: guest.event?.person1 || 'Agape',
-              person2: guest.event?.person2 || 'Gladness',
-              date: formattedDate,
-              venue: guest.event?.venue || 'The Embassy Hall',
-              time: guest.event?.time || '5:00 PM',
-              cardNumber: guest.cardNumber || '108',
-              cardType: guest.guestType || 'SINGLE',
+              guestName: vars.guestName || guestFullName,
+              hostFamily: vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
+              person1: vars.person1 || guest.event?.person1 || 'Agape',
+              person2: vars.person2 || guest.event?.person2 || 'Gladness',
+              date: vars.date || formattedDate,
+              venue: vars.venue || guest.event?.venue || 'The Embassy Hall',
+              time: vars.time || guest.event?.time || '5:00 PM',
+              cardNumber: vars.cardNumber || guest.cardNumber || '108',
+              cardType: vars.cardType || guest.guestType || 'SINGLE',
               imageUrl: cardImageUrl,
-              inviteLink: inviteLink, // ✅ Required for the button
+              inviteLink: inviteLink,
             });
           } else {
             // SMS
             console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
-            
-            let smsMessage = message || `Habari ${guestFullName},
 
-Familia ya ${guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${guest.event?.person1 || 'Agape'} na ${guest.event?.person2 || 'Gladness'} tarehe ${formattedDate}.
+            const vars = smsVariables || {};
 
-Venue: ${guest.event?.venue || 'The Embassy Hall'}, saa ${guest.event?.time || '5:00 PM'}.
+            let smsMessage = `Habari ${vars.guestName || guestFullName},
 
-Card No: ${guest.cardNumber || '108'} • ${guest.guestType || 'SINGLE'}
+Familia ya ${vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${vars.person1 || guest.event?.person1 || 'Agape'} na ${vars.person2 || guest.event?.person2 || 'Gladness'} tarehe ${vars.date || formattedDate}.
+
+Venue: ${vars.venue || guest.event?.venue || 'The Embassy Hall'}, saa ${vars.time || guest.event?.time || '5:00 PM'}.
+
+Card No: ${vars.cardNumber || guest.cardNumber || '108'} • ${vars.cardType || guest.guestType || 'SINGLE'}
 
 Tafadhali onyesha kadi hii wakati wa kuingia.
 Karibu na ufurahie sherehe!
 
 Ahsante.`;
 
-            // ─── If custom message provided, use it ──────────────────────
             if (message) {
               smsMessage = message
                 .replace(/{title}/g, guest.title || '')
@@ -168,7 +206,7 @@ Ahsante.`;
                   messageId: result.messageId,
                   guestId: guest.id,
                   type: guest.routingChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
-                  template: guest.routingChannel === 'whatsapp' ? 'swahiliinvitation' : 'custom',
+                  template: guest.routingChannel === 'whatsapp' ? 'swahili invitation' : 'custom',
                   status: 'SENT',
                   rawData: result.data || {},
                 },
@@ -219,9 +257,13 @@ Ahsante.`;
     });
 
   } catch (error: any) {
-    console.error('Batch send error:', error);
+    console.error('[Batch] Unhandled error:', error);
+    // ─── Always return JSON, never HTML ──────────────────────────────
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { 
+        error: error.message || 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
