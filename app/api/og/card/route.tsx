@@ -1,8 +1,8 @@
 // app/api/og/card/route.tsx
+import { ImageResponse } from '@vercel/og';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
-import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +16,12 @@ export async function GET(req: NextRequest) {
       return new Response('Missing code parameter', { status: 400 });
     }
 
+    // ─── Fetch guest with event and design settings ──────────────────────
     const guest = await prisma.guest.findUnique({
       where: { passCode: code },
-      include: { event: true },
+      include: { 
+        event: true,
+      },
     });
 
     if (!guest) {
@@ -33,7 +36,7 @@ export async function GET(req: NextRequest) {
       year: 'numeric',
     });
 
-    // ─── Generate QR code ──────────────────────────────────────────────────
+    // ─── Generate QR code for check-in ──────────────────────────────────
     const qrData = JSON.stringify({
       guestId: guest.id,
       eventId: event.id,
@@ -44,120 +47,161 @@ export async function GET(req: NextRequest) {
       width: 200,
       errorCorrectionLevel: 'H',
     });
+    const qrBase64 = qrBuffer.toString('base64');
 
-    // ─── Create the card image using Sharp ──────────────────────────────
-    const width = mode === 'qr-only' ? 400 : 800;
-    const height = mode === 'qr-only' ? 400 : 1200;
-    const qrSize = mode === 'qr-only' ? 300 : 120;
-
-    // ─── Build SVG for the card ──────────────────────────────────────────
+    // ─── Get design settings from event ──────────────────────────────────
+    // ✅ These are the settings saved from the Invitation Designer
+    const templateUrl = event.templateCardUrl;
     const overlayColor = event.overlayColor || '#000000';
     const overlayOpacity = event.overlayOpacity || 0.2;
+    const designLayers = event.designLayers as any[] || [];
 
-    let svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-        <defs>
-          <style>
-            .title { font-family: 'Georgia', serif; font-weight: bold; fill: #ffffff; text-anchor: middle; }
-            .subtitle { font-family: 'Georgia', serif; fill: #ffffff; text-anchor: middle; }
-            .text { font-family: 'Arial', sans-serif; fill: #ffffff; text-anchor: middle; }
-          </style>
-        </defs>
-        <!-- Background -->
-        <rect width="${width}" height="${height}" fill="#0D4F4F"/>
-    `;
+    // ─── Render the invitation card ────────────────────────────────────
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#ffffff',
+            padding: '40px',
+          }}
+        >
+          {/* Template Background */}
+          {templateUrl && (
+            <img
+              src={templateUrl}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          )}
 
-    // ─── Add template image if available ──────────────────────────────────
-    if (event.templateCardUrl) {
-      svg += `<image href="${event.templateCardUrl}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>`;
-    }
+          {/* Overlay */}
+          {overlayOpacity > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: overlayColor,
+                opacity: overlayOpacity,
+              }}
+            />
+          )}
 
-    // ─── Add overlay ──────────────────────────────────────────────────────
-    if (overlayOpacity > 0) {
-      svg += `<rect width="${width}" height="${height}" fill="${overlayColor}" opacity="${overlayOpacity}"/>`;
-    }
+          {/* ─── Design Layers ─── */}
+          {designLayers.map((layer: any, index: number) => {
+            if (!layer.visible) return null;
+            
+            const x = (layer.x / 100) * 800;
+            const y = (layer.y / 100) * 1200;
 
-    // ─── Add content ──────────────────────────────────────────────────────
-    if (mode !== 'qr-only') {
-      svg += `
-        <!-- Title -->
-        <text x="${width/2}" y="${height * 0.15}" class="title" font-size="48" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          You're Invited!
-        </text>
+            if (layer.type === 'text') {
+              let text = layer.text;
+              
+              // ─── Replace placeholders with actual guest data ────────────
+              if (layer.isGuestName) {
+                text = guestName;
+              } else if (layer.isGuestType) {
+                text = guest.title || guest.guestType || '';
+              } else if (layer.isCardNumber) {
+                text = guest.cardNumber || '';
+              } else {
+                text = text
+                  .replace(/{guestName}/g, guestName)
+                  .replace(/{guestTitle}/g, guest.title || '')
+                  .replace(/{cardNumber}/g, guest.cardNumber || '')
+                  .replace(/{eventName}/g, event.name || '')
+                  .replace(/{eventDate}/g, eventDate)
+                  .replace(/{venue}/g, event.venue || '');
+              }
 
-        <!-- Guest Name -->
-        <text x="${width/2}" y="${height * 0.28}" class="subtitle" font-size="28" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          ${guestName}
-        </text>
+              const fontSize = layer.fontSize || 24;
+              const fontFamily = layer.fontFamily || 'Playfair Display';
+              const color = layer.color || '#ffffff';
+              
+              return (
+                <div
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    left: x,
+                    top: y,
+                    transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
+                    fontSize: fontSize,
+                    fontFamily: fontFamily,
+                    color: color,
+                    textAlign: layer.align || 'center',
+                    fontWeight: 'bold',
+                    width: '80%',
+                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  {text}
+                </div>
+              );
+            }
 
-        <!-- Event Name -->
-        <text x="${width/2}" y="${height * 0.38}" class="text" font-size="20" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          ${event.name}
-        </text>
+            if (layer.type === 'rect') {
+              const width = (layer.width / 100) * 800;
+              const height = (layer.height / 100) * 1200;
+              
+              return (
+                <div
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    left: x - width/2,
+                    top: y - height/2,
+                    width: width,
+                    height: height,
+                    backgroundColor: layer.fill || 'rgba(255,255,255,0.2)',
+                    border: `${layer.borderWidth || 0}px solid ${layer.borderColor || 'transparent'}`,
+                    borderRadius: '4px',
+                    transform: `rotate(${layer.rotation || 0}deg)`,
+                  }}
+                />
+              );
+            }
 
-        <!-- Date -->
-        <text x="${width/2}" y="${height * 0.46}" class="text" font-size="16" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          ${eventDate}
-        </text>
+            return null;
+          })}
 
-        <!-- Venue -->
-        <text x="${width/2}" y="${height * 0.54}" class="text" font-size="16" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          ${event.venue}
-        </text>
-
-        <!-- Card Info -->
-        <text x="${width/2}" y="${height * 0.62}" class="text" font-size="14" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
-          Card No: ${guest.cardNumber} • ${guest.guestType || 'SINGLE'}
-        </text>
-      `;
-    }
-
-    // ─── Add QR code ──────────────────────────────────────────────────────
-    const qrBase64 = qrBuffer.toString('base64');
-    svg += `
-        <!-- QR Code -->
-        <image href="data:image/png;base64,${qrBase64}" 
-               x="${(width - qrSize) / 2}" 
-               y="${mode === 'qr-only' ? 50 : height * 0.7}" 
-               width="${qrSize}" 
-               height="${qrSize}"/>
-    `;
-
-    if (mode === 'qr-only') {
-      svg += `
-        <text x="${width/2}" y="${height - 40}" class="text" font-size="18" fill="#333333" font-weight="bold">
-          Show this QR code at the entrance
-        </text>
-        <text x="${width/2}" y="${height - 15}" class="text" font-size="12" fill="#999999">
-          ${guestName} • ${guest.cardNumber}
-        </text>
-      `;
-    } else {
-      svg += `
-        <text x="${width/2}" y="${height * 0.85}" class="text" font-size="12" fill="rgba(255,255,255,0.8)">
-          Scan to check in
-        </text>
-      `;
-    }
-
-    svg += `</svg>`;
-
-    // ─── Convert SVG to PNG using Sharp ──────────────────────────────────
-    const pngBuffer = await sharp(Buffer.from(svg))
-      .png()
-      .toBuffer();
-
-    // ─── Return the PNG image using Response with Uint8Array ────────────
-    // Convert Buffer to Uint8Array to avoid type issues
-    const uint8Array = new Uint8Array(pngBuffer);
-
-    return new Response(uint8Array, {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-      },
-    });
-
+          {/* ─── QR Code ─── */}
+          <img
+            src={`data:image/png;base64,${qrBase64}`}
+            style={{
+              position: 'absolute',
+              left: `${event.qrPlacementX || 50}%`,
+              top: `${event.qrPlacementY || 70}%`,
+              transform: `translate(-50%, -50%) rotate(${event.qrRotation || 0}deg)`,
+              width: Math.min(event.qrSize || 120, 200),
+              height: Math.min(event.qrSize || 120, 200),
+            }}
+          />
+        </div>
+      ),
+      {
+        width: 800,
+        height: 1200,
+        headers: {
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('OG Card generation error:', error);
     return new Response('Error generating card: ' + error.message, { status: 500 });
