@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
-import { generateAndStoreCardImage } from '@/lib/image-storage';
+import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,13 +44,16 @@ export async function POST(req: NextRequest) {
 
     if (!cardImageUrl && guest.passCode) {
       try {
+        // Try to generate and store the image
         cardImageUrl = await generateAndStoreCardImage(guest.id);
       } catch (error) {
-        console.error('Failed to generate card image:', error);
-        cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
+        console.error('Failed to generate card image, using fallback:', error);
+        // Fallback: Use the dynamic OG URL (may not work with all providers)
+        cardImageUrl = getCardImageUrl(guest.passCode);
       }
     }
 
+    // ─── If still no image, use a default ────────────────────────────────
     if (!cardImageUrl) {
       cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
     }
@@ -70,6 +73,12 @@ export async function POST(req: NextRequest) {
       ? `https://littlewed.co.tz/invite/${guest.passCode}`
       : `https://littlewed.co.tz/invite/${guest.id}`;
 
+    console.log('[SendTemplate] Sending with:', {
+      imageUrl: cardImageUrl,
+      inviteLink,
+      guestName: guestFullName,
+    });
+
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
@@ -81,8 +90,8 @@ export async function POST(req: NextRequest) {
       time: guest.event?.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
-      imageUrl: cardImageUrl, // ✅ Static PNG URL from Blob
-      inviteLink: inviteLink, // ✅ Required for the button
+      imageUrl: cardImageUrl,
+      inviteLink: inviteLink,
     });
 
     if (result.success) {

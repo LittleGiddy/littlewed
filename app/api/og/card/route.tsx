@@ -1,11 +1,10 @@
 // app/api/og/card/route.tsx
-import { ImageResponse } from '@vercel/og';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
+import sharp from 'sharp';
 
-// This runs as a serverless function (not edge) for size limit
-// export const runtime = 'edge'; // ❌ DO NOT USE
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
@@ -45,186 +44,116 @@ export async function GET(req: NextRequest) {
       width: 200,
       errorCorrectionLevel: 'H',
     });
-    const qrBase64 = qrBuffer.toString('base64');
 
+    // ─── Create the card image using Sharp ──────────────────────────────
+    const width = mode === 'qr-only' ? 400 : 800;
+    const height = mode === 'qr-only' ? 400 : 1200;
+    const qrSize = mode === 'qr-only' ? 300 : 120;
+
+    // ─── Build SVG for the card ──────────────────────────────────────────
     const overlayColor = event.overlayColor || '#000000';
     const overlayOpacity = event.overlayOpacity || 0.2;
 
-    // ─── Render the invitation card ────────────────────────────────────
-    return new ImageResponse(
-      (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#ffffff',
-            padding: '40px',
-          }}
-        >
-          {event.templateCardUrl && (
-            <img
-              src={event.templateCardUrl}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          )}
+    let svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+        <defs>
+          <style>
+            .title { font-family: 'Georgia', serif; font-weight: bold; fill: #ffffff; text-anchor: middle; }
+            .subtitle { font-family: 'Georgia', serif; fill: #ffffff; text-anchor: middle; }
+            .text { font-family: 'Arial', sans-serif; fill: #ffffff; text-anchor: middle; }
+          </style>
+        </defs>
+        <!-- Background -->
+        <rect width="${width}" height="${height}" fill="#0D4F4F"/>
+    `;
 
-          {overlayOpacity > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                backgroundColor: overlayColor,
-                opacity: overlayOpacity,
-              }}
-            />
-          )}
+    // ─── Add template image if available ──────────────────────────────────
+    if (event.templateCardUrl) {
+      svg += `<image href="${event.templateCardUrl}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>`;
+    }
 
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 10,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100%',
-              height: '100%',
-              padding: '60px',
-              color: '#ffffff',
-              textAlign: 'center',
-            }}
-          >
-            {mode !== 'qr-only' && (
-              <>
-                <h1
-                  style={{
-                    fontSize: 48,
-                    fontWeight: 'bold',
-                    marginBottom: 20,
-                    fontFamily: 'Playfair Display, serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  You're Invited!
-                </h1>
-                
-                <p
-                  style={{
-                    fontSize: 28,
-                    marginBottom: 10,
-                    fontFamily: 'Playfair Display, serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  {guestName}
-                </p>
+    // ─── Add overlay ──────────────────────────────────────────────────────
+    if (overlayOpacity > 0) {
+      svg += `<rect width="${width}" height="${height}" fill="${overlayColor}" opacity="${overlayOpacity}"/>`;
+    }
 
-                <p
-                  style={{
-                    fontSize: 20,
-                    marginBottom: 5,
-                    fontFamily: 'DM Sans, sans-serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  {event.name}
-                </p>
+    // ─── Add content ──────────────────────────────────────────────────────
+    if (mode !== 'qr-only') {
+      svg += `
+        <!-- Title -->
+        <text x="${width/2}" y="${height * 0.15}" class="title" font-size="48" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          You're Invited!
+        </text>
 
-                <p
-                  style={{
-                    fontSize: 16,
-                    marginBottom: 5,
-                    fontFamily: 'DM Sans, sans-serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  {eventDate}
-                </p>
+        <!-- Guest Name -->
+        <text x="${width/2}" y="${height * 0.28}" class="subtitle" font-size="28" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          ${guestName}
+        </text>
 
-                <p
-                  style={{
-                    fontSize: 16,
-                    marginBottom: 5,
-                    fontFamily: 'DM Sans, sans-serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  {event.venue}
-                </p>
+        <!-- Event Name -->
+        <text x="${width/2}" y="${height * 0.38}" class="text" font-size="20" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          ${event.name}
+        </text>
 
-                <p
-                  style={{
-                    fontSize: 14,
-                    marginBottom: 20,
-                    fontFamily: 'DM Sans, sans-serif',
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  Card No: {guest.cardNumber} • {guest.guestType || 'SINGLE'}
-                </p>
-              </>
-            )}
+        <!-- Date -->
+        <text x="${width/2}" y="${height * 0.46}" class="text" font-size="16" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          ${eventDate}
+        </text>
 
-            <img
-              src={`data:image/png;base64,${qrBase64}`}
-              style={{
-                width: mode === 'qr-only' ? 300 : 120,
-                height: mode === 'qr-only' ? 300 : 120,
-                marginTop: 20,
-              }}
-            />
+        <!-- Venue -->
+        <text x="${width/2}" y="${height * 0.54}" class="text" font-size="16" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          ${event.venue}
+        </text>
 
-            {mode !== 'qr-only' && (
-              <p
-                style={{
-                  fontSize: 12,
-                  marginTop: 10,
-                  fontFamily: 'DM Sans, sans-serif',
-                  opacity: 0.8,
-                }}
-              >
-                Scan to check in
-              </p>
-            )}
+        <!-- Card Info -->
+        <text x="${width/2}" y="${height * 0.62}" class="text" font-size="14" filter="drop-shadow(2px 2px 4px rgba(0,0,0,0.3))">
+          Card No: ${guest.cardNumber} • ${guest.guestType || 'SINGLE'}
+        </text>
+      `;
+    }
 
-            {mode === 'qr-only' && (
-              <p
-                style={{
-                  fontSize: 18,
-                  marginTop: 20,
-                  fontFamily: 'DM Sans, sans-serif',
-                  opacity: 0.9,
-                }}
-              >
-                Show this QR code at the entrance
-              </p>
-            )}
-          </div>
-        </div>
-      ),
-      {
-        width: mode === 'qr-only' ? 400 : 800,
-        height: mode === 'qr-only' ? 400 : 1200,
-        headers: {
-          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
-        },
-      }
-    );
+    // ─── Add QR code ──────────────────────────────────────────────────────
+    const qrBase64 = qrBuffer.toString('base64');
+    svg += `
+        <!-- QR Code -->
+        <image href="data:image/png;base64,${qrBase64}" 
+               x="${(width - qrSize) / 2}" 
+               y="${mode === 'qr-only' ? 50 : height * 0.7}" 
+               width="${qrSize}" 
+               height="${qrSize}"/>
+    `;
+
+    if (mode === 'qr-only') {
+      svg += `
+        <text x="${width/2}" y="${height - 40}" class="text" font-size="18" fill="#333333" font-weight="bold">
+          Show this QR code at the entrance
+        </text>
+        <text x="${width/2}" y="${height - 15}" class="text" font-size="12" fill="#999999">
+          ${guestName} • ${guest.cardNumber}
+        </text>
+      `;
+    } else {
+      svg += `
+        <text x="${width/2}" y="${height * 0.85}" class="text" font-size="12" fill="rgba(255,255,255,0.8)">
+          Scan to check in
+        </text>
+      `;
+    }
+
+    svg += `</svg>`;
+
+    // ─── Convert SVG to PNG using Sharp ──────────────────────────────────
+    const pngBuffer = await sharp(Buffer.from(svg))
+      .png()
+      .toBuffer();
+
+    return new NextResponse(pngBuffer, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+      },
+    });
+
   } catch (error: any) {
     console.error('OG Card generation error:', error);
     return new Response('Error generating card: ' + error.message, { status: 500 });

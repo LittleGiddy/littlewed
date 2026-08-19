@@ -25,6 +25,9 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
     // ─── Generate the image using OG API ────────────────────────────────
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
     const ogUrl = `${baseUrl}/api/og/card?code=${guest.passCode}`;
+    
+    console.log('[ImageStorage] Generating image from:', ogUrl);
+    
     const response = await fetch(ogUrl);
     
     if (!response.ok) {
@@ -44,6 +47,8 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
       }
     );
 
+    console.log('[ImageStorage] Uploaded to:', blob.url);
+
     // ─── Update guest with the static image URL ──────────────────────────
     await prisma.guest.update({
       where: { id: guest.id },
@@ -55,4 +60,12 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
     console.error('Failed to generate and store card image:', error);
     throw error;
   }
+}
+
+/**
+ * Generate a card image URL without storing (returns OG URL)
+ */
+export function getCardImageUrl(passCode: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
+  return `${baseUrl}/api/og/card?code=${passCode}`;
 }
