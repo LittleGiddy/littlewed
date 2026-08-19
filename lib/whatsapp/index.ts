@@ -144,7 +144,9 @@ export async function sendWeddingInvitation(
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
+  console.log('[WhatsApp] Template: swahili_invitation');
 
+  // ─── Header with image ────────────────────────────────────────────────
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -152,6 +154,7 @@ export async function sendWeddingInvitation(
     }
   };
 
+  // ─── Button with dynamic URL ──────────────────────────────────────────
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -164,23 +167,23 @@ export async function sendWeddingInvitation(
     };
   }
 
-  // ⚠️ REPLACE WITH YOUR EXACT TEMPLATE NAME FROM NEXSMS
-  const TEMPLATE_NAME = 'Mwalikotemp';
-
+  // ─── Send template with proper variable mapping ──────────────────────
+  // IMPORTANT: Match the exact case from your template:
+  // var1, var2, var3, var4, var5, var6, var7, Var8 (capital V), var9
   return sendWhatsAppTemplate({
     to: phone,
-    template: TEMPLATE_NAME,
+    template: 'swahili_invitation', // ⚠️ Replace with your exact template name
     personalisation: [
       {
-        "var1": data.guestName,      // ✅ lowercase var1
-        "var2": data.hostFamily,     // ✅ lowercase var2
-        "var3": data.person1,        // ✅ lowercase var3
-        "var4": data.person2,        // ✅ lowercase var4
-        "var5": data.date,           // ✅ lowercase var5
-        "var6": data.venue,          // ✅ lowercase var6
-        "var7": data.time,           // ✅ lowercase var7
-        "Var8": data.cardNumber,     // ✅ CAPITAL V - matches template!
-        "var9": data.cardType,       // ✅ CAPITAL V - matches template!
+        "var1": data.guestName,      // ✅ Habari {var1}
+        "var2": data.hostFamily,     // ✅ Familia ya {var2}
+        "var3": data.person1,        // ✅ {var3}
+        "var4": data.person2,        // ✅ {var4}
+        "var5": data.date,           // ✅ {var5}
+        "var6": data.venue,          // ✅ {var6}
+        "var7": data.time,           // ✅ {var7}
+        "Var8": data.cardNumber,     // ✅ {Var8} - CAPITAL V!
+        "var9": data.cardType,       // ✅ {var9}
       }
     ],
     header,

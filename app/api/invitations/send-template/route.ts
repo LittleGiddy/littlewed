@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
 
     if (!cardImageUrl) {
       try {
-        // ✅ Generate and store the card image
         cardImageUrl = await generateAndStoreCardImage(guest.id);
       } catch (error) {
         console.error('Failed to generate card image, using fallback:', error);
@@ -73,13 +72,15 @@ export async function POST(req: NextRequest) {
 
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Invite link for the button (if template has one) ──────────────
+    // ─── Invite link for the button ──────────────────────────────────────
     const inviteLink = `https://littlewed.co.tz/invite/${guest.passCode}`;
 
     console.log('[SendTemplate] ====== SENDING TO GUEST ======');
     console.log('[SendTemplate] Guest Name:', guestFullName);
     console.log('[SendTemplate] Phone:', guest.phone);
+    console.log('[SendTemplate] Pass Code:', guest.passCode);
     console.log('[SendTemplate] Card Image URL:', cardImageUrl);
+    console.log('[SendTemplate] Invite Link:', inviteLink);
 
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
@@ -92,9 +93,11 @@ export async function POST(req: NextRequest) {
       time: guest.event?.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
-      imageUrl: cardImageUrl, // ✅ This is the designed card image
+      imageUrl: cardImageUrl,
       inviteLink: inviteLink,
     });
+
+    console.log('[SendTemplate] Result:', JSON.stringify(result, null, 2));
 
     if (result.success) {
       if (result.messageId) {
