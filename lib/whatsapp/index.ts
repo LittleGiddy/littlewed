@@ -92,8 +92,6 @@ export async function sendWhatsAppTemplate({
         
         if (data.errors) {
           console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-          
-          // ─── Fix: Handle errors safely ──────────────────────────────
           if (Array.isArray(data.errors)) {
             errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
           } else if (typeof data.errors === 'object') {
@@ -166,23 +164,23 @@ export async function sendWeddingInvitation(
     };
   }
 
-  // ⚠️ IMPORTANT: Replace this with your EXACT template name from NexSMS
-  const TEMPLATE_NAME = 'Mwalikotemp'; // ← CHANGE THIS
+  // ⚠️ REPLACE WITH YOUR EXACT TEMPLATE NAME FROM NEXSMS
+  const TEMPLATE_NAME = 'YOUR_TEMPLATE_NAME_HERE';
 
   return sendWhatsAppTemplate({
     to: phone,
     template: TEMPLATE_NAME,
     personalisation: [
       {
-        "var1": data.guestName,
-        "var2": data.hostFamily,
-        "var3": data.person1,
-        "var4": data.person2,
-        "var5": data.date,
-        "var6": data.venue,
-        "var7": data.time,
-        "var8": data.cardNumber,
-        "var9": data.cardType,
+        "var1": data.guestName,      // ✅ lowercase var1
+        "var2": data.hostFamily,     // ✅ lowercase var2
+        "var3": data.person1,        // ✅ lowercase var3
+        "var4": data.person2,        // ✅ lowercase var4
+        "var5": data.date,           // ✅ lowercase var5
+        "var6": data.venue,          // ✅ lowercase var6
+        "var7": data.time,           // ✅ lowercase var7
+        "Var8": data.cardNumber,     // ✅ CAPITAL V - matches template!
+        "Var9": data.cardType,       // ✅ CAPITAL V - matches template!
       }
     ],
     header,
