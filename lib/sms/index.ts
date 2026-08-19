@@ -41,7 +41,7 @@ export async function sendSMS({
 
   try {
     // ─── Build the full URL with endpoint ──────────────────────────────
-    const fullUrl = `${SMS_API_URL}/api/sms/v1/send`;
+    const fullUrl = `${SMS_API_URL}/api/messages`;
     
     console.log('[SMS] Sending to:', cleanTo);
     console.log('[SMS] URL:', fullUrl);
