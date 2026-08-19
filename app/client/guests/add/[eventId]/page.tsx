@@ -3,10 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2, AlertCircle, Info, RotateCw } from 'lucide-react';
+import { 
+  ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2, 
+  AlertCircle, Info, RotateCw, Users, UserPlus 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
+const GUEST_TYPES = ['SINGLE', 'DOUBLE'];
 
 export default function AddGuestPage() {
   const { eventId } = useParams();
@@ -21,6 +25,7 @@ export default function AddGuestPage() {
     phone: '',
     cardNumber: '',
     email: '',
+    guestType: 'SINGLE',
   });
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
 
@@ -40,12 +45,11 @@ export default function AddGuestPage() {
       if (res.ok && data.cardNumber) {
         setForm(prev => ({ ...prev, cardNumber: data.cardNumber }));
       } else {
-        // Fallback: generate a random number
+        // Fallback: generate a random 5-digit number
         const rand = Math.floor(10000 + Math.random() * 90000).toString();
         setForm(prev => ({ ...prev, cardNumber: rand }));
       }
     } catch {
-      // Fallback: generate a random number
       const rand = Math.floor(10000 + Math.random() * 90000).toString();
       setForm(prev => ({ ...prev, cardNumber: rand }));
     } finally {
@@ -119,6 +123,7 @@ export default function AddGuestPage() {
           cardNumber: form.cardNumber.trim() || undefined,
           email: form.email.trim() || undefined,
           eventId,
+          guestType: form.guestType,
         }),
         credentials: 'include',
       });
@@ -126,7 +131,8 @@ export default function AddGuestPage() {
       const data = await res.json();
       if (res.ok) {
         const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
-        toast.success(`Guest "${form.title} ${form.name}" added (${channel})`, {
+        const guestTypeLabel = data.guestType === 'DOUBLE' ? 'Double' : 'Single';
+        toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
           icon: <UserCheck size={18} className="text-green-600" />,
         });
         router.push(`/client/events/${eventId}`);
@@ -253,6 +259,26 @@ export default function AddGuestPage() {
                 </p>
               )}
               <p className="text-xs text-gray-400 mt-1">Include country code with + (e.g., +255...)</p>
+            </div>
+
+            {/* ─── Guest Type ─── */}
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                <Users size={14} className="sm:text-base" />
+                Guest Type
+              </label>
+              <select
+                value={form.guestType}
+                onChange={e => setForm(prev => ({ ...prev, guestType: e.target.value }))}
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-white"
+              >
+                {GUEST_TYPES.map(type => (
+                  <option key={type} value={type}>
+                    {type === 'SINGLE' ? 'Single (1 person)' : 'Double (2 people)'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Select DOUBLE if this guest is bringing a plus-one</p>
             </div>
 
             {/* ─── Card Number ─── */}

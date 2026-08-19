@@ -149,7 +149,7 @@ export default function SendInvitationsPage() {
         venue: eventObj?.venue || '',
         time: eventObj?.time || '',
         cardNumber: '{Card Number}',
-        cardType: '{Card Type}',
+        cardType: 'SINGLE', 
       };
 
       setSmsVariables(defaultVars);

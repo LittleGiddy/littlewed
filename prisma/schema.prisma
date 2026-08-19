@@ -222,7 +222,7 @@ model Guest {
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
-  guestType  String?       // 'single', 'double', or any custom value
+  guestType  String?   @default("SINGLE") // ✅ Add default
   title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
   cardNumber     String?   @unique       // ✅ 5-digit numeric code (e.g., "00001", "23790")
   waId           String?   // WhatsApp ID from Meta

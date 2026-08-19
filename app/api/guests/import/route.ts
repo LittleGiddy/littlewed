@@ -39,9 +39,14 @@ async function getNextCardNumber(eventId: string): Promise<string> {
 
 // ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
 async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  // Since NexSMS doesn't have a direct check endpoint, assume WhatsApp is available
-  // This will use WhatsApp if available, SMS as fallback
   return { hasWhatsApp: true };
+}
+
+// ─── Helper: Validate guest type ──────────────────────────────────────────
+function validateGuestType(type: string | undefined): string {
+  if (!type) return 'SINGLE';
+  const upper = type.toUpperCase();
+  return ['SINGLE', 'DOUBLE'].includes(upper) ? upper : 'SINGLE';
 }
 
 export async function POST(req: NextRequest) {
@@ -166,24 +171,25 @@ export async function POST(req: NextRequest) {
       }
 
       // ─── Assign card number ──────────────────────────────────────────────
-      // Use provided card number or generate next available
       let cardNumber = g.cardNumber || null;
       if (!cardNumber) {
         cardNumber = currentNumber.toString().padStart(5, '0');
         currentNumber++;
       }
 
+      // ─── Validate guest type ──────────────────────────────────────────
+      const guestType = validateGuestType(g.guestType);
+
       guestsToInsert.push({
         name: g.name.trim(),
         phone: g.phone,
         title: g.title || '',
-        cardNumber: cardNumber, // ✅ 5-digit numeric
-        guestType: g.guestType || 'SINGLE',
+        cardNumber: cardNumber,
+        guestType: guestType, // ✅ SINGLE or DOUBLE
         email: null,
         eventId,
         routingChannel,
         qrToken: randomBytes(16).toString('hex'),
-        // ❌ smsCode removed
       });
     }
 

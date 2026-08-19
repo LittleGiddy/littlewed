@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { title, name, phone, cardNumber, email, eventId } = await req.json();
+    const { title, name, phone, cardNumber, email, eventId, guestType } = await req.json();
 
     if (!name || !phone || !eventId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -105,7 +105,12 @@ export async function POST(req: NextRequest) {
 
     const passCode = await generateUniquePassCode(prisma);
 
-    // ─── CREATE GUEST WITH SMS AS DEFAULT CHANNEL ──────────────────────
+    // ─── Validate guest type ──────────────────────────────────────────
+    const validGuestType = guestType && ['SINGLE', 'DOUBLE'].includes(guestType.toUpperCase()) 
+      ? guestType.toUpperCase() 
+      : 'SINGLE';
+
+    // ─── CREATE GUEST ──────────────────────────────────────────────────
     const guest = await prisma.guest.create({
       data: {
         title: title || 'Mr',
@@ -114,7 +119,8 @@ export async function POST(req: NextRequest) {
         cardNumber: finalCardNumber,
         email: email?.trim() || null,
         eventId,
-        routingChannel: 'sms', // ✅ ALWAYS SMS by default
+        routingChannel: 'sms',
+        guestType: validGuestType,
         passCode,
         qrToken: randomBytes(16).toString('hex'),
       },
@@ -129,7 +135,7 @@ export async function POST(req: NextRequest) {
       cardImageUrl,
       inviteLink,
       routingChannel: 'sms',
-      message: 'Guest added successfully. SMS is the default channel.',
+      message: `Guest added successfully. Card type: ${validGuestType}`,
     });
   } catch (error: any) {
     console.error('Add guest error:', error);
