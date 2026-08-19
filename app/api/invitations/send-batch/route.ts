@@ -19,13 +19,13 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { 
-      eventId, 
-      guestIds, 
-      smsVariables, 
-      whatsappVariables, 
-      message, 
-      retry 
+    const {
+      eventId,
+      guestIds,
+      smsVariables,
+      whatsappVariables,
+      message,
+      retry
     } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
 
     // ─── Fetch guests with events ──────────────────────────────────────
     const guests = await prisma.guest.findMany({
-      where: { 
-        id: { in: guestIds }, 
+      where: {
+        id: { in: guestIds },
         event: { tenantId },
       },
       include: { event: true },
@@ -60,10 +60,10 @@ export async function POST(req: NextRequest) {
           const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
           const formattedDate = guest.event?.date
             ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
             : '';
 
           // ─── Ensure guest has a pass code ──────────────────────────────
@@ -118,8 +118,9 @@ export async function POST(req: NextRequest) {
               cardNumber: vars.cardNumber || guest.cardNumber || '108',
               cardType: vars.cardType || guest.guestType || 'SINGLE',
               imageUrl: cardImageUrl,
-              inviteLink: inviteLink,
+              inviteLink: inviteLink, // Optional - only if template has button
             });
+
           } else {
             // ─── SMS - Same pattern as working reminders ──────────────
             console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
@@ -237,7 +238,7 @@ Ahsante.`;
   } catch (error: any) {
     console.error('[Batch] Unhandled error:', error);
     return NextResponse.json(
-      { 
+      {
         error: error.message || 'Internal server error',
         details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },

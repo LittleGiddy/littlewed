@@ -102,36 +102,36 @@ export async function sendWhatsAppTemplate({
   }
 }
 
-// ─── Wedding Invitation (Using Your New Template) ──────────────────────
+// ─── Wedding Invitation Template ──────────────────────────────────────
 
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-    guestName: string;
-    hostFamily: string;
-    person1: string;
-    person2: string;
-    date: string;
-    venue: string;
-    time: string;
-    cardNumber: string;
-    cardType: string;
-    imageUrl?: string;
-    inviteLink?: string;
+    guestName: string;      // var1: Guest name
+    hostFamily: string;     // var2: Host family
+    person1: string;        // var3: Person 1 (Groom)
+    person2: string;        // var4: Person 2 (Bride)
+    date: string;           // var5: Event date
+    venue: string;          // var6: Venue
+    time: string;           // var7: Time
+    cardNumber: string;     // var8: Card number
+    cardType: string;       // var9: Card type
+    imageUrl?: string;      // Header image
+    inviteLink?: string;    // Optional link for button
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
+  console.log('[WhatsApp] Template: New approved template with image header');
 
-  // ─── Header with image (optional - test without first) ──────────────
-  // ⚠️ Let's test WITHOUT header first to isolate issues
-  // const header = {
-  //   image: {
-  //     file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
-  //     name: 'Wedding Invitation',
-  //   }
-  // };
+  // ─── Header with image ────────────────────────────────────────────────
+  const header = {
+    image: {
+      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
+      name: 'Wedding Invitation',
+    }
+  };
 
-  // ─── Button with dynamic URL ──────────────────────────────────────────
+  // ─── Button with dynamic URL (optional) ──────────────────────────────
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -145,22 +145,24 @@ export async function sendWeddingInvitation(
   }
 
   // ─── Send template with proper variable mapping ──────────────────────
-  // ✅ Using your NEW template - only 6 variables!
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'invitation_reminder', // ⚠️ Replace with actual template name from NexSMS
+    template: 'swahili_invitation', // ✅ Your new approved template name
     personalisation: [
       {
-        "var1": data.guestName,           // Hello {var1} - Guest name
-        "var2": data.hostFamily,          // {var2}'s wedding - Host family
-        "var3": data.date,                // {var3} - Date
-        "var4": data.venue,               // {var4} - Venue
-        "var5": data.time,                // {var5} - Time
-        "var6": data.cardNumber,          // {var6} - Card number
+        "var1": data.guestName,      // Habari {var1}
+        "var2": data.hostFamily,     // Familia ya {var2}
+        "var3": data.person1,        // sherehe ya {var3}
+        "var4": data.person2,        // na {var4}
+        "var5": data.date,           // tarehe {var5}
+        "var6": data.venue,          // {var6}
+        "var7": data.time,           // saa {var7}
+        "var8": data.cardNumber,     // {var8}
+        "var9": data.cardType,       // {var9}
       }
     ],
-    // header, // ⚠️ Remove header for now - test without it
-    button,
+    header,   // ✅ Image header included
+    button,   // Optional button
   });
 }
 
