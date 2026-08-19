@@ -1,4 +1,4 @@
-// app/api/guests/[guestId]/channel/route.ts
+// app/api/guests/[id]/channel/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ guestId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -15,7 +15,7 @@ export async function PATCH(
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { guestId } = await params;
+    const { id } = await params;
     const { routingChannel } = await req.json();
 
     if (!routingChannel || !['sms', 'whatsapp'].includes(routingChannel)) {
@@ -26,7 +26,7 @@ export async function PATCH(
     }
 
     const guest = await prisma.guest.findFirst({
-      where: { id: guestId, event: { tenantId } },
+      where: { id, event: { tenantId } },
     });
 
     if (!guest) {
@@ -34,7 +34,7 @@ export async function PATCH(
     }
 
     await prisma.guest.update({
-      where: { id: guestId },
+      where: { id },
       data: { routingChannel },
     });
 
