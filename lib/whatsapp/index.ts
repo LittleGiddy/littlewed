@@ -84,10 +84,35 @@ export async function sendWhatsAppTemplate({
 
     if (!response.ok) {
       let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      if (data.errors) {
-        console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-        errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
+      
+      if (response.status === 400) {
+        console.error('[WhatsApp] ❌ Bad Request - Check template name and variables');
+        console.error('[WhatsApp] Template:', template);
+        console.error('[WhatsApp] Variables:', JSON.stringify(personalisation, null, 2));
+        
+        if (data.errors) {
+          console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
+          
+          // ─── Fix: Handle errors safely ──────────────────────────────
+          if (Array.isArray(data.errors)) {
+            errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
+          } else if (typeof data.errors === 'object') {
+            errorMsg = JSON.stringify(data.errors);
+          } else {
+            errorMsg = String(data.errors);
+          }
+        }
+      } else if (response.status === 401) {
+        console.error('[WhatsApp] ❌ Authentication failed - Check NEXTSMS_TOKEN');
+        errorMsg = 'Authentication failed. Please check your API token.';
+      } else if (response.status === 429) {
+        console.error('[WhatsApp] ❌ Rate limit exceeded - Too many messages');
+        errorMsg = 'Rate limit exceeded. Please wait and try again.';
+      } else if (response.status === 403) {
+        console.error('[WhatsApp] ❌ Forbidden - Template might not be approved');
+        errorMsg = 'Template not approved or account restricted.';
       }
+      
       return { success: false, error: errorMsg, data };
     }
 
@@ -107,23 +132,21 @@ export async function sendWhatsAppTemplate({
 export async function sendWeddingInvitation(
   phone: string,
   data: {
-    guestName: string;      // var1: Guest name
-    hostFamily: string;     // var2: Host family
-    person1: string;        // var3: Person 1 (Groom)
-    person2: string;        // var4: Person 2 (Bride)
-    date: string;           // var5: Event date
-    venue: string;          // var6: Venue
-    time: string;           // var7: Time
-    cardNumber: string;     // var8: Card number
-    cardType: string;       // var9: Card type
-    imageUrl?: string;      // Header image
-    inviteLink?: string;    // Optional link for button
+    guestName: string;
+    hostFamily: string;
+    person1: string;
+    person2: string;
+    date: string;
+    venue: string;
+    time: string;
+    cardNumber: string;
+    cardType: string;
+    imageUrl?: string;
+    inviteLink?: string;
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-  console.log('[WhatsApp] Template: New approved template with image header');
 
-  // ─── Header with image ────────────────────────────────────────────────
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -131,7 +154,6 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ─── Button with dynamic URL (optional) ──────────────────────────────
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -144,25 +166,27 @@ export async function sendWeddingInvitation(
     };
   }
 
-  // ─── Send template with proper variable mapping ──────────────────────
+  // ⚠️ IMPORTANT: Replace this with your EXACT template name from NexSMS
+  const TEMPLATE_NAME = 'Mwalikotemp'; // ← CHANGE THIS
+
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili_invitation', // ✅ Your new approved template name
+    template: TEMPLATE_NAME,
     personalisation: [
       {
-        "var1": data.guestName,      // Habari {var1}
-        "var2": data.hostFamily,     // Familia ya {var2}
-        "var3": data.person1,        // sherehe ya {var3}
-        "var4": data.person2,        // na {var4}
-        "var5": data.date,           // tarehe {var5}
-        "var6": data.venue,          // {var6}
-        "var7": data.time,           // saa {var7}
-        "var8": data.cardNumber,     // {var8}
-        "var9": data.cardType,       // {var9}
+        "var1": data.guestName,
+        "var2": data.hostFamily,
+        "var3": data.person1,
+        "var4": data.person2,
+        "var5": data.date,
+        "var6": data.venue,
+        "var7": data.time,
+        "var8": data.cardNumber,
+        "var9": data.cardType,
       }
     ],
-    header,   // ✅ Image header included
-    button,   // Optional button
+    header,
+    button,
   });
 }
 
