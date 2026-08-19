@@ -2,7 +2,7 @@
 
 const SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
 const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
-const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz/api/sms/v1/send';
+const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
 
 export interface SendSMSResult {
   success: boolean;
