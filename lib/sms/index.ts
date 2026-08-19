@@ -1,6 +1,6 @@
 // lib/sms/index.ts
 
-const SMS_API_KEY = process.env.NEXT_SMS_API_KEY; // ✅ Matches your env
+const SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
 const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
 const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
 
@@ -38,14 +38,15 @@ export async function sendSMS({
   // Clean phone number (remove + and non-numeric)
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
-  try {
-    // ─── Build the full URL with endpoint ──────────────────────────────
-    const fullUrl = `${SMS_API_URL}/api/sms/v2/text/single`;
-    
-    console.log('[SMS] Sending to:', cleanTo);
-    console.log('[SMS] URL:', fullUrl);
-    console.log('[SMS] Sender:', SMS_SENDER_ID);
+  // ─── Build the correct API URL ──────────────────────────────────────
+  // This is the URL that was working in the reminder system
+  const fullUrl = `${SMS_API_URL}/api/sms/v2/text/single`;
+  
+  console.log('[SMS] Sending to:', cleanTo);
+  console.log('[SMS] URL:', fullUrl);
+  console.log('[SMS] Sender:', SMS_SENDER_ID);
 
+  try {
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
@@ -53,9 +54,9 @@ export async function sendSMS({
         'Authorization': `Bearer ${SMS_API_KEY}`,
       },
       body: JSON.stringify({
-        to: cleanTo,
         from: SMS_SENDER_ID,
-        message: message,
+        to: cleanTo,
+        text: message,
       }),
     });
 
@@ -68,7 +69,7 @@ export async function sendSMS({
       if (text.includes('<!DOCTYPE') || text.includes('<html')) {
         return {
           success: false,
-          error: 'SMS API returned HTML error page. Please check the API URL and key.',
+          error: 'SMS API returned HTML error page. Please check API configuration.',
           data: { htmlResponse: text.substring(0, 500) },
         };
       }
