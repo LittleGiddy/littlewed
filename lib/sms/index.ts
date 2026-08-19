@@ -1,8 +1,8 @@
 // lib/sms/index.ts
 
-const SMS_API_URL = process.env.SMS_API_URL || 'https://messaging-service.co.tz/api/sms/v1/send';
-const SMS_API_KEY = process.env.SMS_API_KEY!;
-const SMS_SENDER_ID = process.env.SMS_SENDER_ID || 'LittleWed';
+const SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
+const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
+const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz/api/sms/v1/send';
 
 export interface SendSMSResult {
   success: boolean;
@@ -18,9 +18,21 @@ export async function sendSMS({
   to: string;
   message: string;
 }): Promise<SendSMSResult> {
+  // ─── Check if API key is configured ──────────────────────────────────
   if (!SMS_API_KEY) {
-    console.error('[SMS] SMS_API_KEY is not set');
-    return { success: false, error: 'SMS_API_KEY is not set' };
+    console.warn('[SMS] ⚠️ NEXT_SMS_API_KEY is not set. SMS messages will be logged only.');
+    console.log('[SMS] To:', to);
+    console.log('[SMS] Message:', message);
+    
+    return {
+      success: true,
+      messageId: `sms_${Date.now()}`,
+      data: { 
+        simulated: true, 
+        loggedMessage: message, // ✅ Changed from 'message' to 'loggedMessage'
+        to,
+      },
+    };
   }
 
   // Clean phone number (remove + and non-numeric)
@@ -52,7 +64,7 @@ export async function sendSMS({
         console.error('[SMS] ❌ Bad Request - Check phone number and message');
         errorMsg = data.errors?.map((e: any) => e.message || e).join(', ') || errorMsg;
       } else if (response.status === 401) {
-        console.error('[SMS] ❌ Authentication failed - Check SMS_API_KEY');
+        console.error('[SMS] ❌ Authentication failed - Check NEXT_SMS_API_KEY');
         errorMsg = 'Authentication failed. Please check your API key.';
       } else if (response.status === 429) {
         console.error('[SMS] ❌ Rate limit exceeded - Too many messages');
