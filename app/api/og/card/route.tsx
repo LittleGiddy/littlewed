@@ -4,9 +4,8 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 
-// ─── IMPORTANT: Remove the edge runtime line ──────────────────────────────
-// DO NOT use: export const runtime = 'edge';
-// This will run as a serverless function with 50MB limit
+// This runs as a serverless function (not edge) for size limit
+// export const runtime = 'edge'; // ❌ DO NOT USE
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +17,6 @@ export async function GET(req: NextRequest) {
       return new Response('Missing code parameter', { status: 400 });
     }
 
-    // ─── Fetch guest by pass code ──────────────────────────────────────
     const guest = await prisma.guest.findUnique({
       where: { passCode: code },
       include: { event: true },
@@ -36,7 +34,7 @@ export async function GET(req: NextRequest) {
       year: 'numeric',
     });
 
-    // ─── Generate QR code for check-in ──────────────────────────────────
+    // ─── Generate QR code ──────────────────────────────────────────────────
     const qrData = JSON.stringify({
       guestId: guest.id,
       eventId: event.id,
@@ -49,7 +47,6 @@ export async function GET(req: NextRequest) {
     });
     const qrBase64 = qrBuffer.toString('base64');
 
-    // ─── Get design settings ────────────────────────────────────────────
     const overlayColor = event.overlayColor || '#000000';
     const overlayOpacity = event.overlayOpacity || 0.2;
 
@@ -69,7 +66,6 @@ export async function GET(req: NextRequest) {
             padding: '40px',
           }}
         >
-          {/* Template Background */}
           {event.templateCardUrl && (
             <img
               src={event.templateCardUrl}
@@ -84,7 +80,6 @@ export async function GET(req: NextRequest) {
             />
           )}
 
-          {/* Overlay */}
           {overlayOpacity > 0 && (
             <div
               style={{
@@ -99,7 +94,6 @@ export async function GET(req: NextRequest) {
             />
           )}
 
-          {/* Content */}
           <div
             style={{
               position: 'relative',
@@ -186,7 +180,6 @@ export async function GET(req: NextRequest) {
               </>
             )}
 
-            {/* QR Code */}
             <img
               src={`data:image/png;base64,${qrBase64}`}
               style={{
@@ -227,6 +220,9 @@ export async function GET(req: NextRequest) {
       {
         width: mode === 'qr-only' ? 400 : 800,
         height: mode === 'qr-only' ? 400 : 1200,
+        headers: {
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        },
       }
     );
   } catch (error: any) {

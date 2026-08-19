@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateUniquePassCode } from '@/lib/utils';
+import { generateAndStoreCardImage } from '@/lib/image-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event ID and guest IDs are required' }, { status: 400 });
     }
 
-    // ─── Fetch event to verify it exists ──────────────────────────────────
     const event = await prisma.event.findFirst({
       where: { id: eventId, tenantId },
     });
@@ -28,7 +28,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // ─── Fetch guests ──────────────────────────────────────────────────
     const guests = await prisma.guest.findMany({
       where: { id: { in: guestIds }, eventId },
     });
@@ -46,22 +45,20 @@ export async function POST(req: NextRequest) {
         
         if (!passCode) {
           passCode = await generateUniquePassCode(prisma);
-          
-          // ─── Update guest with pass code ──────────────────────────────
           await prisma.guest.update({
             where: { id: guest.id },
             data: { passCode },
           });
         }
 
-        // ─── Build dynamic card URL ──────────────────────────────────────
-        const cardImageUrl = `https://littlewed.co.tz/api/og/card?code=${passCode}`;
+        // ─── Generate and store the card image ────────────────────────────
+        const imageUrl = await generateAndStoreCardImage(guest.id);
 
         results.push({
           guestId: guest.id,
           name: guest.name,
           passCode,
-          cardImageUrl,
+          imageUrl,
           success: true,
         });
 

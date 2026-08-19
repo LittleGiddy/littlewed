@@ -3,46 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
 import { generateUniquePassCode } from '@/lib/utils';
-
-// ─── Helper: Get the next available card number ──────────────────────────
-async function getNextCardNumber(eventId: string): Promise<string> {
-  const guests = await prisma.guest.findMany({
-    where: { eventId },
-    select: { cardNumber: true },
-  });
-
-  const numbers: number[] = [];
-  for (const guest of guests) {
-    if (guest.cardNumber !== null) {
-      const num = parseInt(guest.cardNumber, 10);
-      if (!isNaN(num)) {
-        numbers.push(num);
-      }
-    }
-  }
-
-  numbers.sort((a, b) => a - b);
-
-  let nextNumber = 1;
-  for (const num of numbers) {
-    if (num === nextNumber) {
-      nextNumber++;
-    } else if (num > nextNumber) {
-      break;
-    }
-  }
-
-  return nextNumber.toString().padStart(5, '0');
-}
-
-// ─── Helper: Check WhatsApp ──────────────────────────────────────────────
-async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  // Since NexSMS doesn't have a direct check endpoint, assume WhatsApp is available
-  return { hasWhatsApp: true };
-}
+import { generateAndStoreCardImage } from '@/lib/image-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,7 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // ─── Normalize phone ──────────────────────────────────────────────────
     const { normalized, isValid } = normalizePhone(phone);
     if (!isValid) {
       return NextResponse.json(
@@ -67,24 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Check if number has WhatsApp ──────────────────────────────────
-    let routingChannel = 'sms';
-    let whatsappVerified = false;
-    let waId: string | undefined;
-
-    try {
-      const result = await checkWhatsAppNumber(normalized);
-      if (result.hasWhatsApp) {
-        routingChannel = 'whatsapp';
-        whatsappVerified = true;
-        waId = result.waId;
-      }
-    } catch (error) {
-      console.error(`WhatsApp check failed for ${normalized}:`, error);
-      routingChannel = 'sms';
-    }
-
-    // ─── Check duplicate phone ──────────────────────────────────────────
+    // ─── Check duplicate ──────────────────────────────────────────────────
     const existing = await prisma.guest.findFirst({
       where: { eventId, phone: normalized },
     });
@@ -95,36 +40,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Check duplicate card number ────────────────────────────────────
-    if (cardNumber) {
-      const existingCard = await prisma.guest.findUnique({
-        where: { cardNumber: cardNumber.trim() },
-      });
-      if (existingCard) {
-        return NextResponse.json(
-          { error: 'Card number already exists. Please use a different one.' },
-          { status: 409 }
-        );
+    // ─── Check if number has WhatsApp ──────────────────────────────────
+    let routingChannel = 'sms';
+    try {
+      // Check WhatsApp via NexSMS
+      const result = await checkWhatsAppNumber(normalized);
+      if (result.hasWhatsApp) {
+        routingChannel = 'whatsapp';
       }
-    }
-
-    // ─── Check guest limit ──────────────────────────────────────────────
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      include: { tenant: { select: { bypassPayment: true } } },
-    });
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-    }
-
-    if (!event.tenant?.bypassPayment && event.guestCount) {
-      const currentCount = await prisma.guest.count({ where: { eventId } });
-      if (currentCount >= event.guestCount) {
-        return NextResponse.json(
-          { error: `Guest limit reached (${event.guestCount}).` },
-          { status: 400 }
-        );
-      }
+    } catch (error) {
+      console.error(`WhatsApp check failed for ${normalized}:`, error);
+      routingChannel = 'sms';
     }
 
     // ─── Generate card number ──────────────────────────────────────────
@@ -133,7 +59,7 @@ export async function POST(req: NextRequest) {
       finalCardNumber = await getNextCardNumber(eventId);
     }
 
-    // ─── Generate unique pass code ──────────────────────────────────────
+    // ─── Generate pass code ──────────────────────────────────────────────
     const passCode = await generateUniquePassCode(prisma);
 
     // ─── Create guest ────────────────────────────────────────────────────
@@ -146,22 +72,32 @@ export async function POST(req: NextRequest) {
         email: email?.trim() || null,
         eventId,
         routingChannel,
-        waId: waId || null,
-        passCode, // ✅ Store the unique pass code
+        passCode,
         qrToken: randomBytes(16).toString('hex'),
       },
     });
 
-    // ─── Build the dynamic card URL ──────────────────────────────────────
-    const cardImageUrl = `https://littlewed.co.tz/api/og/card?code=${passCode}`;
-    const inviteLink = `https://littlewed.co.tz/invite/${passCode}`;
+    // ─── AUTO-GENERATE CARD IMAGE ──────────────────────────────────────
+    let cardImageUrl = null;
+    try {
+      // Generate the card image in the background
+      cardImageUrl = await generateAndStoreCardImage(guest.id);
+      
+      // Update guest with the image URL
+      await prisma.guest.update({
+        where: { id: guest.id },
+        data: { invitationCard: cardImageUrl },
+      });
+    } catch (error) {
+      console.error('Failed to auto-generate card image:', error);
+      // Don't fail the guest creation, just log the error
+      // The card can be generated later when "Generate Cards" is clicked
+    }
 
     return NextResponse.json({
       ...guest,
       passCode,
       cardImageUrl,
-      inviteLink,
-      whatsappDetected: whatsappVerified,
       routingChannel,
     });
   } catch (error: any) {

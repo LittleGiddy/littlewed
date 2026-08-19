@@ -115,8 +115,6 @@ export async function sendWhatsAppTemplate({
   }
 }
 
-// ─── Wedding Invitation Template ──────────────────────────────────────
-
 export async function sendWeddingInvitation(
   phone: string,
   data: {
@@ -135,7 +133,6 @@ export async function sendWeddingInvitation(
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
-  // ─── Header with image ────────────────────────────────────────────────
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -143,7 +140,6 @@ export async function sendWeddingInvitation(
     }
   };
 
-  // ─── Button with dynamic URL ──────────────────────────────────────────
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -156,29 +152,26 @@ export async function sendWeddingInvitation(
     };
   }
 
-  // ─── Send template with proper variable mapping ──────────────────────
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili invitation', // Your template name
+    template: 'swahili invitation',
     personalisation: [
       {
-        "var1": data.guestName,      // Guest name with title
-        "var2": data.hostFamily,     // Host family
-        "var3": data.person1,        // Person 1 (Groom)
-        "var4": data.person2,        // Person 2 (Bride)
-        "var5": data.date,           // Event date
-        "var6": data.venue,          // Venue
-        "var7": data.time,           // Time
-        "var8": data.cardNumber,     // Card number
-        "var9": data.cardType,       // Card type
+        "var1": data.guestName,
+        "var2": data.hostFamily,
+        "var3": data.person1,
+        "var4": data.person2,
+        "var5": data.date,
+        "var6": data.venue,
+        "var7": data.time,
+        "var8": data.cardNumber,
+        "var9": data.cardType,
       }
     ],
     header,
     button,
   });
 }
-
-// ─── Helper: Convert full URL to slug ──────────────────────────────────
 
 export function toLinkSuffix(value: string): string {
   try {
