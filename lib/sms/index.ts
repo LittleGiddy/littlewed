@@ -38,8 +38,7 @@ export async function sendSMS({
   // Clean phone number (remove + and non-numeric)
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
-  // ─── Build the correct API URL ──────────────────────────────────────
-  // ✅ Using the /multi endpoint (which also works for single messages)
+  // ─── Use the /multi endpoint (confirmed working with curl) ──────────
   const fullUrl = `${SMS_API_URL}/api/sms/v2/text/multi`;
   
   console.log('[SMS] Sending to:', cleanTo);
@@ -62,10 +61,31 @@ export async function sendSMS({
             text: message,
           }
         ],
-        // Optional: Add reference for tracking
+        flash: 0,
         reference: `invitation_${Date.now()}`,
       }),
     });
+
+    // ─── Check if response is JSON ──────────────────────────────────────
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[SMS] ❌ Non-JSON response:', text.substring(0, 200));
+      
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        return {
+          success: false,
+          error: 'SMS API returned HTML error page. Please check API configuration.',
+          data: { htmlResponse: text.substring(0, 500) },
+        };
+      }
+      
+      return {
+        success: false,
+        error: `SMS API returned non-JSON response: ${text.substring(0, 100)}`,
+        data: { text },
+      };
+    }
 
     const data = await response.json();
 
@@ -79,7 +99,7 @@ export async function sendSMS({
         console.error('[SMS] ❌ Bad Request - Check phone number and message');
         errorMsg = data.errors?.map((e: any) => e.message || e).join(', ') || errorMsg;
       } else if (response.status === 401) {
-        console.error('[SMS] ❌ Authentication failed - Check API key');
+        console.error('[SMS] ❌ Authentication failed - Check NEXT_SMS_API_KEY');
         errorMsg = 'Authentication failed. Please check your API key.';
       } else if (response.status === 429) {
         console.error('[SMS] ❌ Rate limit exceeded - Too many messages');
@@ -93,7 +113,6 @@ export async function sendSMS({
       };
     }
 
-    // Get messageId from the response
     const messageId = data.messages?.[0]?.messageId || 
                       data.messageId || 
                       data.id || 
