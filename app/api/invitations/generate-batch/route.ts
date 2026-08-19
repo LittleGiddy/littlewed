@@ -28,12 +28,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // ─── Only generate for guests WITHOUT cards ──────────────────────────
     const guests = await prisma.guest.findMany({
-      where: { id: { in: guestIds }, eventId },
+      where: {
+        id: { in: guestIds },
+        eventId,
+        invitationCard: null, // ✅ Only guests without cards
+      },
     });
 
     if (guests.length === 0) {
-      return NextResponse.json({ error: 'No guests found' }, { status: 404 });
+      return NextResponse.json({
+        success: true,
+        completed: 0,
+        failed: 0,
+        message: 'All selected guests already have cards',
+        results: [],
+      });
     }
 
     const results = [];
@@ -42,7 +53,7 @@ export async function POST(req: NextRequest) {
       try {
         // ─── Generate pass code if not already set ──────────────────────
         let passCode = guest.passCode;
-        
+
         if (!passCode) {
           passCode = await generateUniquePassCode(prisma);
           await prisma.guest.update({
@@ -61,7 +72,6 @@ export async function POST(req: NextRequest) {
           imageUrl,
           success: true,
         });
-
       } catch (error: any) {
         console.error(`Failed to generate card for ${guest.name}:`, error.message);
         results.push({
@@ -73,16 +83,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const completed = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
+    const completed = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
 
     return NextResponse.json({
       success: true,
       completed,
       failed,
       results,
+      message: `${completed} cards generated, ${failed} failed`,
     });
-
   } catch (error: any) {
     console.error('Generate batch error:', error);
     return NextResponse.json(
