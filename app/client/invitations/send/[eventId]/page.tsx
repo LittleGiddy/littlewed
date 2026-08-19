@@ -131,23 +131,28 @@ export default function SendInvitationsPage() {
       const guestsData = await guestsRes.json();
       const settings = await settingsRes.json();
 
-      setEvent(eventData.event || eventData);
+      const eventObj = eventData.event || eventData;
+      setEvent(eventObj);
 
-      // Set default variables from event data
+      // ─── AUTO-POPULATE Variables from event data ──────────────────────
+      const formattedDate = eventObj?.date
+        ? new Date(eventObj.date).toLocaleDateString('sw-TZ', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : '';
+
       const defaultVars: TemplateVariables = {
-        guestName: '{Guest Name}',
-        hostFamily: eventData.event?.hostFamily || '{Host Family}',
-        person1: eventData.event?.person1 || '{Bride/Groom 1}',
-        person2: eventData.event?.person2 || '{Bride/Groom 2}',
-        date: eventData.event?.date ? new Date(eventData.event.date).toLocaleDateString('sw-TZ', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        }) : '{Date}',
-        venue: eventData.event?.venue || '{Venue}',
-        time: eventData.event?.time || '{Time}',
-        cardNumber: '{Card Number}',
-        cardType: '{Card Type}',
+        guestName: '{Guest Name}', // This will be replaced per guest
+        hostFamily: eventObj?.hostFamily || '',
+        person1: eventObj?.person1 || '',
+        person2: eventObj?.person2 || '',
+        date: formattedDate,
+        venue: eventObj?.venue || '',
+        time: eventObj?.time || '',
+        cardNumber: '{Card Number}', // This will be replaced per guest
+        cardType: '{Card Type}', // This will be replaced per guest
       };
 
       setSmsVariables(defaultVars);
@@ -210,7 +215,7 @@ export default function SendInvitationsPage() {
     const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
     const cardNumber = guest.cardNumber || variables.cardNumber;
 
-    let message = `Habari ${variables.guestName.replace('{Guest Name}', fullName)},
+    let message = `Habari ${fullName},
 
 Familia ya ${variables.hostFamily} inapenda kukualika katika sherehe ya harusi ya ${variables.person1} na ${variables.person2} itakayofanyika tarehe ${variables.date}.
 
@@ -256,9 +261,14 @@ Ahsante.`;
     // Check if any SMS guests need variables
     const smsGuests = targetGuests.filter(g => g.routingChannel === 'sms');
     if (smsGuests.length > 0) {
-      const missingVars = Object.entries(smsVariables).filter(([key, value]) => !value || value.includes('{'));
+      const missingVars = Object.entries(smsVariables).filter(([key, value]) => {
+        // Skip guestName and cardNumber as they are per-guest
+        if (key === 'guestName' || key === 'cardNumber' || key === 'cardType') return false;
+        return !value || value.trim() === '';
+      });
       if (missingVars.length > 0) {
-        toast.error('Please fill in all template variables for SMS');
+        const fieldNames = missingVars.map(([key]) => key).join(', ');
+        toast.error(`Please fill in: ${fieldNames}`);
         return;
       }
     }
@@ -266,9 +276,13 @@ Ahsante.`;
     // Check if any WhatsApp guests need variables
     const whatsappGuests = targetGuests.filter(g => g.routingChannel === 'whatsapp');
     if (whatsappGuests.length > 0) {
-      const missingVars = Object.entries(whatsappVariables).filter(([key, value]) => !value || value.includes('{'));
+      const missingVars = Object.entries(whatsappVariables).filter(([key, value]) => {
+        if (key === 'guestName' || key === 'cardNumber' || key === 'cardType') return false;
+        return !value || value.trim() === '';
+      });
       if (missingVars.length > 0) {
-        toast.error('Please fill in all template variables for WhatsApp');
+        const fieldNames = missingVars.map(([key]) => key).join(', ');
+        toast.error(`Please fill in: ${fieldNames}`);
         return;
       }
     }
@@ -310,7 +324,6 @@ Ahsante.`;
             }))
           );
 
-          // ─── Show toast with failed numbers ──────────────────────────
           toast.custom(
             (t) => (
               <div
@@ -488,33 +501,6 @@ Ahsante.`;
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  // ─── Variable Input Component ──────────────────────────────────────────
-  const VariableInput = ({
-    label,
-    value,
-    onChange,
-    placeholder,
-    helpText,
-  }: {
-    label: string;
-    value: string;
-    onChange: (val: string) => void;
-    placeholder?: string;
-    helpText?: string;
-  }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-700 mb-0.5">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder || `Enter ${label.toLowerCase()}`}
-        className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-      />
-      {helpText && <p className="text-[10px] text-gray-400 mt-0.5">{helpText}</p>}
-    </div>
-  );
-
   // ─── Loading state ─────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -627,63 +613,80 @@ Ahsante.`;
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Custom</span>
           </div>
 
+          {/* ─── Read-only fields (auto-populated from event) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            <VariableInput
-              label="Guest Name"
-              value={smsVariables.guestName}
-              onChange={(val) => setSmsVariables({ ...smsVariables, guestName: val })}
-              placeholder="e.g., Mr John Doe"
-              helpText="Replaced with each guest's name"
-            />
-            <VariableInput
-              label="Host Family"
-              value={smsVariables.hostFamily}
-              onChange={(val) => setSmsVariables({ ...smsVariables, hostFamily: val })}
-              placeholder="e.g., Mr & Mrs Allan Swai"
-            />
-            <VariableInput
-              label="Person 1"
-              value={smsVariables.person1}
-              onChange={(val) => setSmsVariables({ ...smsVariables, person1: val })}
-              placeholder="e.g., Agape"
-            />
-            <VariableInput
-              label="Person 2"
-              value={smsVariables.person2}
-              onChange={(val) => setSmsVariables({ ...smsVariables, person2: val })}
-              placeholder="e.g., Gladness"
-            />
-            <VariableInput
-              label="Date"
-              value={smsVariables.date}
-              onChange={(val) => setSmsVariables({ ...smsVariables, date: val })}
-              placeholder="e.g., 15 Septemba, 2026"
-            />
-            <VariableInput
-              label="Venue"
-              value={smsVariables.venue}
-              onChange={(val) => setSmsVariables({ ...smsVariables, venue: val })}
-              placeholder="e.g., The Embassy Hall"
-            />
-            <VariableInput
-              label="Time"
-              value={smsVariables.time}
-              onChange={(val) => setSmsVariables({ ...smsVariables, time: val })}
-              placeholder="e.g., 5:00 PM"
-            />
-            <VariableInput
-              label="Card Number"
-              value={smsVariables.cardNumber}
-              onChange={(val) => setSmsVariables({ ...smsVariables, cardNumber: val })}
-              placeholder="e.g., 00123"
-              helpText="Replaced with each guest's card number"
-            />
-            <VariableInput
-              label="Card Type"
-              value={smsVariables.cardType}
-              onChange={(val) => setSmsVariables({ ...smsVariables, cardType: val })}
-              placeholder="e.g., SINGLE or DOUBLE"
-            />
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Guest Name</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Host Family</label>
+              <input
+                type="text"
+                value={smsVariables.hostFamily}
+                onChange={(e) => setSmsVariables({ ...smsVariables, hostFamily: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Mr & Mrs Allan Swai"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Person 1</label>
+              <input
+                type="text"
+                value={smsVariables.person1}
+                onChange={(e) => setSmsVariables({ ...smsVariables, person1: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Agape"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Person 2</label>
+              <input
+                type="text"
+                value={smsVariables.person2}
+                onChange={(e) => setSmsVariables({ ...smsVariables, person2: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Gladness"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Date</label>
+              <input
+                type="text"
+                value={smsVariables.date}
+                onChange={(e) => setSmsVariables({ ...smsVariables, date: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., 15 Septemba, 2026"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Venue</label>
+              <input
+                type="text"
+                value={smsVariables.venue}
+                onChange={(e) => setSmsVariables({ ...smsVariables, venue: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., The Embassy Hall"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Time</label>
+              <input
+                type="text"
+                value={smsVariables.time}
+                onChange={(e) => setSmsVariables({ ...smsVariables, time: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., 5:00 PM"
+              />
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Card Number</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Card Type</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
           </div>
 
           {/* ─── SMS Preview ─── */}
@@ -712,63 +715,80 @@ Ahsante.`;
             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Template</span>
           </div>
 
+          {/* ─── Read-only fields (auto-populated from event) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            <VariableInput
-              label="Guest Name"
-              value={whatsappVariables.guestName}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, guestName: val })}
-              placeholder="e.g., Mr John Doe"
-              helpText="Replaced with each guest's name"
-            />
-            <VariableInput
-              label="Host Family"
-              value={whatsappVariables.hostFamily}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, hostFamily: val })}
-              placeholder="e.g., Mr & Mrs Allan Swai"
-            />
-            <VariableInput
-              label="Person 1"
-              value={whatsappVariables.person1}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, person1: val })}
-              placeholder="e.g., Agape"
-            />
-            <VariableInput
-              label="Person 2"
-              value={whatsappVariables.person2}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, person2: val })}
-              placeholder="e.g., Gladness"
-            />
-            <VariableInput
-              label="Date"
-              value={whatsappVariables.date}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, date: val })}
-              placeholder="e.g., 15 Septemba, 2026"
-            />
-            <VariableInput
-              label="Venue"
-              value={whatsappVariables.venue}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, venue: val })}
-              placeholder="e.g., The Embassy Hall"
-            />
-            <VariableInput
-              label="Time"
-              value={whatsappVariables.time}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, time: val })}
-              placeholder="e.g., 5:00 PM"
-            />
-            <VariableInput
-              label="Card Number"
-              value={whatsappVariables.cardNumber}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, cardNumber: val })}
-              placeholder="e.g., 00123"
-              helpText="Replaced with each guest's card number"
-            />
-            <VariableInput
-              label="Card Type"
-              value={whatsappVariables.cardType}
-              onChange={(val) => setWhatsappVariables({ ...whatsappVariables, cardType: val })}
-              placeholder="e.g., SINGLE or DOUBLE"
-            />
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Guest Name</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Host Family</label>
+              <input
+                type="text"
+                value={whatsappVariables.hostFamily}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, hostFamily: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Mr & Mrs Allan Swai"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Person 1</label>
+              <input
+                type="text"
+                value={whatsappVariables.person1}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person1: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Agape"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Person 2</label>
+              <input
+                type="text"
+                value={whatsappVariables.person2}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person2: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., Gladness"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Date</label>
+              <input
+                type="text"
+                value={whatsappVariables.date}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, date: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., 15 Septemba, 2026"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Venue</label>
+              <input
+                type="text"
+                value={whatsappVariables.venue}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, venue: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., The Embassy Hall"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-0.5">Time</label>
+              <input
+                type="text"
+                value={whatsappVariables.time}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, time: e.target.value })}
+                className="w-full p-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                placeholder="e.g., 5:00 PM"
+              />
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Card Number</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+              <label className="block text-xs font-medium text-gray-500 mb-0.5">Card Type</label>
+              <p className="text-sm text-gray-700 font-medium">Auto-replaced per guest</p>
+            </div>
           </div>
 
           {/* ─── WhatsApp Preview ─── */}
