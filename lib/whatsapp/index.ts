@@ -180,7 +180,7 @@ export async function sendWeddingInvitation(
         "var6": data.venue,          // ✅ lowercase var6
         "var7": data.time,           // ✅ lowercase var7
         "Var8": data.cardNumber,     // ✅ CAPITAL V - matches template!
-        "Var9": data.cardType,       // ✅ CAPITAL V - matches template!
+        "var9": data.cardType,       // ✅ CAPITAL V - matches template!
       }
     ],
     header,
