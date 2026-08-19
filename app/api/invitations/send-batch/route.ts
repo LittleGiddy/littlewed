@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms';
+import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { eventId, guestIds } = await req.json();
+    const { eventId, guestIds, message, retry } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds)) {
       return NextResponse.json({ error: 'Event ID and guest IDs are required' }, { status: 400 });
@@ -58,15 +59,48 @@ export async function POST(req: NextRequest) {
               })
             : '';
 
-          // ─── Dynamic card URL using pass code ──────────────────────
-          const cardImageUrl = guest.passCode 
-            ? `https://littlewed.co.tz/api/og/card?code=${guest.passCode}`
-            : guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png';
+          // ─── Ensure guest has a pass code ──────────────────────────────
+          if (!guest.passCode) {
+            console.warn(`[Batch] Guest ${guest.name} has no pass code, skipping`);
+            results.push({
+              guestId: guest.id,
+              name: guest.name,
+              success: false,
+              error: 'No pass code generated. Please generate cards first.',
+              channel: guest.routingChannel,
+            });
+            failCount++;
+            continue;
+          }
+
+          // ─── Ensure card image exists ──────────────────────────────────
+          let cardImageUrl = guest.invitationCard;
+
+          if (!cardImageUrl) {
+            try {
+              // Try to generate and store the image
+              cardImageUrl = await generateAndStoreCardImage(guest.id);
+            } catch (error) {
+              console.error(`[Batch] Failed to generate card image for ${guest.name}:`, error);
+              // Fallback: Use the dynamic OG URL
+              cardImageUrl = getCardImageUrl(guest.passCode);
+            }
+          }
+
+          // ─── If still no image, use a default ──────────────────────────
+          if (!cardImageUrl) {
+            cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
+          }
+
+          // ─── Build invite link for the button ──────────────────────────
+          const inviteLink = `https://littlewed.co.tz/invite/${guest.passCode}`;
 
           let result;
 
           // ─── Send via appropriate channel ──────────────────────────
           if (guest.routingChannel === 'whatsapp') {
+            console.log(`[Batch] Sending WhatsApp to ${guest.name} (${guest.phone})`);
+            
             result = await sendWeddingInvitation(guest.phone!, {
               guestName: guestFullName,
               hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
@@ -78,11 +112,13 @@ export async function POST(req: NextRequest) {
               cardNumber: guest.cardNumber || '108',
               cardType: guest.guestType || 'SINGLE',
               imageUrl: cardImageUrl,
-              // No inviteLink - removed!
+              inviteLink: inviteLink, // ✅ Required for the button
             });
           } else {
-            // SMS (no link)
-            const smsMessage = `Habari ${guestFullName},
+            // SMS
+            console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
+            
+            let smsMessage = message || `Habari ${guestFullName},
 
 Familia ya ${guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${guest.event?.person1 || 'Agape'} na ${guest.event?.person2 || 'Gladness'} tarehe ${formattedDate}.
 
@@ -94,6 +130,24 @@ Tafadhali onyesha kadi hii wakati wa kuingia.
 Karibu na ufurahie sherehe!
 
 Ahsante.`;
+
+            // ─── If custom message provided, use it ──────────────────────
+            if (message) {
+              smsMessage = message
+                .replace(/{title}/g, guest.title || '')
+                .replace(/{name}/g, guest.name)
+                .replace(/{fullName}/g, guestFullName)
+                .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
+                .replace(/{passCode}/g, guest.passCode || 'N/A')
+                .replace(/{event}/g, guest.event?.name || '')
+                .replace(/{date}/g, formattedDate)
+                .replace(/{venue}/g, guest.event?.venue || '')
+                .replace(/{address}/g, guest.event?.address || '')
+                .replace(/{hostFamily}/g, guest.event?.hostFamily || '')
+                .replace(/{person1}/g, guest.event?.person1 || '')
+                .replace(/{person2}/g, guest.event?.person2 || '')
+                .replace(/{time}/g, guest.event?.time || '');
+            }
 
             result = await sendSMS({
               to: guest.phone!,
@@ -114,14 +168,15 @@ Ahsante.`;
                   messageId: result.messageId,
                   guestId: guest.id,
                   type: guest.routingChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
-                  template: guest.routingChannel === 'whatsapp' ? 'swahili invitation' : 'custom',
+                  template: guest.routingChannel === 'whatsapp' ? 'swahiliinvitation' : 'custom',
                   status: 'SENT',
-                  rawData: result.data,
+                  rawData: result.data || {},
                 },
               });
             }
           } else {
             failCount++;
+            console.error(`[Batch] Failed to send to ${guest.name}:`, result.error);
           }
 
           results.push({
