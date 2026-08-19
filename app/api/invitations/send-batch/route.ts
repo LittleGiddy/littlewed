@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
-import { sendSMS } from '@/lib/sms';
+import { sendSMS } from '@/lib/sms/index'; // ✅ Same import as working reminders
 import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
 
 const BATCH_SIZE = 5;
@@ -13,18 +13,12 @@ const MESSAGE_DELAY = 500;
 
 export async function POST(req: NextRequest) {
   try {
-    // ─── Parse JSON body ──────────────────────────────────────────────
-    let body;
-    try {
-      body = await req.json();
-    } catch (parseError) {
-      console.error('[Batch] Failed to parse JSON:', parseError);
-      return NextResponse.json(
-        { error: 'Invalid JSON body' },
-        { status: 400 }
-      );
+    const session = await getServerSession(authOptions);
+    if (!session || (session.user as any).role !== 'CLIENT') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const tenantId = (session.user as any).tenantId;
     const { 
       eventId, 
       guestIds, 
@@ -32,33 +26,11 @@ export async function POST(req: NextRequest) {
       whatsappVariables, 
       message, 
       retry 
-    } = body;
+    } = await req.json();
 
-    // ─── Validate required fields ──────────────────────────────────────
-    if (!eventId) {
-      return NextResponse.json(
-        { error: 'Event ID is required' },
-        { status: 400 }
-      );
+    if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
+      return NextResponse.json({ error: 'Event ID and guest IDs are required' }, { status: 400 });
     }
-
-    if (!guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Guest IDs are required' },
-        { status: 400 }
-      );
-    }
-
-    // ─── Check authentication ──────────────────────────────────────────
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'CLIENT') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const tenantId = (session.user as any).tenantId;
 
     // ─── Fetch guests with events ──────────────────────────────────────
     const guests = await prisma.guest.findMany({
@@ -70,10 +42,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (guests.length === 0) {
-      return NextResponse.json(
-        { error: 'No guests found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'No guests found' }, { status: 404 });
     }
 
     const results = [];
@@ -152,7 +121,7 @@ export async function POST(req: NextRequest) {
               inviteLink: inviteLink,
             });
           } else {
-            // SMS
+            // ─── SMS - Same pattern as working reminders ──────────────
             console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
 
             const vars = smsVariables || {};
@@ -170,6 +139,7 @@ Karibu na ufurahie sherehe!
 
 Ahsante.`;
 
+            // ─── If custom message provided, use it ──────────────────────
             if (message) {
               smsMessage = message
                 .replace(/{title}/g, guest.title || '')
@@ -187,10 +157,18 @@ Ahsante.`;
                 .replace(/{time}/g, guest.event?.time || '');
             }
 
-            result = await sendSMS({
+            // ✅ Use sendSMS the exact same way as reminders
+            const smsResult = await sendSMS({
               to: guest.phone!,
               message: smsMessage,
             });
+
+            result = {
+              success: smsResult.success,
+              error: smsResult.error,
+              data: smsResult.data,
+              messageId: smsResult.messageId,
+            };
           }
 
           if (result.success) {
@@ -258,7 +236,6 @@ Ahsante.`;
 
   } catch (error: any) {
     console.error('[Batch] Unhandled error:', error);
-    // ─── Always return JSON, never HTML ──────────────────────────────
     return NextResponse.json(
       { 
         error: error.message || 'Internal server error',

@@ -1,9 +1,8 @@
 // lib/sms/index.ts
 
-const NEXT_SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
-const NEXT_SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
-// ✅ Use the environment variable directly, with a fallback
-const NEXT_SMS_API_URL = process.env.NEXT_SMS_BASE_URL;
+const SMS_API_KEY = process.env.NEXT_SMS_API_KEY; // ✅ Matches your env
+const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
+const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
 
 export interface SendSMSResult {
   success: boolean;
@@ -20,7 +19,7 @@ export async function sendSMS({
   message: string;
 }): Promise<SendSMSResult> {
   // ─── Check if API key is configured ──────────────────────────────────
-  if (!NEXT_SMS_API_KEY) {
+  if (!SMS_API_KEY) {
     console.warn('[SMS] ⚠️ NEXT_SMS_API_KEY is not set. SMS messages will be logged only.');
     console.log('[SMS] To:', to);
     console.log('[SMS] Message:', message);
@@ -41,21 +40,21 @@ export async function sendSMS({
 
   try {
     // ─── Build the full URL with endpoint ──────────────────────────────
-    const fullUrl = `${NEXT_SMS_API_URL}/api/messages`;
+    const fullUrl = `${SMS_API_URL}/api/sms/v2/text/single`;
     
     console.log('[SMS] Sending to:', cleanTo);
     console.log('[SMS] URL:', fullUrl);
-    console.log('[SMS] Sender:', NEXT_SMS_SENDER_ID);
+    console.log('[SMS] Sender:', SMS_SENDER_ID);
 
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${NEXT_SMS_API_KEY}`,
+        'Authorization': `Bearer ${SMS_API_KEY}`,
       },
       body: JSON.stringify({
         to: cleanTo,
-        from: NEXT_SMS_SENDER_ID,
+        from: SMS_SENDER_ID,
         message: message,
       }),
     });
