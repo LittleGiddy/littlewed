@@ -1,5 +1,5 @@
 // app/api/og/card/route.tsx
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 import sharp from 'sharp';
@@ -147,7 +147,11 @@ export async function GET(req: NextRequest) {
       .png()
       .toBuffer();
 
-    return new NextResponse(pngBuffer, {
+    // ─── Return the PNG image using Response with Uint8Array ────────────
+    // Convert Buffer to Uint8Array to avoid type issues
+    const uint8Array = new Uint8Array(pngBuffer);
+
+    return new Response(uint8Array, {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',

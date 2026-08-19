@@ -34,12 +34,14 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
       throw new Error(`Failed to generate image: ${response.status}`);
     }
 
-    const imageBuffer = await response.arrayBuffer();
+    // ─── Get the image as buffer ─────────────────────────────────────────
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
 
     // ─── Upload to Vercel Blob ───────────────────────────────────────────
     const blob = await put(
       `invitations/${guest.id}.png`,
-      Buffer.from(imageBuffer),
+      imageBuffer,
       {
         access: 'public',
         contentType: 'image/png',
