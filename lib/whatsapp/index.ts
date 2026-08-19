@@ -172,7 +172,7 @@ export async function sendWeddingInvitation(
   // var1, var2, var3, var4, var5, var6, var7, Var8 (capital V), var9
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'swahili_invitation', // ⚠️ Replace with your exact template name
+    template: 'Mwalikotemp', // ⚠️ Replace with your exact template name
     personalisation: [
       {
         "var1": data.guestName,      // ✅ Habari {var1}
