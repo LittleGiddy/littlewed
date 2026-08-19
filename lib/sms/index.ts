@@ -2,6 +2,7 @@
 
 const SMS_API_KEY = process.env.NEXT_SMS_API_KEY;
 const SMS_SENDER_ID = process.env.NEXT_SMS_SENDER_ID || 'MAHIRI LTD';
+// ✅ Use the environment variable directly, with a fallback
 const SMS_API_URL = process.env.NEXT_SMS_BASE_URL || 'https://messaging-service.co.tz';
 
 export interface SendSMSResult {
@@ -29,7 +30,7 @@ export async function sendSMS({
       messageId: `sms_${Date.now()}`,
       data: { 
         simulated: true, 
-        loggedMessage: message, // ✅ Changed from 'message' to 'loggedMessage'
+        loggedMessage: message,
         to,
       },
     };
@@ -39,7 +40,14 @@ export async function sendSMS({
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
   try {
-    const response = await fetch(SMS_API_URL, {
+    // ─── Build the full URL with endpoint ──────────────────────────────
+    const fullUrl = `${SMS_API_URL}/api/sms/v1/send`;
+    
+    console.log('[SMS] Sending to:', cleanTo);
+    console.log('[SMS] URL:', fullUrl);
+    console.log('[SMS] Sender:', SMS_SENDER_ID);
+
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,6 +59,27 @@ export async function sendSMS({
         message: message,
       }),
     });
+
+    // ─── Check if response is JSON ──────────────────────────────────────
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[SMS] ❌ Non-JSON response:', text.substring(0, 200));
+      
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        return {
+          success: false,
+          error: 'SMS API returned HTML error page. Please check the API URL and key.',
+          data: { htmlResponse: text.substring(0, 500) },
+        };
+      }
+      
+      return {
+        success: false,
+        error: `SMS API returned non-JSON response: ${text.substring(0, 100)}`,
+        data: { text },
+      };
+    }
 
     const data = await response.json();
 
@@ -86,7 +115,7 @@ export async function sendSMS({
       data: data,
     };
   } catch (error: any) {
-    console.error('[SMS] Error sending SMS:', error.message);
+    console.error('[SMS] ❌ Error sending SMS:', error.message);
     return { 
       success: false, 
       error: error.message || 'Network error',
