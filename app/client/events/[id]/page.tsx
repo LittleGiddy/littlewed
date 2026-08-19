@@ -11,7 +11,7 @@ import {
   Search, Download, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
   Check, Coins, Sparkles, Hash, Loader2, MoreVertical,
-  Grid3x3, List, Eye, Share2, Printer, Link2,
+  Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle,
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -569,14 +569,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       return;
     }
 
-    // ─── Show confirmation toast ──────────────────────────────────────────
+    // ─── Show confirmation ──────────────────────────────────────────────
     const confirm = await new Promise<boolean>((resolve) => {
       toast.custom(
         (t) => (
           <div
-            className={`${
-              t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
+            className={`${t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
           >
             <div className="p-4 bg-[#0D4F4F]">
               <h3 className="text-white font-semibold text-base">Generate Invitation Cards</h3>
@@ -624,13 +623,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       failed: 0,
     });
 
-    let currentToast = toast.loading('Generating cards...');
+    let currentToast = toast.loading(`Generating ${pendingGuests.length} cards...`);
 
     try {
       const BATCH_SIZE = 10;
-      const results = [];
       let completed = 0;
       let failed = 0;
+      let skipped = 0;
 
       for (let i = 0; i < pendingGuests.length; i += BATCH_SIZE) {
         const batch = pendingGuests.slice(i, i + BATCH_SIZE);
@@ -646,10 +645,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         });
 
         const data = await res.json();
-        results.push(data);
 
-        completed += data.completed || 0;
-        failed += data.failed || 0;
+        if (res.ok) {
+          completed += data.completed || 0;
+          failed += data.failed || 0;
+          skipped += data.skipped || 0;
+        } else {
+          failed += batch.length;
+        }
 
         const progress = Math.min(i + BATCH_SIZE, pendingGuests.length);
         toast.loading(`Generating cards (${progress}/${pendingGuests.length})...`, {
@@ -664,13 +667,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       }
 
       if (completed === pendingGuests.length) {
-        toast.success(`All ${completed} cards generated`, { id: currentToast });
-      } else if (completed > 0) {
-        toast(`${completed} cards generated, ${failed} failed`, {
+        toast.success(`All ${completed} cards generated successfully!`, { id: currentToast });
+      } else if (completed > 0 && failed === 0) {
+        toast.success(`${completed} cards generated! ${skipped} already had cards.`, { id: currentToast });
+      } else if (completed > 0 && failed > 0) {
+        toast(`${completed} generated, ${failed} failed. ${skipped} already had cards.`, {
           id: currentToast,
+          icon: <AlertTriangle size={18} className="text-amber-500" />,
         });
       } else {
-        toast.error('Failed to generate cards', { id: currentToast });
+        toast.error('Failed to generate any cards.', { id: currentToast });
       }
 
       await fetchData(eventId!);
@@ -680,19 +686,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         toast.custom(
           (t) => (
             <div
-              className={`${
-                t.visible ? 'animate-enter' : 'animate-leave'
-              } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
+              className={`${t.visible ? 'animate-enter' : 'animate-leave'
+                } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
             >
               <div className="p-4 bg-[#0D4F4F]">
                 <h3 className="text-white font-semibold text-base flex items-center gap-2">
                   <Send size={18} />
-                  Cards Ready
+                  Cards Ready!
                 </h3>
               </div>
               <div className="p-4">
                 <p className="text-gray-700 text-sm mb-4">
-                  {completed} invitation cards are ready. Would you like to send them now?
+                  {completed} new cards generated. Would you like to send invitations now?
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -769,9 +774,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div
         key={guest.id}
-        className={`bg-white rounded-xl border transition-all hover:shadow-md ${
-          isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'
-        }`}
+        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'
+          }`}
       >
         <div className="flex items-center p-3 gap-3">
           <input
@@ -813,11 +817,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               <span
-                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                  isWhatsApp
+                className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp
                     ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]'
                     : 'bg-gray-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
                 {isWhatsApp ? 'WhatsApp' : 'SMS'}
@@ -919,7 +922,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         title: `${guest.name}'s Invitation`,
                         url: guest.invitationCard || '',
                       })
-                      .catch(() => {});
+                      .catch(() => { });
                   } else {
                     navigator.clipboard.writeText(guest.invitationCard || '');
                     toast.success('Card link copied to clipboard');
@@ -957,11 +960,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="flex items-center gap-1">
               <span
-                className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                  guest.routingChannel === 'whatsapp'
+                className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp'
                     ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]'
                     : 'bg-gray-100 text-gray-600'
-                }`}
+                  }`}
               >
                 {guest.routingChannel === 'whatsapp' ? 'WA' : 'SMS'}
               </span>
@@ -1291,9 +1293,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {STEPS.map((s) => (
                     <div
                       key={s.id}
-                      className={`step-pill ${activeStep === s.id ? 'active' : ''} ${
-                        stepComplete[s.id] ? 'done' : ''
-                      }`}
+                      className={`step-pill ${activeStep === s.id ? 'active' : ''} ${stepComplete[s.id] ? 'done' : ''
+                        }`}
                       onClick={() => goToStep(s.id)}
                     >
                       <div className="step-line" />
@@ -1319,11 +1320,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <div
                       className="h-full bg-[#0D4F4F] rounded-full transition-all duration-300"
                       style={{
-                        width: `${
-                          ((generationProgress.completed + generationProgress.failed) /
+                        width: `${((generationProgress.completed + generationProgress.failed) /
                             generationProgress.total) *
                           100
-                        }%`,
+                          }%`,
                       }}
                     />
                   </div>
@@ -1517,8 +1517,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {generatingCards
                           ? 'Generating...'
                           : guestsWithoutCards.length === 0
-                          ? 'All Done'
-                          : `Generate ${guestsWithoutCards.length} Card${guestsWithoutCards.length !== 1 ? 's' : ''}`}
+                            ? 'All Done'
+                            : `Generate ${guestsWithoutCards.length} Card${guestsWithoutCards.length !== 1 ? 's' : ''}`}
                       </button>
                     </div>
                   </div>
@@ -1527,22 +1527,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => setCardView('grid')}
-                        className={`p-2 rounded-lg transition ${
-                          cardView === 'grid'
+                        className={`p-2 rounded-lg transition ${cardView === 'grid'
                             ? 'bg-[#0D4F4F] text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                        }`}
+                          }`}
                         title="Grid View"
                       >
                         <Grid3x3 size={16} />
                       </button>
                       <button
                         onClick={() => setCardView('list')}
-                        className={`p-2 rounded-lg transition ${
-                          cardView === 'list'
+                        className={`p-2 rounded-lg transition ${cardView === 'list'
                             ? 'bg-[#0D4F4F] text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                        }`}
+                          }`}
                         title="List View"
                       >
                         <List size={16} />
@@ -1740,7 +1738,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           title: `${selectedCardGuest.name}'s Invitation`,
                           url: selectedCardGuest.invitationCard || '',
                         })
-                        .catch(() => {});
+                        .catch(() => { });
                     } else {
                       navigator.clipboard.writeText(selectedCardGuest.invitationCard || '');
                       toast.success('Card link copied');
@@ -1806,9 +1804,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
               <div
-                className={`rounded-xl p-4 mb-4 flex items-center gap-3 ${
-                  isFree ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'
-                }`}
+                className={`rounded-xl p-4 mb-4 flex items-center gap-3 ${isFree ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'
+                  }`}
               >
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl">
                   {isFree ? (
@@ -2133,9 +2130,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                               <span className="truncate">{g.phone || 'No phone'}</span>
                               <span>•</span>
                               <span
-                                className={`inline-flex items-center gap-1 ${
-                                  g.checkedIn ? 'text-green-600' : 'text-amber-600'
-                                }`}
+                                className={`inline-flex items-center gap-1 ${g.checkedIn ? 'text-green-600' : 'text-amber-600'
+                                  }`}
                               >
                                 {g.checkedIn ? <CheckCircle size={12} /> : <Clock size={12} />}
                                 {g.checkedIn ? 'Checked in' : 'Pending'}
