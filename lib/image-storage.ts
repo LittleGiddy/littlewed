@@ -45,17 +45,11 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
         access: 'public',
         contentType: 'image/png',
         addRandomSuffix: false,
-        allowOverwrite: true, // ✅ Allow overwriting existing blobs
+        allowOverwrite: true,
       }
     );
 
     console.log('[ImageStorage] Uploaded to:', blob.url);
-
-    // ─── Update guest with the static image URL ──────────────────────────
-    await prisma.guest.update({
-      where: { id: guest.id },
-      data: { invitationCard: blob.url },
-    });
 
     return blob.url;
   } catch (error: any) {
@@ -66,8 +60,6 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
 
 /**
  * Get card image URL from pass code (without storing)
- * Use this as a fallback when Vercel Blob fails
- * ✅ This function is now exported
  */
 export function getCardImageUrl(passCode: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';

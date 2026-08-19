@@ -65,13 +65,41 @@ export async function POST(req: NextRequest) {
         // ─── Generate and store the card image ────────────────────────────
         const imageUrl = await generateAndStoreCardImage(guest.id);
 
+        // ─── Build the card URL with variables for the guest ─────────────
+        const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+        const eventDate = event.date ? new Date(event.date).toLocaleDateString('sw-TZ', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }) : '';
+
+        // ✅ Store all variables that will be used for SMS/WhatsApp
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: {
+            invitationCard: imageUrl,
+            // Also update any other fields that might be needed
+          },
+        });
+
         results.push({
           guestId: guest.id,
           name: guest.name,
           passCode,
           imageUrl,
+          guestName: guestFullName,
+          cardNumber: guest.cardNumber || '108',
+          cardType: guest.guestType || 'SINGLE',
+          eventName: event.name,
+          eventDate: eventDate,
+          venue: event.venue || 'The Embassy Hall',
+          time: event.time || '5:00 PM',
+          hostFamily: event.hostFamily || 'Mr & Mrs Allan Swai',
+          person1: event.person1 || 'Agape',
+          person2: event.person2 || 'Gladness',
           success: true,
         });
+
       } catch (error: any) {
         console.error(`Failed to generate card for ${guest.name}:`, error.message);
         results.push({
@@ -93,6 +121,7 @@ export async function POST(req: NextRequest) {
       results,
       message: `${completed} cards generated, ${failed} failed`,
     });
+
   } catch (error: any) {
     console.error('Generate batch error:', error);
     return NextResponse.json(
