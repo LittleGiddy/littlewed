@@ -58,7 +58,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── If still no image, use a default ────────────────────────────────
     if (!cardImageUrl) {
       cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
     }
@@ -74,16 +73,16 @@ export async function POST(req: NextRequest) {
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
     // ─── Invite link for the button ──────────────────────────────────────
-    // ⚠️ This MUST be provided for the button to work
     const inviteLink = `https://littlewed.co.tz/invite/${guest.passCode}`;
 
-    console.log('[SendTemplate] Sending with:', {
-      guestId: guest.id,
-      passCode: guest.passCode,
-      imageUrl: cardImageUrl,
-      inviteLink: inviteLink,
-      guestName: guestFullName,
-    });
+    // ─── Log what we're sending ──────────────────────────────────────────
+    console.log('[SendTemplate] ====== SENDING TO GUEST ======');
+    console.log('[SendTemplate] Guest ID:', guest.id);
+    console.log('[SendTemplate] Guest Name:', guestFullName);
+    console.log('[SendTemplate] Phone:', guest.phone);
+    console.log('[SendTemplate] Pass Code:', guest.passCode);
+    console.log('[SendTemplate] Card Image URL:', cardImageUrl);
+    console.log('[SendTemplate] Invite Link:', inviteLink);
 
     // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
@@ -97,8 +96,10 @@ export async function POST(req: NextRequest) {
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
       imageUrl: cardImageUrl,
-      inviteLink: inviteLink, // ✅ This is required for the button
+      inviteLink: inviteLink,
     });
+
+    console.log('[SendTemplate] Result:', JSON.stringify(result, null, 2));
 
     if (result.success) {
       if (result.messageId) {
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
         cardImageUrl,
       });
     } else {
-      console.error('[WhatsApp Template] Failed to send to', guest.phone, result.error);
+      console.error('[SendTemplate] Failed to send to', guest.phone, result.error);
 
       if (result.messageId) {
         await prisma.messageLog.create({
