@@ -39,18 +39,19 @@ export async function sendSMS({
   const cleanTo = to.replace(/^\+/, '').replace(/\D/g, '');
 
   // ─── Build the correct API URL ──────────────────────────────────────
-  // This is the URL that was working in the reminder system
   const fullUrl = `${SMS_API_URL}/api/sms/v2/text/single`;
   
   console.log('[SMS] Sending to:', cleanTo);
   console.log('[SMS] URL:', fullUrl);
   console.log('[SMS] Sender:', SMS_SENDER_ID);
+  console.log('[SMS] API Key:', SMS_API_KEY ? 'Set (hidden)' : 'Missing');
 
   try {
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // ⚠️ IMPORTANT: Don't include Accept header - it was working without it
         'Authorization': `Bearer ${SMS_API_KEY}`,
       },
       body: JSON.stringify({
@@ -69,7 +70,7 @@ export async function sendSMS({
       if (text.includes('<!DOCTYPE') || text.includes('<html')) {
         return {
           success: false,
-          error: 'SMS API returned HTML error page. Please check API configuration.',
+          error: `SMS API returned HTML. Check your API key and sender ID.`,
           data: { htmlResponse: text.substring(0, 500) },
         };
       }
@@ -93,7 +94,7 @@ export async function sendSMS({
         console.error('[SMS] ❌ Bad Request - Check phone number and message');
         errorMsg = data.errors?.map((e: any) => e.message || e).join(', ') || errorMsg;
       } else if (response.status === 401) {
-        console.error('[SMS] ❌ Authentication failed - Check NEXT_SMS_API_KEY');
+        console.error('[SMS] ❌ Authentication failed - Check API key');
         errorMsg = 'Authentication failed. Please check your API key.';
       } else if (response.status === 429) {
         console.error('[SMS] ❌ Rate limit exceeded - Too many messages');
