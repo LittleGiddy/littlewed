@@ -56,6 +56,7 @@ export async function sendWhatsAppTemplate({
     body.header = header;
   }
 
+  // ─── IMPORTANT: Button must be included if template requires it ──────
   if (button) {
     body.button = button;
   }
@@ -87,6 +88,7 @@ export async function sendWhatsAppTemplate({
         console.error('[WhatsApp] ❌ Bad Request - Check template name and variables');
         console.error('[WhatsApp] Template:', template);
         console.error('[WhatsApp] Variables:', JSON.stringify(personalisation, null, 2));
+        console.error('[WhatsApp] Button:', JSON.stringify(button, null, 2));
         
         if (data.errors) {
           console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
@@ -115,6 +117,8 @@ export async function sendWhatsAppTemplate({
   }
 }
 
+// ─── Wedding Invitation Template ──────────────────────────────────────
+
 export async function sendWeddingInvitation(
   phone: string,
   data: {
@@ -133,6 +137,7 @@ export async function sendWeddingInvitation(
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] Sending wedding invitation to:', phone);
 
+  // ─── Header with image ────────────────────────────────────────────────
   const header = {
     image: {
       file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
@@ -140,6 +145,8 @@ export async function sendWeddingInvitation(
     }
   };
 
+  // ─── Button with dynamic URL ──────────────────────────────────────────
+  // ⚠️ IMPORTANT: This template REQUIRES a button with URL parameter
   let button = undefined;
   if (data.inviteLink) {
     const slug = toLinkSuffix(data.inviteLink);
@@ -150,8 +157,12 @@ export async function sendWeddingInvitation(
         },
       },
     };
+    console.log('[WhatsApp] Button created with slug:', slug);
+  } else {
+    console.warn('[WhatsApp] ⚠️ No inviteLink provided - button will be missing!');
   }
 
+  // ─── Send template with proper variable mapping ──────────────────────
   return sendWhatsAppTemplate({
     to: phone,
     template: 'swahili invitation',
@@ -169,9 +180,11 @@ export async function sendWeddingInvitation(
       }
     ],
     header,
-    button,
+    button, // ✅ This must be included
   });
 }
+
+// ─── Helper: Convert full URL to slug ──────────────────────────────────
 
 export function toLinkSuffix(value: string): string {
   try {

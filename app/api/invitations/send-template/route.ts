@@ -39,16 +39,21 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── Ensure guest has a pass code ────────────────────────────────────
+    if (!guest.passCode) {
+      return NextResponse.json({
+        error: 'Guest does not have a pass code. Please generate cards first.',
+      }, { status: 400 });
+    }
+
     // ─── Ensure the card image exists ────────────────────────────────────
     let cardImageUrl = guest.invitationCard;
 
-    if (!cardImageUrl && guest.passCode) {
+    if (!cardImageUrl) {
       try {
-        // Try to generate and store the image
         cardImageUrl = await generateAndStoreCardImage(guest.id);
       } catch (error) {
         console.error('Failed to generate card image, using fallback:', error);
-        // Fallback: Use the dynamic OG URL (may not work with all providers)
         cardImageUrl = getCardImageUrl(guest.passCode);
       }
     }
@@ -69,13 +74,14 @@ export async function POST(req: NextRequest) {
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
     // ─── Invite link for the button ──────────────────────────────────────
-    const inviteLink = guest.passCode
-      ? `https://littlewed.co.tz/invite/${guest.passCode}`
-      : `https://littlewed.co.tz/invite/${guest.id}`;
+    // ⚠️ This MUST be provided for the button to work
+    const inviteLink = `https://littlewed.co.tz/invite/${guest.passCode}`;
 
     console.log('[SendTemplate] Sending with:', {
+      guestId: guest.id,
+      passCode: guest.passCode,
       imageUrl: cardImageUrl,
-      inviteLink,
+      inviteLink: inviteLink,
       guestName: guestFullName,
     });
 
@@ -91,7 +97,7 @@ export async function POST(req: NextRequest) {
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
       imageUrl: cardImageUrl,
-      inviteLink: inviteLink,
+      inviteLink: inviteLink, // ✅ This is required for the button
     });
 
     if (result.success) {
