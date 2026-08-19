@@ -165,7 +165,7 @@ export async function sendWeddingInvitation(
   }
 
   // ⚠️ REPLACE WITH YOUR EXACT TEMPLATE NAME FROM NEXSMS
-  const TEMPLATE_NAME = 'YOUR_TEMPLATE_NAME_HERE';
+  const TEMPLATE_NAME = 'Mwalikotemp';
 
   return sendWhatsAppTemplate({
     to: phone,
