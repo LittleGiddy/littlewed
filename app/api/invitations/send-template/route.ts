@@ -51,12 +51,18 @@ export async function POST(req: NextRequest) {
     // ─── Build guest full name ──────────────────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Build dynamic card URL using pass code ─────────────────────────
+    // ─── Build dynamic card URL ─────────────────────────────────────────
+    // Use the OG API endpoint which returns a PNG image
     const cardImageUrl = guest.passCode 
       ? `https://littlewed.co.tz/api/og/card?code=${guest.passCode}`
       : guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png';
 
-    // ─── Send WhatsApp invitation via template ──────────────────────────
+    // ─── Build invite link for the button ──────────────────────────────
+    const inviteLink = guest.passCode
+      ? `https://littlewed.co.tz/invite/${guest.passCode}`
+      : `https://littlewed.co.tz/invite/${guest.id}`;
+
+    // ─── Send WhatsApp invitation ──────────────────────────────────────
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
       hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
@@ -67,8 +73,8 @@ export async function POST(req: NextRequest) {
       time: guest.event?.time || '5:00 PM',
       cardNumber: guest.cardNumber || '108',
       cardType: guest.guestType || 'SINGLE',
-      imageUrl: cardImageUrl,  // ✅ Dynamic OG image URL
-      // No inviteLink - removed for cleaner flow
+      imageUrl: cardImageUrl,
+      inviteLink: inviteLink,  // ✅ Required for the button
     });
 
     if (result.success) {
