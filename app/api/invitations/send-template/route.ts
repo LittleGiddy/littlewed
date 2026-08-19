@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
             messageId: result.messageId,
             guestId: guest.id,
             type: 'WHATSAPP',
-            template: 'swahili_invitation',
+            template: 'Mwalikotemp',
             status: 'SENT',
             rawData: result.data || {},
           },
