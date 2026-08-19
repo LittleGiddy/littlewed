@@ -1,123 +1,67 @@
-// app/api/invitations/generate-batch/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { generateUniquePassCode } from '@/lib/utils';
-import { generateAndStoreCardImage } from '@/lib/image-storage';
+// lib/image-storage.ts
+import { put } from '@vercel/blob';
+import { prisma } from './prisma';
 
-export async function POST(req: NextRequest) {
+/**
+ * Generate and store a card image for a guest
+ * Returns the static image URL
+ */
+export async function generateAndStoreCardImage(guestId: string): Promise<string> {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'CLIENT') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const tenantId = (session.user as any).tenantId;
-    const { eventId, guestIds } = await req.json();
-
-    if (!eventId || !guestIds || !Array.isArray(guestIds)) {
-      return NextResponse.json({ error: 'Event ID and guest IDs are required' }, { status: 400 });
-    }
-
-    const event = await prisma.event.findFirst({
-      where: { id: eventId, tenantId },
+    // ─── Get guest data ──────────────────────────────────────────────────
+    const guest = await prisma.guest.findUnique({
+      where: { id: guestId },
+      include: { event: true },
     });
 
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    if (!guest) {
+      throw new Error('Guest not found');
     }
 
-    // ─── Fetch guests - check if they have cards ──────────────────────
-    const guests = await prisma.guest.findMany({
-      where: {
-        id: { in: guestIds },
-        eventId,
-      },
-    });
-
-    if (guests.length === 0) {
-      return NextResponse.json({ error: 'No guests found' }, { status: 404 });
+    if (!guest.passCode) {
+      throw new Error('Guest has no pass code');
     }
 
-    const results = [];
-    let completed = 0;
-    let failed = 0;
-    let skipped = 0;
+    // ─── Generate the image using OG API ────────────────────────────────
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
+    const ogUrl = `${baseUrl}/api/og/card?code=${guest.passCode}`;
+    
+    console.log('[ImageStorage] Generating image from:', ogUrl);
+    
+    const response = await fetch(ogUrl);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to generate image: ${response.status}`);
+    }
 
-    for (const guest of guests) {
-      try {
-        // ─── Skip if guest already has a card ──────────────────────────
-        if (guest.invitationCard) {
-          console.log(`[Generate] ⏭️ Skipping ${guest.name} - already has card`);
-          skipped++;
-          results.push({
-            guestId: guest.id,
-            name: guest.name,
-            success: true,
-            skipped: true,
-            message: 'Already has card',
-            cardUrl: guest.invitationCard,
-          });
-          continue;
-        }
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
 
-        // ─── Generate pass code if not already set ──────────────────────
-        let passCode = guest.passCode;
-
-        if (!passCode) {
-          passCode = await generateUniquePassCode(prisma);
-          await prisma.guest.update({
-            where: { id: guest.id },
-            data: { passCode },
-          });
-        }
-
-        // ─── Generate and store the card image ──────────────────────────
-        const imageUrl = await generateAndStoreCardImage(guest.id);
-
-        // ─── Update guest with card URL ──────────────────────────────────
-        await prisma.guest.update({
-          where: { id: guest.id },
-          data: { invitationCard: imageUrl },
-        });
-
-        completed++;
-        results.push({
-          guestId: guest.id,
-          name: guest.name,
-          passCode,
-          imageUrl,
-          success: true,
-        });
-
-      } catch (error: any) {
-        failed++;
-        console.error(`[Generate] ❌ Failed for ${guest.name}:`, error.message);
-        results.push({
-          guestId: guest.id,
-          name: guest.name,
-          success: false,
-          error: error.message,
-        });
+    // ─── Upload to Vercel Blob ───────────────────────────────────────────
+    const blob = await put(
+      `invitations/${guest.id}.png`,
+      imageBuffer,
+      {
+        access: 'public',
+        contentType: 'image/png',
+        addRandomSuffix: false,
+        allowOverwrite: true,
       }
-    }
-
-    return NextResponse.json({
-      success: true,
-      completed,
-      failed,
-      skipped,
-      total: guests.length,
-      results,
-      message: `${completed} generated, ${skipped} already had cards, ${failed} failed`,
-    });
-
-  } catch (error: any) {
-    console.error('[Generate] ❌ Batch error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
     );
+
+    console.log('[ImageStorage] Uploaded to:', blob.url);
+
+    return blob.url;
+  } catch (error: any) {
+    console.error('Failed to generate and store card image:', error);
+    throw error;
   }
+}
+
+/**
+ * Get card image URL from pass code (without storing)
+ */
+export function getCardImageUrl(passCode: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
+  return `${baseUrl}/api/og/card?code=${passCode}`;
 }
