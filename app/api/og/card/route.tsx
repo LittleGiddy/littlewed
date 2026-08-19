@@ -4,7 +4,9 @@ import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 
-export const runtime = 'edge';
+// ─── IMPORTANT: Remove the edge runtime line ──────────────────────────────
+// DO NOT use: export const runtime = 'edge';
+// This will run as a serverless function with 50MB limit
 
 export async function GET(req: NextRequest) {
   try {
