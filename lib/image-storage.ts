@@ -2,7 +2,6 @@
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
-import { ensureFontsConfigured } from './fonts';
 import sharp from 'sharp';
 
 // ─── Type definitions ─────────────────────────────────────────────────────
@@ -92,38 +91,36 @@ async function applyOverlay(
 }
 
 /**
- * Map Google Font names to system font names or local font file names
+ * Map Google Font names to system fallback fonts that Vercel has
  */
-function getFontFamilyForSvg(fontFamily: string): string {
+function getSystemFontFallback(fontFamily: string): string {
   const fontMap: Record<string, string> = {
-    'Playfair Display': 'PlayfairDisplay',
-    'DM Sans': 'DMSans',
-    'Roboto': 'Roboto',
-    'Lora': 'Lora',
-    'Montserrat': 'Montserrat',
+    'Playfair Display': 'Georgia',
+    'DM Sans': 'Arial',
+    'Roboto': 'Arial',
+    'Lora': 'Georgia',
+    'Montserrat': 'Arial',
     'Georgia': 'Georgia',
-    'Open Sans': 'OpenSans',
-    'Raleway': 'Raleway',
-    'Nunito': 'Nunito',
-    'Poppins': 'Poppins',
-    'Great Vibes': 'GreatVibes',
-    'Parisienne': 'Parisienne',
-    'Alex Brush': 'AlexBrush',
-    'Tangerine': 'Tangerine',
-    'Dancing Script': 'DancingScript',
-    'Pacifico': 'Pacifico',
-    'Satisfy': 'Satisfy',
-    'Cedarville Cursive': 'CedarvilleCursive',
-    'Kaushan Script': 'KaushanScript',
+    'Open Sans': 'Arial',
+    'Raleway': 'Arial',
+    'Nunito': 'Arial',
+    'Poppins': 'Arial',
+    'Great Vibes': 'Georgia',
+    'Parisienne': 'Georgia',
+    'Alex Brush': 'Georgia',
+    'Tangerine': 'Georgia',
+    'Dancing Script': 'Georgia',
+    'Pacifico': 'Georgia',
+    'Satisfy': 'Georgia',
+    'Cedarville Cursive': 'Georgia',
+    'Kaushan Script': 'Georgia',
   };
-  return fontMap[fontFamily] || fontFamily;
+  return fontMap[fontFamily] || 'Georgia';
 }
 
 /**
- * Add text layers to the card using SVG overlay.
- * Fonts are resolved via fontconfig from files bundled in public/fonts —
- * see lib/fonts.ts. Remote @import of Google Fonts does NOT work here;
- * librsvg (used by sharp) never fetches external CSS resources.
+ * Add text layers to the card using SVG overlay with system fonts
+ * This uses standard system fonts that should be available on Vercel
  */
 async function addTextLayersToCard(
   cardBuffer: Buffer,
@@ -140,12 +137,10 @@ async function addTextLayersToCard(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // Build SVG with all text layers
   let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   svgContent += `<style>
     .text-layer { 
       font-weight: bold;
-      text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
     }
   </style>`;
 
@@ -162,7 +157,6 @@ async function addTextLayersToCard(
     if (layer.type === 'text') {
       let text = layer.text || '';
       
-      // ─── Replace placeholders ────────────────────────────────────
       if (layer.isGuestName) {
         text = guestName;
       } else if (layer.isGuestType) {
@@ -180,7 +174,6 @@ async function addTextLayersToCard(
           .replace(/{guestType}/g, guest.guestType === 'DOUBLE' ? 'Double' : 'Single');
       }
 
-      // Skip empty text
       if (!text || text.trim() === '') continue;
 
       const x = ((layer.x || 50) / 100) * width;
@@ -191,20 +184,19 @@ async function addTextLayersToCard(
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
       
-      // ✅ Use mapped font name for fontconfig
-      const fontName = getFontFamilyForSvg(fontFamily);
+      // ✅ Use system fallback font
+      const systemFont = getSystemFontFallback(fontFamily);
       
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
       const anchorX = x;
       
-      // Escape text content
       const escapedText = escapeXml(text);
       
       svgContent += `
         <text
           x="${anchorX}"
           y="${y}"
-          font-family="${fontName}"
+          font-family="${systemFont}"
           font-size="${fontSize}"
           fill="${color}"
           text-anchor="${textAnchor}"
@@ -233,7 +225,6 @@ async function addTextLayersToCard(
       .toBuffer();
   } catch (err) {
     console.error('SVG rendering error:', err);
-    // If SVG fails, return the card without text layers
     console.warn('Falling back to card without text layers');
     return cardBuffer;
   }
@@ -244,9 +235,6 @@ export async function generateCardForGuest(
   event: EventLike,
   cardBuffer: Buffer
 ): Promise<string> {
-  // ─── Ensure fonts are configured for sharp ─────────────────────────────
-  ensureFontsConfigured();
-
   // ─── 1. Apply overlay ──────────────────────────────────────────────────
   let processedBuffer = cardBuffer;
   
@@ -285,8 +273,7 @@ export async function generateCardForGuest(
           event
         );
       } catch (textError) {
-        console.error('Failed to add text layers, continuing without them:', textError);
-        // Continue without text layers
+        console.error('Failed to add text layers:', textError);
       }
     }
   }
@@ -346,7 +333,6 @@ export async function generateCardForGuest(
     }
   } catch (qrError) {
     console.error('Failed to composite QR code:', qrError);
-    // Continue without QR
   }
 
   // ─── 6. Add card number if not already in layers ────────────────────
@@ -477,7 +463,6 @@ export async function generateAndStoreCardForGuest(guestId: string): Promise<str
   return imageUrl;
 }
 
-// ─── Legacy function for backward compatibility ─────────────────────────
 export async function generateAndStoreCardImage(guestId: string): Promise<string> {
   return generateAndStoreCardForGuest(guestId);
 }
