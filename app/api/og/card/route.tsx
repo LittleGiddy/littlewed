@@ -26,27 +26,24 @@ export async function GET(req: NextRequest) {
         include: { event: true },
       });
     } else {
-      console.error('[OG Card] Missing guestId or code parameter');
       return new Response('Missing guestId or code parameter', { status: 400 });
     }
 
     if (!guest) {
-      console.error('[OG Card] Guest not found for:', { guestId, code });
-      return new Response('Guest not found', { status: 404 });
+      return new Response(`Guest not found: ${guestId || code}`, { status: 404 });
     }
 
-    console.log('[OG Card] Generating for guest:', guest.id, guest.name);
+    console.log('[OG Card] Guest found:', guest.id, guest.name);
 
     const event = guest.event;
     
     if (!event.templateCardUrl) {
-      console.error('[OG Card] No template for event:', event.id);
       return new Response('No invitation card template configured', { status: 400 });
     }
 
     const guestName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
     
-    // ─── Safely parse date ──────────────────────────────────────────────
+    // ─── Safely get event date ──────────────────────────────────────────
     let eventDate = '';
     try {
       if (event.date) {
@@ -60,7 +57,7 @@ export async function GET(req: NextRequest) {
       console.warn('[OG Card] Date parsing error:', e);
     }
 
-    // ─── Generate QR code for check-in ──────────────────────────────────
+    // ─── Generate QR code ──────────────────────────────────────────────────
     let qrBase64 = '';
     try {
       const qrData = JSON.stringify({
@@ -76,16 +73,15 @@ export async function GET(req: NextRequest) {
       });
       qrBase64 = qrBuffer.toString('base64');
     } catch (qrError) {
-      console.error('[OG Card] QR generation error:', qrError);
-      // Continue without QR code
+      console.error('[OG Card] QR error:', qrError);
     }
 
-    // ─── Get design settings from event ──────────────────────────────────
+    // ─── Get design settings ──────────────────────────────────────────────
     const templateUrl = event.templateCardUrl;
     const overlayColor = event.overlayColor || '#000000';
     const overlayOpacity = event.overlayOpacity || 0.2;
     
-    // ✅ SAFELY PARSE design layers
+    // ─── SAFELY PARSE design layers ──────────────────────────────────────
     let designLayers: any[] = [];
     try {
       if (event.designLayers) {
@@ -96,178 +92,135 @@ export async function GET(req: NextRequest) {
         }
       }
     } catch (e) {
-      console.warn('[OG Card] Failed to parse design layers:', e);
-      // Use empty array if parsing fails
+      console.warn('[OG Card] Layer parse error:', e);
+      designLayers = [];
     }
 
-    // ─── Also get the QR position from event ────────────────────────────
+    // ─── QR position ──────────────────────────────────────────────────────
     const qrPosition = {
       x: event.qrPlacementX ?? 50,
       y: event.qrPlacementY ?? 70,
       size: Math.min(event.qrSize ?? 120, 200),
     };
 
-    // ─── Render the invitation card ────────────────────────────────────
-    try {
-      return new ImageResponse(
-        (
-          <div
+    // ─── DEBUG: Return a simple card first ─────────────────────────────
+    // This will help us confirm if ImageResponse works at all
+    
+    const cardContent = (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          padding: '40px',
+        }}
+      >
+        {/* Background Image */}
+        {templateUrl && (
+          <img
+            src={templateUrl}
             style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
               width: '100%',
               height: '100%',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#ffffff',
-              padding: '40px',
+              objectFit: 'cover',
             }}
-          >
-            {/* Template Background */}
-            {templateUrl && (
-              <img
-                src={templateUrl}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                }}
-              />
-            )}
+          />
+        )}
 
-            {/* Overlay */}
-            {overlayOpacity > 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: overlayColor,
-                  opacity: overlayOpacity,
-                }}
-              />
-            )}
+        {/* Overlay */}
+        {overlayOpacity > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: overlayColor,
+              opacity: overlayOpacity,
+            }}
+          />
+        )}
 
-            {/* ─── Design Layers ─── */}
-            {Array.isArray(designLayers) && designLayers.map((layer: any, index: number) => {
-              if (!layer || layer.visible === false) return null;
-              
-              try {
-                const x = ((layer.x || 50) / 100) * 800;
-                const y = ((layer.y || 50) / 100) * 1200;
+        {/* Guest Name - always show this */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '100px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '48px',
+            fontFamily: 'Georgia, serif',
+            color: '#ffffff',
+            textAlign: 'center',
+            textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
+            width: '80%',
+            zIndex: 10,
+          }}
+        >
+          {guestName}
+        </div>
 
-                if (layer.type === 'text') {
-                  let text = layer.text || '';
-                  
-                  // ─── Replace placeholders with actual guest data ────────────
-                  if (layer.isGuestName) {
-                    text = guestName;
-                  } else if (layer.isGuestType) {
-                    text = guest.title || guest.guestType || '';
-                  } else if (layer.isCardNumber) {
-                    text = guest.cardNumber || '';
-                  } else {
-                    text = String(text)
-                      .replace(/{guestName}/g, guestName)
-                      .replace(/{guestTitle}/g, guest.title || '')
-                      .replace(/{cardNumber}/g, guest.cardNumber || '')
-                      .replace(/{eventName}/g, event.name || '')
-                      .replace(/{eventDate}/g, eventDate)
-                      .replace(/{venue}/g, event.venue || '');
-                  }
+        {/* QR Code */}
+        {qrBase64 && (
+          <img
+            src={`data:image/png;base64,${qrBase64}`}
+            style={{
+              position: 'absolute',
+              bottom: '200px',
+              right: '50px',
+              width: '120px',
+              height: '120px',
+              zIndex: 10,
+            }}
+          />
+        )}
 
-                  const fontSize = layer.fontSize || 24;
-                  const fontFamily = layer.fontFamily || 'Playfair Display, serif';
-                  const color = layer.color || '#ffffff';
-                  
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        left: x,
-                        top: y,
-                        transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
-                        fontSize: fontSize,
-                        fontFamily: fontFamily,
-                        color: color,
-                        textAlign: (layer.align || 'center') as any,
-                        fontWeight: 'bold',
-                        width: '80%',
-                        textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                      }}
-                    >
-                      {text}
-                    </div>
-                  );
-                }
+        {/* Debug info - remove this later */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '20px',
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.5)',
+            fontFamily: 'monospace',
+            zIndex: 10,
+          }}
+        >
+          Guest: {guest.id}
+        </div>
+      </div>
+    );
 
-                if (layer.type === 'rect') {
-                  const width = ((layer.width || 30) / 100) * 800;
-                  const height = ((layer.height || 20) / 100) * 1200;
-                  
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        position: 'absolute',
-                        left: x - width/2,
-                        top: y - height/2,
-                        width: width,
-                        height: height,
-                        backgroundColor: layer.fill || 'rgba(255,255,255,0.2)',
-                        border: `${layer.borderWidth || 0}px solid ${layer.borderColor || 'transparent'}`,
-                        borderRadius: '4px',
-                        transform: `rotate(${layer.rotation || 0}deg)`,
-                      }}
-                    />
-                  );
-                }
-
-                return null;
-              } catch (layerError) {
-                console.error('[OG Card] Error rendering layer:', layerError);
-                return null;
-              }
-            })}
-
-            {/* ─── QR Code ─── */}
-            {qrBase64 && (
-              <img
-                src={`data:image/png;base64,${qrBase64}`}
-                style={{
-                  position: 'absolute',
-                  left: `${qrPosition.x}%`,
-                  top: `${qrPosition.y}%`,
-                  transform: `translate(-50%, -50%) rotate(${event.qrRotation || 0}deg)`,
-                  width: qrPosition.size,
-                  height: qrPosition.size,
-                }}
-              />
-            )}
-          </div>
-        ),
-        {
-          width: 800,
-          height: 1200,
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-        }
-      );
-    } catch (imageError) {
-      console.error('[OG Card] ImageResponse error:', imageError);
-      return new Response(`Image generation error: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`, { status: 500 });
-    }
+    // ─── Return the image ──────────────────────────────────────────────────
+    return new ImageResponse(cardContent, {
+      width: 800,
+      height: 1200,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      },
+    });
 
   } catch (error: any) {
-    console.error('[OG Card] Fatal error:', error);
-    return new Response(`Fatal error: ${error.message || 'Unknown error'}`, { status: 500 });
+    console.error('[OG Card] Error:', error);
+    // Return a plain text error response so we can see it
+    return new Response(
+      `Error: ${error.message}\n\nStack: ${error.stack || 'No stack'}`,
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      }
+    );
   }
 }
