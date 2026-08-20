@@ -91,36 +91,58 @@ async function applyOverlay(
 }
 
 /**
- * Map Google Font names to system fallback fonts that Vercel has
+ * Render text as an image using Sharp's text rendering
+ * This works on Vercel because it doesn't rely on fontconfig
  */
-function getSystemFontFallback(fontFamily: string): string {
-  const fontMap: Record<string, string> = {
-    'Playfair Display': 'Georgia',
-    'DM Sans': 'Arial',
-    'Roboto': 'Arial',
-    'Lora': 'Georgia',
-    'Montserrat': 'Arial',
-    'Georgia': 'Georgia',
-    'Open Sans': 'Arial',
-    'Raleway': 'Arial',
-    'Nunito': 'Arial',
-    'Poppins': 'Arial',
-    'Great Vibes': 'Georgia',
-    'Parisienne': 'Georgia',
-    'Alex Brush': 'Georgia',
-    'Tangerine': 'Georgia',
-    'Dancing Script': 'Georgia',
-    'Pacifico': 'Georgia',
-    'Satisfy': 'Georgia',
-    'Cedarville Cursive': 'Georgia',
-    'Kaushan Script': 'Georgia',
-  };
-  return fontMap[fontFamily] || 'Georgia';
+async function renderTextAsImage(
+  text: string,
+  fontSize: number,
+  fontFamily: string,
+  color: string,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  align: string,
+  rotation: number,
+  shadow: boolean = true
+): Promise<Buffer> {
+  // Create SVG with text
+  const fontName = fontFamily;
+  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
+  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
+  
+  const shadowStyle = shadow ? `
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/>
+    </filter>
+  ` : '';
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  ${shadowStyle}
+  <text
+    x="${anchorX}"
+    y="${y}"
+    font-family="${fontName}, Georgia, serif"
+    font-size="${fontSize}"
+    fill="${color}"
+    text-anchor="${textAnchor}"
+    dominant-baseline="middle"
+    transform="rotate(${rotation}, ${anchorX}, ${y})"
+    ${shadow ? 'filter="url(#shadow)"' : ''}
+  >${escapeXml(text)}</text>
+</svg>`;
+
+  // Render SVG to buffer
+  return await sharp(Buffer.from(svg))
+    .png()
+    .toBuffer();
 }
 
 /**
- * Add text layers to the card using SVG overlay with system fonts
- * This uses standard system fonts that should be available on Vercel
+ * Add text layers to the card using image-based text rendering
+ * This approach works reliably on Vercel
  */
 async function addTextLayersToCard(
   cardBuffer: Buffer,
@@ -137,13 +159,6 @@ async function addTextLayersToCard(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
-  svgContent += `<style>
-    .text-layer { 
-      font-weight: bold;
-    }
-  </style>`;
-
   const guestName = getGuestFullName(guest);
   const eventDate = event.date ? new Date(event.date).toLocaleDateString('sw-TZ', {
     day: 'numeric',
@@ -151,12 +166,16 @@ async function addTextLayersToCard(
     year: 'numeric',
   }) : '';
 
+  // Collect all text layers to render
+  const textComposites: sharp.OverlayOptions[] = [];
+
   for (const layer of layers) {
     if (!layer || layer.visible === false) continue;
     
     if (layer.type === 'text') {
       let text = layer.text || '';
       
+      // ─── Replace placeholders ────────────────────────────────────
       if (layer.isGuestName) {
         text = guestName;
       } else if (layer.isGuestType) {
@@ -176,58 +195,50 @@ async function addTextLayersToCard(
 
       if (!text || text.trim() === '') continue;
 
-      const x = ((layer.x || 50) / 100) * width;
-      const y = ((layer.y || 50) / 100) * height;
+      const x = (layer.x || 50) / 100 * width;
+      const y = (layer.y || 50) / 100 * height;
       const fontSize = layer.fontSize || 24;
       const fontFamily = layer.fontFamily || 'Playfair Display';
       const color = layer.color || '#ffffff';
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
       
-      // ✅ Use system fallback font
-      const systemFont = getSystemFontFallback(fontFamily);
-      
-      const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
-      const anchorX = x;
-      
-      const escapedText = escapeXml(text);
-      
-      svgContent += `
-        <text
-          x="${anchorX}"
-          y="${y}"
-          font-family="${systemFont}"
-          font-size="${fontSize}"
-          fill="${color}"
-          text-anchor="${textAnchor}"
-          dominant-baseline="middle"
-          transform="rotate(${rotation}, ${anchorX}, ${y})"
-          class="text-layer"
-        >${escapedText}</text>
-      `;
+      // Render text as image
+      try {
+        const textImage = await renderTextAsImage(
+          text,
+          fontSize,
+          fontFamily,
+          color,
+          width,
+          height,
+          x,
+          y,
+          align,
+          rotation
+        );
+
+        // Add to composites
+        textComposites.push({
+          input: textImage,
+          top: 0,
+          left: 0,
+        });
+      } catch (textError) {
+        console.error('Failed to render text layer:', textError);
+      }
     }
   }
 
-  svgContent += '</svg>';
-
-  const svgBuffer = Buffer.from(svgContent);
-  
-  try {
-    return await sharp(cardBuffer)
-      .composite([
-        {
-          input: svgBuffer,
-          top: 0,
-          left: 0,
-        },
-      ])
-      .png()
-      .toBuffer();
-  } catch (err) {
-    console.error('SVG rendering error:', err);
-    console.warn('Falling back to card without text layers');
+  if (textComposites.length === 0) {
     return cardBuffer;
   }
+
+  // Apply all text layers
+  return await sharp(cardBuffer)
+    .composite(textComposites)
+    .png()
+    .toBuffer();
 }
 
 export async function generateCardForGuest(
@@ -339,24 +350,24 @@ export async function generateCardForGuest(
   const hasCardNumberLayer = designLayers.some(l => l.isCardNumber);
   if (guest.cardNumber && !hasCardNumberLayer) {
     try {
-      const cardNumberSvg = `
-        <svg width="${width}" height="${height}">
-          <text
-            x="${width - 30}"
-            y="${height - 30}"
-            font-family="monospace"
-            font-size="16"
-            fill="rgba(255,255,255,0.7)"
-            text-anchor="end"
-            dominant-baseline="middle"
-          >#${escapeXml(guest.cardNumber)}</text>
-        </svg>
-      `;
+      const cardNumberImage = await renderTextAsImage(
+        `#${guest.cardNumber}`,
+        16,
+        'monospace',
+        'rgba(255,255,255,0.7)',
+        width,
+        height,
+        width - 30,
+        height - 30,
+        'right',
+        0,
+        false
+      );
       
       finalBuffer = await sharp(finalBuffer)
         .composite([
           {
-            input: Buffer.from(cardNumberSvg),
+            input: cardNumberImage,
             top: 0,
             left: 0,
           },
@@ -372,32 +383,24 @@ export async function generateCardForGuest(
   const hasGuestTypeLayer = designLayers.some(l => l.isGuestType);
   if (guest.guestType === 'DOUBLE' && !hasGuestTypeLayer) {
     try {
-      const guestTypeSvg = `
-        <svg width="${width}" height="${height}">
-          <rect
-            x="${width - 110}"
-            y="${height - 65}"
-            width="80"
-            height="24"
-            rx="12"
-            fill="rgba(0,0,0,0.3)"
-          />
-          <text
-            x="${width - 70}"
-            y="${height - 53}"
-            font-family="Arial, sans-serif"
-            font-size="11"
-            fill="rgba(255,255,255,0.6)"
-            text-anchor="middle"
-            dominant-baseline="middle"
-          >+1 Guest</text>
-        </svg>
-      `;
+      const guestTypeImage = await renderTextAsImage(
+        '+1 Guest',
+        11,
+        'Arial',
+        'rgba(255,255,255,0.6)',
+        width,
+        height,
+        width - 70,
+        height - 53,
+        'center',
+        0,
+        false
+      );
       
       finalBuffer = await sharp(finalBuffer)
         .composite([
           {
-            input: Buffer.from(guestTypeSvg),
+            input: guestTypeImage,
             top: 0,
             left: 0,
           },
