@@ -2,6 +2,7 @@
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
+import { ensureFontsConfigured } from './fonts';
 import sharp from 'sharp';
 
 // ─── Type definitions ─────────────────────────────────────────────────────
@@ -50,38 +51,6 @@ function escapeXml(str: string): string {
 }
 
 /**
- * Get Google Font URL for a given font family
- */
-function getGoogleFontUrl(fontFamily: string): string {
-  const fontMap: Record<string, string> = {
-    'Playfair Display': 'Playfair+Display:wght@400;700',
-    'DM Sans': 'DM+Sans:wght@400;700',
-    'Roboto': 'Roboto:wght@400;700',
-    'Lora': 'Lora:wght@400;700',
-    'Montserrat': 'Montserrat:wght@400;700',
-    'Georgia': 'Georgia',
-    'Open Sans': 'Open+Sans:wght@400;700',
-    'Raleway': 'Raleway:wght@400;700',
-    'Nunito': 'Nunito:wght@400;700',
-    'Poppins': 'Poppins:wght@400;700',
-    'Great Vibes': 'Great+Vibes',
-    'Parisienne': 'Parisienne',
-    'Alex Brush': 'Alex+Brush',
-    'Tangerine': 'Tangerine',
-    'Dancing Script': 'Dancing+Script:wght@400;700',
-    'Pacifico': 'Pacifico',
-    'Satisfy': 'Satisfy',
-    'Cedarville Cursive': 'Cedarville+Cursive',
-    'Kaushan Script': 'Kaushan+Script',
-  };
-  
-  const fontName = fontMap[fontFamily];
-  if (!fontName) return '';
-  
-  return `https://fonts.googleapis.com/css2?family=${fontName}&display=swap`;
-}
-
-/**
  * Apply overlay to the card
  */
 async function applyOverlay(
@@ -123,7 +92,10 @@ async function applyOverlay(
 }
 
 /**
- * Add text layers to the card using SVG overlay with Google Fonts
+ * Add text layers to the card using SVG overlay.
+ * Fonts are resolved via fontconfig from files bundled in public/fonts —
+ * see lib/fonts.ts. Remote @import of Google Fonts does NOT work here;
+ * librsvg (used by sharp) never fetches external CSS resources.
  */
 async function addTextLayersToCard(
   cardBuffer: Buffer,
@@ -140,36 +112,13 @@ async function addTextLayersToCard(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // Collect all unique fonts used in layers
-  const usedFonts = new Set<string>();
-  for (const layer of layers) {
-    if (layer.type === 'text' && layer.fontFamily) {
-      usedFonts.add(layer.fontFamily);
-    }
-  }
-
-  // Build font imports - using CDATA to avoid XML parsing issues
-  let fontImports = '';
-  for (const font of usedFonts) {
-    const fontUrl = getGoogleFontUrl(font);
-    if (fontUrl) {
-      // Use CDATA to wrap the @import to avoid XML parsing issues
-      fontImports += `@import url("${fontUrl}");\n`;
-    }
-  }
-
   // Build SVG with all text layers
   let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
-  
-  // Add CDATA for styles to prevent XML parsing issues
   svgContent += `<style>
-    <![CDATA[
-      ${fontImports}
-      .text-layer { 
-        font-weight: bold;
-        text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
-      }
-    ]]>
+    .text-layer { 
+      font-weight: bold;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+    }
   </style>`;
 
   const guestName = getGuestFullName(guest);
@@ -215,7 +164,7 @@ async function addTextLayersToCard(
       const align = layer.align || 'center';
       
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
-      const anchorX = align === 'left' ? x : align === 'right' ? x : x;
+      const anchorX = x;
       
       // Escape text content
       const escapedText = escapeXml(text);
@@ -224,7 +173,7 @@ async function addTextLayersToCard(
         <text
           x="${anchorX}"
           y="${y}"
-          font-family="${fontFamily}, Georgia, serif"
+          font-family="${fontFamily}"
           font-size="${fontSize}"
           fill="${color}"
           text-anchor="${textAnchor}"
@@ -264,6 +213,8 @@ export async function generateCardForGuest(
   event: EventLike,
   cardBuffer: Buffer
 ): Promise<string> {
+  ensureFontsConfigured();
+
   // ─── 1. Apply overlay ──────────────────────────────────────────────────
   let processedBuffer = cardBuffer;
   
