@@ -4,8 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
-import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
-
+import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -51,17 +50,15 @@ export async function POST(req: NextRequest) {
 
     if (!cardImageUrl) {
       try {
-        cardImageUrl = await generateAndStoreCardImage(guest.id);
+        cardImageUrl = await generateAndStoreCardForGuest(guest.id);
       } catch (error) {
-        console.error('Failed to generate card image, using fallback:', error);
-        cardImageUrl = getCardImageUrl(guest.passCode);
+        console.error('Failed to generate card image on send:', error);
       }
     }
 
     if (!cardImageUrl) {
       cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
     }
-
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
           day: 'numeric',
