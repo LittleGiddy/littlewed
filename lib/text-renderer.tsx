@@ -1,6 +1,7 @@
 // lib/text-renderer.tsx
 import { ImageResponse } from '@vercel/og';
 import sharp from 'sharp';
+import React from 'react';
 
 /**
  * Escape XML special characters
@@ -45,9 +46,10 @@ export async function renderTextToImage(
   try {
     // Use @vercel/og to render text
     const response = new ImageResponse(
-      (
-        <div
-          style={{
+      React.createElement(
+        'div',
+        {
+          style: {
             width: '100%',
             height: '100%',
             display: 'flex',
@@ -58,10 +60,12 @@ export async function renderTextToImage(
             left: 0,
             transform: `rotate(${rotation}deg)`,
             transformOrigin: `${x}px ${y}px`,
-          }}
-        >
-          <div
-            style={{
+          },
+        },
+        React.createElement(
+          'div',
+          {
+            style: {
               fontSize: `${fontSize}px`,
               fontFamily: fontFamily,
               color: color,
@@ -73,11 +77,10 @@ export async function renderTextToImage(
               display: 'flex',
               alignItems: 'center',
               justifyContent: justifyContent,
-            }}
-          >
-            {text}
-          </div>
-        </div>
+            },
+          },
+          text
+        )
       ),
       {
         width: width,

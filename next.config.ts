@@ -1,7 +1,8 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ['sharp'],
+  serverExternalPackages: ['sharp', '@vercel/og'],
   images: {
     remotePatterns: [
       {
@@ -33,6 +34,15 @@ const nextConfig = {
       allowedOrigins: ['localhost:3000', 'littlewed.co.tz', '*.littlewed.co.tz', 'littlewed-kappa.vercel.app'],
     },
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@vercel/og': require.resolve('@vercel/og'),
+      };
+    }
+    return config;
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
