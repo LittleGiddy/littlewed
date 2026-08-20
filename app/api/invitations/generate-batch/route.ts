@@ -1,3 +1,4 @@
+// app/api/invitations/generate-batch/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -60,6 +61,9 @@ export async function POST(req: NextRequest) {
     const results = await runWithConcurrency(guests, CONCURRENCY, async (guest) => {
       try {
         const passCode = guest.passCode || (await generateUniquePassCode(prisma));
+        
+        // ─── Generate the card using the new function ─────────────────────
+        // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
         const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
         await prisma.guest.update({
@@ -67,10 +71,21 @@ export async function POST(req: NextRequest) {
           data: { passCode, invitationCard: imageUrl },
         });
 
-        return { guestId: guest.id, name: guest.name, passCode, imageUrl, success: true };
+        return { 
+          guestId: guest.id, 
+          name: guest.name, 
+          passCode, 
+          imageUrl, 
+          success: true 
+        };
       } catch (error: any) {
         console.error(`Failed to generate card for ${guest.name}:`, error.message);
-        return { guestId: guest.id, name: guest.name, success: false, error: error.message };
+        return { 
+          guestId: guest.id, 
+          name: guest.name, 
+          success: false, 
+          error: error.message 
+        };
       }
     });
 
@@ -78,7 +93,10 @@ export async function POST(req: NextRequest) {
     const failed = results.filter((r) => !r.success).length;
 
     return NextResponse.json({
-      success: true, completed, failed, results,
+      success: true, 
+      completed, 
+      failed, 
+      results,
       message: `${completed} cards generated, ${failed} failed`,
     });
   } catch (error: any) {

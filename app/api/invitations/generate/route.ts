@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
 import { put } from '@vercel/blob';
+import { fetchTemplateBuffer, generateCardForGuest } from '@/lib/image-storage';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
@@ -62,22 +63,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const qrPosition = {
-      x: event.qrPlacementX ?? 100,
-      y: event.qrPlacementY ?? 100,
-      size: event.qrSize ?? 200,
-    };
-
-    const namePosition = event.includeName
-      ? {
-          x: event.namePlacementX ?? 50,
-          y: event.namePlacementY ?? 50,
-          fontSize: event.nameFontSize ?? 24,
-          fontColor: event.nameFontColor ?? '#000000',
-          fontFamily: event.nameFontFamily || 'Playfair Display, serif',
-        }
-      : null;
-
     // ─── Fetch the base card once ──────────────────────────────────────
     let cardBuffer: Buffer;
     try {
@@ -99,44 +84,22 @@ export async function POST(req: NextRequest) {
 
     for (const guest of event.guests) {
       try {
-        // ─── 1. Get card number (use guest.cardNumber or generate one) ──
-        const cardNumber = guest.cardNumber || '00000';
-        
-        // ─── 2. Generate QR from card number ────────────────────────────
-        const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size);
-        
-        // ─── 3. Get guest details ──────────────────────────────────────
-        const fullName = getGuestFullName(guest);
+        // ─── Use the new generateCardForGuest function ────────────────────
+        // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
+        const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
-        // ─── 4. Composite QR on card ───────────────────────────────────
-        const finalCardBuffer = await compositeQROnCard(
-          cardBuffer,
-          qrBuffer,
-          qrPosition,
-          namePosition,
-          event.includeName ? fullName : undefined,
-          cardNumber
-        );
-
-        // ─── 5. Upload to Vercel Blob ──────────────────────────────────
-        const key = `guests/${event.tenantId}/${guest.id}.png`;
-        const blob = await put(key, finalCardBuffer, {
-          access: 'public',
-          contentType: 'image/png',
-          allowOverwrite: true,
-        });
-
-        // ─── 6. Update database ────────────────────────────────────────
+        // ─── Update database ──────────────────────────────────────────────
         await prisma.guest.update({
           where: { id: guest.id },
-          data: { invitationCard: blob.url },
+          data: { invitationCard: imageUrl },
         });
 
+        const fullName = getGuestFullName(guest);
         results.push({ 
           guestId: guest.id, 
           name: fullName, 
           success: true,
-          cardUrl: blob.url,
+          cardUrl: imageUrl,
         });
         completed++;
       } catch (error: any) {
