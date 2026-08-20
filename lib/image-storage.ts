@@ -6,9 +6,9 @@ import { prisma } from './prisma';
  * Generate and store a card image for a guest
  * Returns the static image URL
  */
-// lib/image-storage.ts
 export async function generateAndStoreCardImage(guestId: string): Promise<string> {
   try {
+    // ─── Get guest with event data ─────────────────────────────────────
     const guest = await prisma.guest.findUnique({
       where: { id: guestId },
       include: { event: true },
@@ -24,17 +24,21 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
       throw new Error('No invitation card configured for this event');
     }
 
-    const guestName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    // ─── Generate the image using OG API ────────────────────────────────
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
-    
-    // ✅ Pass data as URL parameters
-    const ogUrl = `${baseUrl}/api/og/card?name=${encodeURIComponent(guestName)}&template=${encodeURIComponent(event.templateCardUrl)}&cardNumber=${guest.cardNumber || ''}`;
+    const ogUrl = `${baseUrl}/api/og/card?guestId=${guest.id}`;
     
     console.log('[ImageStorage] Generating image from:', ogUrl);
     
-    const response = await fetch(ogUrl);
+    const response = await fetch(ogUrl, {
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[ImageStorage] OG API error:', response.status, errorText);
       throw new Error(`Failed to generate image: ${response.status}`);
     }
 
@@ -53,9 +57,29 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
       }
     );
 
+    console.log('[ImageStorage] Uploaded to:', blob.url);
     return blob.url;
+
   } catch (error: any) {
     console.error('Failed to generate and store card image:', error);
     throw error;
   }
+}
+
+/**
+ * Get card image URL from pass code (without storing)
+ * This returns the OG URL that generates the card on-the-fly
+ */
+export function getCardImageUrl(passCode: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
+  return `${baseUrl}/api/og/card?code=${passCode}`;
+}
+
+/**
+ * Get card image URL from guest ID (without storing)
+ * This returns the OG URL that generates the card on-the-fly
+ */
+export function getCardImageUrlByGuestId(guestId: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
+  return `${baseUrl}/api/og/card?guestId=${guestId}`;
 }
