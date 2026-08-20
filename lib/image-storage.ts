@@ -1,4 +1,5 @@
 // lib/image-storage.ts
+import './fonts'; // MUST be the first import — sets FONTCONFIG_FILE before sharp initializes
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
