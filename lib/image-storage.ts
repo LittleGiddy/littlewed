@@ -1,12 +1,15 @@
 // lib/image-storage.ts
+// ─── COMPLETELY DISABLE FONTCONFIG ──────────────────────────────────────
+// This must be set BEFORE importing sharp
+process.env.SHARP_FONTCONFIG = '0';
+process.env.FONTCONFIG_FILE = '/dev/null';
+process.env.FONTCONFIG_PATH = '/dev/null';
+
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
-import { renderTextToImage } from './text-renderer';
 import sharp from 'sharp';
-
-// ─── Disable fontconfig warnings ─────────────────────────────────────────
-process.env.SHARP_FONTCONFIG = '0';
+import { renderTextToImage } from './text-renderer';
 
 // ─── Type definitions ─────────────────────────────────────────────────────
 interface EventLike {
@@ -116,7 +119,7 @@ export async function generateCardForGuest(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // ─── 4. Add text layers using @vercel/og ──────────────────────────────
+  // ─── 4. Add text layers ──────────────────────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
@@ -164,7 +167,7 @@ export async function generateCardForGuest(
       const y = ((layer.y || 50) / 100) * height;
       
       try {
-        // ─── Render text using @vercel/og ──────────────────────────────
+        // ─── Render text using Satori-based renderer ────────────────────
         const textImage = await renderTextToImage(text, {
           fontSize: layer.fontSize || 24,
           fontFamily: layer.fontFamily || 'Playfair Display',
