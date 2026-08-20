@@ -1,6 +1,6 @@
 // lib/image-storage.ts
 // ─── COMPLETELY DISABLE FONTCONFIG ──────────────────────────────────────
-// This must be set BEFORE importing sharp
+// These must be set BEFORE importing sharp
 process.env.SHARP_FONTCONFIG = '0';
 process.env.FONTCONFIG_FILE = '/dev/null';
 process.env.FONTCONFIG_PATH = '/dev/null';
@@ -9,7 +9,6 @@ import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
-import { renderTextToImage } from './text-renderer';
 
 // ─── Type definitions ─────────────────────────────────────────────────────
 interface EventLike {
@@ -47,6 +46,49 @@ export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buff
 }
 
 /**
+ * Escape XML special characters
+ */
+function escapeXml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Map Google Font names to system fonts available on Vercel
+ */
+function getSystemFont(fontFamily: string): string {
+  const fontMap: Record<string, string> = {
+    'Playfair Display': 'Georgia',
+    'DM Sans': 'Arial',
+    'Roboto': 'Arial',
+    'Lora': 'Georgia',
+    'Montserrat': 'Arial',
+    'Open Sans': 'Arial',
+    'Raleway': 'Arial',
+    'Nunito': 'Arial',
+    'Poppins': 'Arial',
+    'Great Vibes': 'Georgia',
+    'Parisienne': 'Georgia',
+    'Alex Brush': 'Georgia',
+    'Tangerine': 'Georgia',
+    'Dancing Script': 'Georgia',
+    'Pacifico': 'Georgia',
+    'Satisfy': 'Georgia',
+    'Cedarville Cursive': 'Georgia',
+    'Kaushan Script': 'Georgia',
+    'Georgia': 'Georgia',
+    'monospace': 'monospace',
+    'Arial': 'Arial',
+  };
+  return fontMap[fontFamily] || 'Georgia';
+}
+
+/**
  * Apply overlay to the card
  */
 async function applyOverlay(
@@ -80,6 +122,60 @@ async function applyOverlay(
     ])
     .png()
     .toBuffer();
+}
+
+/**
+ * Render text as SVG with system fonts
+ */
+async function renderTextSvg(
+  text: string,
+  options: {
+    fontSize: number;
+    fontFamily: string;
+    color: string;
+    align: 'left' | 'center' | 'right';
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+    rotation: number;
+    shadow?: boolean;
+  }
+): Promise<Buffer> {
+  const { 
+    fontSize, fontFamily, color, align, width, height, x, y, rotation, shadow = true 
+  } = options;
+
+  const systemFont = getSystemFont(fontFamily);
+  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
+  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
+  
+  const shadowStyle = shadow ? `
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/>
+    </filter>
+  ` : '';
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    ${shadowStyle}
+  </defs>
+  <text
+    x="${anchorX}"
+    y="${y}"
+    font-family="${systemFont}, serif"
+    font-size="${fontSize}"
+    fill="${color}"
+    text-anchor="${textAnchor}"
+    dominant-baseline="middle"
+    transform="rotate(${rotation}, ${anchorX}, ${y})"
+    ${shadow ? 'filter="url(#shadow)"' : ''}
+    style="font-weight: bold;"
+  >${escapeXml(text)}</text>
+</svg>`;
+
+  return await sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 export async function generateCardForGuest(
@@ -119,13 +215,12 @@ export async function generateCardForGuest(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // ─── 4. Add text layers ──────────────────────────────────────────────
+  // ─── 4. Add text layers using pure SVG ──────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
     const textLayers = designLayers.filter(l => l.type === 'text');
     
-    // ─── Pre-compute all dynamic values ──────────────────────────────────
     const guestFullName = getGuestFullName(guest);
     const guestTitle = guest?.title || '';
     const cardNumber = guest?.cardNumber || '';
@@ -143,7 +238,6 @@ export async function generateCardForGuest(
       
       let text = layer.text || '';
       
-      // ─── Replace placeholders ──────────────────────────────────────────
       if (layer.isGuestName) {
         text = guestFullName;
       } else if (layer.isGuestType) {
@@ -167,8 +261,7 @@ export async function generateCardForGuest(
       const y = ((layer.y || 50) / 100) * height;
       
       try {
-        // ─── Render text using Satori-based renderer ────────────────────
-        const textImage = await renderTextToImage(text, {
+        const textImage = await renderTextSvg(text, {
           fontSize: layer.fontSize || 24,
           fontFamily: layer.fontFamily || 'Playfair Display',
           color: layer.color || '#ffffff',
@@ -192,7 +285,6 @@ export async function generateCardForGuest(
     }
   }
 
-  // Apply text layers
   if (textComposites.length > 0) {
     processedBuffer = await sharp(processedBuffer)
       .composite(textComposites)
@@ -254,7 +346,7 @@ export async function generateCardForGuest(
   const hasCardNumberLayer = designLayers.some(l => l.isCardNumber);
   if (guest.cardNumber && !hasCardNumberLayer) {
     try {
-      const cardNumberImage = await renderTextToImage(
+      const cardNumberImage = await renderTextSvg(
         `#${guest.cardNumber}`,
         {
           fontSize: 16,
@@ -289,7 +381,7 @@ export async function generateCardForGuest(
   const hasGuestTypeLayer = designLayers.some(l => l.isGuestType);
   if (guest.guestType === 'DOUBLE' && !hasGuestTypeLayer) {
     try {
-      const guestTypeImage = await renderTextToImage(
+      const guestTypeImage = await renderTextSvg(
         '+1 Guest',
         {
           fontSize: 11,
