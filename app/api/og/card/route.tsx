@@ -3,7 +3,9 @@ import { ImageResponse } from '@vercel/og';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export const runtime = 'edge';
+// ❌ REMOVE THIS LINE:
+// export const runtime = 'edge';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
