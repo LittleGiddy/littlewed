@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateUniquePassCode } from '@/lib/utils';
-import { fetchTemplateBuffer, generateCardForGuest, runWithConcurrency } from '@/lib/image-generation';
+import { fetchTemplateBuffer, generateCardForGuest, runWithConcurrency } from '@/lib/image-storage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // Hobby-plan max — a safety net, not the main strategy
