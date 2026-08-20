@@ -1,6 +1,7 @@
+// lib/image-storage.ts
 import { put } from '@vercel/blob';
-import { generateQRFromCardNumber, compositeQROnCard } from './qr';
 import { prisma } from './prisma';
+import { generateQRFromCardNumber, compositeQROnCard } from './qr';
 
 interface EventLike {
   tenantId: string;
@@ -18,32 +19,6 @@ interface EventLike {
 
 function getGuestFullName(guest: any): string {
   return guest.title ? `${guest.title} ${guest.name}` : guest.name;
-}
-
-export async function generateAndStoreCardForGuest(guestId: string): Promise<string> {
-  const guest = await prisma.guest.findUnique({
-    where: { id: guestId },
-    include: { event: true },
-  });
-
-  if (!guest) {
-    throw new Error('Guest not found');
-  }
-
-  const event = guest.event;
-  if (!event.templateCardUrl) {
-    throw new Error('No invitation card template configured for this event');
-  }
-
-  const cardBuffer = await fetchTemplateBuffer(event.templateCardUrl);
-  const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
-
-  await prisma.guest.update({
-    where: { id: guest.id },
-    data: { invitationCard: imageUrl },
-  });
-
-  return imageUrl;
 }
 
 export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buffer> {
@@ -65,7 +40,6 @@ export async function generateCardForGuest(
     size: event.qrSize ?? 200,
   };
 
-  
   const namePosition = event.includeName
     ? {
         x: event.namePlacementX ?? 50,
@@ -114,4 +88,30 @@ export async function runWithConcurrency<T, R>(
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
+}
+
+export async function generateAndStoreCardForGuest(guestId: string): Promise<string> {
+  const guest = await prisma.guest.findUnique({
+    where: { id: guestId },
+    include: { event: true },
+  });
+
+  if (!guest) {
+    throw new Error('Guest not found');
+  }
+
+  const event = guest.event;
+  if (!event.templateCardUrl) {
+    throw new Error('No invitation card template configured for this event');
+  }
+
+  const cardBuffer = await fetchTemplateBuffer(event.templateCardUrl);
+  const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
+
+  await prisma.guest.update({
+    where: { id: guest.id },
+    data: { invitationCard: imageUrl },
+  });
+
+  return imageUrl;
 }
