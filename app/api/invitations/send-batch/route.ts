@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
-import { generateAndStoreCardImage, getCardImageUrl } from '@/lib/image-storage';
+import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
@@ -80,15 +80,14 @@ export async function POST(req: NextRequest) {
             continue;
           }
 
-          // ─── Ensure card image exists ──────────────────────────────────
+                   // ─── Ensure card image exists ──────────────────────────────────
           let cardImageUrl = guest.invitationCard;
 
           if (!cardImageUrl) {
             try {
-              cardImageUrl = await generateAndStoreCardImage(guest.id);
+              cardImageUrl = await generateAndStoreCardForGuest(guest.id);
             } catch (error) {
               console.error(`[Batch] Failed to generate card image for ${guest.name}:`, error);
-              cardImageUrl = getCardImageUrl(guest.passCode);
             }
           }
 
