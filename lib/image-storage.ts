@@ -50,31 +50,35 @@ function escapeXml(str: string): string {
 }
 
 /**
- * Map Google Font names to system fallback fonts
+ * Get Google Font URL for a given font family
  */
-function getSystemFont(fontFamily: string): string {
+function getGoogleFontUrl(fontFamily: string): string {
   const fontMap: Record<string, string> = {
-    'Playfair Display': 'Georgia, serif',
-    'DM Sans': 'Arial, sans-serif',
-    'Roboto': 'Arial, sans-serif',
-    'Lora': 'Georgia, serif',
-    'Montserrat': 'Arial, sans-serif',
-    'Georgia': 'Georgia, serif',
-    'Open Sans': 'Arial, sans-serif',
-    'Raleway': 'Arial, sans-serif',
-    'Nunito': 'Arial, sans-serif',
-    'Poppins': 'Arial, sans-serif',
-    'Great Vibes': 'Brush Script MT, cursive',
-    'Parisienne': 'Brush Script MT, cursive',
-    'Alex Brush': 'Brush Script MT, cursive',
-    'Tangerine': 'Brush Script MT, cursive',
-    'Dancing Script': 'Brush Script MT, cursive',
-    'Pacifico': 'Brush Script MT, cursive',
-    'Satisfy': 'Brush Script MT, cursive',
-    'Cedarville Cursive': 'Brush Script MT, cursive',
-    'Kaushan Script': 'Brush Script MT, cursive',
+    'Playfair Display': 'Playfair+Display:wght@400;700',
+    'DM Sans': 'DM+Sans:wght@400;700',
+    'Roboto': 'Roboto:wght@400;700',
+    'Lora': 'Lora:wght@400;700',
+    'Montserrat': 'Montserrat:wght@400;700',
+    'Georgia': 'Georgia',
+    'Open Sans': 'Open+Sans:wght@400;700',
+    'Raleway': 'Raleway:wght@400;700',
+    'Nunito': 'Nunito:wght@400;700',
+    'Poppins': 'Poppins:wght@400;700',
+    'Great Vibes': 'Great+Vibes',
+    'Parisienne': 'Parisienne',
+    'Alex Brush': 'Alex+Brush',
+    'Tangerine': 'Tangerine',
+    'Dancing Script': 'Dancing+Script:wght@400;700',
+    'Pacifico': 'Pacifico',
+    'Satisfy': 'Satisfy',
+    'Cedarville Cursive': 'Cedarville+Cursive',
+    'Kaushan Script': 'Kaushan+Script',
   };
-  return fontMap[fontFamily] || 'Georgia, serif';
+  
+  const fontName = fontMap[fontFamily];
+  if (!fontName) return '';
+  
+  return `https://fonts.googleapis.com/css2?family=${fontName}&display=swap`;
 }
 
 /**
@@ -119,7 +123,7 @@ async function applyOverlay(
 }
 
 /**
- * Add text layers to the card using SVG overlay with system fonts
+ * Add text layers to the card using SVG overlay with Google Fonts
  */
 async function addTextLayersToCard(
   cardBuffer: Buffer,
@@ -136,11 +140,29 @@ async function addTextLayersToCard(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
+  // Collect all unique fonts used in layers
+  const usedFonts = new Set<string>();
+  for (const layer of layers) {
+    if (layer.type === 'text' && layer.fontFamily) {
+      usedFonts.add(layer.fontFamily);
+    }
+  }
+
+  // Build font imports
+  let fontImports = '';
+  for (const font of usedFonts) {
+    const fontUrl = getGoogleFontUrl(font);
+    if (fontUrl) {
+      fontImports += `@import url('${fontUrl}');\n`;
+    }
+  }
+
   // Build SVG with all text layers
   let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   
-  // Add a style section
+  // Add font imports and styles
   svgContent += `<style>
+    ${fontImports}
     .text-layer { 
       font-weight: bold;
       text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
@@ -189,17 +211,15 @@ async function addTextLayersToCard(
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
       
-      // ✅ Use system font fallbacks
-      const systemFont = getSystemFont(fontFamily);
-      
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
       const anchorX = align === 'left' ? x : align === 'right' ? x : x;
       
+      // Use the actual font family name
       svgContent += `
         <text
           x="${anchorX}"
           y="${y}"
-          font-family="${systemFont}"
+          font-family="${fontFamily}, Georgia, serif"
           font-size="${fontSize}"
           fill="${color}"
           text-anchor="${textAnchor}"
