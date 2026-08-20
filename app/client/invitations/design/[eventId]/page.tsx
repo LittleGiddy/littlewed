@@ -3,7 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Upload, Move, Maximize2, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
-  AlignLeft, AlignCenter, AlignRight, Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
+  AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+  Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
   Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, X, Maximize, Minimize,
   RotateCw, Zap, Sliders
@@ -60,6 +61,13 @@ const createLineLayer = (x1 = 10, y1 = 50, x2 = 90, y2 = 50) => ({
   dashArray: 'solid', arrowStart: 'none', arrowEnd: 'none',
   visible: true, locked: false,
 });
+
+// ─── Alignment Icons ─────────────────────────────────────────────────────
+const ALIGN_H = [
+  { label: <AlignLeft size={14} />, value: 'left' },
+  { label: <AlignCenter size={14} />, value: 'center' },
+  { label: <AlignRight size={14} />, value: 'right' },
+];
 
 export default function InvitationDesigner() {
   const { eventId } = useParams();
@@ -365,6 +373,22 @@ export default function InvitationDesigner() {
     [newLayers[index], newLayers[index + 1]] = [newLayers[index + 1], newLayers[index]];
     setLayersWithHistory(newLayers);
     setSelectedLayerIndex(index + 1);
+  };
+
+  const bringToFront = (index: number) => {
+    const layer = layers[index];
+    const newLayers = layers.filter((_, i) => i !== index);
+    newLayers.push(layer);
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
+  };
+
+  const sendToBack = (index: number) => {
+    const layer = layers[index];
+    const newLayers = layers.filter((_, i) => i !== index);
+    newLayers.unshift(layer);
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(0);
   };
 
   const toggleLayerVisibility = (index: number) => {
@@ -676,7 +700,8 @@ export default function InvitationDesigner() {
     step = 1, 
     label, 
     suffix = '',
-    icon: Icon 
+    icon: Icon,
+    showInput = false
   }: any) => (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
@@ -688,18 +713,30 @@ export default function InvitationDesigner() {
           {value}{suffix}
         </span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F] transition-all hover:h-2"
-        style={{
-          background: `linear-gradient(to right, #0D4F4F 0%, #0D4F4F ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
-        }}
-      />
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F] transition-all hover:h-2"
+          style={{
+            background: `linear-gradient(to right, #0D4F4F 0%, #0D4F4F ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
+          }}
+        />
+        {showInput && (
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+            min={min}
+            max={max}
+          />
+        )}
+      </div>
     </div>
   );
 
@@ -854,7 +891,7 @@ export default function InvitationDesigner() {
 
                   {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* ─── QR Code - Clean version ─── */}
+                  {/* ─── QR Code ─── */}
                   <div
                     className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto"
                     style={{
@@ -886,21 +923,19 @@ export default function InvitationDesigner() {
                       e.preventDefault();
                     }}
                   >
-                    {/* Clean QR Code with minimal styling */}
-                    <div className="relative w-full h-full">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <QrCode 
-                          size={Math.min(Math.max(qrSize * 0.5, 24), 60)} 
-                          className="text-white drop-shadow-lg"
-                          style={{ 
-                            color: qrColor,
-                            filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.3))'
-                          }}
-                        />
-                      </div>
-                      {/* Minimal border indicator */}
-                      <div className="absolute inset-0 border-2 border-white/30 rounded-lg pointer-events-none" />
-                      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] text-white/50 font-mono whitespace-nowrap pointer-events-none">
+                    <div 
+                      className="w-full h-full rounded-lg flex items-center justify-center"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.95)',
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                      }}
+                    >
+                      <QrCode 
+                        size={Math.min(Math.max(qrSize * 0.5, 24), 60)} 
+                        style={{ color: qrColor }}
+                      />
+                      <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] text-gray-400 font-mono whitespace-nowrap pointer-events-none">
                         QR Code
                       </div>
                     </div>
@@ -980,6 +1015,17 @@ export default function InvitationDesigner() {
                 {/* ─── Layers Tab ─── */}
                 {activeTab === 'layers' && (
                   <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] text-gray-500">{layers.length} layers</span>
+                      <div className="flex gap-1">
+                        <button onClick={bringToFront} className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500" title="Bring to Front">
+                          <BringToFront size={12} />
+                        </button>
+                        <button onClick={sendToBack} className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500" title="Send to Back">
+                          <SendToBack size={12} />
+                        </button>
+                      </div>
+                    </div>
                     {layers.length === 0 ? (
                       <div className="text-center py-6 text-gray-400 text-xs">
                         <Layers size={20} className="mx-auto mb-2 opacity-30" />
@@ -1040,6 +1086,26 @@ export default function InvitationDesigner() {
                   <div>
                     {selectedLayer ? (
                       <div className="space-y-3">
+                        {/* ─── Position Controls ─── */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <RangeSlider
+                            label="X Position"
+                            value={Math.round(selectedLayer.x || 50)}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { x: v })}
+                            min={0}
+                            max={100}
+                            suffix="%"
+                          />
+                          <RangeSlider
+                            label="Y Position"
+                            value={Math.round(selectedLayer.y || 50)}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { y: v })}
+                            min={0}
+                            max={100}
+                            suffix="%"
+                          />
+                        </div>
+
                         {selectedLayer.type === 'text' && (
                           <>
                             <div>
@@ -1079,6 +1145,7 @@ export default function InvitationDesigner() {
                               min={8}
                               max={100}
                               suffix="px"
+                              showInput
                             />
 
                             <RangeSlider
@@ -1089,6 +1156,7 @@ export default function InvitationDesigner() {
                               max={180}
                               suffix="°"
                               icon={RotateCw}
+                              showInput
                             />
 
                             <div>
@@ -1101,15 +1169,15 @@ export default function InvitationDesigner() {
                                   className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200 p-1"
                                 />
                                 <div className="flex gap-1 flex-1">
-                                  {['left', 'center', 'right'].map(a => (
+                                  {ALIGN_H.map((a) => (
                                     <button
-                                      key={a}
-                                      onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
+                                      key={a.value}
+                                      onClick={() => updateLayer(selectedLayerIndex!, { align: a.value })}
                                       className={`flex-1 p-1.5 rounded-lg border transition ${
-                                        selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+                                        selectedLayer.align === a.value ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
                                       }`}
                                     >
-                                      {a === 'left' ? <AlignLeft size={12} /> : a === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                                      {a.label}
                                     </button>
                                   ))}
                                 </div>
@@ -1163,23 +1231,28 @@ export default function InvitationDesigner() {
                               min={0}
                               max={10}
                               suffix="px"
+                              showInput
                             />
-                            <RangeSlider
-                              label="Width"
-                              value={selectedLayer.width || 30}
-                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { width: v })}
-                              min={5}
-                              max={100}
-                              suffix="%"
-                            />
-                            <RangeSlider
-                              label="Height"
-                              value={selectedLayer.height || 20}
-                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { height: v })}
-                              min={5}
-                              max={100}
-                              suffix="%"
-                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <RangeSlider
+                                label="Width"
+                                value={selectedLayer.width || 30}
+                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { width: v })}
+                                min={5}
+                                max={100}
+                                suffix="%"
+                                showInput
+                              />
+                              <RangeSlider
+                                label="Height"
+                                value={selectedLayer.height || 20}
+                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { height: v })}
+                                min={5}
+                                max={100}
+                                suffix="%"
+                                showInput
+                              />
+                            </div>
                             <RangeSlider
                               label="Rotation"
                               value={selectedLayer.rotation || 0}
@@ -1188,6 +1261,7 @@ export default function InvitationDesigner() {
                               max={180}
                               suffix="°"
                               icon={RotateCw}
+                              showInput
                             />
                           </>
                         )}
@@ -1210,6 +1284,7 @@ export default function InvitationDesigner() {
                               min={1}
                               max={10}
                               suffix="px"
+                              showInput
                             />
                             <div>
                               <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash Style</label>
@@ -1255,6 +1330,7 @@ export default function InvitationDesigner() {
                       max={100}
                       suffix="%"
                       icon={Palette}
+                      showInput
                     />
 
                     <div className="border-t border-gray-100 pt-3 mt-2">
@@ -1269,6 +1345,7 @@ export default function InvitationDesigner() {
                           min={0}
                           max={100}
                           suffix="%"
+                          showInput
                         />
                         <RangeSlider
                           label="Y Position"
@@ -1277,6 +1354,7 @@ export default function InvitationDesigner() {
                           min={0}
                           max={100}
                           suffix="%"
+                          showInput
                         />
                       </div>
                       <RangeSlider
@@ -1286,6 +1364,7 @@ export default function InvitationDesigner() {
                         min={40}
                         max={250}
                         suffix="px"
+                        showInput
                       />
                       <RangeSlider
                         label="Rotation"
@@ -1295,6 +1374,7 @@ export default function InvitationDesigner() {
                         max={180}
                         suffix="°"
                         icon={RotateCw}
+                        showInput
                       />
                       <div>
                         <label className="block text-[10px] font-medium text-gray-600 mb-1">QR Color</label>
