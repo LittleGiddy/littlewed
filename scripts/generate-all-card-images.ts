@@ -1,6 +1,6 @@
 // scripts/generate-all-card-images.ts
 import { prisma } from '../lib/prisma';
-import { generateAndStoreCardImage } from '../lib/image-storage';
+import { generateAndStoreCardForGuest } from '../lib/image-storage';
 
 async function generateAllCardImages() {
   console.log('🔄 Generating card images for all guests...');
@@ -19,7 +19,7 @@ async function generateAllCardImages() {
 
   for (const guest of guests) {
     try {
-      await generateAndStoreCardImage(guest.id);
+      await generateAndStoreCardForGuest(guest.id);
       console.log(`✅ ${guest.name} (${guest.id})`);
       success++;
       // Small delay to avoid rate limiting
