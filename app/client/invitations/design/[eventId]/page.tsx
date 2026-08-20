@@ -304,6 +304,14 @@ export default function InvitationDesigner() {
     toast.success('Guest title layer added');
   };
 
+  const addGuestTypeLayer = () => {
+    const newLayer = createTextLayer('{guestType}', 50, 58, false, true, false);
+    const newLayers = [...layers, newLayer];
+    setLayersWithHistory(newLayers);
+    setSelectedLayerIndex(newLayers.length - 1);
+    toast.success('Guest type layer added');
+  };
+
   const addCardNumberLayer = () => {
     const newLayer = createTextLayer('{cardNumber}', 50, 65, false, false, true);
     const newLayers = [...layers, newLayer];
@@ -930,6 +938,12 @@ export default function InvitationDesigner() {
                   <UserCheck size={12} /> Title
                 </button>
                 <button
+                  onClick={addGuestTypeLayer}
+                  className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
+                >
+                  <Users size={12} /> Guest Type
+                </button>
+                <button
                   onClick={addCardNumberLayer}
                   className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
                 >
@@ -937,7 +951,7 @@ export default function InvitationDesigner() {
                 </button>
                 <button
                   onClick={addTextLayer}
-                  className="bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1"
+                  className="bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1 col-span-2"
                 >
                   <Type size={12} /> Custom Text
                 </button>
@@ -1020,6 +1034,15 @@ export default function InvitationDesigner() {
                             value={selectedLayer.text}
                             onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                           />
+                          {selectedLayer.isGuestName && (
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with each guest's name</p>
+                          )}
+                          {selectedLayer.isGuestType && (
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with "Single" or "Double"</p>
+                          )}
+                          {selectedLayer.isCardNumber && (
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with each guest's card number</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-[10px] font-medium text-gray-700">Font</label>

@@ -50,6 +50,34 @@ function escapeXml(str: string): string {
 }
 
 /**
+ * Map Google Font names to system fallback fonts
+ */
+function getSystemFont(fontFamily: string): string {
+  const fontMap: Record<string, string> = {
+    'Playfair Display': 'Georgia, serif',
+    'DM Sans': 'Arial, sans-serif',
+    'Roboto': 'Arial, sans-serif',
+    'Lora': 'Georgia, serif',
+    'Montserrat': 'Arial, sans-serif',
+    'Georgia': 'Georgia, serif',
+    'Open Sans': 'Arial, sans-serif',
+    'Raleway': 'Arial, sans-serif',
+    'Nunito': 'Arial, sans-serif',
+    'Poppins': 'Arial, sans-serif',
+    'Great Vibes': 'Brush Script MT, cursive',
+    'Parisienne': 'Brush Script MT, cursive',
+    'Alex Brush': 'Brush Script MT, cursive',
+    'Tangerine': 'Brush Script MT, cursive',
+    'Dancing Script': 'Brush Script MT, cursive',
+    'Pacifico': 'Brush Script MT, cursive',
+    'Satisfy': 'Brush Script MT, cursive',
+    'Cedarville Cursive': 'Brush Script MT, cursive',
+    'Kaushan Script': 'Brush Script MT, cursive',
+  };
+  return fontMap[fontFamily] || 'Georgia, serif';
+}
+
+/**
  * Apply overlay to the card
  */
 async function applyOverlay(
@@ -66,7 +94,6 @@ async function applyOverlay(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // Create a colored overlay
   const overlayBuffer = await sharp({
     create: {
       width: width,
@@ -78,7 +105,6 @@ async function applyOverlay(
     .png()
     .toBuffer();
 
-  // Composite with opacity using blend mode
   return await sharp(cardBuffer)
     .composite([
       {
@@ -93,7 +119,7 @@ async function applyOverlay(
 }
 
 /**
- * Add text layers to the card using SVG overlay
+ * Add text layers to the card using SVG overlay with system fonts
  */
 async function addTextLayersToCard(
   cardBuffer: Buffer,
@@ -113,9 +139,12 @@ async function addTextLayersToCard(
   // Build SVG with all text layers
   let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   
-  // Add a style section for fonts
+  // Add a style section
   svgContent += `<style>
-    .text-layer { font-weight: bold; }
+    .text-layer { 
+      font-weight: bold;
+      text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+    }
   </style>`;
 
   const guestName = getGuestFullName(guest);
@@ -149,13 +178,19 @@ async function addTextLayersToCard(
           .replace(/{guestType}/g, guest.guestType === 'DOUBLE' ? 'Double' : 'Single');
       }
 
+      // Skip empty text
+      if (!text || text.trim() === '') continue;
+
       const x = ((layer.x || 50) / 100) * width;
       const y = ((layer.y || 50) / 100) * height;
       const fontSize = layer.fontSize || 24;
-      const fontFamily = layer.fontFamily || 'Playfair Display, serif';
+      const fontFamily = layer.fontFamily || 'Playfair Display';
       const color = layer.color || '#ffffff';
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
+      
+      // ✅ Use system font fallbacks
+      const systemFont = getSystemFont(fontFamily);
       
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
       const anchorX = align === 'left' ? x : align === 'right' ? x : x;
@@ -164,7 +199,7 @@ async function addTextLayersToCard(
         <text
           x="${anchorX}"
           y="${y}"
-          font-family="${fontFamily}"
+          font-family="${systemFont}"
           font-size="${fontSize}"
           fill="${color}"
           text-anchor="${textAnchor}"
@@ -178,7 +213,6 @@ async function addTextLayersToCard(
 
   svgContent += '</svg>';
 
-  // Composite the SVG onto the card
   const svgBuffer = Buffer.from(svgContent);
   
   return await sharp(cardBuffer)
@@ -224,7 +258,7 @@ export async function generateCardForGuest(
     designLayers = [];
   }
 
-  // ─── 3. Add design layers (text, shapes) ─────────────────────────────
+  // ─── 3. Add design layers (text) ─────────────────────────────────────
   if (designLayers.length > 0) {
     const textLayers = designLayers.filter(l => l.type === 'text');
     if (textLayers.length > 0) {
@@ -256,14 +290,12 @@ export async function generateCardForGuest(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // Calculate QR position in pixels
   const qrX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
   const qrY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
 
   let finalBuffer = processedBuffer;
   
   if (qrRotation !== 0) {
-    // Rotate the QR code
     const rotatedQr = await sharp(qrBuffer)
       .rotate(qrRotation)
       .png()
