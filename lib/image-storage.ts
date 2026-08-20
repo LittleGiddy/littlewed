@@ -92,6 +92,34 @@ async function applyOverlay(
 }
 
 /**
+ * Map Google Font names to system font names or local font file names
+ */
+function getFontFamilyForSvg(fontFamily: string): string {
+  const fontMap: Record<string, string> = {
+    'Playfair Display': 'PlayfairDisplay',
+    'DM Sans': 'DMSans',
+    'Roboto': 'Roboto',
+    'Lora': 'Lora',
+    'Montserrat': 'Montserrat',
+    'Georgia': 'Georgia',
+    'Open Sans': 'OpenSans',
+    'Raleway': 'Raleway',
+    'Nunito': 'Nunito',
+    'Poppins': 'Poppins',
+    'Great Vibes': 'GreatVibes',
+    'Parisienne': 'Parisienne',
+    'Alex Brush': 'AlexBrush',
+    'Tangerine': 'Tangerine',
+    'Dancing Script': 'DancingScript',
+    'Pacifico': 'Pacifico',
+    'Satisfy': 'Satisfy',
+    'Cedarville Cursive': 'CedarvilleCursive',
+    'Kaushan Script': 'KaushanScript',
+  };
+  return fontMap[fontFamily] || fontFamily;
+}
+
+/**
  * Add text layers to the card using SVG overlay.
  * Fonts are resolved via fontconfig from files bundled in public/fonts —
  * see lib/fonts.ts. Remote @import of Google Fonts does NOT work here;
@@ -163,6 +191,9 @@ async function addTextLayersToCard(
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
       
+      // ✅ Use mapped font name for fontconfig
+      const fontName = getFontFamilyForSvg(fontFamily);
+      
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
       const anchorX = x;
       
@@ -173,7 +204,7 @@ async function addTextLayersToCard(
         <text
           x="${anchorX}"
           y="${y}"
-          font-family="${fontFamily}"
+          font-family="${fontName}"
           font-size="${fontSize}"
           fill="${color}"
           text-anchor="${textAnchor}"
@@ -213,6 +244,7 @@ export async function generateCardForGuest(
   event: EventLike,
   cardBuffer: Buffer
 ): Promise<string> {
+  // ─── Ensure fonts are configured for sharp ─────────────────────────────
   ensureFontsConfigured();
 
   // ─── 1. Apply overlay ──────────────────────────────────────────────────
@@ -401,8 +433,7 @@ export async function generateCardForGuest(
   return blob.url;
 }
 
-// Runs `fn` over `items` with at most `limit` in flight at once —
-// keeps Neon connections and Blob uploads from spiking all at once.
+// ─── Exports ──────────────────────────────────────────────────────────────
 export async function runWithConcurrency<T, R>(
   items: T[],
   limit: number,
