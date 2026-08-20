@@ -1012,75 +1012,96 @@ export default function InvitationDesigner() {
               </div>
 
               <div className="p-3 max-h-[50vh] overflow-y-auto">
-                {/* ─── Layers Tab ─── */}
-                {activeTab === 'layers' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] text-gray-500">{layers.length} layers</span>
-                      <div className="flex gap-1">
-                        <button onClick={bringToFront} className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500" title="Bring to Front">
-                          <BringToFront size={12} />
-                        </button>
-                        <button onClick={sendToBack} className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500" title="Send to Back">
-                          <SendToBack size={12} />
-                        </button>
-                      </div>
-                    </div>
-                    {layers.length === 0 ? (
-                      <div className="text-center py-6 text-gray-400 text-xs">
-                        <Layers size={20} className="mx-auto mb-2 opacity-30" />
-                        No layers yet
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {layers.map((layer, idx) => (
-                          <div
-                            key={layer.id}
-                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                              idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-4 border-[#0D4F4F]' : ''
-                            }`}
-                            onClick={() => setSelectedLayerIndex(idx)}
-                          >
-                            <span className="text-[10px] truncate flex items-center gap-1.5">
-                              {layer.type === 'text' && <Type size={10} />}
-                              {layer.type === 'rect' && <Square size={10} />}
-                              {layer.type === 'line' && <Minus size={10} />}
-                              {layer.isGuestName && <User size={10} className="text-[#0D4F4F]" />}
-                              {layer.isGuestType && <UserCheck size={10} className="text-[#0D4F4F]" />}
-                              {layer.isCardNumber && <Hash size={10} className="text-[#0D4F4F]" />}
-                              <span className="truncate max-w-[60px]">
-                                {layer.type === 'text' 
-                                  ? (layer.text || 'Text').substring(0, 12) 
-                                  : layer.type === 'rect' ? 'Rectangle' : 'Line'}
-                              </span>
-                            </span>
-                            <div className="flex gap-0.5">
-                              <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle">
-                                {layer.visible ? <Eye size={10} /> : <EyeOff size={10} />}
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Lock">
-                                {layer.locked ? <Lock size={10} /> : <Unlock size={10} />}
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
-                                <Copy size={10} />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Up">
-                                <ArrowUp size={10} />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Down">
-                                <ArrowDown size={10} />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
-                                <Trash2 size={10} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
+               {/* ─── Layers Tab ─── */}
+{activeTab === 'layers' && (
+  <div>
+    <div className="flex items-center justify-between mb-2">
+      <span className="text-[10px] text-gray-500">{layers.length} layers</span>
+      <div className="flex gap-1">
+        <button 
+          onClick={() => {
+            if (selectedLayerIndex !== null) {
+              bringToFront(selectedLayerIndex);
+            } else {
+              toast.error('Select a layer first');
+            }
+          }} 
+          className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
+          title="Bring to Front"
+          disabled={selectedLayerIndex === null}
+        >
+          <ArrowUp size={12} />
+        </button>
+        <button 
+          onClick={() => {
+            if (selectedLayerIndex !== null) {
+              sendToBack(selectedLayerIndex);
+            } else {
+              toast.error('Select a layer first');
+            }
+          }} 
+          className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
+          title="Send to Back"
+          disabled={selectedLayerIndex === null}
+        >
+          <ArrowDown size={12} />
+        </button>
+      </div>
+    </div>
+    {layers.length === 0 ? (
+      <div className="text-center py-6 text-gray-400 text-xs">
+        <Layers size={20} className="mx-auto mb-2 opacity-30" />
+        No layers yet
+      </div>
+    ) : (
+      <div className="space-y-1">
+        {layers.map((layer, idx) => (
+          <div
+            key={layer.id}
+            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
+              idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-4 border-[#0D4F4F]' : ''
+            }`}
+            onClick={() => setSelectedLayerIndex(idx)}
+          >
+            <span className="text-[10px] truncate flex items-center gap-1.5">
+              {layer.type === 'text' && <Type size={10} />}
+              {layer.type === 'rect' && <Square size={10} />}
+              {layer.type === 'line' && <Minus size={10} />}
+              {layer.isGuestName && <User size={10} className="text-[#0D4F4F]" />}
+              {layer.isGuestType && <UserCheck size={10} className="text-[#0D4F4F]" />}
+              {layer.isCardNumber && <Hash size={10} className="text-[#0D4F4F]" />}
+              <span className="truncate max-w-[60px]">
+                {layer.type === 'text' 
+                  ? (layer.text || 'Text').substring(0, 12) 
+                  : layer.type === 'rect' ? 'Rectangle' : 'Line'}
+              </span>
+            </span>
+            <div className="flex gap-0.5">
+              <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle">
+                {layer.visible ? <Eye size={10} /> : <EyeOff size={10} />}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Lock">
+                {layer.locked ? <Lock size={10} /> : <Unlock size={10} />}
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
+                <Copy size={10} />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Up">
+                <ArrowUp size={10} />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Down">
+                <ArrowDown size={10} />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
+                <Trash2 size={10} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
                 {/* ─── Properties Tab ─── */}
                 {activeTab === 'properties' && (
                   <div>
