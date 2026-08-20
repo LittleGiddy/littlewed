@@ -111,7 +111,7 @@ async function renderTextAsImage(
   const fontName = fontFamily;
   const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
   const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
-  
+
   const shadowStyle = shadow ? `
     <filter id="shadow">
       <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/>
@@ -171,10 +171,10 @@ async function addTextLayersToCard(
 
   for (const layer of layers) {
     if (!layer || layer.visible === false) continue;
-    
+
     if (layer.type === 'text') {
       let text = layer.text || '';
-      
+
       // ─── Replace placeholders ────────────────────────────────────
       if (layer.isGuestName) {
         text = guestName;
@@ -202,7 +202,7 @@ async function addTextLayersToCard(
       const color = layer.color || '#ffffff';
       const rotation = layer.rotation || 0;
       const align = layer.align || 'center';
-      
+
       // Render text as image
       try {
         const textImage = await renderTextAsImage(
@@ -248,7 +248,7 @@ export async function generateCardForGuest(
 ): Promise<string> {
   // ─── 1. Apply overlay ──────────────────────────────────────────────────
   let processedBuffer = cardBuffer;
-  
+
   if (event.overlayColor && event.overlayOpacity && event.overlayOpacity > 0) {
     processedBuffer = await applyOverlay(
       processedBuffer,
@@ -312,14 +312,14 @@ export async function generateCardForGuest(
   const qrY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
 
   let finalBuffer = processedBuffer;
-  
+
   try {
     if (qrRotation !== 0) {
       const rotatedQr = await sharp(qrBuffer)
         .rotate(qrRotation)
         .png()
         .toBuffer();
-      
+
       finalBuffer = await sharp(processedBuffer)
         .composite([
           {
@@ -363,7 +363,7 @@ export async function generateCardForGuest(
         0,
         false
       );
-      
+
       finalBuffer = await sharp(finalBuffer)
         .composite([
           {
@@ -396,7 +396,7 @@ export async function generateCardForGuest(
         0,
         false
       );
-      
+
       finalBuffer = await sharp(finalBuffer)
         .composite([
           {
