@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "copy-fonts": "node scripts/copy-fonts.js",
-    "prebuild": "npm run copy-fonts && prisma generate",
+    "prebuild": "prisma generate",
     "postinstall": "prisma generate"
   },
   "dependencies": {
