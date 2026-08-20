@@ -1,5 +1,4 @@
 // lib/image-storage.ts
-import './fonts'; // MUST be the first import — sets FONTCONFIG_FILE before sharp initializes
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
@@ -252,6 +251,7 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
+      // ✅ Convert percentage to pixels for positioning
       const x = ((layer.x || 50) / 100) * width;
       const y = ((layer.y || 50) / 100) * height;
       
@@ -288,6 +288,7 @@ export async function generateCardForGuest(
   }
 
   // ─── 5. Add QR code ──────────────────────────────────────────────────
+  // ✅ QR position values are percentages (0-100) from the designer
   const qrPosition = {
     x: event.qrPlacementX ?? 85,
     y: event.qrPlacementY ?? 85,
@@ -299,8 +300,11 @@ export async function generateCardForGuest(
   const cardNumber = guest.cardNumber || '00000';
   const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size, qrColor);
 
-  const qrX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
-  const qrY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
+  // ✅ Convert percentage to pixels for QR positioning
+  // The x and y are the center point of the QR code (percentage based)
+  // Subtract half the size to get the top-left corner for sharp
+  const qrTopLeftX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
+  const qrTopLeftY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
 
   let finalBuffer = processedBuffer;
   
@@ -315,8 +319,8 @@ export async function generateCardForGuest(
         .composite([
           {
             input: rotatedQr,
-            top: Math.round(qrY),
-            left: Math.round(qrX),
+            top: Math.round(qrTopLeftY),
+            left: Math.round(qrTopLeftX),
           },
         ])
         .png()
@@ -326,8 +330,8 @@ export async function generateCardForGuest(
         .composite([
           {
             input: qrBuffer,
-            top: Math.round(qrY),
-            left: Math.round(qrX),
+            top: Math.round(qrTopLeftY),
+            left: Math.round(qrTopLeftX),
           },
         ])
         .png()
