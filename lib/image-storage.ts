@@ -39,7 +39,7 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[ImageStorage] OG API error:', response.status, errorText);
-      throw new Error(`Failed to generate image: ${response.status} - ${errorText}`);
+      throw new Error(`Failed to generate image: ${response.status}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -68,7 +68,6 @@ export async function generateAndStoreCardImage(guestId: string): Promise<string
 
 /**
  * Get card image URL from pass code (without storing)
- * This returns the OG URL that generates the card on-the-fly
  */
 export function getCardImageUrl(passCode: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
