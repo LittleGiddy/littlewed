@@ -1,10 +1,4 @@
 // lib/image-storage.ts
-// ─── COMPLETELY DISABLE FONTCONFIG ──────────────────────────────────────
-// These must be set BEFORE importing sharp
-process.env.SHARP_FONTCONFIG = '0';
-process.env.FONTCONFIG_FILE = '/dev/null';
-process.env.FONTCONFIG_PATH = '/dev/null';
-
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
