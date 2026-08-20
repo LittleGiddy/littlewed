@@ -26,9 +26,9 @@ interface EventLike {
   overlayColor: string | null;
   overlayOpacity: number | null;
   designLayers: any;
-  name?: string | null; // ✅ Added
-  venue?: string | null; // ✅ Added
-  date?: string | Date | null; // ✅ Added
+  name?: string | null;
+  venue?: string | null;
+  date?: string | Date | null;
 }
 
 function getGuestFullName(guest: any): string {
@@ -116,13 +116,13 @@ export async function generateCardForGuest(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // ─── 4. Add text layers using Satori ──────────────────────────────────
+  // ─── 4. Add text layers ──────────────────────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
     const textLayers = designLayers.filter(l => l.type === 'text');
     
-    // ─── Pre-compute all dynamic values once ─────────────────────────────
+    // ─── Pre-compute all dynamic values ──────────────────────────────────
     const guestFullName = getGuestFullName(guest);
     const guestTitle = guest?.title || '';
     const cardNumber = guest?.cardNumber || '';
@@ -164,7 +164,7 @@ export async function generateCardForGuest(
       const y = ((layer.y || 50) / 100) * height;
       
       try {
-        // ─── Render text using Satori ──────────────────────────────────
+        // ─── Render text using SVG with system fonts ────────────────────
         const textImage = await renderTextToImage(text, {
           fontSize: layer.fontSize || 24,
           fontFamily: layer.fontFamily || 'Playfair Display',
