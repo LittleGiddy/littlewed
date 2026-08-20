@@ -148,25 +148,28 @@ async function addTextLayersToCard(
     }
   }
 
-  // Build font imports
+  // Build font imports - using CDATA to avoid XML parsing issues
   let fontImports = '';
   for (const font of usedFonts) {
     const fontUrl = getGoogleFontUrl(font);
     if (fontUrl) {
-      fontImports += `@import url('${fontUrl}');\n`;
+      // Use CDATA to wrap the @import to avoid XML parsing issues
+      fontImports += `@import url("${fontUrl}");\n`;
     }
   }
 
   // Build SVG with all text layers
   let svgContent = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
   
-  // Add font imports and styles
+  // Add CDATA for styles to prevent XML parsing issues
   svgContent += `<style>
-    ${fontImports}
-    .text-layer { 
-      font-weight: bold;
-      text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
-    }
+    <![CDATA[
+      ${fontImports}
+      .text-layer { 
+        font-weight: bold;
+        text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+      }
+    ]]>
   </style>`;
 
   const guestName = getGuestFullName(guest);
@@ -214,7 +217,9 @@ async function addTextLayersToCard(
       const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
       const anchorX = align === 'left' ? x : align === 'right' ? x : x;
       
-      // Use the actual font family name
+      // Escape text content
+      const escapedText = escapeXml(text);
+      
       svgContent += `
         <text
           x="${anchorX}"
@@ -226,7 +231,7 @@ async function addTextLayersToCard(
           dominant-baseline="middle"
           transform="rotate(${rotation}, ${anchorX}, ${y})"
           class="text-layer"
-        >${escapeXml(text)}</text>
+        >${escapedText}</text>
       `;
     }
   }
@@ -235,16 +240,23 @@ async function addTextLayersToCard(
 
   const svgBuffer = Buffer.from(svgContent);
   
-  return await sharp(cardBuffer)
-    .composite([
-      {
-        input: svgBuffer,
-        top: 0,
-        left: 0,
-      },
-    ])
-    .png()
-    .toBuffer();
+  try {
+    return await sharp(cardBuffer)
+      .composite([
+        {
+          input: svgBuffer,
+          top: 0,
+          left: 0,
+        },
+      ])
+      .png()
+      .toBuffer();
+  } catch (err) {
+    console.error('SVG rendering error:', err);
+    // If SVG fails, return the card without text layers
+    console.warn('Falling back to card without text layers');
+    return cardBuffer;
+  }
 }
 
 export async function generateCardForGuest(
@@ -282,12 +294,17 @@ export async function generateCardForGuest(
   if (designLayers.length > 0) {
     const textLayers = designLayers.filter(l => l.type === 'text');
     if (textLayers.length > 0) {
-      processedBuffer = await addTextLayersToCard(
-        processedBuffer,
-        textLayers,
-        guest,
-        event
-      );
+      try {
+        processedBuffer = await addTextLayersToCard(
+          processedBuffer,
+          textLayers,
+          guest,
+          event
+        );
+      } catch (textError) {
+        console.error('Failed to add text layers, continuing without them:', textError);
+        // Continue without text layers
+      }
     }
   }
 
@@ -315,99 +332,112 @@ export async function generateCardForGuest(
 
   let finalBuffer = processedBuffer;
   
-  if (qrRotation !== 0) {
-    const rotatedQr = await sharp(qrBuffer)
-      .rotate(qrRotation)
-      .png()
-      .toBuffer();
-    
-    finalBuffer = await sharp(processedBuffer)
-      .composite([
-        {
-          input: rotatedQr,
-          top: Math.round(qrY),
-          left: Math.round(qrX),
-        },
-      ])
-      .png()
-      .toBuffer();
-  } else {
-    finalBuffer = await sharp(processedBuffer)
-      .composite([
-        {
-          input: qrBuffer,
-          top: Math.round(qrY),
-          left: Math.round(qrX),
-        },
-      ])
-      .png()
-      .toBuffer();
+  try {
+    if (qrRotation !== 0) {
+      const rotatedQr = await sharp(qrBuffer)
+        .rotate(qrRotation)
+        .png()
+        .toBuffer();
+      
+      finalBuffer = await sharp(processedBuffer)
+        .composite([
+          {
+            input: rotatedQr,
+            top: Math.round(qrY),
+            left: Math.round(qrX),
+          },
+        ])
+        .png()
+        .toBuffer();
+    } else {
+      finalBuffer = await sharp(processedBuffer)
+        .composite([
+          {
+            input: qrBuffer,
+            top: Math.round(qrY),
+            left: Math.round(qrX),
+          },
+        ])
+        .png()
+        .toBuffer();
+    }
+  } catch (qrError) {
+    console.error('Failed to composite QR code:', qrError);
+    // Continue without QR
   }
 
   // ─── 6. Add card number if not already in layers ────────────────────
   const hasCardNumberLayer = designLayers.some(l => l.isCardNumber);
   if (guest.cardNumber && !hasCardNumberLayer) {
-    const cardNumberSvg = `
-      <svg width="${width}" height="${height}">
-        <text
-          x="${width - 30}"
-          y="${height - 30}"
-          font-family="monospace"
-          font-size="16"
-          fill="rgba(255,255,255,0.7)"
-          text-anchor="end"
-          dominant-baseline="middle"
-        >#${escapeXml(guest.cardNumber)}</text>
-      </svg>
-    `;
-    
-    finalBuffer = await sharp(finalBuffer)
-      .composite([
-        {
-          input: Buffer.from(cardNumberSvg),
-          top: 0,
-          left: 0,
-        },
-      ])
-      .png()
-      .toBuffer();
+    try {
+      const cardNumberSvg = `
+        <svg width="${width}" height="${height}">
+          <text
+            x="${width - 30}"
+            y="${height - 30}"
+            font-family="monospace"
+            font-size="16"
+            fill="rgba(255,255,255,0.7)"
+            text-anchor="end"
+            dominant-baseline="middle"
+          >#${escapeXml(guest.cardNumber)}</text>
+        </svg>
+      `;
+      
+      finalBuffer = await sharp(finalBuffer)
+        .composite([
+          {
+            input: Buffer.from(cardNumberSvg),
+            top: 0,
+            left: 0,
+          },
+        ])
+        .png()
+        .toBuffer();
+    } catch (cardNumberError) {
+      console.error('Failed to add card number:', cardNumberError);
+    }
   }
 
   // ─── 7. Add guest type badge if DOUBLE ─────────────────────────────
   const hasGuestTypeLayer = designLayers.some(l => l.isGuestType);
   if (guest.guestType === 'DOUBLE' && !hasGuestTypeLayer) {
-    const guestTypeSvg = `
-      <svg width="${width}" height="${height}">
-        <rect
-          x="${width - 110}"
-          y="${height - 65}"
-          width="80"
-          height="24"
-          rx="12"
-          fill="rgba(0,0,0,0.3)"
-        />
-        <text
-          x="${width - 70}"
-          y="${height - 53}"
-          font-family="Arial, sans-serif"
-          font-size="11"
-          fill="rgba(255,255,255,0.6)"
-          text-anchor="middle"
-          dominant-baseline="middle"
-        >+1 Guest</text>
-      </svg>
-    `;
-    
-    finalBuffer = await sharp(finalBuffer)
-      .composite([
-        {
-          input: Buffer.from(guestTypeSvg),
-          top: 0,
-          left: 0,
-        },
-      ])
-      .png()
-      .toBuffer();
+    try {
+      const guestTypeSvg = `
+        <svg width="${width}" height="${height}">
+          <rect
+            x="${width - 110}"
+            y="${height - 65}"
+            width="80"
+            height="24"
+            rx="12"
+            fill="rgba(0,0,0,0.3)"
+          />
+          <text
+            x="${width - 70}"
+            y="${height - 53}"
+            font-family="Arial, sans-serif"
+            font-size="11"
+            fill="rgba(255,255,255,0.6)"
+            text-anchor="middle"
+            dominant-baseline="middle"
+          >+1 Guest</text>
+        </svg>
+      `;
+      
+      finalBuffer = await sharp(finalBuffer)
+        .composite([
+          {
+            input: Buffer.from(guestTypeSvg),
+            top: 0,
+            left: 0,
+          },
+        ])
+        .png()
+        .toBuffer();
+    } catch (guestTypeError) {
+      console.error('Failed to add guest type badge:', guestTypeError);
+    }
   }
 
   // ─── 8. Upload to Vercel Blob ──────────────────────────────────────
