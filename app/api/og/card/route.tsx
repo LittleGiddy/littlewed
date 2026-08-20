@@ -1,4 +1,4 @@
-// app/api/og/card/route.tsx
+// app/api/og/card/route.tsx (UPDATED)
 import { ImageResponse } from '@vercel/og';
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -9,32 +9,55 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
+    const guestId = searchParams.get('guestId');
     const code = searchParams.get('code');
-    const mode = searchParams.get('mode') || 'full';
     
-    if (!code) {
-      return new Response('Missing code parameter', { status: 400 });
+    let guest;
+    
+    // ─── Try guestId first, then fall back to code ──────────────────────
+    if (guestId) {
+      guest = await prisma.guest.findUnique({
+        where: { id: guestId },
+        include: { event: true },
+      });
+    } else if (code) {
+      guest = await prisma.guest.findFirst({
+        where: { passCode: code }, // ✅ Use findFirst instead of findUnique
+        include: { event: true },
+      });
+    } else {
+      return new Response('Missing guestId or code parameter', { status: 400 });
     }
 
-    // ─── Fetch guest with event and design settings ──────────────────────
-    const guest = await prisma.guest.findUnique({
-      where: { passCode: code },
-      include: { 
-        event: true,
-      },
-    });
-
     if (!guest) {
+      console.error('[OG Card] Guest not found for:', { guestId, code });
       return new Response('Guest not found', { status: 404 });
     }
 
+    console.log('[OG Card] Generating for guest:', guest.id, guest.name);
+
     const event = guest.event;
+    
+    if (!event.templateCardUrl) {
+      console.error('[OG Card] No template for event:', event.id);
+      return new Response('No invitation card template configured', { status: 400 });
+    }
+
     const guestName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    const eventDate = new Date(event.date).toLocaleDateString('sw-TZ', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    
+    // ─── Safely parse date ──────────────────────────────────────────────
+    let eventDate = '';
+    try {
+      if (event.date) {
+        eventDate = new Date(event.date).toLocaleDateString('sw-TZ', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        });
+      }
+    } catch (e) {
+      console.warn('Date parsing error:', e);
+    }
 
     // ─── Generate QR code for check-in ──────────────────────────────────
     const qrData = JSON.stringify({
@@ -43,18 +66,42 @@ export async function GET(req: NextRequest) {
       cardNumber: guest.cardNumber,
       passCode: guest.passCode,
     });
-    const qrBuffer = await QRCode.toBuffer(qrData, {
-      width: 200,
-      errorCorrectionLevel: 'H',
-    });
-    const qrBase64 = qrBuffer.toString('base64');
+    
+    let qrBase64 = '';
+    try {
+      const qrBuffer = await QRCode.toBuffer(qrData, {
+        width: 200,
+        errorCorrectionLevel: 'H',
+      });
+      qrBase64 = qrBuffer.toString('base64');
+    } catch (qrError) {
+      console.error('[OG Card] QR generation error:', qrError);
+      // Continue without QR code
+    }
 
     // ─── Get design settings from event ──────────────────────────────────
-    // ✅ These are the settings saved from the Invitation Designer
     const templateUrl = event.templateCardUrl;
     const overlayColor = event.overlayColor || '#000000';
     const overlayOpacity = event.overlayOpacity || 0.2;
-    const designLayers = event.designLayers as any[] || [];
+    
+    // ✅ Safely parse design layers
+    let designLayers: any[] = [];
+    try {
+      if (typeof event.designLayers === 'string') {
+        designLayers = JSON.parse(event.designLayers);
+      } else if (Array.isArray(event.designLayers)) {
+        designLayers = event.designLayers;
+      }
+    } catch (e) {
+      console.warn('[OG Card] Failed to parse design layers:', e);
+    }
+
+    // ─── Also get the QR position from event ────────────────────────────
+    const qrPosition = {
+      x: event.qrPlacementX ?? 50,
+      y: event.qrPlacementY ?? 70,
+      size: Math.min(event.qrSize ?? 120, 200),
+    };
 
     // ─── Render the invitation card ────────────────────────────────────
     return new ImageResponse(
@@ -120,7 +167,7 @@ export async function GET(req: NextRequest) {
               } else if (layer.isCardNumber) {
                 text = guest.cardNumber || '';
               } else {
-                text = text
+                text = String(text || '')
                   .replace(/{guestName}/g, guestName)
                   .replace(/{guestTitle}/g, guest.title || '')
                   .replace(/{cardNumber}/g, guest.cardNumber || '')
@@ -130,7 +177,7 @@ export async function GET(req: NextRequest) {
               }
 
               const fontSize = layer.fontSize || 24;
-              const fontFamily = layer.fontFamily || 'Playfair Display';
+              const fontFamily = layer.fontFamily || 'Playfair Display, serif';
               const color = layer.color || '#ffffff';
               
               return (
@@ -144,7 +191,7 @@ export async function GET(req: NextRequest) {
                     fontSize: fontSize,
                     fontFamily: fontFamily,
                     color: color,
-                    textAlign: layer.align || 'center',
+                    textAlign: (layer.align || 'center') as any,
                     fontWeight: 'bold',
                     width: '80%',
                     textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
@@ -181,29 +228,31 @@ export async function GET(req: NextRequest) {
           })}
 
           {/* ─── QR Code ─── */}
-          <img
-            src={`data:image/png;base64,${qrBase64}`}
-            style={{
-              position: 'absolute',
-              left: `${event.qrPlacementX || 50}%`,
-              top: `${event.qrPlacementY || 70}%`,
-              transform: `translate(-50%, -50%) rotate(${event.qrRotation || 0}deg)`,
-              width: Math.min(event.qrSize || 120, 200),
-              height: Math.min(event.qrSize || 120, 200),
-            }}
-          />
+          {qrBase64 && (
+            <img
+              src={`data:image/png;base64,${qrBase64}`}
+              style={{
+                position: 'absolute',
+                left: `${qrPosition.x}%`,
+                top: `${qrPosition.y}%`,
+                transform: `translate(-50%, -50%) rotate(${event.qrRotation || 0}deg)`,
+                width: qrPosition.size,
+                height: qrPosition.size,
+              }}
+            />
+          )}
         </div>
       ),
       {
         width: 800,
         height: 1200,
         headers: {
-          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
         },
       }
     );
   } catch (error: any) {
     console.error('OG Card generation error:', error);
-    return new Response('Error generating card: ' + error.message, { status: 500 });
+    return new Response(`Error generating card: ${error.message}`, { status: 500 });
   }
 }
