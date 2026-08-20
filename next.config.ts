@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ['sharp'],
   images: {
@@ -10,17 +11,16 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.vercel.app', // ✅ Vercel free plan domain
+        hostname: '*.vercel.app',
       },
       {
         protocol: 'https',
-        hostname: '*.littlewed.co.tz', // Keep for future production
+        hostname: '*.littlewed.co.tz',
       },
       {
         protocol: 'https',
         hostname: 'littlewed.co.tz',
       },
-
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
@@ -29,6 +29,16 @@ const nextConfig = {
       },
     ],
   },
+  // ✅ Include fonts in the serverless function bundle
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./public/fonts/**'],
+  },
+  // ✅ Experimental features
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'littlewed.co.tz', '*.littlewed.co.tz', 'littlewed-kappa.vercel.app'],
+    },
+  },
 };
 
-module.exports = nextConfig;
+export default nextConfig;
