@@ -83,6 +83,7 @@ export default function SendInvitationsPage() {
   const [whatsappFailed, setWhatsappFailed] = useState<{ name: string; phone: string }[]>([]);
   const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
   const [switchingAll, setSwitchingAll] = useState(false);
+    const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
 
   // ─── Template Variables State ──────────────────────────────────────────
   const [smsVariables, setSmsVariables] = useState<TemplateVariables>({
@@ -134,10 +135,10 @@ export default function SendInvitationsPage() {
 
       const formattedDate = eventObj?.date
         ? new Date(eventObj.date).toLocaleDateString('sw-TZ', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          })
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
         : '';
 
       const defaultVars: TemplateVariables = {
@@ -149,7 +150,7 @@ export default function SendInvitationsPage() {
         venue: eventObj?.venue || '',
         time: eventObj?.time || '',
         cardNumber: '{Card Number}',
-        cardType: 'SINGLE', 
+        cardType: 'SINGLE',
       };
 
       setSmsVariables(defaultVars);
@@ -241,7 +242,7 @@ export default function SendInvitationsPage() {
     }
   };
 
-  // ─── Generate Cards ──────────────────────────────────────────────────
+    // ─── Generate Cards (chunked, with visible progress bar) ─────────────
   const handleGenerateCards = async () => {
     const pendingGuests = guests.filter(g => !g.passCode);
     if (pendingGuests.length === 0) {
@@ -250,32 +251,51 @@ export default function SendInvitationsPage() {
     }
 
     setGeneratingCards(true);
-    const toastId = toast.loading(`Generating ${pendingGuests.length} cards...`);
+    const CHUNK_SIZE = 25;
+    const allIds = pendingGuests.map(g => g.id);
+    let completed = 0;
+    let failed = 0;
+    setGenProgress({ done: 0, total: allIds.length });
 
     try {
-      const res = await fetch('/api/invitations/generate-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventId,
-          guestIds: pendingGuests.map(g => g.id)
-        }),
-        credentials: 'include',
-      });
+      for (let i = 0; i < allIds.length; i += CHUNK_SIZE) {
+        const chunk = allIds.slice(i, i + CHUNK_SIZE);
 
-      const data = await res.json();
+        const res = await fetch('/api/invitations/generate-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId, guestIds: chunk }),
+          credentials: 'include',
+        });
 
-      if (res.ok && data.completed > 0) {
-        toast.success(`${data.completed} cards generated`, { id: toastId, duration: 3000 });
+        const data = await res.json();
+
+        if (res.ok) {
+          completed += data.completed ?? 0;
+          failed += data.failed ?? 0;
+        } else {
+          failed += chunk.length;
+          console.error('Chunk failed:', data.error);
+        }
+
+        const done = Math.min(i + CHUNK_SIZE, allIds.length);
+        setGenProgress({ done, total: allIds.length });
         await loadData();
+      }
+
+      if (failed === 0) {
+        toast.success(`${completed} cards generated`, { duration: 3000 });
+      } else if (completed > 0) {
+        toast(`${completed} generated, ${failed} failed — click Cards again to retry`, { duration: 4000 });
       } else {
-        toast.error('Failed to generate cards', { id: toastId, duration: 3000 });
+        toast.error('Failed to generate cards', { duration: 3000 });
       }
     } catch (err) {
       console.error('Generation error:', err);
-      toast.error('Network error', { id: toastId, duration: 3000 });
+      toast.error('Network error — click Cards again to resume', { duration: 3000 });
     } finally {
       setGeneratingCards(false);
+      setTimeout(() => setGenProgress(null), 1500); // let the completed bar show briefly before it disappears
     }
   };
 
@@ -392,9 +412,8 @@ Ahsante.`;
           toast.custom(
             (t) => (
               <div
-                className={`${
-                  t.visible ? 'animate-enter' : 'animate-leave'
-                } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
+                className={`${t.visible ? 'animate-enter' : 'animate-leave'
+                  } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
               >
                 <div className="p-4 bg-amber-50 border-b border-amber-200">
                   <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
@@ -642,26 +661,45 @@ Ahsante.`;
         </div>
       </div>
 
+            {/* ─── Card Generation Progress ─── */}
+      {genProgress && (
+        <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+          <div className="flex items-center justify-between text-xs sm:text-sm mb-1.5">
+            <span className="font-medium text-gray-700 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-amber-600" />
+              Generating cards
+            </span>
+            <span className="text-gray-400 font-mono">
+              {genProgress.done} / {genProgress.total}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-600 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${(genProgress.done / genProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ─── Channel Toggle & Preview ─── */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
           <button
             onClick={() => setActiveChannel('sms')}
-            className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${
-              activeChannel === 'sms'
-                ? 'bg-[#0D4F4F] text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-50'
-            }`}
+            className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${activeChannel === 'sms'
+              ? 'bg-[#0D4F4F] text-white shadow-sm'
+              : 'text-gray-500 hover:bg-gray-50'
+              }`}
           >
             <Phone size={14} /> SMS
           </button>
           <button
             onClick={() => setActiveChannel('whatsapp')}
-            className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${
-              activeChannel === 'whatsapp'
-                ? 'bg-[#0D4F4F] text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-50'
-            }`}
+            className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${activeChannel === 'whatsapp'
+              ? 'bg-[#0D4F4F] text-white shadow-sm'
+              : 'text-gray-500 hover:bg-gray-50'
+              }`}
           >
             <MessageCircle size={14} /> WhatsApp
           </button>
@@ -670,11 +708,10 @@ Ahsante.`;
         <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${
-              showPreview
-                ? 'bg-[#0D4F4F] text-white shadow-sm'
-                : 'text-gray-500 hover:bg-gray-50'
-            }`}
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${showPreview
+              ? 'bg-[#0D4F4F] text-white shadow-sm'
+              : 'text-gray-500 hover:bg-gray-50'
+              }`}
           >
             {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
             {showPreview ? 'Hide Preview' : 'Preview'}
@@ -901,31 +938,28 @@ Ahsante.`;
         <div className="flex gap-1">
           <button
             onClick={() => setFilterChannel('all')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${
-              filterChannel === 'all'
-                ? 'bg-[#0D4F4F] text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterChannel === 'all'
+              ? 'bg-[#0D4F4F] text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             All
           </button>
           <button
             onClick={() => setFilterChannel('whatsapp')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${
-              filterChannel === 'whatsapp'
-                ? 'bg-[#0D4F4F] text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'whatsapp'
+              ? 'bg-[#0D4F4F] text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             <MessageCircle size={10} /> WA
           </button>
           <button
             onClick={() => setFilterChannel('sms')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${
-              filterChannel === 'sms'
-                ? 'bg-[#0D4F4F] text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'sms'
+              ? 'bg-[#0D4F4F] text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             <Phone size={10} /> SMS
           </button>
@@ -933,42 +967,38 @@ Ahsante.`;
         <div className="flex gap-1">
           <button
             onClick={() => setFilterStatus('all')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${
-              filterStatus === 'all'
-                ? 'bg-gray-700 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'all'
+              ? 'bg-gray-700 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             All
           </button>
           <button
             onClick={() => setFilterStatus('sent')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${
-              filterStatus === 'sent'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'sent'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             <CheckCircle size={10} /> Sent
           </button>
           <button
             onClick={() => setFilterStatus('pending')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${
-              filterStatus === 'pending'
-                ? 'bg-amber-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'pending'
+              ? 'bg-amber-500 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
           >
             <Clock size={10} /> Pending
           </button>
           {failedCount > 0 && (
             <button
               onClick={() => setFilterStatus('failed')}
-              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${
-                filterStatus === 'failed'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'failed'
+                ? 'bg-red-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
             >
               <XCircle size={10} /> Failed
             </button>
@@ -1035,9 +1065,8 @@ Ahsante.`;
               return (
                 <div
                   key={guest.id}
-                  className={`px-3 sm:px-5 py-2 sm:py-3 hover:bg-gray-50 transition cursor-pointer ${
-                    status === 'sent' ? 'bg-green-50/30' : ''
-                  } ${status === 'failed' ? 'bg-red-50/30' : ''}`}
+                  className={`px-3 sm:px-5 py-2 sm:py-3 hover:bg-gray-50 transition cursor-pointer ${status === 'sent' ? 'bg-green-50/30' : ''
+                    } ${status === 'failed' ? 'bg-red-50/30' : ''}`}
                   onClick={() => setExpandedGuest(isExpanded ? null : guest.id)}
                 >
                   <div className="flex items-center gap-2 sm:gap-4">
@@ -1050,11 +1079,10 @@ Ahsante.`;
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                         <span className="font-semibold text-gray-900 text-xs sm:text-sm truncate">{fullName}</span>
-                        <span className={`text-[9px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-0.5 sm:gap-1 ${
-                          isWhatsApp
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
+                        <span className={`text-[9px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-0.5 sm:gap-1 ${isWhatsApp
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600'
+                          }`}>
                           {isWhatsApp ? <MessageCircle size={9} /> : <Phone size={9} />}
                           <span className="hidden xs:inline">{isWhatsApp ? 'WhatsApp' : 'SMS'}</span>
                           <span className="xs:hidden">{isWhatsApp ? 'WA' : 'SMS'}</span>

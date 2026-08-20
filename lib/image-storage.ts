@@ -1,85 +1,89 @@
-// lib/image-storage.ts
 import { put } from '@vercel/blob';
-import { prisma } from './prisma';
+import { generateQRFromCardNumber, compositeQROnCard } from './qr';
 
-/**
- * Generate and store a card image for a guest
- * Returns the static image URL
- */
-export async function generateAndStoreCardImage(guestId: string): Promise<string> {
-  try {
-    // ─── Get guest with event data ─────────────────────────────────────
-    const guest = await prisma.guest.findUnique({
-      where: { id: guestId },
-      include: { event: true },
-    });
+interface EventLike {
+  tenantId: string;
+  templateCardUrl: string | null;
+  qrPlacementX: number | null;
+  qrPlacementY: number | null;
+  qrSize: number | null;
+  includeName: boolean | null;
+  namePlacementX: number | null;
+  namePlacementY: number | null;
+  nameFontSize: number | null;
+  nameFontColor: string | null;
+  nameFontFamily: string | null;
+}
 
-    if (!guest) {
-      throw new Error('Guest not found');
-    }
+function getGuestFullName(guest: any): string {
+  return guest.title ? `${guest.title} ${guest.name}` : guest.name;
+}
 
-    const event = guest.event;
-
-    if (!event.templateCardUrl) {
-      throw new Error('No invitation card configured for this event');
-    }
-
-    // ─── Generate the image using OG API ────────────────────────────────
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
-    const ogUrl = `${baseUrl}/api/og/card?guestId=${guest.id}`;
-    
-    console.log('[ImageStorage] Generating image from:', ogUrl);
-    
-    const response = await fetch(ogUrl, {
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[ImageStorage] OG API error:', response.status, errorText);
-      throw new Error(`Failed to generate image: ${response.status}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
-
-    // ─── Upload to Vercel Blob ───────────────────────────────────────────
-    const blob = await put(
-      `invitations/${guest.id}.png`,
-      imageBuffer,
-      {
-        access: 'public',
-        contentType: 'image/png',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-      }
-    );
-
-    console.log('[ImageStorage] Uploaded to:', blob.url);
-    return blob.url;
-
-  } catch (error: any) {
-    console.error('Failed to generate and store card image:', error);
-    throw error;
+export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buffer> {
+  const response = await fetch(templateCardUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch template card: ${response.statusText}`);
   }
+  return Buffer.from(await response.arrayBuffer());
 }
 
-/**
- * Get card image URL from pass code (without storing)
- * This returns the OG URL that generates the card on-the-fly
- */
-export function getCardImageUrl(passCode: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
-  return `${baseUrl}/api/og/card?code=${passCode}`;
+export async function generateCardForGuest(
+  guest: any,
+  event: EventLike,
+  cardBuffer: Buffer
+): Promise<string> {
+  const qrPosition = {
+    x: event.qrPlacementX ?? 100,
+    y: event.qrPlacementY ?? 100,
+    size: event.qrSize ?? 200,
+  };
+
+  const namePosition = event.includeName
+    ? {
+        x: event.namePlacementX ?? 50,
+        y: event.namePlacementY ?? 50,
+        fontSize: event.nameFontSize ?? 24,
+        fontColor: event.nameFontColor ?? '#000000',
+        fontFamily: event.nameFontFamily || 'Playfair Display, serif',
+      }
+    : null;
+
+  const cardNumber = guest.cardNumber || '00000';
+  const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size);
+
+  const finalCardBuffer = await compositeQROnCard(
+    cardBuffer,
+    qrBuffer,
+    qrPosition,
+    namePosition,
+    event.includeName ? getGuestFullName(guest) : undefined,
+    cardNumber
+  );
+
+  const blob = await put(`guests/${event.tenantId}/${guest.id}.png`, finalCardBuffer, {
+    access: 'public',
+    contentType: 'image/png',
+    allowOverwrite: true,
+  });
+
+  return blob.url;
 }
 
-/**
- * Get card image URL from guest ID (without storing)
- * This returns the OG URL that generates the card on-the-fly
- */
-export function getCardImageUrlByGuestId(guestId: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
-  return `${baseUrl}/api/og/card?guestId=${guestId}`;
+// Runs `fn` over `items` with at most `limit` in flight at once —
+// keeps Neon connections and Blob uploads from spiking all at once.
+export async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const current = idx++;
+      results[current] = await fn(items[current]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }

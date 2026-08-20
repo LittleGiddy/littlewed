@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  serverExternalPackages: ['sharp'],
   images: {
     remotePatterns: [
       {
@@ -13,11 +14,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: '*.littlewed.com', // Keep for future production
+        hostname: '*.littlewed.co.tz', // Keep for future production
       },
       {
         protocol: 'https',
-        hostname: 'littlewed.com',
+        hostname: 'littlewed.co.tz',
       },
 
       {
