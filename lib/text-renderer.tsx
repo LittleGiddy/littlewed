@@ -1,4 +1,5 @@
 // lib/text-renderer.tsx
+import { ImageResponse } from '@vercel/og';
 import sharp from 'sharp';
 
 /**
@@ -15,37 +16,8 @@ function escapeXml(str: string): string {
 }
 
 /**
- * Map Google Font names to system fonts available on Vercel
- */
-function getSystemFont(fontFamily: string): string {
-  const fontMap: Record<string, string> = {
-    'Playfair Display': 'Georgia',
-    'DM Sans': 'Arial',
-    'Roboto': 'Arial',
-    'Lora': 'Georgia',
-    'Montserrat': 'Arial',
-    'Open Sans': 'Arial',
-    'Raleway': 'Arial',
-    'Nunito': 'Arial',
-    'Poppins': 'Arial',
-    'Great Vibes': 'Georgia',
-    'Parisienne': 'Georgia',
-    'Alex Brush': 'Georgia',
-    'Tangerine': 'Georgia',
-    'Dancing Script': 'Georgia',
-    'Pacifico': 'Georgia',
-    'Satisfy': 'Georgia',
-    'Cedarville Cursive': 'Georgia',
-    'Kaushan Script': 'Georgia',
-    'Georgia': 'Georgia',
-    'monospace': 'monospace',
-    'Arial': 'Arial',
-  };
-  return fontMap[fontFamily] || 'Georgia';
-}
-
-/**
- * Render text as SVG with proper styling
+ * Render text as PNG using @vercel/og
+ * This works on Vercel because it's built for it
  */
 export async function renderTextToImage(
   text: string,
@@ -66,40 +38,64 @@ export async function renderTextToImage(
     fontSize, fontFamily, color, align, width, height, x, y, rotation, shadow = true 
   } = options;
 
-  // Get system font fallback
-  const systemFont = getSystemFont(fontFamily);
-  
   // Map alignment
-  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
-  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
-  
-  // Build shadow filter
-  const shadowStyle = shadow ? `
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/>
-    </filter>
-  ` : '';
+  const justifyContent = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
+  const textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
 
-  // Create SVG with text
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  ${shadowStyle}
-  <text
-    x="${anchorX}"
-    y="${y}"
-    font-family="${systemFont}"
-    font-size="${fontSize}"
-    fill="${color}"
-    text-anchor="${textAnchor}"
-    dominant-baseline="middle"
-    transform="rotate(${rotation}, ${anchorX}, ${y})"
-    ${shadow ? 'filter="url(#shadow)"' : ''}
-    style="font-weight: bold;"
-  >${escapeXml(text)}</text>
-</svg>`;
+  try {
+    // Use @vercel/og to render text
+    const response = new ImageResponse(
+      (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: justifyContent,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            transform: `rotate(${rotation}deg)`,
+            transformOrigin: `${x}px ${y}px`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: `${fontSize}px`,
+              fontFamily: fontFamily,
+              color: color,
+              fontWeight: 700,
+              textShadow: shadow ? '2px 2px 8px rgba(0,0,0,0.5)' : 'none',
+              padding: '0 20px',
+              textAlign: textAlign as any,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: justifyContent,
+            }}
+          >
+            {text}
+          </div>
+        </div>
+      ),
+      {
+        width: width,
+        height: height,
+      }
+    );
 
-  // Convert SVG to PNG using sharp
-  return await sharp(Buffer.from(svg))
-    .png()
-    .toBuffer();
+    // Convert the response to buffer
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.error('[TextRenderer] @vercel/og error:', error);
+    // Fallback: Create a simple SVG with basic fonts
+    const fallbackSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <text x="${x}" y="${y}" font-size="${fontSize}" fill="${color}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif">
+        ${escapeXml(text)}
+      </text>
+    </svg>`;
+    return await sharp(Buffer.from(fallbackSvg)).png().toBuffer();
+  }
 }

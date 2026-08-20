@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ['sharp'],
   images: {
@@ -29,11 +28,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // ✅ Include fonts in the serverless function bundle
-  outputFileTracingIncludes: {
-    '/api/**/*': ['./public/fonts/**'],
-  },
-  // ✅ Experimental features
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'littlewed.co.tz', '*.littlewed.co.tz', 'littlewed-kappa.vercel.app'],
@@ -41,4 +35,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
