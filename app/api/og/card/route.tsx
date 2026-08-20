@@ -5,26 +5,24 @@ import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';   // required anyway since you use Prisma
+export const maxDuration = 30;     // give the fetch + render pipeline room
+
+const CARD_WIDTH = 800;
+const CARD_HEIGHT = 1200;
+const QR_SIZE = 120;
 
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const guestId = searchParams.get('guestId');
     const code = searchParams.get('code');
-    
+
     let guest;
-    
-    // ─── Try guestId first, then fall back to code ──────────────────────
     if (guestId) {
-      guest = await prisma.guest.findUnique({
-        where: { id: guestId },
-        include: { event: true },
-      });
+      guest = await prisma.guest.findUnique({ where: { id: guestId }, include: { event: true } });
     } else if (code) {
-      guest = await prisma.guest.findFirst({
-        where: { passCode: code },
-        include: { event: true },
-      });
+      guest = await prisma.guest.findFirst({ where: { passCode: code }, include: { event: true } });
     } else {
       return new Response('Missing guestId or code parameter', { status: 400 });
     }
@@ -33,31 +31,30 @@ export async function GET(req: NextRequest) {
       return new Response(`Guest not found: ${guestId || code}`, { status: 404 });
     }
 
-    console.log('[OG Card] Guest found:', guest.id, guest.name);
-
     const event = guest.event;
-    
     if (!event.templateCardUrl) {
       return new Response('No invitation card template configured', { status: 400 });
     }
 
-    const guestName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    
-    // ─── Safely get event date ──────────────────────────────────────────
-    let eventDate = '';
+    // ─── Pre-validate the template image BEFORE handing it to Satori ────
+    // This turns a silent mid-stream Satori crash into a clean, catchable error.
     try {
-      if (event.date) {
-        eventDate = new Date(event.date).toLocaleDateString('sw-TZ', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric',
-        });
+      const check = await fetch(event.templateCardUrl, { method: 'HEAD' });
+      const contentType = check.headers.get('content-type') || '';
+      if (!check.ok) {
+        throw new Error(`Template image not reachable: ${check.status}`);
       }
-    } catch (e) {
-      console.warn('[OG Card] Date parsing error:', e);
+      if (!/image\/(png|jpe?g)/.test(contentType)) {
+        throw new Error(`Template image must be PNG or JPEG, got: ${contentType}`);
+      }
+    } catch (imgErr: any) {
+      console.error('[OG Card] Template image check failed:', imgErr.message);
+      return new Response(`Template image error: ${imgErr.message}`, { status: 400 });
     }
 
-    // ─── Generate QR code ──────────────────────────────────────────────────
+    const guestName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
+    // ─── Generate QR code ────────────────────────────────────────────
     let qrBase64 = '';
     try {
       const qrData = JSON.stringify({
@@ -66,49 +63,20 @@ export async function GET(req: NextRequest) {
         cardNumber: guest.cardNumber,
         passCode: guest.passCode,
       });
-      
-      const qrBuffer = await QRCode.toBuffer(qrData, {
-        width: 200,
-        errorCorrectionLevel: 'H',
-      });
+      const qrBuffer = await QRCode.toBuffer(qrData, { width: 200, errorCorrectionLevel: 'H' });
       qrBase64 = qrBuffer.toString('base64');
     } catch (qrError) {
       console.error('[OG Card] QR error:', qrError);
     }
 
-    // ─── Get design settings ──────────────────────────────────────────────
-    const templateUrl = event.templateCardUrl;
     const overlayColor = event.overlayColor || '#000000';
-    const overlayOpacity = event.overlayOpacity || 0.2;
-    
-    // ─── SAFELY PARSE design layers ──────────────────────────────────────
-    let designLayers: any[] = [];
-    try {
-      if (event.designLayers) {
-        if (typeof event.designLayers === 'string') {
-          designLayers = JSON.parse(event.designLayers);
-        } else if (Array.isArray(event.designLayers)) {
-          designLayers = event.designLayers;
-        }
-      }
-    } catch (e) {
-      console.warn('[OG Card] Layer parse error:', e);
-      designLayers = [];
-    }
+    // use ?? not || so an intentional 0 (no overlay) isn't overwritten
+    const overlayOpacity = event.overlayOpacity ?? 0.2;
 
-    // ─── QR position ──────────────────────────────────────────────────────
-    const qrPosition = {
-      x: event.qrPlacementX ?? 50,
-      y: event.qrPlacementY ?? 70,
-      size: Math.min(event.qrSize ?? 120, 200),
-    };
-
-    // ─── DEBUG: Return a simple card first ─────────────────────────────
-    // This will help us confirm if ImageResponse works at all
-    
     const cardContent = (
       <div
         style={{
+          position: 'relative',           // needed so absolute children anchor correctly
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -117,40 +85,27 @@ export async function GET(req: NextRequest) {
           justifyContent: 'center',
           backgroundColor: '#ffffff',
           fontFamily: 'Arial, sans-serif',
-          padding: '40px',
         }}
       >
-        {/* Background Image */}
-        {templateUrl && (
-          <img
-            src={templateUrl}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
-          />
-        )}
+        <img
+          src={event.templateCardUrl}
+          width={CARD_WIDTH}
+          height={CARD_HEIGHT}
+          style={{ position: 'absolute', top: 0, left: 0, width: CARD_WIDTH, height: CARD_HEIGHT, objectFit: 'cover' }}
+        />
 
-        {/* Overlay */}
         {overlayOpacity > 0 && (
           <div
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
+              position: 'absolute', top: 0, left: 0,
+              width: '100%', height: '100%',
               backgroundColor: overlayColor,
               opacity: overlayOpacity,
+              display: 'flex',
             }}
           />
         )}
 
-        {/* Guest Name - always show this */}
         <div
           style={{
             position: 'absolute',
@@ -161,66 +116,36 @@ export async function GET(req: NextRequest) {
             fontFamily: 'Georgia, serif',
             color: '#ffffff',
             textAlign: 'center',
-            textShadow: '2px 2px 8px rgba(0,0,0,0.8)',
             width: '80%',
-            zIndex: 10,
+            display: 'flex',
+            justifyContent: 'center',
           }}
         >
           {guestName}
         </div>
 
-        {/* QR Code */}
         {qrBase64 && (
           <img
             src={`data:image/png;base64,${qrBase64}`}
-            style={{
-              position: 'absolute',
-              bottom: '200px',
-              right: '50px',
-              width: '120px',
-              height: '120px',
-              zIndex: 10,
-            }}
+            width={QR_SIZE}
+            height={QR_SIZE}
+            style={{ position: 'absolute', bottom: '200px', right: '50px' }}
           />
         )}
-
-        {/* Debug info - remove this later */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '20px',
-            fontSize: '12px',
-            color: 'rgba(255,255,255,0.5)',
-            fontFamily: 'monospace',
-            zIndex: 10,
-          }}
-        >
-          Guest: {guest.id}
-        </div>
       </div>
     );
 
-    // ─── Return the image ──────────────────────────────────────────────────
     return new ImageResponse(cardContent, {
-      width: 800,
-      height: 1200,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-      },
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
     });
 
   } catch (error: any) {
     console.error('[OG Card] Error:', error);
-    // Return a plain text error response so we can see it
-    return new Response(
-      `Error: ${error.message}\n\nStack: ${error.stack || 'No stack'}`,
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'text/plain',
-        },
-      }
-    );
+    return new Response(`Error: ${error.message}\n\nStack: ${error.stack || 'No stack'}`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/plain' },
+    });
   }
 }
