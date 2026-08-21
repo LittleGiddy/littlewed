@@ -7,7 +7,8 @@ import {
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
   Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw,
-  X, Maximize, Minimize, ArrowRight, Zap, Sliders
+  X, Maximize, Minimize, ArrowRight, Zap, Sliders, Move as MoveIcon, 
+  GripVertical, Crosshair
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -128,7 +129,6 @@ export default function InvitationDesigner() {
       const containerWidth = container.clientWidth;
       if (containerWidth <= 0) return;
       
-      // ✅ Maintain aspect ratio 800:1200 = 2:3
       const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
       const maxHeight = window.innerHeight * 0.65;
       const maxWidth = containerWidth;
@@ -198,10 +198,28 @@ export default function InvitationDesigner() {
       else if (e.key === 'Delete' && selectedLayerIndex !== null) {
         deleteLayer(selectedLayerIndex);
       }
+      else if (selectedLayerIndex !== null && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const layer = layers[selectedLayerIndex];
+        if (!layer || layer.locked) return;
+        
+        const step = e.shiftKey ? 2 : 0.5;
+        let newX = layer.x || 50;
+        let newY = layer.y || 50;
+        
+        switch(e.key) {
+          case 'ArrowUp': newY = Math.max(0, newY - step); break;
+          case 'ArrowDown': newY = Math.min(100, newY + step); break;
+          case 'ArrowLeft': newX = Math.max(0, newX - step); break;
+          case 'ArrowRight': newX = Math.min(100, newX + step); break;
+        }
+        
+        updateLayer(selectedLayerIndex, { x: newX, y: newY });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, selectedLayerIndex]);
+  }, [undo, redo, selectedLayerIndex, layers]);
 
   // ─── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -610,6 +628,7 @@ export default function InvitationDesigner() {
     if (!layer.visible) return null;
     const isSelected = index === selectedLayerIndex;
     const isLocked = layer.locked;
+    
     const commonStyle: any = {
       position: 'absolute' as const,
       pointerEvents: 'auto' as const,
@@ -623,13 +642,14 @@ export default function InvitationDesigner() {
       const shadow = layer.shadow
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
+      
       return (
         <div
           key={layer.id}
           className="select-none"
           style={{
             ...commonStyle,
-            cursor: isLocked ? 'default' : 'move',
+            cursor: isLocked ? 'default' : 'grab',
             left: `${layer.x}%`,
             top: `${layer.y}%`,
             transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
@@ -638,11 +658,21 @@ export default function InvitationDesigner() {
             color: layer.color,
             textAlign: layer.align || 'center',
             textShadow: shadow,
-            width: '80%',
+            width: 'auto',
+            maxWidth: '80%',
             fontWeight: 'bold',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
             lineHeight: 1.4,
+            display: 'inline-block',
+            ...(isSelected && !isLocked ? {
+              boxShadow: '0 0 0 2px #0D4F4F, 0 0 0 4px rgba(13,79,79,0.1)',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              margin: '-4px -8px',
+              backgroundColor: 'rgba(13,79,79,0.05)',
+              cursor: 'grab',
+            } : {}),
           }}
           onMouseDown={isLocked ? undefined : startDrag(index)}
           onTouchStart={isLocked ? undefined : startDrag(index)}
@@ -650,12 +680,17 @@ export default function InvitationDesigner() {
         >
           {layer.text || ' '}
           {isSelected && !isLocked && (
-            <div
-              className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4F4F] rounded cursor-nw-resize"
-              style={{ transform: 'translate(50%, 50%)' }}
-              onMouseDown={startResize(index)}
-              onTouchStart={startResize(index)}
-            />
+            <>
+              <div
+                className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4F4F] rounded cursor-nw-resize"
+                style={{ transform: 'translate(50%, 50%)' }}
+                onMouseDown={startResize(index)}
+                onTouchStart={startResize(index)}
+              />
+              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-[8px] text-[#0D4F4F] bg-white/80 px-2 py-0.5 rounded whitespace-nowrap opacity-60 pointer-events-none flex items-center gap-1">
+                <MoveIcon size={10} /> Drag · ← ↑ ↓ →
+              </div>
+            </>
           )}
         </div>
       );
@@ -670,7 +705,7 @@ export default function InvitationDesigner() {
           key={layer.id}
           style={{
             ...commonStyle,
-            cursor: isLocked ? 'default' : 'move',
+            cursor: isLocked ? 'default' : 'grab',
             left: `${layer.x}%`,
             top: `${layer.y}%`,
             transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
@@ -762,6 +797,55 @@ export default function InvitationDesigner() {
     }
     return null;
   };
+
+  // ─── Range Slider Component ──────────────────────────────────────────
+  const RangeSlider = ({ 
+    value, 
+    onChange, 
+    min, 
+    max, 
+    step = 1, 
+    label, 
+    suffix = '',
+    icon: Icon,
+    showInput = true
+  }: any) => (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-medium text-gray-600 flex items-center gap-1.5">
+          {Icon && <Icon size={12} className="text-[#0D4F4F]" />}
+          {label}
+        </label>
+        <span className="text-[10px] font-semibold text-[#0D4F4F] bg-[#0D4F4F]/10 px-2 py-0.5 rounded">
+          {value}{suffix}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F] transition-all hover:h-2"
+          style={{
+            background: `linear-gradient(to right, #0D4F4F 0%, #0D4F4F ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
+          }}
+        />
+        {showInput && (
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+            min={min}
+            max={max}
+          />
+        )}
+      </div>
+    </div>
+  );
 
   // ─── Render ────────────────────────────────────────────────────────────
   if (loading) {
@@ -911,7 +995,10 @@ export default function InvitationDesigner() {
               <h2 className="font-semibold flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
                 <Maximize2 size={16} className="sm:text-lg text-[#0D4F4F]" /> Live Preview
               </h2>
-              <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
+              <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-2">
+                <GripVertical size={12} /> Drag
+                <span className="hidden sm:inline text-[8px] bg-gray-100 px-1.5 py-0.5 rounded">↑↓←→</span>
+              </span>
             </div>
 
             {/* ✅ Preview Container */}
@@ -1017,8 +1104,10 @@ export default function InvitationDesigner() {
               </div>
             </div>
 
-            <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
-              Click a layer to edit properties below
+            <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3 flex items-center justify-center gap-2">
+              <span>Click a layer to edit</span>
+              <span className="w-px h-3 bg-gray-300"></span>
+              <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[8px]">↑↓←→</kbd> to nudge</span>
             </p>
           </div>
         </div>
@@ -1130,11 +1219,67 @@ export default function InvitationDesigner() {
 
               <Section title="Properties" section="properties" icon={<Settings size={14} />}>
                 {selectedLayer ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {/* ✅ Enhanced Position Controls with Range Sliders and Number Inputs */}
+                    <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+                      <p className="text-[9px] font-medium text-gray-500 mb-2 flex items-center gap-1">
+                        <Crosshair size={10} className="text-[#0D4F4F]" />
+                        Position
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[8px] font-medium text-gray-500">X (%)</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={Math.round(selectedLayer.x || 50)}
+                              onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
+                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F]"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={Math.round(selectedLayer.x || 50)}
+                              onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
+                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4F4F] focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-medium text-gray-500">Y (%)</label>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={Math.round(selectedLayer.y || 50)}
+                              onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
+                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F]"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={Math.round(selectedLayer.y || 50)}
+                              onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
+                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4F4F] focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {selectedLayer.type === 'text' && (
                       <>
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Text</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
                           <textarea
                             className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                             rows={2}
@@ -1142,17 +1287,18 @@ export default function InvitationDesigner() {
                             onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                           />
                           {selectedLayer.isGuestName && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with each guest's name</p>
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with guest's name</p>
                           )}
                           {selectedLayer.isGuestType && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with "Single" or "Double"</p>
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with "Single" or "Double"</p>
                           )}
                           {selectedLayer.isCardNumber && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with each guest's card number</p>
+                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with card number</p>
                           )}
                         </div>
+
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Font</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Font</label>
                           <select
                             className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                             value={selectedLayer.fontFamily}
@@ -1161,229 +1307,157 @@ export default function InvitationDesigner() {
                             {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
                           </select>
                         </div>
+
+                        <RangeSlider
+                          label="Size"
+                          value={selectedLayer.fontSize}
+                          onChange={(v: number) => updateLayer(selectedLayerIndex!, { fontSize: v })}
+                          min={8}
+                          max={100}
+                          suffix="px"
+                          showInput={true}
+                        />
+
+                        <RangeSlider
+                          label="Rotation"
+                          value={selectedLayer.rotation || 0}
+                          onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
+                          min={-180}
+                          max={180}
+                          suffix="°"
+                          icon={RotateCw}
+                          showInput={true}
+                        />
+
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Size</label>
-                          <div className="flex items-center gap-2">
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
+                          <div className="flex gap-2 items-center">
                             <input
-                              type="range"
-                              min="8"
-                              max="100"
-                              value={selectedLayer.fontSize}
-                              onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
+                              type="color"
+                              value={selectedLayer.color}
+                              onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
+                              className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                             />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.fontSize}
-                              onChange={e => updateLayer(selectedLayerIndex!, { fontSize: Number(e.target.value) })}
-                              min="8"
-                              max="100"
-                            />
+                            <div className="flex gap-1 flex-1">
+                              {['left', 'center', 'right'].map(a => (
+                                <button
+                                  key={a}
+                                  onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
+                                  className={`flex-1 p-1 rounded-lg border transition ${
+                                    selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  {a === 'left' ? <AlignLeft size={12} /> : a === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Color</label>
+
+                        <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
                           <input
-                            type="color"
-                            value={selectedLayer.color}
-                            onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                            className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                            type="checkbox"
+                            checked={!!selectedLayer.shadow}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                updateLayer(selectedLayerIndex!, {
+                                  shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
+                                });
+                              } else {
+                                updateLayer(selectedLayerIndex!, { shadow: null });
+                              }
+                            }}
+                            className="accent-[#0D4F4F]"
                           />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Alignment</label>
-                          <div className="flex gap-1">
-                            {['left', 'center', 'right'].map(a => (
-                              <button
-                                key={a}
-                                onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
-                                className={`flex-1 p-1 rounded-lg border transition ${selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'}`}
-                              >
-                                {a === 'left' ? <AlignLeft size={12} /> : a === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Rotation</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              min="-180"
-                              max="180"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={!!selectedLayer.shadow}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  updateLayer(selectedLayerIndex!, {
-                                    shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
-                                  });
-                                } else {
-                                  updateLayer(selectedLayerIndex!, { shadow: null });
-                                }
-                              }}
-                            />
-                            Shadow
-                          </label>
-                        </div>
+                          Shadow
+                        </label>
                       </>
                     )}
 
                     {selectedLayer.type === 'rect' && (
                       <>
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Fill Color</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Fill</label>
                           <input
                             type="color"
                             value={selectedLayer.fill || '#ffffff'}
                             onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                            className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Border Color</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Border</label>
                           <input
                             type="color"
                             value={selectedLayer.borderColor || '#ffffff'}
                             onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                            className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Border Width</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="0"
-                              max="10"
-                              value={selectedLayer.borderWidth || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.borderWidth || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { borderWidth: Number(e.target.value) })}
-                              min="0"
-                              max="10"
-                            />
-                          </div>
+                        <RangeSlider
+                          label="Border Width"
+                          value={selectedLayer.borderWidth || 0}
+                          onChange={(v: number) => updateLayer(selectedLayerIndex!, { borderWidth: v })}
+                          min={0}
+                          max={10}
+                          suffix="px"
+                          showInput={true}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <RangeSlider
+                            label="Width"
+                            value={selectedLayer.width || 30}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { width: v })}
+                            min={5}
+                            max={100}
+                            suffix="%"
+                            showInput={true}
+                          />
+                          <RangeSlider
+                            label="Height"
+                            value={selectedLayer.height || 20}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { height: v })}
+                            min={5}
+                            max={100}
+                            suffix="%"
+                            showInput={true}
+                          />
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Width / Height</label>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="range"
-                              min="5"
-                              max="100"
-                              value={selectedLayer.width || 30}
-                              onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.width || 30}
-                              onChange={e => updateLayer(selectedLayerIndex!, { width: Number(e.target.value) })}
-                              min="5"
-                              max="100"
-                            />
-                            <span className="text-[10px] text-gray-400">×</span>
-                            <input
-                              type="range"
-                              min="5"
-                              max="100"
-                              value={selectedLayer.height || 20}
-                              onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.height || 20}
-                              onChange={e => updateLayer(selectedLayerIndex!, { height: Number(e.target.value) })}
-                              min="5"
-                              max="100"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Rotation</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="-180"
-                              max="180"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.rotation || 0}
-                              onChange={e => updateLayer(selectedLayerIndex!, { rotation: Number(e.target.value) })}
-                              min="-180"
-                              max="180"
-                            />
-                          </div>
-                        </div>
+                        <RangeSlider
+                          label="Rotation"
+                          value={selectedLayer.rotation || 0}
+                          onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
+                          min={-180}
+                          max={180}
+                          suffix="°"
+                          icon={RotateCw}
+                          showInput={true}
+                        />
                       </>
                     )}
 
                     {selectedLayer.type === 'line' && (
                       <>
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Stroke Color</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Stroke</label>
                           <input
                             type="color"
                             value={selectedLayer.strokeColor || '#ffffff'}
                             onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                            className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                           />
                         </div>
+                        <RangeSlider
+                          label="Stroke Width"
+                          value={selectedLayer.strokeWidth || 2}
+                          onChange={(v: number) => updateLayer(selectedLayerIndex!, { strokeWidth: v })}
+                          min={1}
+                          max={10}
+                          suffix="px"
+                          showInput={true}
+                        />
                         <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Stroke Width</label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="1"
-                              max="10"
-                              value={selectedLayer.strokeWidth || 2}
-                              onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
-                              className="flex-1 accent-[#0D4F4F]"
-                            />
-                            <input
-                              type="number"
-                              className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center"
-                              value={selectedLayer.strokeWidth || 2}
-                              onChange={e => updateLayer(selectedLayerIndex!, { strokeWidth: Number(e.target.value) })}
-                              min="1"
-                              max="10"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-700">Dash Style</label>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash</label>
                           <select
                             className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                             value={selectedLayer.dashArray || 'solid'}
@@ -1399,7 +1473,7 @@ export default function InvitationDesigner() {
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-400 text-xs">
-                    <Settings size={20} className="mx-auto mb-2 opacity-30" />
+                    <Settings size={18} className="mx-auto mb-1 opacity-30" />
                     Select a layer to edit
                   </div>
                 )}
@@ -1416,21 +1490,16 @@ export default function InvitationDesigner() {
                       className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-700">Opacity</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={overlayOpacity}
-                        onChange={e => setOverlayOpacity(parseFloat(e.target.value))}
-                        className="flex-1 accent-[#0D4F4F]"
-                      />
-                      <span className="text-[10px] text-gray-500 w-10 text-right">{Math.round(overlayOpacity * 100)}%</span>
-                    </div>
-                  </div>
+                  <RangeSlider
+                    label="Opacity"
+                    value={Math.round(overlayOpacity * 100)}
+                    onChange={(v: number) => setOverlayOpacity(v / 100)}
+                    min={0}
+                    max={100}
+                    suffix="%"
+                    icon={Palette}
+                    showInput={true}
+                  />
                 </div>
               </Section>
 
@@ -1459,51 +1528,25 @@ export default function InvitationDesigner() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-700">Size</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="40"
-                        max="300"
-                        step="5"
-                        value={qrSize}
-                        onChange={e => setQrSize(Number(e.target.value))}
-                        className="flex-1 accent-[#0D4F4F]"
-                      />
-                      <input
-                        type="number"
-                        min="40"
-                        max="300"
-                        step="5"
-                        value={qrSize}
-                        onChange={e => setQrSize(Math.min(300, Math.max(40, Number(e.target.value))))}
-                        className="w-14 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-700">Rotation</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="-180"
-                        max="180"
-                        step="1"
-                        value={qrRotation}
-                        onChange={e => setQrRotation(Number(e.target.value))}
-                        className="flex-1 accent-[#0D4F4F]"
-                      />
-                      <input
-                        type="number"
-                        min="-180"
-                        max="180"
-                        value={qrRotation}
-                        onChange={e => setQrRotation(Math.min(180, Math.max(-180, Number(e.target.value))))}
-                        className="w-14 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
+                  <RangeSlider
+                    label="Size"
+                    value={qrSize}
+                    onChange={(v: number) => setQrSize(v)}
+                    min={40}
+                    max={300}
+                    suffix="px"
+                    showInput={true}
+                  />
+                  <RangeSlider
+                    label="Rotation"
+                    value={qrRotation}
+                    onChange={(v: number) => setQrRotation(v)}
+                    min={-180}
+                    max={180}
+                    suffix="°"
+                    icon={RotateCw}
+                    showInput={true}
+                  />
                   <div>
                     <label className="block text-[10px] font-medium text-gray-700">Color</label>
                     <input
@@ -1513,28 +1556,25 @@ export default function InvitationDesigner() {
                       className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-medium text-gray-700">Quick Presets</label>
-                    <div className="flex gap-1">
-                      {[
-                        { label: 'Small', size: 80 },
-                        { label: 'Medium', size: 150 },
-                        { label: 'Large', size: 200 },
-                        { label: 'XL', size: 250 },
-                      ].map(preset => (
-                        <button
-                          key={preset.label}
-                          onClick={() => setQrSize(preset.size)}
-                          className={`flex-1 py-1 rounded-lg text-[8px] font-semibold transition ${
-                            qrSize === preset.size
-                              ? 'bg-[#0D4F4F] text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex gap-1 mt-1">
+                    {[
+                      { label: 'S', size: 80 },
+                      { label: 'M', size: 150 },
+                      { label: 'L', size: 200 },
+                      { label: 'XL', size: 250 },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setQrSize(preset.size)}
+                        className={`flex-1 py-1 rounded-lg text-[8px] font-semibold transition ${
+                          qrSize === preset.size
+                            ? 'bg-[#0D4F4F] text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </Section>
