@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// ─── Shared canvas constants ─────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -114,45 +114,46 @@ export default function InvitationDesigner() {
   const [resizing, setResizing] = useState<{ index: number; type: string } | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, initialSize: 0, initialWidth: 0, initialHeight: 0, initialFontSize: 0 });
 
-  // ─── Canvas scaling with proper aspect ratio ────────────────────────
+  // ─── Canvas ref and state ────────────────────────────────────────────
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasScale, setCanvasScale] = useState(1);
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [canvasScale, setCanvasScale] = useState(0.5);
+  const [containerSize, setContainerSize] = useState({ width: 400, height: 600 });
 
   useEffect(() => {
     const container = canvasContainerRef.current;
     if (!container) return;
 
-    const computeScale = () => {
+    const computeSize = () => {
       const containerWidth = container.clientWidth;
       if (containerWidth <= 0) return;
       
       // ✅ Maintain aspect ratio 800:1200 = 2:3
       const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
-      const idealHeight = containerWidth * aspectRatio;
+      const maxHeight = window.innerHeight * 0.65;
+      const maxWidth = containerWidth;
       
-      // ✅ Limit max height to 70vh so it doesn't take over the page
-      const maxHeight = window.innerHeight * 0.7;
-      const finalHeight = Math.min(idealHeight, maxHeight);
-      const finalWidth = finalHeight / aspectRatio;
+      let finalWidth = maxWidth;
+      let finalHeight = finalWidth * aspectRatio;
       
-      // ✅ Calculate scale
-      const scaleX = finalWidth / DESIGNER_WIDTH;
-      const scaleY = finalHeight / DESIGNER_HEIGHT;
-      const scale = Math.min(scaleX, scaleY, 0.8);
+      if (finalHeight > maxHeight) {
+        finalHeight = maxHeight;
+        finalWidth = finalHeight / aspectRatio;
+      }
+      
+      const scale = Math.min(finalWidth / DESIGNER_WIDTH, finalHeight / DESIGNER_HEIGHT, 0.8);
       
       setContainerSize({ width: finalWidth, height: finalHeight });
       setCanvasScale(scale);
     };
 
-    computeScale();
-    const ro = new ResizeObserver(computeScale);
+    computeSize();
+    const ro = new ResizeObserver(computeSize);
     ro.observe(container);
-    window.addEventListener('resize', computeScale);
+    window.addEventListener('resize', computeSize);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', computeScale);
+      window.removeEventListener('resize', computeSize);
     };
   }, []);
 
@@ -913,109 +914,107 @@ export default function InvitationDesigner() {
               <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
             </div>
 
-            {/* ✅ Container with proper aspect ratio - NO CROPPING */}
+            {/* ✅ Preview Container */}
             <div 
               ref={canvasContainerRef}
               className="mx-auto bg-gray-100 rounded-xl overflow-hidden relative"
               style={{ 
                 width: containerSize.width || '100%',
-                height: containerSize.height || 'auto',
+                height: containerSize.height || 500,
                 maxWidth: '100%',
               }}
             >
-              {containerSize.width > 0 && containerSize.height > 0 && (
-                <div
-                  ref={canvasRef}
-                  className="absolute top-1/2 left-1/2 origin-center"
-                  style={{
-                    width: DESIGNER_WIDTH,
-                    height: DESIGNER_HEIGHT,
-                    transform: `translate(-50%, -50%) scale(${canvasScale})`,
-                    transformOrigin: 'center center',
-                  }}
-                >
-                  {templateUrl ? (
-                    <>
-                      <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                      <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+              <div
+                ref={canvasRef}
+                className="absolute top-1/2 left-1/2 origin-center"
+                style={{
+                  width: DESIGNER_WIDTH,
+                  height: DESIGNER_HEIGHT,
+                  transform: `translate(-50%, -50%) scale(${canvasScale})`,
+                  transformOrigin: 'center center',
+                }}
+              >
+                {templateUrl ? (
+                  <>
+                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
-                      {layers.map((layer, idx) => renderLayer(layer, idx))}
+                    {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                      {/* ─── QR Code ─── */}
-                      <div
-                        className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
+                    {/* ─── QR Code ─── */}
+                    <div
+                      className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
+                      style={{
+                        left: `${qrX}%`,
+                        top: `${qrY}%`,
+                        width: Math.min(qrSize, 300),
+                        height: Math.min(qrSize, 300),
+                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                        zIndex: 20,
+                      }}
+                      onMouseDown={(e) => {
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        const clientX = e.clientX;
+                        const clientY = e.clientY;
+                        setDragOffset({
+                          x: clientX - rect.left - (qrX / 100) * rect.width,
+                          y: clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
+                      }}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        setDragOffset({
+                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
+                      }}
+                    >
+                      <div 
+                        className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
                         style={{
-                          left: `${qrX}%`,
-                          top: `${qrY}%`,
-                          width: Math.min(qrSize, 300),
-                          height: Math.min(qrSize, 300),
-                          transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                          zIndex: 20,
-                        }}
-                        onMouseDown={(e) => {
-                          const rect = canvasRef.current!.getBoundingClientRect();
-                          const clientX = e.clientX;
-                          const clientY = e.clientY;
-                          setDragOffset({
-                            x: clientX - rect.left - (qrX / 100) * rect.width,
-                            y: clientY - rect.top - (qrY / 100) * rect.height,
-                          });
-                          setDragging({ type: 'qr', index: -1 });
-                          e.preventDefault();
-                        }}
-                        onTouchStart={(e) => {
-                          const touch = e.touches[0];
-                          const rect = canvasRef.current!.getBoundingClientRect();
-                          setDragOffset({
-                            x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                            y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                          });
-                          setDragging({ type: 'qr', index: -1 });
-                          e.preventDefault();
+                          backgroundColor: 'rgba(255,255,255,0.85)',
+                          backdropFilter: 'blur(2px)',
+                          border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
                         }}
                       >
-                        <div 
-                          className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
-                          style={{
-                            backgroundColor: 'rgba(255,255,255,0.85)',
-                            backdropFilter: 'blur(2px)',
-                            border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                          }}
-                        >
-                          <div className="absolute inset-0 opacity-[0.03]" style={{ 
-                            backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
-                            backgroundSize: '6px 6px'
-                          }} />
-                          
-                          <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
-                            <QrCode 
-                              size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
-                              style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
-                              className="drop-shadow-sm"
-                            />
-                            <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
-                              SCAN ME
-                            </span>
-                          </div>
-
-                          <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                          <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                          <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                          <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute inset-0 opacity-[0.03]" style={{ 
+                          backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
+                          backgroundSize: '6px 6px'
+                        }} />
+                        
+                        <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
+                          <QrCode 
+                            size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
+                            style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                            className="drop-shadow-sm"
+                          />
+                          <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                            SCAN ME
+                          </span>
                         </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                      <div className="text-center p-4">
-                        <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
-                        <p className="text-xs sm:text-sm">Select a template or upload your own</p>
+
+                        <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                    <div className="text-center p-4">
+                      <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+                      <p className="text-xs sm:text-sm">Select a template or upload your own</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
