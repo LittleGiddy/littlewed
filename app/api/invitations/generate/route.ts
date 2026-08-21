@@ -4,7 +4,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
-import { put } from '@vercel/blob';
 import { fetchTemplateBuffer, generateCardForGuest } from '@/lib/image-storage';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
@@ -82,35 +81,53 @@ export async function POST(req: NextRequest) {
     let completed = 0;
     let failed = 0;
 
-    for (const guest of event.guests) {
-      try {
-        // ─── Use the new generateCardForGuest function ────────────────────
-        // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
-        const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
+    // Process guests with concurrency limit to avoid overwhelming Cloudinary
+    const BATCH_SIZE = 5;
+    const guestBatches = [];
+    for (let i = 0; i < event.guests.length; i += BATCH_SIZE) {
+      guestBatches.push(event.guests.slice(i, i + BATCH_SIZE));
+    }
 
-        // ─── Update database ──────────────────────────────────────────────
-        await prisma.guest.update({
-          where: { id: guest.id },
-          data: { invitationCard: imageUrl },
-        });
+    for (const batch of guestBatches) {
+      const batchPromises = batch.map(async (guest) => {
+        try {
+          // ─── Use the generateCardForGuest function ────────────────────
+          // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
+          const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
-        const fullName = getGuestFullName(guest);
-        results.push({ 
-          guestId: guest.id, 
-          name: fullName, 
-          success: true,
-          cardUrl: imageUrl,
-        });
-        completed++;
-      } catch (error: any) {
-        console.error(`Failed for ${guest.name}:`, error);
-        results.push({
-          guestId: guest.id,
-          name: guest.name,
-          success: false,
-          error: error.message || 'Unknown error',
-        });
-        failed++;
+          // ─── Update database ──────────────────────────────────────────────
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: { invitationCard: imageUrl },
+          });
+
+          const fullName = getGuestFullName(guest);
+          return {
+            guestId: guest.id,
+            name: fullName,
+            success: true,
+            cardUrl: imageUrl,
+          };
+        } catch (error: any) {
+          console.error(`Failed for ${guest.name}:`, error);
+          return {
+            guestId: guest.id,
+            name: guest.name,
+            success: false,
+            error: error.message || 'Unknown error',
+          };
+        }
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      
+      for (const result of batchResults) {
+        if (result.success) {
+          completed++;
+        } else {
+          failed++;
+        }
+        results.push(result);
       }
     }
 

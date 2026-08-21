@@ -1,9 +1,16 @@
-// lib/image-storage.ts - Updated with text alignment support
+// lib/image-storage.ts - Updated with Cloudinary storage
 import './fonts';
-import { put } from '@vercel/blob';
+import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
+
+// ─── Cloudinary Configuration ──────────────────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
@@ -179,6 +186,33 @@ async function renderTextSvg(
 </svg>`;
 
   return await sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+// ─── Save to Cloudinary ────────────────────────────────────────────────
+async function saveToCloudinary(buffer: Buffer, filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // The upload_stream method is used for server-side uploads from a buffer
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: filePath.split('/')[0], // Organize by tenant/event (e.g., "guests/tenant123")
+        public_id: filePath.split('/')[1].split('.')[0], // Use guest ID as public ID
+        format: 'png',
+        overwrite: true, // Overwrite if the guest card is regenerated
+        use_filename: true,
+        unique_filename: false,
+      },
+      (error, result) => {
+        if (error) {
+          console.error('[Cloudinary] Upload error:', error);
+          reject(error);
+        } else {
+          resolve(result?.secure_url || '');
+        }
+      }
+    );
+    
+    uploadStream.end(buffer);
+  });
 }
 
 export async function generateCardForGuest(
@@ -379,15 +413,12 @@ export async function generateCardForGuest(
     console.error('Failed to composite QR code:', qrError);
   }
 
-  // ─── 7. Upload to Vercel Blob ──────────────────────────────────────
-  const blob = await put(`guests/${event.tenantId}/${guest.id}.png`, finalBuffer, {
-    access: 'public',
-    contentType: 'image/png',
-    allowOverwrite: true,
-  });
+  // ─── 7. Save to Cloudinary ──────────────────────────────────────────
+  const filePath = `${event.tenantId}/${guest.id}`;
+  const publicUrl = await saveToCloudinary(finalBuffer, filePath);
 
-  console.log('[CardGen] ✅ Card generated:', blob.url);
-  return blob.url;
+  console.log('[CardGen] ✅ Card saved to Cloudinary:', publicUrl);
+  return publicUrl;
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────
