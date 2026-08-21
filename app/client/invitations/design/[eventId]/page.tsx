@@ -71,10 +71,10 @@ export default function InvitationDesigner() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [overlayColor, setOverlayColor] = useState('#000000');
   const [overlayOpacity, setOverlayOpacity] = useState(0.2);
-  const [qrX, setQrX] = useState(100);
-  const [qrY, setQrY] = useState(100);
-  const [qrSize, setQrSize] = useState(200);
-  const [qrColor, setQrColor] = useState('#0D4F4F'); // ✅ Changed default to match branding
+  const [qrX, setQrX] = useState(85);
+  const [qrY, setQrY] = useState(85);
+  const [qrSize, setQrSize] = useState(150);
+  const [qrColor, setQrColor] = useState('#0D4F4F');
   const [qrRotation, setQrRotation] = useState(0);
   const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null);
@@ -147,10 +147,13 @@ export default function InvitationDesigner() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
       else if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+      else if (e.key === 'Delete' && selectedLayerIndex !== null) {
+        deleteLayer(selectedLayerIndex);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, selectedLayerIndex]);
 
   // ─── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -191,9 +194,9 @@ export default function InvitationDesigner() {
 
         setOverlayColor(settings.overlayColor ?? '#000000');
         setOverlayOpacity(settings.overlayOpacity ?? 0.2);
-        setQrX(settings.qrPlacementX ?? 100);
-        setQrY(settings.qrPlacementY ?? 100);
-        setQrSize(settings.qrSize ?? 200);
+        setQrX(settings.qrPlacementX ?? 85);
+        setQrY(settings.qrPlacementY ?? 85);
+        setQrSize(settings.qrSize ?? 150);
         setQrColor(settings.qrColor ?? '#0D4F4F');
         setQrRotation(settings.qrRotation ?? 0);
       } catch {
@@ -279,7 +282,6 @@ export default function InvitationDesigner() {
   };
 
   // ─── Layer operations with history ──────────────────────────────────
-  // ✅ FIX: Separate state update from history recording
   const setLayersWithHistory = (newLayers: any[], recordHistory = true) => {
     setLayers(newLayers);
     if (recordHistory) {
@@ -287,7 +289,6 @@ export default function InvitationDesigner() {
     }
   };
 
-  // ✅ FIX: Debounced history recording for sliders and drags
   const scheduleHistory = useCallback((newLayers: any[]) => {
     setLayers(newLayers);
     if (historyTimeoutRef.current) {
@@ -419,7 +420,6 @@ export default function InvitationDesigner() {
     setLayersWithHistory(newLayers);
   };
 
-  // ✅ FIX: Update layer with debounced history for smooth sliders
   const updateLayer = (index: number, updates: any) => {
     const newLayers = [...layers];
     newLayers[index] = { ...newLayers[index], ...updates };
@@ -867,9 +867,7 @@ export default function InvitationDesigner() {
             </div>
             <div
               ref={canvasRef}
-              className={`relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[70vh] mx-auto ${
-                showGrid ? 'bg-[repeating-linear-gradient(0deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px),repeating-linear-gradient(90deg,transparent,transparent_19px,rgba(0,0,0,0.05)_19px,rgba(0,0,0,0.05)_20px)]' : ''
-              }`}
+              className="relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[70vh] mx-auto"
               onMouseUp={() => { endDrag(); endResize(); }}
               onMouseLeave={() => { endDrag(); endResize(); }}
               onTouchEnd={() => { endDrag(); endResize(); }}
@@ -884,15 +882,16 @@ export default function InvitationDesigner() {
 
                   {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* ✅ FIX: Clean QR Code - no dark overlay */}
+                  {/* ─── Modern QR Code Placeholder ─── */}
                   <div
-                    className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto"
+                    className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                     style={{
                       left: `${qrX}%`,
                       top: `${qrY}%`,
                       width: Math.min(qrSize, 300),
                       height: Math.min(qrSize, 300),
                       transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                      zIndex: 20,
                     }}
                     onMouseDown={(e) => {
                       const rect = canvasRef.current!.getBoundingClientRect();
@@ -916,22 +915,48 @@ export default function InvitationDesigner() {
                       e.preventDefault();
                     }}
                   >
-                    {/* ✅ Clean QR placeholder - white background with colored dashed border */}
+                    {/* QR Card with modern design */}
                     <div 
-                      className="w-full h-full rounded-lg flex items-center justify-center"
+                      className="w-full h-full rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden"
                       style={{
                         backgroundColor: '#ffffff',
-                        border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                        border: `2px solid ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.04)',
                       }}
                     >
-                      <div className="flex flex-col items-center gap-1">
-                        <QrCode 
-                          size={Math.min(Math.max(qrSize * 0.4, 24), 60)} 
-                          style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
-                        />
-                        <span className="text-[8px] text-gray-400 font-mono">QR Code</span>
+                      {/* Subtle pattern overlay for realism */}
+                      <div className="absolute inset-0 opacity-5" style={{ 
+                        backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
+                        backgroundSize: '8px 8px'
+                      }} />
+                      
+                      {/* QR Icon with modern styling */}
+                      <div className="flex flex-col items-center justify-center gap-1.5 p-3 relative z-10">
+                        <div className="relative">
+                          <div className="absolute inset-0 rounded-full blur-xl opacity-20" style={{ backgroundColor: qrColor }} />
+                          <QrCode 
+                            size={Math.min(Math.max(qrSize * 0.45, 32), 80)} 
+                            style={{ 
+                              color: qrColor === '#000000' ? '#0D4F4F' : qrColor,
+                              position: 'relative',
+                              zIndex: 2,
+                            }}
+                            className="drop-shadow-sm"
+                          />
+                        </div>
+                        <span className="text-[9px] font-mono tracking-wider" style={{ color: qrColor }}>
+                          QR CODE
+                        </span>
                       </div>
+
+                      {/* Corner markers for QR aesthetic */}
+                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 rounded-tl" style={{ borderColor: qrColor }} />
+                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 rounded-tr" style={{ borderColor: qrColor }} />
+                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 rounded-bl" style={{ borderColor: qrColor }} />
+                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 rounded-br" style={{ borderColor: qrColor }} />
+
+                      {/* Hover indicator */}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200 rounded-xl" />
                     </div>
                   </div>
                 </>
@@ -1391,8 +1416,8 @@ export default function InvitationDesigner() {
                     <div className="flex items-center gap-2">
                       <input
                         type="range"
-                        min="20"
-                        max="400"
+                        min="40"
+                        max="300"
                         step="5"
                         value={qrSize}
                         onChange={e => setQrSize(Number(e.target.value))}
@@ -1400,11 +1425,11 @@ export default function InvitationDesigner() {
                       />
                       <input
                         type="number"
-                        min="20"
-                        max="400"
+                        min="40"
+                        max="300"
                         step="5"
                         value={qrSize}
-                        onChange={e => setQrSize(Math.min(400, Math.max(20, Number(e.target.value))))}
+                        onChange={e => setQrSize(Math.min(300, Math.max(40, Number(e.target.value))))}
                         className="w-14 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                       />
                     </div>
@@ -1444,10 +1469,10 @@ export default function InvitationDesigner() {
                     <label className="block text-[10px] font-medium text-gray-700">Quick Presets</label>
                     <div className="flex gap-1">
                       {[
-                        { label: 'Tiny', size: 40 },
                         { label: 'Small', size: 80 },
                         { label: 'Medium', size: 150 },
-                        { label: 'Large', size: 250 },
+                        { label: 'Large', size: 200 },
+                        { label: 'XL', size: 250 },
                       ].map(preset => (
                         <button
                           key={preset.label}
