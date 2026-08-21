@@ -882,7 +882,7 @@ export default function InvitationDesigner() {
 
                   {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* ─── Modern QR Code Placeholder ─── */}
+                  {/* ─── QR Code - Clean version ─── */}
                   <div
                     className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                     style={{
@@ -915,48 +915,35 @@ export default function InvitationDesigner() {
                       e.preventDefault();
                     }}
                   >
-                    {/* QR Card with modern design */}
                     <div 
-                      className="w-full h-full rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative overflow-hidden"
+                      className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
                       style={{
-                        backgroundColor: '#ffffff',
-                        border: `2px solid ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.04)',
+                        backgroundColor: 'rgba(255,255,255,0.85)',
+                        backdropFilter: 'blur(2px)',
+                        border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
                       }}
                     >
-                      {/* Subtle pattern overlay for realism */}
-                      <div className="absolute inset-0 opacity-5" style={{ 
+                      <div className="absolute inset-0 opacity-[0.03]" style={{ 
                         backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
-                        backgroundSize: '8px 8px'
+                        backgroundSize: '6px 6px'
                       }} />
                       
-                      {/* QR Icon with modern styling */}
-                      <div className="flex flex-col items-center justify-center gap-1.5 p-3 relative z-10">
-                        <div className="relative">
-                          <div className="absolute inset-0 rounded-full blur-xl opacity-20" style={{ backgroundColor: qrColor }} />
-                          <QrCode 
-                            size={Math.min(Math.max(qrSize * 0.45, 32), 80)} 
-                            style={{ 
-                              color: qrColor === '#000000' ? '#0D4F4F' : qrColor,
-                              position: 'relative',
-                              zIndex: 2,
-                            }}
-                            className="drop-shadow-sm"
-                          />
-                        </div>
-                        <span className="text-[9px] font-mono tracking-wider" style={{ color: qrColor }}>
-                          QR CODE
+                      <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
+                        <QrCode 
+                          size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
+                          style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                          className="drop-shadow-sm"
+                        />
+                        <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                          SCAN ME
                         </span>
                       </div>
 
-                      {/* Corner markers for QR aesthetic */}
-                      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 rounded-tl" style={{ borderColor: qrColor }} />
-                      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 rounded-tr" style={{ borderColor: qrColor }} />
-                      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 rounded-bl" style={{ borderColor: qrColor }} />
-                      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 rounded-br" style={{ borderColor: qrColor }} />
-
-                      {/* Hover indicator */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200 rounded-xl" />
+                      <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                      <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                      <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                      <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
                     </div>
                   </div>
                 </>

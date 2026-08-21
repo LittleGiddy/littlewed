@@ -1,5 +1,6 @@
 'use client';
 
+import { CardViewerModal } from '@/components/CardViewerModal';
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -83,7 +84,7 @@ export default function SendInvitationsPage() {
   const [whatsappFailed, setWhatsappFailed] = useState<{ name: string; phone: string }[]>([]);
   const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
   const [switchingAll, setSwitchingAll] = useState(false);
-    const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
+  const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
 
   // ─── Template Variables State ──────────────────────────────────────────
   const [smsVariables, setSmsVariables] = useState<TemplateVariables>({
@@ -117,6 +118,7 @@ export default function SendInvitationsPage() {
   const failedCount = results.filter(r => !r.success).length;
   const successCount = results.filter(r => r.success).length;
   const guestsWithoutPassCode = guests.filter(g => !g.passCode).length;
+  const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
 
   // ─── Load Data ──────────────────────────────────────────────────────────
   const loadData = async () => {
@@ -242,7 +244,7 @@ export default function SendInvitationsPage() {
     }
   };
 
-    // ─── Generate Cards (chunked, with visible progress bar) ─────────────
+  // ─── Generate Cards (chunked, with visible progress bar) ─────────────
   const handleGenerateCards = async () => {
     const pendingGuests = guests.filter(g => !g.passCode);
     if (pendingGuests.length === 0) {
@@ -661,7 +663,7 @@ Ahsante.`;
         </div>
       </div>
 
-            {/* ─── Card Generation Progress ─── */}
+      {/* ─── Card Generation Progress ─── */}
       {genProgress && (
         <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center justify-between text-xs sm:text-sm mb-1.5">
@@ -1145,8 +1147,15 @@ Ahsante.`;
                   {isExpanded && (
                     <div className="mt-2 pt-2 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       {guest.invitationCard && (
-                        <div className="bg-gray-50 rounded-xl p-2 text-center">
-                          <p className="text-[10px] text-gray-500 mb-1">Card</p>
+                        <div
+                          className="bg-gray-50 rounded-xl p-2 text-center cursor-pointer hover:shadow-md transition"
+                          onClick={() => setSelectedCard({
+                            url: guest.invitationCard!,
+                            name: getFullName(guest),
+                            cardNumber: guest.cardNumber || undefined
+                          })}
+                        >
+                          <p className="text-[10px] text-gray-500 mb-1">🖱️ Click to view</p>
                           <img
                             src={guest.invitationCard}
                             alt="Card"
@@ -1261,6 +1270,16 @@ Ahsante.`;
           </div>
         </div>
       )}
+
+      {selectedCard && (
+  <CardViewerModal
+    isOpen={!!selectedCard}
+    onClose={() => setSelectedCard(null)}
+    cardUrl={selectedCard.url}
+    guestName={selectedCard.name}
+    cardNumber={selectedCard.cardNumber}
+  />
+  )}
 
     </div>
   );
