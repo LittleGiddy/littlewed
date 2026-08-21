@@ -126,7 +126,7 @@ export default function InvitationDesigner() {
       
       const scaleX = containerWidth / DESIGNER_WIDTH;
       const scaleY = containerHeight / DESIGNER_HEIGHT;
-      const scale = Math.min(scaleX, scaleY, 1);
+      const scale = Math.min(scaleX, scaleY, 1.2);
       setCanvasScale(scale);
     };
 
@@ -862,7 +862,7 @@ export default function InvitationDesigner() {
       <div className="flex-1 flex overflow-hidden">
         {/* ─── Preview Area ─── */}
         <div className="flex-1 flex items-center justify-center p-3 sm:p-4 overflow-auto">
-          <div className="w-full max-w-[480px] h-full max-h-[80vh] flex flex-col">
+          <div className="w-full max-w-[600px] h-full max-h-[85vh] flex flex-col">
             {/* Template selector */}
             <div className="flex items-center gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
               <span className="text-[10px] font-medium text-gray-500 flex-shrink-0">Template:</span>
@@ -897,7 +897,7 @@ export default function InvitationDesigner() {
             {/* Card Preview */}
             <div 
               ref={canvasContainerRef}
-              className="flex-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative min-h-[300px]"
+              className="flex-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative min-h-[400px]"
             >
               <div
                 ref={canvasRef}
