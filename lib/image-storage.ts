@@ -92,8 +92,8 @@ async function applyOverlay(
   }
 
   const metadata = await sharp(cardBuffer).metadata();
-  const width = metadata.width || 3508;
-  const height = metadata.height || 4961;
+  const width = metadata.width || 800;
+  const height = metadata.height || 1200;
 
   const overlayBuffer = await sharp({
     create: {
@@ -177,12 +177,12 @@ export async function generateCardForGuest(
 ): Promise<string> {
   // ─── 1. Get actual image dimensions ──────────────────────────────────
   const metadata = await sharp(cardBuffer).metadata();
-  const actualWidth = metadata.width || 3508;
-  const actualHeight = metadata.height || 4961;
+  const actualWidth = metadata.width || 800;
+  const actualHeight = metadata.height || 1200;
 
-  // ─── 2. Calculate scale factor from designer to actual ──────────────
+  // ─── 2. Calculate scale factor ──────────────────────────────────────
   // The designer uses 800x1200 as the base canvas
-  // The actual card may be a different size (A5, custom upload, etc.)
+  // The actual card may be a different size
   const scaleX = actualWidth / DESIGNER_WIDTH;
   const scaleY = actualHeight / DESIGNER_HEIGHT;
   const scaleFactor = Math.min(scaleX, scaleY);

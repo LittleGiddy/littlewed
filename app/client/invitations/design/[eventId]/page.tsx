@@ -13,6 +13,8 @@ import toast from 'react-hot-toast';
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
+// Preview scale - the card is displayed at 1/3 size
+const PREVIEW_SCALE = 1 / 3;
 
 // ─── Generate unique IDs ────────────────────────────────────────────────
 const generateId = () => {
@@ -124,10 +126,11 @@ export default function InvitationDesigner() {
       const containerHeight = container.clientHeight;
       if (containerWidth <= 0 || containerHeight <= 0) return;
       
-      // ✅ Allow the card to scale to fit the container nicely
+      // ✅ Preview is displayed at 1/3 of the actual size
+      // The canvas is 800x1200, but we want it to fit nicely on screen
       const scaleX = containerWidth / DESIGNER_WIDTH;
       const scaleY = containerHeight / DESIGNER_HEIGHT;
-      const scale = Math.min(scaleX, scaleY, 1.5);
+      const scale = Math.min(scaleX, scaleY, 0.5);
       setCanvasScale(scale);
     };
 
@@ -597,6 +600,14 @@ export default function InvitationDesigner() {
       const shadow = layer.shadow
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
+      
+      // ✅ CRITICAL: Multiply font size by 3 for preview readability
+      // The preview is at 1/3 scale, so 24px becomes 8px - too small!
+      // We multiply by 3 to make it readable (24px * 3 = 72px in preview)
+      // But we need to adjust based on the actual canvas scale
+      const previewScaleFactor = Math.max(1 / canvasScale, 1);
+      const displayFontSize = layer.fontSize * Math.min(previewScaleFactor, 3);
+      
       return (
         <div
           key={layer.id}
@@ -607,7 +618,7 @@ export default function InvitationDesigner() {
             left: `${layer.x}%`,
             top: `${layer.y}%`,
             transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
-            fontSize: `${layer.fontSize}px`,
+            fontSize: `${displayFontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
             textAlign: layer.align || 'center',
