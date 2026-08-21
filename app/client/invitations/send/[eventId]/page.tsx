@@ -9,7 +9,8 @@ import {
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw,
   ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
-  FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap
+  FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
+  HelpCircle, Edit3, Send as SendIcon, Globe, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -50,17 +51,31 @@ interface SendResult {
   messageId?: string;
 }
 
-interface TemplateVariables {
-  guestName: string;
-  hostFamily: string;
-  person1: string;
-  person2: string;
-  date: string;
-  venue: string;
-  time: string;
-  cardNumber: string;
-  cardType: string;
-}
+// ─── SMS Template Default ───────────────────────────────────────────────
+const DEFAULT_SMS_TEMPLATE = `Habari {guestName},
+
+Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}.
+
+Reception: {venue}, saa {time}
+
+Card No: {cardNumber} {guestType}
+
+Tafadhali onyesha kadi hii wakati wa kuingia.
+Karibu sana!`;
+
+// ─── Available Variables ────────────────────────────────────────────────
+const SMS_VARIABLES = [
+  { key: '{guestName}', label: 'Guest Full Name', example: 'Mr John Doe' },
+  { key: '{guestTitle}', label: 'Guest Title', example: 'Mr' },
+  { key: '{cardNumber}', label: 'Card Number', example: '00123' },
+  { key: '{guestType}', label: 'Guest Type', example: 'Single / Double' },
+  { key: '{hostFamily}', label: 'Host Family', example: 'Mr & Mrs Allan Swai' },
+  { key: '{person1}', label: 'Person 1', example: 'Agape' },
+  { key: '{person2}', label: 'Person 2', example: 'Gladness' },
+  { key: '{eventDate}', label: 'Event Date', example: '15 Septemba, 2026' },
+  { key: '{venue}', label: 'Venue', example: 'The Embassy Hall' },
+  { key: '{time}', label: 'Event Time', example: '5:00 PM' },
+];
 
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
@@ -85,31 +100,14 @@ export default function SendInvitationsPage() {
   const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
   const [switchingAll, setSwitchingAll] = useState(false);
   const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
+  const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
 
-  // ─── Template Variables State ──────────────────────────────────────────
-  const [smsVariables, setSmsVariables] = useState<TemplateVariables>({
-    guestName: '',
-    hostFamily: '',
-    person1: '',
-    person2: '',
-    date: '',
-    venue: '',
-    time: '',
-    cardNumber: '',
-    cardType: '',
-  });
+  // ─── SMS Template State ────────────────────────────────────────────────
+  const [smsTemplate, setSmsTemplate] = useState(DEFAULT_SMS_TEMPLATE);
+  const [showVariables, setShowVariables] = useState(false);
 
-  const [whatsappVariables, setWhatsappVariables] = useState<TemplateVariables>({
-    guestName: '',
-    hostFamily: '',
-    person1: '',
-    person2: '',
-    date: '',
-    venue: '',
-    time: '',
-    cardNumber: '',
-    cardType: '',
-  });
+  // ─── WhatsApp Variables ──────────────────────────────────────────────
+  const [whatsappVariables, setWhatsappVariables] = useState<Record<string, string>>({});
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -118,7 +116,6 @@ export default function SendInvitationsPage() {
   const failedCount = results.filter(r => !r.success).length;
   const successCount = results.filter(r => r.success).length;
   const guestsWithoutPassCode = guests.filter(g => !g.passCode).length;
-  const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
 
   // ─── Load Data ──────────────────────────────────────────────────────────
   const loadData = async () => {
@@ -143,20 +140,27 @@ export default function SendInvitationsPage() {
         })
         : '';
 
-      const defaultVars: TemplateVariables = {
-        guestName: '{Guest Name}',
+      // ─── Update SMS template with event data ──────────────────────────
+      const updatedTemplate = DEFAULT_SMS_TEMPLATE
+        .replace(/{hostFamily}/g, eventObj?.hostFamily || '{hostFamily}')
+        .replace(/{person1}/g, eventObj?.person1 || '{person1}')
+        .replace(/{person2}/g, eventObj?.person2 || '{person2}')
+        .replace(/{eventDate}/g, formattedDate || '{eventDate}')
+        .replace(/{venue}/g, eventObj?.venue || '{venue}')
+        .replace(/{time}/g, eventObj?.time || '{time}');
+
+      setSmsTemplate(updatedTemplate);
+
+      // ─── Set WhatsApp variables ──────────────────────────────────────
+      setWhatsappVariables({
         hostFamily: eventObj?.hostFamily || '',
         person1: eventObj?.person1 || '',
         person2: eventObj?.person2 || '',
-        date: formattedDate,
+        eventDate: formattedDate,
         venue: eventObj?.venue || '',
         time: eventObj?.time || '',
-        cardNumber: '{Card Number}',
-        cardType: 'SINGLE',
-      };
+      });
 
-      setSmsVariables(defaultVars);
-      setWhatsappVariables(defaultVars);
       setGuests(guestsData || []);
     } catch (error) {
       console.error('Load error:', error);
@@ -170,6 +174,28 @@ export default function SendInvitationsPage() {
   useEffect(() => {
     loadData();
   }, [eventId]);
+
+  // ─── Helper: Insert variable at cursor position ──────────────────────
+  const insertVariable = (variable: string) => {
+    const textarea = document.getElementById('sms-template-editor') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = smsTemplate;
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+    const newText = before + variable + after;
+
+    setSmsTemplate(newText);
+
+    // Set cursor position after inserted variable
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + variable.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 10);
+  };
 
   // ─── Switch All Guests to WhatsApp ──────────────────────────────────
   const switchAllToWhatsApp = async () => {
@@ -244,7 +270,7 @@ export default function SendInvitationsPage() {
     }
   };
 
-  // ─── Generate Cards (chunked, with visible progress bar) ─────────────
+  // ─── Generate Cards ────────────────────────────────────────────────────
   const handleGenerateCards = async () => {
     const pendingGuests = guests.filter(g => !g.passCode);
     if (pendingGuests.length === 0) {
@@ -297,31 +323,25 @@ export default function SendInvitationsPage() {
       toast.error('Network error — click Cards again to resume', { duration: 3000 });
     } finally {
       setGeneratingCards(false);
-      setTimeout(() => setGenProgress(null), 1500); // let the completed bar show briefly before it disappears
+      setTimeout(() => setGenProgress(null), 1500);
     }
   };
 
-  // ─── Helper: Build personalized message ──────────────────────────────
-  const buildPersonalizedMessage = (variables: TemplateVariables, guest: Guest): string => {
+  // ─── Build SMS Message from Template ──────────────────────────────────
+  const buildSmsMessage = (template: string, guest: Guest): string => {
     const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    const cardNumber = guest.cardNumber || variables.cardNumber;
+    const cardNumber = guest.cardNumber || '';
+    const guestType = guest.guestType === 'DOUBLE' ? 'Double' : 'Single';
 
-    return `Habari ${fullName},
-
-Familia ya ${variables.hostFamily} inapenda kukualika katika sherehe ya harusi ya ${variables.person1} na ${variables.person2} itakayofanyika tarehe ${variables.date}.
-
-Reception itafanyika katika ukumbi wa ${variables.venue}, kuanzia saa ${variables.time}.
-
-Card No: ${cardNumber} ${variables.cardType}
-
-Tafadhali onyesha kadi hii wakati wa kuingia.
-Karibu na ufurahie sherehe!
-
-Ahsante.`;
+    return template
+      .replace(/{guestName}/g, fullName)
+      .replace(/{guestTitle}/g, guest.title || '')
+      .replace(/{cardNumber}/g, cardNumber)
+      .replace(/{guestType}/g, guestType);
   };
 
-  // ─── Get sample message preview ──────────────────────────────────────
-  const getSamplePreview = (variables: TemplateVariables): string => {
+  // ─── Get sample SMS preview ──────────────────────────────────────────
+  const getSampleSmsPreview = (): string => {
     const sampleGuest: Guest = {
       id: 'sample',
       name: 'John Doe',
@@ -334,8 +354,9 @@ Ahsante.`;
       cardNumber: '00123',
       invitationSentAt: null,
       passCode: 'WED-8F92',
+      guestType: 'DOUBLE',
     };
-    return buildPersonalizedMessage(variables, sampleGuest);
+    return buildSmsMessage(smsTemplate, sampleGuest);
   };
 
   // ─── Broadcast to all guests ──────────────────────────────────────────
@@ -344,32 +365,6 @@ Ahsante.`;
     if (targetGuests.length === 0) {
       toast.error('No guests matching the current filters');
       return;
-    }
-
-    // Validate SMS variables
-    const smsGuests = targetGuests.filter(g => g.routingChannel === 'sms');
-    if (smsGuests.length > 0) {
-      const missingVars = Object.entries(smsVariables).filter(([key, value]) => {
-        if (key === 'guestName' || key === 'cardNumber' || key === 'cardType') return false;
-        return !value || value.trim() === '';
-      });
-      if (missingVars.length > 0) {
-        toast.error(`Please fill in: ${missingVars.map(([k]) => k).join(', ')}`);
-        return;
-      }
-    }
-
-    // Validate WhatsApp variables
-    const whatsappGuests = targetGuests.filter(g => g.routingChannel === 'whatsapp');
-    if (whatsappGuests.length > 0) {
-      const missingVars = Object.entries(whatsappVariables).filter(([key, value]) => {
-        if (key === 'guestName' || key === 'cardNumber' || key === 'cardType') return false;
-        return !value || value.trim() === '';
-      });
-      if (missingVars.length > 0) {
-        toast.error(`Please fill in: ${missingVars.map(([k]) => k).join(', ')}`);
-        return;
-      }
     }
 
     setSending(true);
@@ -387,7 +382,7 @@ Ahsante.`;
         body: JSON.stringify({
           eventId,
           guestIds,
-          smsVariables,
+          smsTemplate,
           whatsappVariables,
         }),
         credentials: 'include',
@@ -410,7 +405,6 @@ Ahsante.`;
             }))
           );
 
-          // Show toast with failed numbers - auto dismiss after 6 seconds
           toast.custom(
             (t) => (
               <div
@@ -494,7 +488,7 @@ Ahsante.`;
         body: JSON.stringify({
           eventId,
           guestIds: failedGuestIds,
-          smsVariables,
+          smsTemplate,
           whatsappVariables,
           retry: true,
         }),
@@ -684,7 +678,7 @@ Ahsante.`;
         </div>
       )}
 
-      {/* ─── Channel Toggle & Preview ─── */}
+      {/* ─── Channel Toggle ─── */}
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
           <button
@@ -695,6 +689,7 @@ Ahsante.`;
               }`}
           >
             <Phone size={14} /> SMS
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">{smsCount}</span>
           </button>
           <button
             onClick={() => setActiveChannel('whatsapp')}
@@ -704,131 +699,107 @@ Ahsante.`;
               }`}
           >
             <MessageCircle size={14} /> WhatsApp
-          </button>
-        </div>
-
-        <div className="flex gap-1 sm:gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${showPreview
-              ? 'bg-[#0D4F4F] text-white shadow-sm'
-              : 'text-gray-500 hover:bg-gray-50'
-              }`}
-          >
-            {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
-            {showPreview ? 'Hide Preview' : 'Preview'}
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full">{whatsappCount}</span>
           </button>
         </div>
       </div>
 
       {/* ─── SMS Editor ─── */}
       {activeChannel === 'sms' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <FileText size={16} className="text-[#0D4F4F]" />
-            <h2 className="font-semibold text-gray-800 text-sm sm:text-base">SMS Message</h2>
-            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Custom</span>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-[#0D4F4F]" />
+              <h2 className="font-semibold text-gray-800 text-base">SMS Template</h2>
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Editable</span>
+            </div>
+            <button
+              onClick={() => setShowVariables(!showVariables)}
+              className="text-xs text-[#0D4F4F] hover:text-[#0A3D3D] font-medium flex items-center gap-1"
+            >
+              <HelpCircle size={14} />
+              {showVariables ? 'Hide Variables' : 'Show Variables'}
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-              <label className="block text-[10px] font-medium text-gray-500">Guest Name</label>
-              <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Host Family</label>
-              <input
-                type="text"
-                value={smsVariables.hostFamily}
-                onChange={(e) => setSmsVariables({ ...smsVariables, hostFamily: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="Host family name"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Person 1</label>
-              <input
-                type="text"
-                value={smsVariables.person1}
-                onChange={(e) => setSmsVariables({ ...smsVariables, person1: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="e.g., Agape"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Person 2</label>
-              <input
-                type="text"
-                value={smsVariables.person2}
-                onChange={(e) => setSmsVariables({ ...smsVariables, person2: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="e.g., Gladness"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Date</label>
-              <input
-                type="text"
-                value={smsVariables.date}
-                onChange={(e) => setSmsVariables({ ...smsVariables, date: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="e.g., 15 Septemba, 2026"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Venue</label>
-              <input
-                type="text"
-                value={smsVariables.venue}
-                onChange={(e) => setSmsVariables({ ...smsVariables, venue: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="e.g., The Embassy Hall"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-medium text-gray-700">Time</label>
-              <input
-                type="text"
-                value={smsVariables.time}
-                onChange={(e) => setSmsVariables({ ...smsVariables, time: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
-                placeholder="e.g., 5:00 PM"
-              />
-            </div>
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-              <label className="block text-[10px] font-medium text-gray-500">Card Number</label>
-              <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
-              <label className="block text-[10px] font-medium text-gray-500">Card Type</label>
-              <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
-            </div>
-          </div>
-
-          {showPreview && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <Eye size={12} /> Message Preview
+          {/* ─── Variables Panel ─── */}
+          {showVariables && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+              <p className="text-xs font-medium text-blue-800 mb-2 flex items-center gap-1.5">
+                <Info size={14} />
+                Available Variables - Click to insert
               </p>
-              <div className="mt-1 bg-white rounded-lg p-3 text-xs sm:text-sm text-gray-700 font-mono whitespace-pre-wrap border border-gray-100 max-h-48 overflow-y-auto">
-                {getSamplePreview(smsVariables)}
+              <div className="flex flex-wrap gap-1.5">
+                {SMS_VARIABLES.map((v) => (
+                  <button
+                    key={v.key}
+                    onClick={() => insertVariable(v.key)}
+                    className="text-[10px] bg-white border border-blue-200 px-2.5 py-1 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition flex items-center gap-1 group"
+                    title={`${v.label}: ${v.example}`}
+                  >
+                    <code className="text-blue-700 font-mono text-[9px]">{v.key}</code>
+                    <span className="text-gray-400 text-[8px] group-hover:text-gray-600">↗</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
+
+          {/* ─── Template Editor ─── */}
+          <div className="relative">
+            <textarea
+              id="sms-template-editor"
+              value={smsTemplate}
+              onChange={(e) => setSmsTemplate(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent min-h-[200px] resize-y"
+              placeholder="Write your SMS template here..."
+            />
+            <div className="absolute bottom-3 right-3 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded">
+              {smsTemplate.length} characters
+            </div>
+          </div>
+
+          {/* ─── Preview ─── */}
+          <div className="mt-4">
+            <button
+              onClick={() => setShowPreview(!showPreview)}
+              className="text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1.5"
+            >
+              {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </button>
+
+            {showPreview && (
+              <div className="mt-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider flex items-center gap-2 mb-2">
+                  <Eye size={12} /> Preview (sample guest)
+                </p>
+                <div className="bg-white rounded-lg p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap border border-gray-100 max-h-60 overflow-y-auto">
+                  {getSampleSmsPreview()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ─── Variable Placeholders Info ─── */}
+          <div className="mt-3 text-[10px] text-gray-400 flex items-center gap-2">
+            <Info size={12} />
+            <span>Variables will be replaced with actual guest data when sending</span>
+          </div>
         </div>
       )}
 
       {/* ─── WhatsApp Editor ─── */}
       {activeChannel === 'whatsapp' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
           <div className="flex items-center gap-2 mb-3">
-            <MessageCircle size={16} className="text-green-600" />
-            <h2 className="font-semibold text-gray-800 text-sm sm:text-base">WhatsApp Message</h2>
-            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Template</span>
+            <MessageCircle size={18} className="text-green-600" />
+            <h2 className="font-semibold text-gray-800 text-base">WhatsApp Template</h2>
+            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <label className="block text-[10px] font-medium text-gray-500">Guest Name</label>
               <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
             </div>
@@ -836,9 +807,9 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Host Family</label>
               <input
                 type="text"
-                value={whatsappVariables.hostFamily}
+                value={whatsappVariables.hostFamily || ''}
                 onChange={(e) => setWhatsappVariables({ ...whatsappVariables, hostFamily: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="Host family name"
               />
             </div>
@@ -846,9 +817,9 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Person 1</label>
               <input
                 type="text"
-                value={whatsappVariables.person1}
+                value={whatsappVariables.person1 || ''}
                 onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person1: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Agape"
               />
             </div>
@@ -856,9 +827,9 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Person 2</label>
               <input
                 type="text"
-                value={whatsappVariables.person2}
+                value={whatsappVariables.person2 || ''}
                 onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person2: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Gladness"
               />
             </div>
@@ -866,9 +837,9 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Date</label>
               <input
                 type="text"
-                value={whatsappVariables.date}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, date: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                value={whatsappVariables.eventDate || ''}
+                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, eventDate: e.target.value })}
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 15 Septemba, 2026"
               />
             </div>
@@ -876,9 +847,9 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Venue</label>
               <input
                 type="text"
-                value={whatsappVariables.venue}
+                value={whatsappVariables.venue || ''}
                 onChange={(e) => setWhatsappVariables({ ...whatsappVariables, venue: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., The Embassy Hall"
               />
             </div>
@@ -886,17 +857,17 @@ Ahsante.`;
               <label className="block text-[10px] font-medium text-gray-700">Time</label>
               <input
                 type="text"
-                value={whatsappVariables.time}
+                value={whatsappVariables.time || ''}
                 onChange={(e) => setWhatsappVariables({ ...whatsappVariables, time: e.target.value })}
-                className="w-full p-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 5:00 PM"
               />
             </div>
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <label className="block text-[10px] font-medium text-gray-500">Card Number</label>
               <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <label className="block text-[10px] font-medium text-gray-500">Card Type</label>
               <p className="text-sm text-gray-700 font-medium">Auto-replaced</p>
             </div>
@@ -905,10 +876,16 @@ Ahsante.`;
           {showPreview && (
             <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-200">
               <p className="text-[10px] font-medium text-green-700 uppercase tracking-wider flex items-center gap-2">
-                <Eye size={12} /> Message Preview
+                <Eye size={12} /> Template Preview
               </p>
-              <div className="mt-1 bg-white rounded-lg p-3 text-xs sm:text-sm text-gray-700 font-mono whitespace-pre-wrap border border-green-100 max-h-48 overflow-y-auto">
-                {getSamplePreview(whatsappVariables)}
+              <div className="mt-1 bg-white rounded-lg p-3 text-xs sm:text-sm text-gray-700 whitespace-pre-wrap border border-green-100 max-h-48 overflow-y-auto">
+                {`Habari {guestName},
+
+Familia ya ${whatsappVariables.hostFamily || '{hostFamily}'} inakualika katika sherehe ya harusi ya ${whatsappVariables.person1 || '{person1}'} na ${whatsappVariables.person2 || '{person2}'} itakayofanyika tarehe ${whatsappVariables.eventDate || '{eventDate}'}.
+
+Reception: ${whatsappVariables.venue || '{venue}'}, saa ${whatsappVariables.time || '{time}'}
+
+Card No: {cardNumber} {guestType}`}
               </div>
             </div>
           )}
@@ -1096,12 +1073,15 @@ Ahsante.`;
                             switchGuestChannel(guest.id, newChannel);
                           }}
                           disabled={switchingChannel === guest.id}
-                          className="text-[9px] sm:text-[10px] text-blue-500 hover:text-blue-700 transition font-medium disabled:opacity-50"
+                          className="text-[9px] sm:text-[10px] text-blue-500 hover:text-blue-700 transition font-medium disabled:opacity-50 flex items-center gap-0.5"
                         >
                           {switchingChannel === guest.id ? (
                             <Loader2 size={9} className="animate-spin" />
                           ) : (
-                            `→ ${isWhatsApp ? 'SMS' : 'WA'}`
+                            <>
+                              <RotateCw size={9} />
+                              <span className="hidden xs:inline">{isWhatsApp ? '→ SMS' : '→ WA'}</span>
+                            </>
                           )}
                         </button>
                         {guest.cardNumber && (
@@ -1272,15 +1252,14 @@ Ahsante.`;
       )}
 
       {selectedCard && (
-  <CardViewerModal
-    isOpen={!!selectedCard}
-    onClose={() => setSelectedCard(null)}
-    cardUrl={selectedCard.url}
-    guestName={selectedCard.name}
-    cardNumber={selectedCard.cardNumber}
-  />
-  )}
-
+        <CardViewerModal
+          isOpen={!!selectedCard}
+          onClose={() => setSelectedCard(null)}
+          cardUrl={selectedCard.url}
+          guestName={selectedCard.name}
+          cardNumber={selectedCard.cardNumber}
+        />
+      )}
     </div>
   );
 }
