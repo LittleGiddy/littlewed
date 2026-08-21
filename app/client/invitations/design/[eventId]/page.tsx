@@ -10,6 +10,13 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// ─── Shared canvas constants ─────────────────────────────────────────────
+// IMPORTANT: these must exactly match DESIGNER_WIDTH / DESIGNER_HEIGHT in
+// lib/image-storage.ts. Every x/y/fontSize/width/height value saved by this
+// designer is defined relative to this logical canvas size.
+const DESIGNER_WIDTH = 800;
+const DESIGNER_HEIGHT = 1200;
+
 // ─── Generate unique IDs ────────────────────────────────────────────────
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -108,7 +115,27 @@ export default function InvitationDesigner() {
   const [resizing, setResizing] = useState<{ index: number; type: string } | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, initialSize: 0, initialWidth: 0, initialHeight: 0, initialFontSize: 0 });
 
+  // ─── Canvas scaling ───────────────────────────────────────────────────
+  // outerRef = responsive box the user sees on screen (varies with viewport)
+  // canvasRef = fixed DESIGNER_WIDTH x DESIGNER_HEIGHT logical canvas,
+  //             visually shrunk/grown with CSS transform: scale(scale)
+  const outerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const update = () => {
+      const width = el.clientWidth;
+      if (width > 0) setScale(width / DESIGNER_WIDTH);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -427,6 +454,10 @@ export default function InvitationDesigner() {
   };
 
   // ─── Drag handlers ──────────────────────────────────────────────────
+  // Note: these use canvasRef.getBoundingClientRect(), which correctly
+  // returns the *scaled* on-screen box even though the canvas element's
+  // intrinsic size is fixed at DESIGNER_WIDTH x DESIGNER_HEIGHT — so the
+  // percentage math below needs no changes for the scaling fix.
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     if (!canvasRef.current) return;
@@ -537,16 +568,21 @@ export default function InvitationDesigner() {
     if (!resizing) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const deltaY = clientY - resizeStart.y;
+    // Normalize screen-pixel drag deltas back to logical canvas pixels,
+    // since the canvas is visually scaled by `scale`.
+    const safeScale = scale || 1;
+    const deltaX = (clientX - resizeStart.x) / safeScale;
+    const deltaY = (clientY - resizeStart.y) / safeScale;
     const idx = resizing.index;
     const layer = layers[idx];
     if (layer.type === 'text') {
       const newSize = Math.max(8, resizeStart.initialFontSize + deltaY * 0.5);
       updateLayer(idx, { fontSize: Math.round(newSize) });
     } else if (layer.type === 'rect') {
-      const deltaX = clientX - resizeStart.x;
-      const newWidth = Math.max(5, resizeStart.initialWidth + deltaX * 0.2);
-      const newHeight = Math.max(5, resizeStart.initialHeight + deltaY * 0.2);
+      // Width/height are stored as % of the logical canvas, so convert
+      // the logical-pixel delta into a percentage of DESIGNER_WIDTH/HEIGHT.
+      const newWidth = Math.max(5, resizeStart.initialWidth + (deltaX / DESIGNER_WIDTH) * 100);
+      const newHeight = Math.max(5, resizeStart.initialHeight + (deltaY / DESIGNER_HEIGHT) * 100);
       updateLayer(idx, {
         width: Math.round(Math.min(100, newWidth)),
         height: Math.round(Math.min(100, newHeight)),
@@ -865,9 +901,17 @@ export default function InvitationDesigner() {
               </h2>
               <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
             </div>
+
+            {/* Outer responsive box — this is what actually sizes to the viewport */}
             <div
-              ref={canvasRef}
-              className="relative rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] max-h-[70vh] mx-auto"
+              ref={outerRef}
+              className="relative rounded-xl overflow-hidden bg-gray-100 mx-auto"
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                aspectRatio: `${DESIGNER_WIDTH} / ${DESIGNER_HEIGHT}`,
+                maxHeight: '70vh',
+              }}
               onMouseUp={() => { endDrag(); endResize(); }}
               onMouseLeave={() => { endDrag(); endResize(); }}
               onTouchEnd={() => { endDrag(); endResize(); }}
@@ -875,87 +919,104 @@ export default function InvitationDesigner() {
               onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
               onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
             >
-              {templateUrl ? (
-                <>
-                  <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                  <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+              {/* Inner fixed-size logical canvas — always DESIGNER_WIDTH x DESIGNER_HEIGHT,
+                  visually scaled to fit the outer box. This guarantees px values here mean
+                  exactly the same thing as they do in lib/image-storage.ts on the backend. */}
+              <div
+                ref={canvasRef}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: DESIGNER_WIDTH,
+                  height: DESIGNER_HEIGHT,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                {templateUrl ? (
+                  <>
+                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
-                  {layers.map((layer, idx) => renderLayer(layer, idx))}
+                    {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                  {/* ─── QR Code - Clean version ─── */}
-                  <div
-                    className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
-                    style={{
-                      left: `${qrX}%`,
-                      top: `${qrY}%`,
-                      width: Math.min(qrSize, 300),
-                      height: Math.min(qrSize, 300),
-                      transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                      zIndex: 20,
-                    }}
-                    onMouseDown={(e) => {
-                      const rect = canvasRef.current!.getBoundingClientRect();
-                      const clientX = e.clientX;
-                      const clientY = e.clientY;
-                      setDragOffset({
-                        x: clientX - rect.left - (qrX / 100) * rect.width,
-                        y: clientY - rect.top - (qrY / 100) * rect.height,
-                      });
-                      setDragging({ type: 'qr', index: -1 });
-                      e.preventDefault();
-                    }}
-                    onTouchStart={(e) => {
-                      const touch = e.touches[0];
-                      const rect = canvasRef.current!.getBoundingClientRect();
-                      setDragOffset({
-                        x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                        y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                      });
-                      setDragging({ type: 'qr', index: -1 });
-                      e.preventDefault();
-                    }}
-                  >
-                    <div 
-                      className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
+                    {/* ─── QR Code - Clean version ─── */}
+                    <div
+                      className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                       style={{
-                        backgroundColor: 'rgba(255,255,255,0.85)',
-                        backdropFilter: 'blur(2px)',
-                        border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                        left: `${qrX}%`,
+                        top: `${qrY}%`,
+                        width: Math.min(qrSize, 300),
+                        height: Math.min(qrSize, 300),
+                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                        zIndex: 20,
+                      }}
+                      onMouseDown={(e) => {
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        const clientX = e.clientX;
+                        const clientY = e.clientY;
+                        setDragOffset({
+                          x: clientX - rect.left - (qrX / 100) * rect.width,
+                          y: clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
+                      }}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        setDragOffset({
+                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
                       }}
                     >
-                      <div className="absolute inset-0 opacity-[0.03]" style={{ 
-                        backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
-                        backgroundSize: '6px 6px'
-                      }} />
-                      
-                      <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
-                        <QrCode 
-                          size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
-                          style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
-                          className="drop-shadow-sm"
-                        />
-                        <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
-                          SCAN ME
-                        </span>
-                      </div>
+                      <div 
+                        className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.85)',
+                          backdropFilter: 'blur(2px)',
+                          border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                        }}
+                      >
+                        <div className="absolute inset-0 opacity-[0.03]" style={{ 
+                          backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
+                          backgroundSize: '6px 6px'
+                        }} />
+                        
+                        <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
+                          <QrCode 
+                            size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
+                            style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                            className="drop-shadow-sm"
+                          />
+                          <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                            SCAN ME
+                          </span>
+                        </div>
 
-                      <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                      <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                      <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                      <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                    <div className="text-center p-4">
+                      <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+                      <p className="text-xs sm:text-sm">Select a template or upload your own</p>
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                  <div className="text-center p-4">
-                    <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
-                    <p className="text-xs sm:text-sm">Select a template or upload your own</p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+
             <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
               Click a layer to edit properties below
             </p>

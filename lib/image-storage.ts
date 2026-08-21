@@ -6,7 +6,7 @@ import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
 
 // ─── Constants ──────────────────────────────────────────────────────────
-// These should match the designer's canvas size
+// These MUST match DESIGNER_WIDTH / DESIGNER_HEIGHT in the designer page.
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -55,31 +55,21 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function getSystemFont(fontFamily: string): string {
-  const fontMap: Record<string, string> = {
-    'Playfair Display': 'Georgia',
-    'DM Sans': 'Arial',
-    'Roboto': 'Arial',
-    'Lora': 'Georgia',
-    'Montserrat': 'Arial',
-    'Open Sans': 'Arial',
-    'Raleway': 'Arial',
-    'Nunito': 'Arial',
-    'Poppins': 'Arial',
-    'Great Vibes': 'Georgia',
-    'Parisienne': 'Georgia',
-    'Alex Brush': 'Georgia',
-    'Tangerine': 'Georgia',
-    'Dancing Script': 'Georgia',
-    'Pacifico': 'Georgia',
-    'Satisfy': 'Georgia',
-    'Cedarville Cursive': 'Georgia',
-    'Kaushan Script': 'Georgia',
-    'Georgia': 'Georgia',
-    'monospace': 'monospace',
-    'Arial': 'Arial',
-  };
-  return fontMap[fontFamily] || 'Georgia';
+// ─── Font family resolution ────────────────────────────────────────────
+// Passes the real font family through to fontconfig (registered via
+// lib/fonts.ts from public/fonts) instead of substituting a system font.
+// A generic CSS fallback is appended so rendering degrades gracefully
+// (rather than showing tofu boxes) if a specific font file is ever missing.
+const SCRIPT_FONTS = new Set([
+  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
+  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script',
+]);
+
+function svgFontFamily(fontFamily: string): string {
+  const family = fontFamily || 'Playfair Display';
+  const fallback = SCRIPT_FONTS.has(family) ? 'cursive' : 'serif';
+  // Quote the family name in case it contains spaces.
+  return `"${family}", ${fallback}`;
 }
 
 async function applyOverlay(
@@ -138,7 +128,7 @@ async function renderTextSvg(
     fontSize, fontFamily, color, align, width, height, x, y, rotation, shadow = true 
   } = options;
 
-  const systemFont = getSystemFont(fontFamily);
+  const resolvedFontFamily = svgFontFamily(fontFamily);
   const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
   const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
   
@@ -156,7 +146,7 @@ async function renderTextSvg(
   <text
     x="${anchorX}"
     y="${y}"
-    font-family="${systemFont}, serif"
+    font-family="${resolvedFontFamily}"
     font-size="${fontSize}"
     fill="${color}"
     text-anchor="${textAnchor}"
