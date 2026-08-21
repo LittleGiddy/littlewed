@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
-  HelpCircle, Edit3, Send as SendIcon, Globe, Lock
+  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -27,7 +27,7 @@ interface Guest {
   invitationSentAt: string | null;
   passCode?: string | null;
   checkedIn?: boolean;
-  guestType?: string | null; // ✅ Added guestType
+  guestType?: string | null;
 }
 
 interface EventData {
@@ -78,6 +78,16 @@ const SMS_VARIABLES = [
   { key: '{time}', label: 'Event Time', example: '5:00 PM' },
 ];
 
+// ─── SMS Variables Form Fields ──────────────────────────────────────────
+const SMS_FIELD_LABELS: Record<string, string> = {
+  hostFamily: 'Host Family',
+  person1: 'Person 1 (e.g., Agape)',
+  person2: 'Person 2 (e.g., Gladness)',
+  eventDate: 'Event Date',
+  venue: 'Venue',
+  time: 'Event Time',
+};
+
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -103,12 +113,22 @@ export default function SendInvitationsPage() {
   const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
   const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
 
-  // ─── SMS Template State ────────────────────────────────────────────────
+  // ─── SMS State ────────────────────────────────────────────────────────
+  const [smsVariables, setSmsVariables] = useState<Record<string, string>>({
+    hostFamily: '',
+    person1: '',
+    person2: '',
+    eventDate: '',
+    venue: '',
+    time: '',
+  });
   const [smsTemplate, setSmsTemplate] = useState(DEFAULT_SMS_TEMPLATE);
   const [showVariables, setShowVariables] = useState(false);
+  const [isSmsSaving, setIsSmsSaving] = useState(false);
 
   // ─── WhatsApp Variables ──────────────────────────────────────────────
   const [whatsappVariables, setWhatsappVariables] = useState<Record<string, string>>({});
+  const [isWhatsappSaving, setIsWhatsappSaving] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
@@ -117,6 +137,70 @@ export default function SendInvitationsPage() {
   const failedCount = results.filter(r => !r.success).length;
   const successCount = results.filter(r => r.success).length;
   const guestsWithoutPassCode = guests.filter(g => !g.passCode).length;
+
+  // ─── Auto-save SMS to localStorage ────────────────────────────────────
+  const saveSmsState = useCallback(() => {
+    try {
+      const state = {
+        template: smsTemplate,
+        variables: smsVariables,
+      };
+      localStorage.setItem(`sms_template_${eventId}`, JSON.stringify(state));
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+  }, [smsTemplate, smsVariables, eventId]);
+
+  const loadSmsState = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(`sms_template_${eventId}`);
+      if (saved) {
+        const state = JSON.parse(saved);
+        if (state.template) setSmsTemplate(state.template);
+        if (state.variables) setSmsVariables(state.variables);
+        return true;
+      }
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+    return false;
+  }, [eventId]);
+
+  // ─── Auto-save WhatsApp to localStorage ──────────────────────────────
+  const saveWhatsappState = useCallback(() => {
+    try {
+      localStorage.setItem(`whatsapp_variables_${eventId}`, JSON.stringify(whatsappVariables));
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+  }, [whatsappVariables, eventId]);
+
+  const loadWhatsappState = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(`whatsapp_variables_${eventId}`);
+      if (saved) {
+        const state = JSON.parse(saved);
+        setWhatsappVariables(state);
+        return true;
+      }
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+    return false;
+  }, [eventId]);
+
+  // ─── Auto-save on change ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!loading && eventId) {
+      saveSmsState();
+    }
+  }, [smsTemplate, smsVariables, saveSmsState, loading, eventId]);
+
+  useEffect(() => {
+    if (!loading && eventId) {
+      saveWhatsappState();
+    }
+  }, [whatsappVariables, saveWhatsappState, loading, eventId]);
 
   // ─── Load Data ──────────────────────────────────────────────────────────
   const loadData = async () => {
@@ -141,26 +225,45 @@ export default function SendInvitationsPage() {
         })
         : '';
 
-      // ─── Update SMS template with event data ──────────────────────────
-      const updatedTemplate = DEFAULT_SMS_TEMPLATE
-        .replace(/{hostFamily}/g, eventObj?.hostFamily || '{hostFamily}')
-        .replace(/{person1}/g, eventObj?.person1 || '{person1}')
-        .replace(/{person2}/g, eventObj?.person2 || '{person2}')
-        .replace(/{eventDate}/g, formattedDate || '{eventDate}')
-        .replace(/{venue}/g, eventObj?.venue || '{venue}')
-        .replace(/{time}/g, eventObj?.time || '{time}');
+      // ─── Load saved SMS state or use defaults ──────────────────────
+      const hasSaved = loadSmsState();
 
-      setSmsTemplate(updatedTemplate);
+      if (!hasSaved) {
+        // Set default variables from event
+        setSmsVariables({
+          hostFamily: eventObj?.hostFamily || '',
+          person1: eventObj?.person1 || '',
+          person2: eventObj?.person2 || '',
+          eventDate: formattedDate,
+          venue: eventObj?.venue || '',
+          time: eventObj?.time || '',
+        });
 
-      // ─── Set WhatsApp variables ──────────────────────────────────────
-      setWhatsappVariables({
-        hostFamily: eventObj?.hostFamily || '',
-        person1: eventObj?.person1 || '',
-        person2: eventObj?.person2 || '',
-        eventDate: formattedDate,
-        venue: eventObj?.venue || '',
-        time: eventObj?.time || '',
-      });
+        // Update template with event data
+        const updatedTemplate = DEFAULT_SMS_TEMPLATE
+          .replace(/{hostFamily}/g, eventObj?.hostFamily || '{hostFamily}')
+          .replace(/{person1}/g, eventObj?.person1 || '{person1}')
+          .replace(/{person2}/g, eventObj?.person2 || '{person2}')
+          .replace(/{eventDate}/g, formattedDate || '{eventDate}')
+          .replace(/{venue}/g, eventObj?.venue || '{venue}')
+          .replace(/{time}/g, eventObj?.time || '{time}');
+
+        setSmsTemplate(updatedTemplate);
+      }
+
+      // ─── Load saved WhatsApp state ──────────────────────────────────
+      const hasWhatsappSaved = loadWhatsappState();
+
+      if (!hasWhatsappSaved) {
+        setWhatsappVariables({
+          hostFamily: eventObj?.hostFamily || '',
+          person1: eventObj?.person1 || '',
+          person2: eventObj?.person2 || '',
+          eventDate: formattedDate,
+          venue: eventObj?.venue || '',
+          time: eventObj?.time || '',
+        });
+      }
 
       setGuests(guestsData || []);
     } catch (error) {
@@ -190,12 +293,66 @@ export default function SendInvitationsPage() {
 
     setSmsTemplate(newText);
 
-    // Set cursor position after inserted variable
     setTimeout(() => {
       textarea.focus();
       const newCursorPos = start + variable.length;
       textarea.setSelectionRange(newCursorPos, newCursorPos);
     }, 10);
+  };
+
+  // ─── Update SMS variable ──────────────────────────────────────────────
+  const updateSmsVariable = (key: string, value: string) => {
+    setSmsVariables(prev => ({ ...prev, [key]: value }));
+    // Also update the template with the new value
+    const updatedTemplate = smsTemplate.replace(
+      new RegExp(`{${key}}`, 'g'),
+      value || `{${key}}`
+    );
+    setSmsTemplate(updatedTemplate);
+  };
+
+  // ─── Update WhatsApp variable ─────────────────────────────────────────
+  const updateWhatsappVariable = (key: string, value: string) => {
+    setWhatsappVariables(prev => ({ ...prev, [key]: value }));
+  };
+
+  // ─── Build SMS Message from Template ──────────────────────────────────
+  const buildSmsMessage = (template: string, guest: Guest): string => {
+    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+    const cardNumber = guest.cardNumber || '';
+    const guestType = guest.guestType === 'DOUBLE' ? 'Double' : 'Single';
+
+    return template
+      .replace(/{guestName}/g, fullName)
+      .replace(/{guestTitle}/g, guest.title || '')
+      .replace(/{cardNumber}/g, cardNumber)
+      .replace(/{guestType}/g, guestType)
+      .replace(/{hostFamily}/g, smsVariables.hostFamily || '{hostFamily}')
+      .replace(/{person1}/g, smsVariables.person1 || '{person1}')
+      .replace(/{person2}/g, smsVariables.person2 || '{person2}')
+      .replace(/{eventDate}/g, smsVariables.eventDate || '{eventDate}')
+      .replace(/{venue}/g, smsVariables.venue || '{venue}')
+      .replace(/{time}/g, smsVariables.time || '{time}');
+  };
+
+  // ─── Get sample SMS preview ──────────────────────────────────────────
+  const getSampleSmsPreview = (): string => {
+    const sampleGuest: Guest = {
+      id: 'sample',
+      name: 'John Doe',
+      title: 'Mr',
+      phone: '+255712345678',
+      routingChannel: 'sms',
+      invitationCard: null,
+      smsCode: null,
+      qrToken: null,
+      cardNumber: '00123',
+      invitationSentAt: null,
+      passCode: 'WED-8F92',
+      checkedIn: false,
+      guestType: 'DOUBLE',
+    };
+    return buildSmsMessage(smsTemplate, sampleGuest);
   };
 
   // ─── Switch All Guests to WhatsApp ──────────────────────────────────
@@ -328,39 +485,6 @@ export default function SendInvitationsPage() {
     }
   };
 
-  // ─── Build SMS Message from Template ──────────────────────────────────
-  const buildSmsMessage = (template: string, guest: Guest): string => {
-    const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-    const cardNumber = guest.cardNumber || '';
-    const guestType = guest.guestType === 'DOUBLE' ? 'Double' : 'Single';
-
-    return template
-      .replace(/{guestName}/g, fullName)
-      .replace(/{guestTitle}/g, guest.title || '')
-      .replace(/{cardNumber}/g, cardNumber)
-      .replace(/{guestType}/g, guestType);
-  };
-
-  // ─── Get sample SMS preview ──────────────────────────────────────────
-  const getSampleSmsPreview = (): string => {
-    const sampleGuest: Guest = {
-      id: 'sample',
-      name: 'John Doe',
-      title: 'Mr',
-      phone: '+255712345678',
-      routingChannel: 'sms',
-      invitationCard: null,
-      smsCode: null,
-      qrToken: null,
-      cardNumber: '00123',
-      invitationSentAt: null,
-      passCode: 'WED-8F92',
-      checkedIn: false,
-      guestType: 'DOUBLE',
-    };
-    return buildSmsMessage(smsTemplate, sampleGuest);
-  };
-
   // ─── Broadcast to all guests ──────────────────────────────────────────
   const broadcast = async () => {
     const targetGuests = getFilteredGuests();
@@ -385,6 +509,7 @@ export default function SendInvitationsPage() {
           eventId,
           guestIds,
           smsTemplate,
+          smsVariables,
           whatsappVariables,
         }),
         credentials: 'include',
@@ -491,6 +616,7 @@ export default function SendInvitationsPage() {
           eventId,
           guestIds: failedGuestIds,
           smsTemplate,
+          smsVariables,
           whatsappVariables,
           retry: true,
         }),
@@ -724,6 +850,25 @@ export default function SendInvitationsPage() {
             </button>
           </div>
 
+          {/* ─── SMS Variable Fields ─── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            {Object.entries(SMS_FIELD_LABELS).map(([key, label]) => (
+              <div key={key}>
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">
+                  {label}
+                  <span className="text-gray-400 text-[8px] ml-1">(variable: {'{'}{key}{'}'})</span>
+                </label>
+                <input
+                  type="text"
+                  value={smsVariables[key] || ''}
+                  onChange={(e) => updateSmsVariable(key, e.target.value)}
+                  className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                  placeholder={`Enter ${label.toLowerCase()}`}
+                />
+              </div>
+            ))}
+          </div>
+
           {/* ─── Variables Panel ─── */}
           {showVariables && (
             <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
@@ -783,10 +928,13 @@ export default function SendInvitationsPage() {
             )}
           </div>
 
-          {/* ─── Variable Placeholders Info ─── */}
-          <div className="mt-3 text-[10px] text-gray-400 flex items-center gap-2">
-            <Info size={12} />
-            <span>Variables will be replaced with actual guest data when sending</span>
+          {/* ─── Auto-save indicator ─── */}
+          <div className="mt-3 flex items-center justify-between text-[10px] text-gray-400">
+            <div className="flex items-center gap-2">
+              <Save size={12} className="text-green-500" />
+              <span>Auto-saved</span>
+            </div>
+            <span>Changes are saved automatically</span>
           </div>
         </div>
       )}
@@ -810,7 +958,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.hostFamily || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, hostFamily: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('hostFamily', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="Host family name"
               />
@@ -820,7 +968,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.person1 || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person1: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('person1', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Agape"
               />
@@ -830,7 +978,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.person2 || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, person2: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('person2', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Gladness"
               />
@@ -840,7 +988,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.eventDate || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, eventDate: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('eventDate', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 15 Septemba, 2026"
               />
@@ -850,7 +998,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.venue || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, venue: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('venue', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., The Embassy Hall"
               />
@@ -860,7 +1008,7 @@ export default function SendInvitationsPage() {
               <input
                 type="text"
                 value={whatsappVariables.time || ''}
-                onChange={(e) => setWhatsappVariables({ ...whatsappVariables, time: e.target.value })}
+                onChange={(e) => updateWhatsappVariable('time', e.target.value)}
                 className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 5:00 PM"
               />
@@ -891,6 +1039,15 @@ Card No: {cardNumber} {guestType}`}
               </div>
             </div>
           )}
+
+          {/* ─── Auto-save indicator ─── */}
+          <div className="mt-3 flex items-center justify-between text-[10px] text-gray-400">
+            <div className="flex items-center gap-2">
+              <Save size={12} className="text-green-500" />
+              <span>Auto-saved</span>
+            </div>
+            <span>Changes are saved automatically</span>
+          </div>
         </div>
       )}
 
