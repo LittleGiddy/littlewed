@@ -2,15 +2,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
-  Upload, Move, Maximize2, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
+  Upload, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
   AlignLeft, AlignCenter, AlignRight, Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
   Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, RotateCw,
-  X, Maximize, Minimize, ArrowRight, Zap, Sliders
+  X, Maximize, Minimize, ArrowLeft, Zap, Sliders, PanelRight, PanelLeft
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// ─── Shared canvas constants ─────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -22,7 +22,6 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// ─── Google Fonts list ──────────────────────────────────────────────────
 const FONTS = [
   'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
   'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
@@ -30,7 +29,6 @@ const FONTS = [
   'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
 ];
 
-// ─── Alignment Icons ─────────────────────────────────────────────────────
 const ALIGN_H = [
   { label: <AlignLeft size={14} />, value: 'left' },
   { label: <AlignCenter size={14} />, value: 'center' },
@@ -97,9 +95,9 @@ export default function InvitationDesigner() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [event, setEvent] = useState<any>(null);
-  const [isFullPreview, setIsFullPreview] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'layers' | 'properties' | 'settings'>('layers');
+  const [showPanel, setShowPanel] = useState(true);
 
   // ─── Debounce timer for history ──────────────────────────────────────
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -113,36 +111,36 @@ export default function InvitationDesigner() {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, initialSize: 0, initialWidth: 0, initialHeight: 0, initialFontSize: 0 });
 
   // ─── Canvas scaling ───────────────────────────────────────────────────
-  const outerWrapperRef = useRef<HTMLDivElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasBox, setCanvasBox] = useState({ width: DESIGNER_WIDTH, height: DESIGNER_HEIGHT, scale: 1 });
+  const [canvasScale, setCanvasScale] = useState(1);
 
   useEffect(() => {
-    const wrapper = outerWrapperRef.current;
-    if (!wrapper) return;
+    const container = canvasContainerRef.current;
+    if (!container) return;
 
-    const compute = () => {
-      const availWidth = wrapper.clientWidth;
-      const availHeight = window.innerHeight * 0.7;
-      if (availWidth <= 0) return;
-      const scaleW = availWidth / DESIGNER_WIDTH;
-      const scaleH = availHeight / DESIGNER_HEIGHT;
-      const s = Math.min(scaleW, scaleH);
-      setCanvasBox({ width: DESIGNER_WIDTH * s, height: DESIGNER_HEIGHT * s, scale: s });
+    const computeScale = () => {
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      if (containerWidth <= 0 || containerHeight <= 0) return;
+      
+      const scaleX = containerWidth / DESIGNER_WIDTH;
+      const scaleY = containerHeight / DESIGNER_HEIGHT;
+      const scale = Math.min(scaleX, scaleY, 1);
+      setCanvasScale(scale);
     };
 
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(wrapper);
-    window.addEventListener('resize', compute);
+    computeScale();
+    const ro = new ResizeObserver(computeScale);
+    ro.observe(container);
+    window.addEventListener('resize', computeScale);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', compute);
+      window.removeEventListener('resize', computeScale);
     };
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   // ─── History helpers ──────────────────────────────────────────────────
   const pushHistory = useCallback((newLayers: any[]) => {
@@ -252,7 +250,7 @@ export default function InvitationDesigner() {
     
     const MAX_FILE_SIZE = 3 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      toast.error('File size exceeds 3MB limit. Please compress your image and try again.');
+      toast.error('File size exceeds 3MB limit');
       e.target.value = '';
       return;
     }
@@ -800,53 +798,53 @@ export default function InvitationDesigner() {
   const selectedLayer = selectedLayerIndex !== null ? layers[selectedLayerIndex] : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* ─── Top Bar ─── */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* ─── Top Navigation Bar ─── */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm flex-shrink-0">
+        <div className="px-3 sm:px-6 h-12 sm:h-14 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => router.push(`/client/events/${eventId}`)}
-              className="p-1.5 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-100 transition"
+              className="p-1.5 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-100 transition flex-shrink-0"
             >
-              <ArrowRight size={18} className="rotate-180" />
+              <ArrowLeft size={18} />
             </button>
-            <div>
-              <h1 className="font-serif text-base sm:text-xl font-black text-gray-900">Designer</h1>
-              <p className="text-[9px] sm:text-[10px] text-gray-500 hidden sm:block">{event?.name}</p>
+            <div className="min-w-0">
+              <h1 className="font-serif text-sm sm:text-base font-black text-gray-900 truncate">Designer</h1>
+              <p className="text-[8px] sm:text-[10px] text-gray-500 truncate hidden xs:block">{event?.name}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <button
               onClick={() => setShowGrid(!showGrid)}
-              className={`p-1.5 sm:p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              className={`p-1.5 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               title="Toggle grid"
             >
-              <Grid size={15} />
+              <Grid size={16} />
             </button>
             <button
               onClick={undo}
               disabled={historyIndex <= 0}
-              className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
               title="Undo"
             >
-              <Undo size={15} />
+              <Undo size={16} />
             </button>
             <button
               onClick={redo}
               disabled={historyIndex >= history.length - 1}
-              className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
+              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
               title="Redo"
             >
-              <Redo size={15} />
+              <Redo size={16} />
             </button>
             <button
-              onClick={() => setIsFullPreview(!isFullPreview)}
-              className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
-              title={isFullPreview ? 'Minimize preview' : 'Maximize preview'}
+              onClick={() => setShowPanel(!showPanel)}
+              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition hidden lg:flex"
+              title={showPanel ? 'Hide panel' : 'Show panel'}
             >
-              {isFullPreview ? <Minimize size={15} /> : <Maximize size={15} />}
+              {showPanel ? <PanelRight size={16} /> : <PanelLeft size={16} />}
             </button>
             <button
               onClick={handleSave}
@@ -858,579 +856,298 @@ export default function InvitationDesigner() {
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-        {/* ─── Template Gallery ─── */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 sm:p-3 mb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ImageIcon size={14} className="text-[#0D4F4F]" />
-              <span className="text-xs font-medium text-gray-700">Template</span>
-            </div>
-            <label className="cursor-pointer bg-[#0D4F4F] text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1">
-              <Upload size={12} /> Upload
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-                className="hidden" 
-                ref={fileInputRef} 
-              />
-            </label>
-          </div>
-          
-          {templates.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-1.5 mt-2 scrollbar-thin">
-              {templates.map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => selectTemplate(t)}
-                  className={`flex-shrink-0 w-14 sm:w-16 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
-                    selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'
-                  }`}
-                >
-                  <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
-                  <div className="p-0.5 text-center">
-                    <p className="text-[6px] text-gray-500 truncate">{t.name}</p>
+      {/* ─── Main Content ─── */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* ─── Preview Area ─── */}
+        <div className="flex-1 flex items-center justify-center p-3 sm:p-4 overflow-auto">
+          <div className="w-full max-w-[480px] h-full max-h-[80vh] flex flex-col">
+            {/* Template selector */}
+            <div className="flex items-center gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
+              <span className="text-[10px] font-medium text-gray-500 flex-shrink-0">Template:</span>
+              <div className="flex gap-1.5">
+                {templates.slice(0, 8).map((t) => (
+                  <div
+                    key={t.id}
+                    onClick={() => selectTemplate(t)}
+                    className={`flex-shrink-0 w-10 h-14 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
+                      selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'
+                    }`}
+                  >
+                    <img src={t.imageUrl} alt={t.name} className="w-full h-full object-cover" />
                   </div>
-                </div>
-              ))}
+                ))}
+                <label className="flex-shrink-0 w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-[#0D4F4F] transition">
+                  <Upload size={14} className="text-gray-400" />
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" ref={fileInputRef} />
+                </label>
+                {uploading && <Loader2 size={14} className="animate-spin text-[#0D4F4F] flex-shrink-0" />}
+                {templateUrl && (
+                  <button
+                    onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
+                    className="flex-shrink-0 text-red-500 hover:text-red-700 transition p-1"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
-          {templateUrl && !templates.some(t => t.imageUrl === templateUrl) && (
-            <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
-              <Check size={10} className="text-green-600" /> Custom uploaded
+
+            {/* Card Preview */}
+            <div 
+              ref={canvasContainerRef}
+              className="flex-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative min-h-[300px]"
+            >
+              <div
+                ref={canvasRef}
+                className="absolute top-1/2 left-1/2 origin-center"
+                style={{
+                  width: DESIGNER_WIDTH,
+                  height: DESIGNER_HEIGHT,
+                  transform: `translate(-50%, -50%) scale(${canvasScale})`,
+                  transformOrigin: 'center center',
+                }}
+              >
+                {templateUrl ? (
+                  <>
+                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                    <div className="absolute inset-0 pointer-events-none" style={{ 
+                      backgroundColor: overlayColor, 
+                      opacity: overlayOpacity 
+                    }} />
+
+                    {layers.map((layer, idx) => renderLayer(layer, idx))}
+
+                    {/* QR Code */}
+                    <div
+                      className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto"
+                      style={{
+                        left: `${qrX}%`,
+                        top: `${qrY}%`,
+                        width: Math.min(qrSize, 300),
+                        height: Math.min(qrSize, 300),
+                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                        zIndex: 20,
+                      }}
+                      onMouseDown={(e) => {
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        const clientX = e.clientX;
+                        const clientY = e.clientY;
+                        setDragOffset({
+                          x: clientX - rect.left - (qrX / 100) * rect.width,
+                          y: clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
+                      }}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        const rect = canvasRef.current!.getBoundingClientRect();
+                        setDragOffset({
+                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                        });
+                        setDragging({ type: 'qr', index: -1 });
+                        e.preventDefault();
+                      }}
+                    >
+                      <div 
+                        className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
+                        style={{
+                          backgroundColor: 'rgba(255,255,255,0.85)',
+                          backdropFilter: 'blur(2px)',
+                          border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                        }}
+                      >
+                        <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
+                          <QrCode 
+                            size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
+                            style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                            className="drop-shadow-sm"
+                          />
+                          <span className="text-[7px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                            SCAN ME
+                          </span>
+                        </div>
+                        <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                    <div className="text-center p-4">
+                      <ImageIcon size={40} className="mx-auto mb-3 opacity-50" />
+                      <p className="text-sm font-medium">No template selected</p>
+                      <p className="text-xs">Upload or choose a template above</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <p className="text-[9px] text-gray-400 text-center mt-2 flex-shrink-0">
+              Click a layer to edit · Drag to reposition · {layers.length} layers
             </p>
-          )}
+          </div>
         </div>
 
-        {/* ─── Main Content: Preview + Controls Side by Side ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* ─── Preview ─── */}
-          <div className={`${isFullPreview ? 'lg:col-span-12' : 'lg:col-span-7'} order-1`}>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-semibold flex items-center gap-1.5 text-sm">
-                  <Maximize2 size={15} className="text-[#0D4F4F]" /> Preview
-                </h2>
-                <span className="text-[9px] text-gray-400">Drag to reposition</span>
+        {/* ─── Controls Panel ─── */}
+        {showPanel && (
+          <div className="w-full sm:w-80 lg:w-96 bg-white border-l border-gray-200 flex flex-col overflow-hidden flex-shrink-0">
+            {/* Quick Add */}
+            <div className="p-3 border-b border-gray-100 flex-shrink-0">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                <Zap size={12} className="text-[#0D4F4F]" /> Quick Add
+              </p>
+              <div className="grid grid-cols-4 gap-1.5">
+                <button onClick={addGuestNameLayer} className="bg-[#0D4F4F] text-white px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                  <User size={11} /> Name
+                </button>
+                <button onClick={addGuestTitleLayer} className="bg-[#0D4F4F] text-white px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                  <UserCheck size={11} /> Title
+                </button>
+                <button onClick={addGuestTypeLayer} className="bg-[#0D4F4F] text-white px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                  <Users size={11} /> Type
+                </button>
+                <button onClick={addCardNumberLayer} className="bg-[#0D4F4F] text-white px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                  <Hash size={11} /> Card
+                </button>
+                <button onClick={addTextLayer} className="col-span-2 bg-gray-200 text-gray-700 px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                  <Type size={11} /> Custom Text
+                </button>
+                <button onClick={addRectLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                  <Square size={11} /> Rect
+                </button>
+                <button onClick={addLineLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                  <Minus size={11} /> Line
+                </button>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex border-b border-gray-100 flex-shrink-0">
+                {[
+                  { id: 'layers', label: 'Layers', icon: Layers },
+                  { id: 'properties', label: 'Properties', icon: Settings },
+                  { id: 'settings', label: 'Settings', icon: Sliders },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex-1 py-2 text-[10px] font-semibold transition flex items-center justify-center gap-1 ${
+                      activeTab === tab.id
+                        ? 'text-[#0D4F4F] border-b-2 border-[#0D4F4F] bg-[#0D4F4F]/5'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    <tab.icon size={12} />
+                    {tab.label}
+                  </button>
+                ))}
               </div>
 
-              <div ref={outerWrapperRef} className="mx-auto" style={{ width: '100%', maxWidth: 480 }}>
-                <div
-                  className="relative rounded-lg overflow-hidden bg-gray-100 mx-auto"
-                  style={{ width: canvasBox.width, height: canvasBox.height }}
-                  onMouseUp={() => { endDrag(); endResize(); }}
-                  onMouseLeave={() => { endDrag(); endResize(); }}
-                  onTouchEnd={() => { endDrag(); endResize(); }}
-                  onTouchCancel={() => { endDrag(); endResize(); }}
-                  onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-                  onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-                >
-                  <div
-                    ref={canvasRef}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: DESIGNER_WIDTH,
-                      height: DESIGNER_HEIGHT,
-                      transform: `scale(${canvasBox.scale})`,
-                      transformOrigin: 'top left',
-                    }}
-                  >
-                    {templateUrl ? (
-                      <>
-                        <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                        <div className="absolute inset-0 pointer-events-none" style={{ 
-                          backgroundColor: overlayColor, 
-                          opacity: overlayOpacity 
-                        }} />
-
-                        {layers.map((layer, idx) => renderLayer(layer, idx))}
-
-                        {/* ─── QR Code ─── */}
-                        <div
-                          className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
-                          style={{
-                            left: `${qrX}%`,
-                            top: `${qrY}%`,
-                            width: Math.min(qrSize, 300),
-                            height: Math.min(qrSize, 300),
-                            transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                            zIndex: 20,
-                          }}
-                          onMouseDown={(e) => {
-                            const rect = canvasRef.current!.getBoundingClientRect();
-                            const clientX = e.clientX;
-                            const clientY = e.clientY;
-                            setDragOffset({
-                              x: clientX - rect.left - (qrX / 100) * rect.width,
-                              y: clientY - rect.top - (qrY / 100) * rect.height,
-                            });
-                            setDragging({ type: 'qr', index: -1 });
-                            e.preventDefault();
-                          }}
-                          onTouchStart={(e) => {
-                            const touch = e.touches[0];
-                            const rect = canvasRef.current!.getBoundingClientRect();
-                            setDragOffset({
-                              x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                              y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                            });
-                            setDragging({ type: 'qr', index: -1 });
-                            e.preventDefault();
-                          }}
+              <div className="flex-1 overflow-y-auto p-3">
+                {/* ─── Layers Tab ─── */}
+                {activeTab === 'layers' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] text-gray-500">{layers.length} layers</span>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => {
+                            if (selectedLayerIndex !== null) bringToFront(selectedLayerIndex);
+                            else toast.error('Select a layer first');
+                          }} 
+                          className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
+                          title="Bring to Front"
+                          disabled={selectedLayerIndex === null}
                         >
-                          <div 
-                            className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
-                            style={{
-                              backgroundColor: 'rgba(255,255,255,0.85)',
-                              backdropFilter: 'blur(2px)',
-                              border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                            }}
-                          >
-                            <div className="absolute inset-0 opacity-[0.03]" style={{ 
-                              backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
-                              backgroundSize: '6px 6px'
-                            }} />
-                            <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
-                              <QrCode 
-                                size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
-                                style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
-                                className="drop-shadow-sm"
-                              />
-                              <span className="text-[7px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
-                                SCAN ME
-                              </span>
-                            </div>
-                            <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                          </div>
-                        </div>
-                      </>
+                          <ArrowUp size={10} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (selectedLayerIndex !== null) sendToBack(selectedLayerIndex);
+                            else toast.error('Select a layer first');
+                          }} 
+                          className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
+                          title="Send to Back"
+                          disabled={selectedLayerIndex === null}
+                        >
+                          <ArrowDown size={10} />
+                        </button>
+                      </div>
+                    </div>
+                    {layers.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400 text-xs">
+                        <Layers size={18} className="mx-auto mb-1 opacity-30" />
+                        No layers yet
+                      </div>
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                        <div className="text-center p-4">
-                          <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
-                          <p className="text-xs">Select a template or upload your own</p>
-                        </div>
+                      <div className="space-y-1">
+                        {layers.map((layer, idx) => (
+                          <div
+                            key={layer.id}
+                            className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
+                              idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-3 border-[#0D4F4F]' : ''
+                            }`}
+                            onClick={() => setSelectedLayerIndex(idx)}
+                          >
+                            <span className="text-[10px] truncate flex items-center gap-1.5 max-w-[100px]">
+                              {layer.type === 'text' && <Type size={9} />}
+                              {layer.type === 'rect' && <Square size={9} />}
+                              {layer.type === 'line' && <Minus size={9} />}
+                              {layer.isGuestName && <User size={9} className="text-[#0D4F4F]" />}
+                              {layer.isGuestType && <UserCheck size={9} className="text-[#0D4F4F]" />}
+                              {layer.isCardNumber && <Hash size={9} className="text-[#0D4F4F]" />}
+                              <span className="truncate">
+                                {layer.type === 'text' 
+                                  ? (layer.text || 'Text').substring(0, 10) 
+                                  : layer.type === 'rect' ? 'Rect' : 'Line'}
+                              </span>
+                            </span>
+                            <div className="flex gap-0.5 flex-shrink-0">
+                              <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle">
+                                {layer.visible ? <Eye size={9} /> : <EyeOff size={9} />}
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Lock">
+                                {layer.locked ? <Lock size={9} /> : <Unlock size={9} />}
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
+                                <Copy size={9} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Up">
+                                <ArrowUp size={9} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Down">
+                                <ArrowDown size={9} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
+                                <Trash2 size={9} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
+                )}
 
-          {/* ─── Controls Panel ─── */}
-          {!isFullPreview && (
-            <div className="lg:col-span-5 order-2 space-y-3">
-              {/* ─── Quick Add ─── */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                  <Zap size={12} className="text-[#0D4F4F]" /> Quick Add
-                </p>
-                <div className="grid grid-cols-4 gap-1.5">
-                  <button onClick={addGuestNameLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <User size={11} /> Name
-                  </button>
-                  <button onClick={addGuestTitleLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <UserCheck size={11} /> Title
-                  </button>
-                  <button onClick={addGuestTypeLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <Users size={11} /> Type
-                  </button>
-                  <button onClick={addCardNumberLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <Hash size={11} /> Card
-                  </button>
-                  <button onClick={addTextLayer} className="col-span-2 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Type size={11} /> Custom Text
-                  </button>
-                  <button onClick={addRectLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Square size={11} /> Rect
-                  </button>
-                  <button onClick={addLineLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Minus size={11} /> Line
-                  </button>
-                </div>
-              </div>
-
-              {/* ─── Tabs ─── */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="flex border-b border-gray-100">
-                  {[
-                    { id: 'layers', label: 'Layers', icon: Layers },
-                    { id: 'properties', label: 'Properties', icon: Settings },
-                    { id: 'settings', label: 'Settings', icon: Sliders },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex-1 py-2 text-[10px] font-semibold transition flex items-center justify-center gap-1 ${
-                        activeTab === tab.id
-                          ? 'text-[#0D4F4F] border-b-2 border-[#0D4F4F] bg-[#0D4F4F]/5'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      <tab.icon size={12} />
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="p-3 max-h-[50vh] overflow-y-auto">
-                  {/* ─── Layers Tab ─── */}
-                  {activeTab === 'layers' && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] text-gray-500">{layers.length} layers</span>
-                        <div className="flex gap-1">
-                          <button 
-                            onClick={() => {
-                              if (selectedLayerIndex !== null) bringToFront(selectedLayerIndex);
-                              else toast.error('Select a layer first');
-                            }} 
-                            className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
-                            title="Bring to Front"
-                            disabled={selectedLayerIndex === null}
-                          >
-                            <ArrowUp size={10} />
-                          </button>
-                          <button 
-                            onClick={() => {
-                              if (selectedLayerIndex !== null) sendToBack(selectedLayerIndex);
-                              else toast.error('Select a layer first');
-                            }} 
-                            className="p-1 hover:bg-gray-100 rounded text-[10px] text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed" 
-                            title="Send to Back"
-                            disabled={selectedLayerIndex === null}
-                          >
-                            <ArrowDown size={10} />
-                          </button>
-                        </div>
-                      </div>
-                      {layers.length === 0 ? (
-                        <div className="text-center py-4 text-gray-400 text-xs">
-                          <Layers size={18} className="mx-auto mb-1 opacity-30" />
-                          No layers yet
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          {layers.map((layer, idx) => (
-                            <div
-                              key={layer.id}
-                              className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                                idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-3 border-[#0D4F4F]' : ''
-                              }`}
-                              onClick={() => setSelectedLayerIndex(idx)}
-                            >
-                              <span className="text-[10px] truncate flex items-center gap-1.5">
-                                {layer.type === 'text' && <Type size={9} />}
-                                {layer.type === 'rect' && <Square size={9} />}
-                                {layer.type === 'line' && <Minus size={9} />}
-                                {layer.isGuestName && <User size={9} className="text-[#0D4F4F]" />}
-                                {layer.isGuestType && <UserCheck size={9} className="text-[#0D4F4F]" />}
-                                {layer.isCardNumber && <Hash size={9} className="text-[#0D4F4F]" />}
-                                <span className="truncate max-w-[50px]">
-                                  {layer.type === 'text' 
-                                    ? (layer.text || 'Text').substring(0, 10) 
-                                    : layer.type === 'rect' ? 'Rect' : 'Line'}
-                                </span>
-                              </span>
-                              <div className="flex gap-0.5">
-                                <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle">
-                                  {layer.visible ? <Eye size={9} /> : <EyeOff size={9} />}
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Lock">
-                                  {layer.locked ? <Lock size={9} /> : <Unlock size={9} />}
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
-                                  <Copy size={9} />
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Up">
-                                  <ArrowUp size={9} />
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Down">
-                                  <ArrowDown size={9} />
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
-                                  <Trash2 size={9} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ─── Properties Tab ─── */}
-                  {activeTab === 'properties' && (
-                    <div>
-                      {selectedLayer ? (
-                        <div className="space-y-2.5">
-                          <div className="grid grid-cols-2 gap-2">
-                            <RangeSlider
-                              label="X Position"
-                              value={Math.round(selectedLayer.x || 50)}
-                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { x: v })}
-                              min={0}
-                              max={100}
-                              suffix="%"
-                              showInput
-                            />
-                            <RangeSlider
-                              label="Y Position"
-                              value={Math.round(selectedLayer.y || 50)}
-                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { y: v })}
-                              min={0}
-                              max={100}
-                              suffix="%"
-                              showInput
-                            />
-                          </div>
-
-                          {selectedLayer.type === 'text' && (
-                            <>
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
-                                <textarea
-                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                                  rows={2}
-                                  value={selectedLayer.text}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
-                                />
-                                {selectedLayer.isGuestName && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Guest's name</p>
-                                )}
-                                {selectedLayer.isGuestType && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Single/Double</p>
-                                )}
-                                {selectedLayer.isCardNumber && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Card number</p>
-                                )}
-                              </div>
-
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Font</label>
-                                <select
-                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                                  value={selectedLayer.fontFamily}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
-                                >
-                                  {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
-                              </div>
-
-                              <RangeSlider
-                                label="Font Size"
-                                value={selectedLayer.fontSize}
-                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { fontSize: v })}
-                                min={8}
-                                max={100}
-                                suffix="px"
-                                showInput
-                              />
-
-                              <RangeSlider
-                                label="Rotation"
-                                value={selectedLayer.rotation || 0}
-                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
-                                min={-180}
-                                max={180}
-                                suffix="°"
-                                icon={RotateCw}
-                                showInput
-                              />
-
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
-                                <div className="flex gap-2 items-center">
-                                  <input
-                                    type="color"
-                                    value={selectedLayer.color}
-                                    onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                                    className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                                  />
-                                  <div className="flex gap-1 flex-1">
-                                    {ALIGN_H.map((a) => (
-                                      <button
-                                        key={a.value}
-                                        onClick={() => updateLayer(selectedLayerIndex!, { align: a.value })}
-                                        className={`flex-1 p-1 rounded-lg border transition ${
-                                          selectedLayer.align === a.value ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                      >
-                                        {a.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={!!selectedLayer.shadow}
-                                  onChange={e => {
-                                    if (e.target.checked) {
-                                      updateLayer(selectedLayerIndex!, {
-                                        shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
-                                      });
-                                    } else {
-                                      updateLayer(selectedLayerIndex!, { shadow: null });
-                                    }
-                                  }}
-                                  className="accent-[#0D4F4F]"
-                                />
-                                Shadow
-                              </label>
-                            </>
-                          )}
-
-                          {selectedLayer.type === 'rect' && (
-                            <>
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Fill Color</label>
-                                <input
-                                  type="color"
-                                  value={selectedLayer.fill || '#ffffff'}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Border Color</label>
-                                <input
-                                  type="color"
-                                  value={selectedLayer.borderColor || '#ffffff'}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                                />
-                              </div>
-                              <RangeSlider
-                                label="Border Width"
-                                value={selectedLayer.borderWidth || 0}
-                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { borderWidth: v })}
-                                min={0}
-                                max={10}
-                                suffix="px"
-                                showInput
-                              />
-                              <div className="grid grid-cols-2 gap-2">
-                                <RangeSlider
-                                  label="Width"
-                                  value={selectedLayer.width || 30}
-                                  onChange={(v: number) => updateLayer(selectedLayerIndex!, { width: v })}
-                                  min={5}
-                                  max={100}
-                                  suffix="%"
-                                  showInput
-                                />
-                                <RangeSlider
-                                  label="Height"
-                                  value={selectedLayer.height || 20}
-                                  onChange={(v: number) => updateLayer(selectedLayerIndex!, { height: v })}
-                                  min={5}
-                                  max={100}
-                                  suffix="%"
-                                  showInput
-                                />
-                              </div>
-                              <RangeSlider
-                                label="Rotation"
-                                value={selectedLayer.rotation || 0}
-                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
-                                min={-180}
-                                max={180}
-                                suffix="°"
-                                icon={RotateCw}
-                                showInput
-                              />
-                            </>
-                          )}
-
-                          {selectedLayer.type === 'line' && (
-                            <>
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Stroke Color</label>
-                                <input
-                                  type="color"
-                                  value={selectedLayer.strokeColor || '#ffffff'}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                                />
-                              </div>
-                              <RangeSlider
-                                label="Stroke Width"
-                                value={selectedLayer.strokeWidth || 2}
-                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { strokeWidth: v })}
-                                min={1}
-                                max={10}
-                                suffix="px"
-                                showInput
-                              />
-                              <div>
-                                <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash Style</label>
-                                <select
-                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
-                                  value={selectedLayer.dashArray || 'solid'}
-                                  onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
-                                >
-                                  <option value="solid">Solid</option>
-                                  <option value="dashed">Dashed</option>
-                                  <option value="dotted">Dotted</option>
-                                </select>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-gray-400 text-xs">
-                          <Settings size={18} className="mx-auto mb-1 opacity-30" />
-                          Select a layer to edit
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ─── Settings Tab ─── */}
-                  {activeTab === 'settings' && (
-                    <div className="space-y-2.5">
-                      <div>
-                        <label className="block text-[10px] font-medium text-gray-600 mb-1">Overlay Color</label>
-                        <input
-                          type="color"
-                          value={overlayColor}
-                          onChange={e => setOverlayColor(e.target.value)}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                        />
-                      </div>
-                      <RangeSlider
-                        label="Overlay Opacity"
-                        value={Math.round(overlayOpacity * 100)}
-                        onChange={(v: number) => setOverlayOpacity(v / 100)}
-                        min={0}
-                        max={100}
-                        suffix="%"
-                        icon={Palette}
-                        showInput
-                      />
-
-                      <div className="border-t border-gray-100 pt-2.5 mt-2">
-                        <p className="text-[10px] font-medium text-gray-600 mb-2 flex items-center gap-1.5">
-                          <QrCode size={12} className="text-[#0D4F4F]" /> QR Code Settings
-                        </p>
+                {/* ─── Properties Tab ─── */}
+                {activeTab === 'properties' && (
+                  <div>
+                    {selectedLayer ? (
+                      <div className="space-y-2.5">
                         <div className="grid grid-cols-2 gap-2">
                           <RangeSlider
                             label="X"
-                            value={Math.round(qrX)}
-                            onChange={(v: number) => setQrX(v)}
+                            value={Math.round(selectedLayer.x || 50)}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { x: v })}
                             min={0}
                             max={100}
                             suffix="%"
@@ -1438,70 +1155,321 @@ export default function InvitationDesigner() {
                           />
                           <RangeSlider
                             label="Y"
-                            value={Math.round(qrY)}
-                            onChange={(v: number) => setQrY(v)}
+                            value={Math.round(selectedLayer.y || 50)}
+                            onChange={(v: number) => updateLayer(selectedLayerIndex!, { y: v })}
                             min={0}
                             max={100}
                             suffix="%"
                             showInput
                           />
                         </div>
+
+                        {selectedLayer.type === 'text' && (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
+                              <textarea
+                                className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                rows={2}
+                                value={selectedLayer.text}
+                                onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
+                              />
+                              {selectedLayer.isGuestName && (
+                                <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Guest's name</p>
+                              )}
+                              {selectedLayer.isGuestType && (
+                                <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Single/Double</p>
+                              )}
+                              {selectedLayer.isCardNumber && (
+                                <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Card number</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Font</label>
+                              <select
+                                className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                value={selectedLayer.fontFamily}
+                                onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
+                              >
+                                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                              </select>
+                            </div>
+
+                            <RangeSlider
+                              label="Size"
+                              value={selectedLayer.fontSize}
+                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { fontSize: v })}
+                              min={8}
+                              max={100}
+                              suffix="px"
+                              showInput
+                            />
+
+                            <RangeSlider
+                              label="Rotation"
+                              value={selectedLayer.rotation || 0}
+                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
+                              min={-180}
+                              max={180}
+                              suffix="°"
+                              icon={RotateCw}
+                              showInput
+                            />
+
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={selectedLayer.color}
+                                  onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
+                                  className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                                />
+                                <div className="flex gap-1 flex-1">
+                                  {ALIGN_H.map((a) => (
+                                    <button
+                                      key={a.value}
+                                      onClick={() => updateLayer(selectedLayerIndex!, { align: a.value })}
+                                      className={`flex-1 p-1 rounded-lg border transition ${
+                                        selectedLayer.align === a.value ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+                                      }`}
+                                    >
+                                      {a.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
+                            <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={!!selectedLayer.shadow}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    updateLayer(selectedLayerIndex!, {
+                                      shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 }
+                                    });
+                                  } else {
+                                    updateLayer(selectedLayerIndex!, { shadow: null });
+                                  }
+                                }}
+                                className="accent-[#0D4F4F]"
+                              />
+                              Shadow
+                            </label>
+                          </>
+                        )}
+
+                        {selectedLayer.type === 'rect' && (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Fill</label>
+                              <input
+                                type="color"
+                                value={selectedLayer.fill || '#ffffff'}
+                                onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
+                                className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Border</label>
+                              <input
+                                type="color"
+                                value={selectedLayer.borderColor || '#ffffff'}
+                                onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
+                                className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                              />
+                            </div>
+                            <RangeSlider
+                              label="Border Width"
+                              value={selectedLayer.borderWidth || 0}
+                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { borderWidth: v })}
+                              min={0}
+                              max={10}
+                              suffix="px"
+                              showInput
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <RangeSlider
+                                label="Width"
+                                value={selectedLayer.width || 30}
+                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { width: v })}
+                                min={5}
+                                max={100}
+                                suffix="%"
+                                showInput
+                              />
+                              <RangeSlider
+                                label="Height"
+                                value={selectedLayer.height || 20}
+                                onChange={(v: number) => updateLayer(selectedLayerIndex!, { height: v })}
+                                min={5}
+                                max={100}
+                                suffix="%"
+                                showInput
+                              />
+                            </div>
+                            <RangeSlider
+                              label="Rotation"
+                              value={selectedLayer.rotation || 0}
+                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { rotation: v })}
+                              min={-180}
+                              max={180}
+                              suffix="°"
+                              icon={RotateCw}
+                              showInput
+                            />
+                          </>
+                        )}
+
+                        {selectedLayer.type === 'line' && (
+                          <>
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Stroke</label>
+                              <input
+                                type="color"
+                                value={selectedLayer.strokeColor || '#ffffff'}
+                                onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
+                                className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                              />
+                            </div>
+                            <RangeSlider
+                              label="Stroke Width"
+                              value={selectedLayer.strokeWidth || 2}
+                              onChange={(v: number) => updateLayer(selectedLayerIndex!, { strokeWidth: v })}
+                              min={1}
+                              max={10}
+                              suffix="px"
+                              showInput
+                            />
+                            <div>
+                              <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash</label>
+                              <select
+                                className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                value={selectedLayer.dashArray || 'solid'}
+                                onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
+                              >
+                                <option value="solid">Solid</option>
+                                <option value="dashed">Dashed</option>
+                                <option value="dotted">Dotted</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-gray-400 text-xs">
+                        <Settings size={18} className="mx-auto mb-1 opacity-30" />
+                        Select a layer to edit
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ─── Settings Tab ─── */}
+                {activeTab === 'settings' && (
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="block text-[10px] font-medium text-gray-600 mb-1">Overlay</label>
+                      <input
+                        type="color"
+                        value={overlayColor}
+                        onChange={e => setOverlayColor(e.target.value)}
+                        className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                      />
+                    </div>
+                    <RangeSlider
+                      label="Opacity"
+                      value={Math.round(overlayOpacity * 100)}
+                      onChange={(v: number) => setOverlayOpacity(v / 100)}
+                      min={0}
+                      max={100}
+                      suffix="%"
+                      icon={Palette}
+                      showInput
+                    />
+
+                    <div className="border-t border-gray-100 pt-2.5 mt-2">
+                      <p className="text-[10px] font-medium text-gray-600 mb-2 flex items-center gap-1.5">
+                        <QrCode size={12} className="text-[#0D4F4F]" /> QR Code
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
                         <RangeSlider
-                          label="Size"
-                          value={qrSize}
-                          onChange={(v: number) => setQrSize(v)}
-                          min={40}
-                          max={300}
-                          suffix="px"
+                          label="X"
+                          value={Math.round(qrX)}
+                          onChange={(v: number) => setQrX(v)}
+                          min={0}
+                          max={100}
+                          suffix="%"
                           showInput
                         />
                         <RangeSlider
-                          label="Rotation"
-                          value={qrRotation}
-                          onChange={(v: number) => setQrRotation(v)}
-                          min={-180}
-                          max={180}
-                          suffix="°"
-                          icon={RotateCw}
+                          label="Y"
+                          value={Math.round(qrY)}
+                          onChange={(v: number) => setQrY(v)}
+                          min={0}
+                          max={100}
+                          suffix="%"
                           showInput
                         />
-                        <div>
-                          <label className="block text-[10px] font-medium text-gray-600 mb-1">QR Color</label>
-                          <input
-                            type="color"
-                            value={qrColor}
-                            onChange={e => setQrColor(e.target.value)}
-                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                          />
-                        </div>
-                        <div className="flex gap-1 mt-1">
-                          {[
-                            { label: 'S', size: 80 },
-                            { label: 'M', size: 150 },
-                            { label: 'L', size: 200 },
-                            { label: 'XL', size: 250 },
-                          ].map(preset => (
-                            <button
-                              key={preset.label}
-                              onClick={() => setQrSize(preset.size)}
-                              className={`flex-1 py-1 rounded-lg text-[8px] font-semibold transition ${
-                                qrSize === preset.size
-                                  ? 'bg-[#0D4F4F] text-white'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
+                      </div>
+                      <RangeSlider
+                        label="Size"
+                        value={qrSize}
+                        onChange={(v: number) => setQrSize(v)}
+                        min={40}
+                        max={300}
+                        suffix="px"
+                        showInput
+                      />
+                      <RangeSlider
+                        label="Rotation"
+                        value={qrRotation}
+                        onChange={(v: number) => setQrRotation(v)}
+                        min={-180}
+                        max={180}
+                        suffix="°"
+                        icon={RotateCw}
+                        showInput
+                      />
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
+                        <input
+                          type="color"
+                          value={qrColor}
+                          onChange={e => setQrColor(e.target.value)}
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                        />
+                      </div>
+                      <div className="flex gap-1 mt-1">
+                        {[
+                          { label: 'S', size: 80 },
+                          { label: 'M', size: 150 },
+                          { label: 'L', size: 200 },
+                          { label: 'XL', size: 250 },
+                        ].map(preset => (
+                          <button
+                            key={preset.label}
+                            onClick={() => setQrSize(preset.size)}
+                            className={`flex-1 py-1 rounded-lg text-[8px] font-semibold transition ${
+                              qrSize === preset.size
+                                ? 'bg-[#0D4F4F] text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Success Modal ─── */}
