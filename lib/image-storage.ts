@@ -252,6 +252,7 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
+      // ✅ Convert percentage to pixels for positioning
       const x = ((layer.x || 50) / 100) * width;
       const y = ((layer.y || 50) / 100) * height;
       
@@ -288,51 +289,55 @@ export async function generateCardForGuest(
   }
 
   // ─── 5. Add QR code ──────────────────────────────────────────────────
+  // ✅ QR position values are percentages (0-100) from the designer
+  // ✅ QR size is in pixels from the designer
   const qrPosition = {
     x: event.qrPlacementX ?? 85,
     y: event.qrPlacementY ?? 85,
     size: event.qrSize ?? 150,
   };
 
-  const qrColor = event.qrColor || '#000000';
+  // ✅ Use brand color as default if not set
+  const qrColor = event.qrColor || '#0D4F4F';
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
+  
+  // ✅ Generate QR with proper size
   const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size, qrColor);
 
-  const qrX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
-  const qrY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
+  // ✅ Convert percentage to pixels for QR positioning (SAME as text layers)
+  // The x and y are the center point of the QR code (percentage based)
+  // Subtract half the size to get the top-left corner for sharp
+  const qrTopLeftX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
+  const qrTopLeftY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
+
+  // ✅ Ensure QR code stays within card bounds (with margin)
+  const margin = 20;
+  const clampedX = Math.max(margin, Math.min(width - qrPosition.size - margin, qrTopLeftX));
+  const clampedY = Math.max(margin, Math.min(height - qrPosition.size - margin, qrTopLeftY));
 
   let finalBuffer = processedBuffer;
   
   try {
+    // ✅ Rotate QR if needed
+    let qrToComposite = qrBuffer;
     if (qrRotation !== 0) {
-      const rotatedQr = await sharp(qrBuffer)
+      qrToComposite = await sharp(qrBuffer)
         .rotate(qrRotation)
         .png()
         .toBuffer();
-      
-      finalBuffer = await sharp(processedBuffer)
-        .composite([
-          {
-            input: rotatedQr,
-            top: Math.round(qrY),
-            left: Math.round(qrX),
-          },
-        ])
-        .png()
-        .toBuffer();
-    } else {
-      finalBuffer = await sharp(processedBuffer)
-        .composite([
-          {
-            input: qrBuffer,
-            top: Math.round(qrY),
-            left: Math.round(qrX),
-          },
-        ])
-        .png()
-        .toBuffer();
     }
+    
+    finalBuffer = await sharp(processedBuffer)
+      .composite([
+        {
+          input: qrToComposite,
+          top: Math.round(clampedY),
+          left: Math.round(clampedX),
+        },
+      ])
+      .png()
+      .toBuffer();
   } catch (qrError) {
     console.error('Failed to composite QR code:', qrError);
   }
@@ -350,7 +355,8 @@ export async function generateCardForGuest(
           align: 'right',
           width: width,
           height: height,
-          x: width - 30,
+          // ✅ Position at bottom-right with margin
+          x: width - 40,
           y: height - 30,
           rotation: 0,
           shadow: false,
@@ -385,8 +391,9 @@ export async function generateCardForGuest(
           align: 'center',
           width: width,
           height: height,
-          x: width - 70,
-          y: height - 53,
+          // ✅ Position at bottom-right with margin
+          x: width - 80,
+          y: height - 55,
           rotation: 0,
           shadow: false,
         }
