@@ -124,10 +124,10 @@ export default function InvitationDesigner() {
       const containerHeight = container.clientHeight;
       if (containerWidth <= 0 || containerHeight <= 0) return;
       
-      // ✅ Allow scaling up to 2x so the card fills the container
+      // ✅ Allow the card to scale to fit the container nicely
       const scaleX = containerWidth / DESIGNER_WIDTH;
       const scaleY = containerHeight / DESIGNER_HEIGHT;
-      const scale = Math.min(scaleX, scaleY, 2);
+      const scale = Math.min(scaleX, scaleY, 1.5);
       setCanvasScale(scale);
     };
 
@@ -898,7 +898,7 @@ export default function InvitationDesigner() {
           <div className="flex-1 flex items-center justify-center min-h-0">
             <div 
               ref={canvasContainerRef}
-              className="w-full h-full max-w-[700px] max-h-[90vh] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative"
+              className="w-full h-full max-w-[700px] max-h-[85vh] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative"
             >
               <div
                 ref={canvasRef}
