@@ -116,24 +116,40 @@ export default function InvitationDesigner() {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, initialSize: 0, initialWidth: 0, initialHeight: 0, initialFontSize: 0 });
 
   // ─── Canvas scaling ───────────────────────────────────────────────────
-  // outerRef = responsive box the user sees on screen (varies with viewport)
+  // outerWrapperRef = flexible-width parent that just supplies available width
+  // canvasBox = the EXACT pixel box (width, height, scale) the card should
+  //             render at, computed from BOTH available width and available
+  //             height (capped at 70vh), so the box can never be clamped
+  //             independently of the scale applied to the inner canvas —
+  //             which is what caused the cropping bug.
   // canvasRef = fixed DESIGNER_WIDTH x DESIGNER_HEIGHT logical canvas,
-  //             visually shrunk/grown with CSS transform: scale(scale)
-  const outerRef = useRef<HTMLDivElement>(null);
+  //             visually scaled via CSS transform to fit canvasBox exactly.
+  const outerWrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [canvasBox, setCanvasBox] = useState({ width: DESIGNER_WIDTH, height: DESIGNER_HEIGHT, scale: 1 });
 
   useEffect(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const update = () => {
-      const width = el.clientWidth;
-      if (width > 0) setScale(width / DESIGNER_WIDTH);
+    const wrapper = outerWrapperRef.current;
+    if (!wrapper) return;
+
+    const compute = () => {
+      const availWidth = wrapper.clientWidth;
+      const availHeight = window.innerHeight * 0.7; // matches old 70vh cap
+      if (availWidth <= 0) return;
+      const scaleW = availWidth / DESIGNER_WIDTH;
+      const scaleH = availHeight / DESIGNER_HEIGHT;
+      const s = Math.min(scaleW, scaleH); // whichever constraint binds first
+      setCanvasBox({ width: DESIGNER_WIDTH * s, height: DESIGNER_HEIGHT * s, scale: s });
     };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(wrapper);
+    window.addEventListener('resize', compute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', compute);
+    };
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -569,8 +585,8 @@ export default function InvitationDesigner() {
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     // Normalize screen-pixel drag deltas back to logical canvas pixels,
-    // since the canvas is visually scaled by `scale`.
-    const safeScale = scale || 1;
+    // since the canvas is visually scaled by canvasBox.scale.
+    const safeScale = canvasBox.scale || 1;
     const deltaX = (clientX - resizeStart.x) / safeScale;
     const deltaY = (clientY - resizeStart.y) / safeScale;
     const idx = resizing.index;
@@ -902,118 +918,120 @@ export default function InvitationDesigner() {
               <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
             </div>
 
-            {/* Outer responsive box — this is what actually sizes to the viewport */}
-            <div
-              ref={outerRef}
-              className="relative rounded-xl overflow-hidden bg-gray-100 mx-auto"
-              style={{
-                width: '100%',
-                maxWidth: 480,
-                aspectRatio: `${DESIGNER_WIDTH} / ${DESIGNER_HEIGHT}`,
-                maxHeight: '70vh',
-              }}
-              onMouseUp={() => { endDrag(); endResize(); }}
-              onMouseLeave={() => { endDrag(); endResize(); }}
-              onTouchEnd={() => { endDrag(); endResize(); }}
-              onTouchCancel={() => { endDrag(); endResize(); }}
-              onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-              onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-            >
-              {/* Inner fixed-size logical canvas — always DESIGNER_WIDTH x DESIGNER_HEIGHT,
-                  visually scaled to fit the outer box. This guarantees px values here mean
-                  exactly the same thing as they do in lib/image-storage.ts on the backend. */}
+            {/* Flexible-width wrapper — just supplies the available width to
+                the scale calculation. Height is NOT constrained here. */}
+            <div ref={outerWrapperRef} className="mx-auto" style={{ width: '100%', maxWidth: 480 }}>
+              {/* Box sized EXACTLY to the computed canvas dimensions (both
+                  width and height derived together from a single scale
+                  factor) — so it can never crop or letterbox the canvas
+                  scaled inside it. */}
               <div
-                ref={canvasRef}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: DESIGNER_WIDTH,
-                  height: DESIGNER_HEIGHT,
-                  transform: `scale(${scale})`,
-                  transformOrigin: 'top left',
-                }}
+                className="relative rounded-xl overflow-hidden bg-gray-100 mx-auto"
+                style={{ width: canvasBox.width, height: canvasBox.height }}
+                onMouseUp={() => { endDrag(); endResize(); }}
+                onMouseLeave={() => { endDrag(); endResize(); }}
+                onTouchEnd={() => { endDrag(); endResize(); }}
+                onTouchCancel={() => { endDrag(); endResize(); }}
+                onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
+                onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
               >
-                {templateUrl ? (
-                  <>
-                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+                {/* Inner fixed-size logical canvas — always DESIGNER_WIDTH x
+                    DESIGNER_HEIGHT, visually scaled to fit canvasBox. This
+                    guarantees px values here mean exactly the same thing as
+                    they do in lib/image-storage.ts on the backend. */}
+                <div
+                  ref={canvasRef}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: DESIGNER_WIDTH,
+                    height: DESIGNER_HEIGHT,
+                    transform: `scale(${canvasBox.scale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  {templateUrl ? (
+                    <>
+                      <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                      <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
-                    {layers.map((layer, idx) => renderLayer(layer, idx))}
+                      {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                    {/* ─── QR Code - Clean version ─── */}
-                    <div
-                      className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
-                      style={{
-                        left: `${qrX}%`,
-                        top: `${qrY}%`,
-                        width: Math.min(qrSize, 300),
-                        height: Math.min(qrSize, 300),
-                        transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
-                        zIndex: 20,
-                      }}
-                      onMouseDown={(e) => {
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        const clientX = e.clientX;
-                        const clientY = e.clientY;
-                        setDragOffset({
-                          x: clientX - rect.left - (qrX / 100) * rect.width,
-                          y: clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                      onTouchStart={(e) => {
-                        const touch = e.touches[0];
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        setDragOffset({
-                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                    >
-                      <div 
-                        className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
+                      {/* ─── QR Code - Clean version ─── */}
+                      <div
+                        className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                         style={{
-                          backgroundColor: 'rgba(255,255,255,0.85)',
-                          backdropFilter: 'blur(2px)',
-                          border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
-                          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                          left: `${qrX}%`,
+                          top: `${qrY}%`,
+                          width: Math.min(qrSize, 300),
+                          height: Math.min(qrSize, 300),
+                          transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
+                          zIndex: 20,
+                        }}
+                        onMouseDown={(e) => {
+                          const rect = canvasRef.current!.getBoundingClientRect();
+                          const clientX = e.clientX;
+                          const clientY = e.clientY;
+                          setDragOffset({
+                            x: clientX - rect.left - (qrX / 100) * rect.width,
+                            y: clientY - rect.top - (qrY / 100) * rect.height,
+                          });
+                          setDragging({ type: 'qr', index: -1 });
+                          e.preventDefault();
+                        }}
+                        onTouchStart={(e) => {
+                          const touch = e.touches[0];
+                          const rect = canvasRef.current!.getBoundingClientRect();
+                          setDragOffset({
+                            x: touch.clientX - rect.left - (qrX / 100) * rect.width,
+                            y: touch.clientY - rect.top - (qrY / 100) * rect.height,
+                          });
+                          setDragging({ type: 'qr', index: -1 });
+                          e.preventDefault();
                         }}
                       >
-                        <div className="absolute inset-0 opacity-[0.03]" style={{ 
-                          backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
-                          backgroundSize: '6px 6px'
-                        }} />
-                        
-                        <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
-                          <QrCode 
-                            size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
-                            style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
-                            className="drop-shadow-sm"
-                          />
-                          <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
-                            SCAN ME
-                          </span>
-                        </div>
+                        <div 
+                          className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
+                          style={{
+                            backgroundColor: 'rgba(255,255,255,0.85)',
+                            backdropFilter: 'blur(2px)',
+                            border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                          }}
+                        >
+                          <div className="absolute inset-0 opacity-[0.03]" style={{ 
+                            backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
+                            backgroundSize: '6px 6px'
+                          }} />
+                          
+                          <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
+                            <QrCode 
+                              size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
+                              style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                              className="drop-shadow-sm"
+                            />
+                            <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                              SCAN ME
+                            </span>
+                          </div>
 
-                        <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                        <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                        <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                        <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                          <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                          <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                          <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                          <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                      <div className="text-center p-4">
+                        <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
+                        <p className="text-xs sm:text-sm">Select a template or upload your own</p>
                       </div>
                     </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-                    <div className="text-center p-4">
-                      <ImageIcon size={32} className="sm:text-4xl mx-auto mb-2 opacity-50" />
-                      <p className="text-xs sm:text-sm">Select a template or upload your own</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 
