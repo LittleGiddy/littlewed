@@ -449,7 +449,7 @@ export default function LoginPage() {
               Welcome<br /><span>back.</span>
             </div>
             <p className="tagline-sub">
-              Sign in to manage your events, guests, and invitations — all in one place.
+              Sign in to manage your events, guests, and invitations, all in one place.
             </p>
           </div>
 
@@ -585,7 +585,7 @@ export default function LoginPage() {
 
             {/* Page footer */}
             <div className="page-footer">
-              // In your footer component
+          
               <Link href="/privacy-policy" className="text-sm text-gray-500 hover:text-[#0D4F4F] transition">
                 Privacy Policy
               </Link>

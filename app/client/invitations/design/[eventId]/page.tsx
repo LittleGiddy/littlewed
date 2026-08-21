@@ -40,6 +40,7 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false,
   text, fontSize: 36,
   fontFamily: 'Playfair Display',
   color: '#ffffff',
+  textAlign: 'left', // 'left' | 'center' | 'right'
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
   visible: true, locked: false,
   isGuestName,
@@ -676,7 +677,18 @@ export default function InvitationDesigner() {
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
       
-      // ✅ Text always starts at X position (left-aligned)
+      // Get text alignment with fallback to 'left'
+      const textAlign = layer.textAlign || 'left';
+      
+      // For right alignment, we need to shift the position
+      // For center, we center relative to the text box
+      let transformX = '0';
+      if (textAlign === 'center') {
+        transformX = '-50%';
+      } else if (textAlign === 'right') {
+        transformX = '-100%';
+      }
+      
       return (
         <div
           key={layer.id}
@@ -687,11 +699,11 @@ export default function InvitationDesigner() {
             position: 'absolute',
             left: `${layer.x}%`,
             top: `${layer.y}%`,
-            transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)`,
+            transform: `translate(${transformX}, -50%) rotate(${layer.rotation || 0}deg)`,
             fontSize: `${layer.fontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
-            textAlign: 'left',
+            textAlign: textAlign,
             textShadow: shadow,
             width: 'auto',
             maxWidth: '80%',
@@ -1359,6 +1371,51 @@ export default function InvitationDesigner() {
                             onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
                             className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                           />
+                        </div>
+
+                        {/* ─── Text Alignment ─── */}
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1 flex items-center gap-1.5">
+                            <AlignLeft size={12} className="text-[#0D4F4F]" />
+                            Alignment
+                          </label>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'left' })}
+                              className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
+                                (selectedLayer.textAlign || 'left') === 'left'
+                                  ? 'bg-[#0D4F4F] text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              <AlignLeft size={12} /> Left
+                            </button>
+                            <button
+                              onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'center' })}
+                              className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
+                                selectedLayer.textAlign === 'center'
+                                  ? 'bg-[#0D4F4F] text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              <AlignCenter size={12} /> Center
+                            </button>
+                            <button
+                              onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'right' })}
+                              className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
+                                selectedLayer.textAlign === 'right'
+                                  ? 'bg-[#0D4F4F] text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              <AlignRight size={12} /> Right
+                            </button>
+                          </div>
+                          <p className="text-[8px] text-gray-400 mt-0.5">
+                            {selectedLayer.textAlign === 'center' ? 'Text centered at this position' :
+                             selectedLayer.textAlign === 'right' ? 'Text ends at this position' :
+                             'Text starts at this position'}
+                          </p>
                         </div>
 
                         <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">

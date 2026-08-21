@@ -1,4 +1,4 @@
-// lib/image-storage.ts - Fixed text rendering to use left alignment
+// lib/image-storage.ts - Updated with text alignment support
 import './fonts';
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
@@ -130,17 +130,28 @@ async function renderTextSvg(
     y: number;
     rotation: number;
     shadow?: boolean;
+    textAlign?: 'left' | 'center' | 'right';
   }
 ): Promise<Buffer> {
   const { 
-    fontSize, fontFamily, color, width, height, x, y, rotation, shadow = true 
+    fontSize, fontFamily, color, width, height, x, y, rotation, shadow = true,
+    textAlign = 'left'
   } = options;
 
   const systemFont = getSystemFont(fontFamily);
   
-  // ✅ ALWAYS use text-anchor="start" (left alignment)
-  const textAnchor = 'start';
-  const anchorX = x;
+  // Map textAlign to SVG text-anchor
+  let textAnchor = 'start';
+  let anchorX = x;
+  
+  if (textAlign === 'center') {
+    textAnchor = 'middle';
+    anchorX = x;
+  } else if (textAlign === 'right') {
+    textAnchor = 'end';
+    anchorX = x;
+  }
+  // left = 'start' (default)
   
   const shadowStyle = shadow ? `
     <filter id="shadow">
@@ -261,16 +272,19 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
-      // ✅ Position using percentage of actual dimensions
-      // ✅ Text is left-aligned at the X position
+      // Position using percentage of actual dimensions
       const x = ((layer.x || 50) / 100) * actualWidth;
       const y = ((layer.y || 50) / 100) * actualHeight;
       
-      // ✅ Scale font size from designer to actual card size
+      // Scale font size from designer to actual card size
       const fontSize = Math.round((layer.fontSize || 24) * scaleFactor);
+      
+      // Get text alignment from layer, default to 'left'
+      const textAlign = layer.textAlign || 'left';
       
       console.log('[CardGen] Layer:', {
         text: text.substring(0, 20),
+        textAlign: textAlign,
         layerX: layer.x,
         layerY: layer.y,
         convertedX: Math.round(x),
@@ -281,7 +295,6 @@ export async function generateCardForGuest(
       });
       
       try {
-        // ✅ Use left-aligned text rendering
         const textImage = await renderTextSvg(text, {
           fontSize: fontSize,
           fontFamily: layer.fontFamily || 'Playfair Display',
@@ -292,6 +305,7 @@ export async function generateCardForGuest(
           y: y,
           rotation: layer.rotation || 0,
           shadow: !!layer.shadow,
+          textAlign: textAlign,
         });
 
         textComposites.push({
