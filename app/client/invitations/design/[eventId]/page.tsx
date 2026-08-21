@@ -492,38 +492,48 @@ export default function InvitationDesigner() {
     scheduleHistory(newLayers);
   };
 
-  // ─── Drag handlers ──────────────────────────────────────────────────
+  // ─── Drag handlers with mobile support ─────────────────────────────
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     if (!canvasRef.current) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const rect = canvasRef.current.getBoundingClientRect();
     const layer = layers[index];
     const x = layer.x ?? 50;
     const y = layer.y ?? 50;
-    setDragOffset({
-      x: clientX - rect.left - (x / 100) * rect.width,
-      y: clientY - rect.top - (y / 100) * rect.height,
-    });
+    
+    // Calculate offset in percentage points
+    const offsetX = (clientX - rect.left) / rect.width * 100 - x;
+    const offsetY = (clientY - rect.top) / rect.height * 100 - y;
+    
+    setDragOffset({ x: offsetX, y: offsetY });
     setDragging({ type: 'layer', index });
-    e.preventDefault();
   };
 
   const startDragLinePoint = (index: number, point: 'start' | 'end') => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     e.stopPropagation();
-    setDragging({ type: 'linePoint', index, point });
     e.preventDefault();
+    setDragging({ type: 'linePoint', index, point });
   };
 
   const moveDrag = (e: React.MouseEvent | React.TouchEvent) => {
     if (!dragging || !canvasRef.current) return;
+    
+    e.preventDefault();
+    
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const rect = canvasRef.current.getBoundingClientRect();
-    let newX = (clientX - rect.left - dragOffset.x) / rect.width * 100;
-    let newY = (clientY - rect.top - dragOffset.y) / rect.height * 100;
+    
+    let newX = (clientX - rect.left) / rect.width * 100 - dragOffset.x;
+    let newY = (clientY - rect.top) / rect.height * 100 - dragOffset.y;
+    
     if (snapToGrid) {
       const gridSize = 5;
       newX = Math.round(newX / gridSize) * gridSize;
@@ -535,7 +545,6 @@ export default function InvitationDesigner() {
     if (dragging.type === 'qr') {
       setQrX(newX);
       setQrY(newY);
-      e.preventDefault();
       return;
     }
 
@@ -550,7 +559,6 @@ export default function InvitationDesigner() {
       } else {
         updateLayer(idx, { endX: newX, endY: newY });
       }
-      e.preventDefault();
       return;
     }
 
@@ -572,7 +580,6 @@ export default function InvitationDesigner() {
     } else {
       updateLayer(idx, { x: newX, y: newY });
     }
-    e.preventDefault();
   };
 
   const endDrag = () => setDragging(null);
@@ -581,6 +588,7 @@ export default function InvitationDesigner() {
   const startResize = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     e.stopPropagation();
+    e.preventDefault();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const layer = layers[index];
@@ -596,11 +604,11 @@ export default function InvitationDesigner() {
       initialFontSize,
     });
     setResizing({ index, type: layer.type });
-    e.preventDefault();
   };
 
   const moveResize = (e: React.MouseEvent | React.TouchEvent) => {
     if (!resizing) return;
+    e.preventDefault();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = clientY - resizeStart.y;
@@ -618,7 +626,6 @@ export default function InvitationDesigner() {
         height: Math.round(Math.min(100, newHeight)),
       });
     }
-    e.preventDefault();
   };
 
   const endResize = () => setResizing(null);
@@ -643,6 +650,14 @@ export default function InvitationDesigner() {
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
       
+      // ✅ Fix alignment positioning
+      // left: text starts at X position (anchor left)
+      // center: text centered at X position (anchor middle)
+      // right: text ends at X position (anchor right)
+      const alignStyle = layer.align === 'left' ? { left: `${layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` }
+        : layer.align === 'right' ? { right: `${100 - layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` }
+        : { left: `${layer.x}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)` };
+      
       return (
         <div
           key={layer.id}
@@ -650,9 +665,9 @@ export default function InvitationDesigner() {
           style={{
             ...commonStyle,
             cursor: isLocked ? 'default' : 'grab',
-            left: `${layer.x}%`,
+            position: 'absolute',
             top: `${layer.y}%`,
-            transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
+            ...alignStyle,
             fontSize: `${layer.fontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
