@@ -1,4 +1,4 @@
-// lib/image-storage.ts
+// lib/image-storage.ts - Fixed text rendering to use left alignment
 import './fonts';
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
@@ -6,7 +6,6 @@ import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
 
 // ─── Constants ──────────────────────────────────────────────────────────
-// The designer uses this as the base canvas size
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -125,7 +124,6 @@ async function renderTextSvg(
     fontSize: number;
     fontFamily: string;
     color: string;
-    align: 'left' | 'center' | 'right';
     width: number;
     height: number;
     x: number;
@@ -135,12 +133,14 @@ async function renderTextSvg(
   }
 ): Promise<Buffer> {
   const { 
-    fontSize, fontFamily, color, align, width, height, x, y, rotation, shadow = true 
+    fontSize, fontFamily, color, width, height, x, y, rotation, shadow = true 
   } = options;
 
   const systemFont = getSystemFont(fontFamily);
-  const textAnchor = align === 'left' ? 'start' : align === 'right' ? 'end' : 'middle';
-  const anchorX = align === 'left' ? 0 : align === 'right' ? width : width / 2;
+  
+  // ✅ ALWAYS use text-anchor="start" (left alignment)
+  const textAnchor = 'start';
+  const anchorX = x;
   
   const shadowStyle = shadow ? `
     <filter id="shadow">
@@ -181,8 +181,6 @@ export async function generateCardForGuest(
   const actualHeight = metadata.height || 1200;
 
   // ─── 2. Calculate scale factor ──────────────────────────────────────
-  // The designer uses 800x1200 as the base canvas
-  // The actual card may be a different size
   const scaleX = actualWidth / DESIGNER_WIDTH;
   const scaleY = actualHeight / DESIGNER_HEIGHT;
   const scaleFactor = Math.min(scaleX, scaleY);
@@ -264,11 +262,11 @@ export async function generateCardForGuest(
       if (!text || text.trim() === '') continue;
 
       // ✅ Position using percentage of actual dimensions
+      // ✅ Text is left-aligned at the X position
       const x = ((layer.x || 50) / 100) * actualWidth;
       const y = ((layer.y || 50) / 100) * actualHeight;
       
       // ✅ Scale font size from designer to actual card size
-      // This ensures fonts are large and readable on the final card
       const fontSize = Math.round((layer.fontSize || 24) * scaleFactor);
       
       console.log('[CardGen] Layer:', {
@@ -277,16 +275,17 @@ export async function generateCardForGuest(
         layerY: layer.y,
         convertedX: Math.round(x),
         convertedY: Math.round(y),
-        fontSize: fontSize,
+        designerFontSize: layer.fontSize,
+        scaledFontSize: fontSize,
         fontFamily: layer.fontFamily
       });
       
       try {
+        // ✅ Use left-aligned text rendering
         const textImage = await renderTextSvg(text, {
           fontSize: fontSize,
           fontFamily: layer.fontFamily || 'Playfair Display',
           color: layer.color || '#ffffff',
-          align: layer.align || 'center',
           width: actualWidth,
           height: actualHeight,
           x: x,
@@ -314,7 +313,6 @@ export async function generateCardForGuest(
   }
 
   // ─── 6. Add QR code ──────────────────────────────────────────────────
-  // ✅ QR size is in pixels from designer, scaled to actual
   const qrSize = Math.round((event.qrSize || 150) * scaleFactor);
   const qrX = event.qrPlacementX ?? 85;
   const qrY = event.qrPlacementY ?? 85;
@@ -324,7 +322,6 @@ export async function generateCardForGuest(
   
   const qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, qrColor);
 
-  // ✅ Position QR at center of percentage position
   const qrTopLeftX = ((qrX) / 100) * actualWidth - qrSize / 2;
   const qrTopLeftY = ((qrY) / 100) * actualHeight - qrSize / 2;
 
