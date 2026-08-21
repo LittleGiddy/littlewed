@@ -5,6 +5,11 @@ import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
 
+// ─── Constants ──────────────────────────────────────────────────────────
+// These should match the designer's canvas size
+const DESIGNER_WIDTH = 800;
+const DESIGNER_HEIGHT = 1200;
+
 // ─── Type definitions ─────────────────────────────────────────────────────
 interface EventLike {
   tenantId: string;
@@ -173,12 +178,24 @@ export async function generateCardForGuest(
 ): Promise<string> {
   // ─── 1. Get actual image dimensions ──────────────────────────────────
   const metadata = await sharp(cardBuffer).metadata();
-  const width = metadata.width || 3508;  // A5 at 300 DPI
-  const height = metadata.height || 4961; // A5 at 300 DPI
+  const actualWidth = metadata.width || 3508;
+  const actualHeight = metadata.height || 4961;
 
-  console.log('[CardGen] A5 Card dimensions:', { width, height });
+  // ─── 2. Calculate scale factor from designer preview ────────────────
+  // The designer uses a fixed canvas size (800x1200)
+  // We need to scale from that to the actual card size
+  const scaleX = actualWidth / DESIGNER_WIDTH;
+  const scaleY = actualHeight / DESIGNER_HEIGHT;
+  // Use the minimum scale to maintain aspect ratio
+  const scaleFactor = Math.min(scaleX, scaleY);
 
-  // ─── 2. Apply overlay ──────────────────────────────────────────────────
+  console.log('[CardGen] Scaling:', {
+    designerSize: `${DESIGNER_WIDTH}x${DESIGNER_HEIGHT}`,
+    actualSize: `${actualWidth}x${actualHeight}`,
+    scaleFactor: scaleFactor.toFixed(2)
+  });
+
+  // ─── 3. Apply overlay ──────────────────────────────────────────────────
   let processedBuffer = cardBuffer;
   
   if (event.overlayColor && event.overlayOpacity && event.overlayOpacity > 0) {
@@ -189,7 +206,7 @@ export async function generateCardForGuest(
     );
   }
 
-  // ─── 3. Parse design layers ────────────────────────────────────────────
+  // ─── 4. Parse design layers ────────────────────────────────────────────
   let designLayers: any[] = [];
   try {
     if (event.designLayers) {
@@ -206,7 +223,7 @@ export async function generateCardForGuest(
 
   console.log('[CardGen] Design layers count:', designLayers.length);
 
-  // ─── 4. Add ALL text layers from design ──────────────────────────────
+  // ─── 5. Add ALL text layers from design ──────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
@@ -249,13 +266,12 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
-      // ✅ Convert percentage to pixels based on A5 dimensions
-      const x = ((layer.x || 50) / 100) * width;
-      const y = ((layer.y || 50) / 100) * height;
+      // ✅ Convert percentage to pixels using scale factor
+      // Position: percentage of designer canvas, then scaled to actual size
+      const x = ((layer.x || 50) / 100) * DESIGNER_WIDTH * scaleFactor;
+      const y = ((layer.y || 50) / 100) * DESIGNER_HEIGHT * scaleFactor;
       
-      // ✅ Scale font size proportionally if needed
-      // If the designer used 800x1200 preview, scale to A5
-      const scaleFactor = Math.min(width / 800, height / 1200);
+      // ✅ Scale font size from designer to actual size
       const fontSize = (layer.fontSize || 24) * scaleFactor;
       
       console.log('[CardGen] Layer:', {
@@ -274,8 +290,8 @@ export async function generateCardForGuest(
           fontFamily: layer.fontFamily || 'Playfair Display',
           color: layer.color || '#ffffff',
           align: layer.align || 'center',
-          width: width,
-          height: height,
+          width: actualWidth,
+          height: actualHeight,
           x: x,
           y: y,
           rotation: layer.rotation || 0,
@@ -300,13 +316,12 @@ export async function generateCardForGuest(
       .toBuffer();
   }
 
-  // ─── 5. Add QR code ──────────────────────────────────────────────────
-  // ✅ QR size is in pixels from designer, but we need to scale it for A5
+  // ─── 6. Add QR code ──────────────────────────────────────────────────
+  // ✅ QR size is from designer, scaled to actual size
   const qrSize = event.qrSize ?? 150;
-  const scaleFactor = Math.min(width / 800, height / 1200);
   const scaledQrSize = Math.round(qrSize * scaleFactor);
   
-  // ✅ QR position is percentage (0-100) from designer
+  // ✅ QR position is percentage from designer, scaled to actual size
   const qrX = event.qrPlacementX ?? 85;
   const qrY = event.qrPlacementY ?? 85;
   
@@ -319,13 +334,13 @@ export async function generateCardForGuest(
 
   // ✅ Convert percentage to pixels for QR positioning
   // The QR is centered at the percentage position
-  const qrTopLeftX = ((qrX) / 100) * width - scaledQrSize / 2;
-  const qrTopLeftY = ((qrY) / 100) * height - scaledQrSize / 2;
+  const qrTopLeftX = ((qrX) / 100) * DESIGNER_WIDTH * scaleFactor - scaledQrSize / 2;
+  const qrTopLeftY = ((qrY) / 100) * DESIGNER_HEIGHT * scaleFactor - scaledQrSize / 2;
 
   // ✅ Ensure QR code stays within card bounds
-  const margin = Math.round(40 * scaleFactor); // Scaled margin
-  const clampedX = Math.max(margin, Math.min(width - scaledQrSize - margin, qrTopLeftX));
-  const clampedY = Math.max(margin, Math.min(height - scaledQrSize - margin, qrTopLeftY));
+  const margin = Math.round(20 * scaleFactor);
+  const clampedX = Math.max(margin, Math.min(actualWidth - scaledQrSize - margin, qrTopLeftX));
+  const clampedY = Math.max(margin, Math.min(actualHeight - scaledQrSize - margin, qrTopLeftY));
 
   console.log('[CardGen] QR:', {
     designerSize: qrSize,
@@ -363,7 +378,7 @@ export async function generateCardForGuest(
     console.error('Failed to composite QR code:', qrError);
   }
 
-  // ─── 6. Upload to Vercel Blob ──────────────────────────────────────
+  // ─── 7. Upload to Vercel Blob ──────────────────────────────────────
   const blob = await put(`guests/${event.tenantId}/${guest.id}.png`, finalBuffer, {
     access: 'public',
     contentType: 'image/png',
