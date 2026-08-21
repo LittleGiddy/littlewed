@@ -27,6 +27,7 @@ interface Guest {
   invitationSentAt: string | null;
   passCode?: string | null;
   checkedIn?: boolean;
+  guestType?: string | null; // ✅ Added guestType
 }
 
 interface EventData {
@@ -354,6 +355,7 @@ export default function SendInvitationsPage() {
       cardNumber: '00123',
       invitationSentAt: null,
       passCode: 'WED-8F92',
+      checkedIn: false,
       guestType: 'DOUBLE',
     };
     return buildSmsMessage(smsTemplate, sampleGuest);
