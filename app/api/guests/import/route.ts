@@ -6,35 +6,42 @@ import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
 
-// ─── Helper: Get the next available card number ──────────────────────────
-async function getNextCardNumber(eventId: string): Promise<string> {
-  const guests = await prisma.guest.findMany({
+// ─── Helper: Generate a unique random card number ──────────────────────
+async function generateUniqueCardNumber(eventId: string): Promise<string> {
+  // Get all existing card numbers for this event
+  const existingGuests = await prisma.guest.findMany({
     where: { eventId },
     select: { cardNumber: true },
   });
 
-  const numbers: number[] = [];
-  for (const guest of guests) {
-    if (guest.cardNumber !== null) {
-      const num = parseInt(guest.cardNumber, 10);
-      if (!isNaN(num)) {
-        numbers.push(num);
-      }
+  const existingNumbers = new Set(
+    existingGuests
+      .map(g => g.cardNumber)
+      .filter((num): num is string => num !== null)
+  );
+
+  // Try up to 100 times to find a unique random number
+  for (let attempt = 0; attempt < 100; attempt++) {
+    // Generate random 5-digit number (10000 - 99999)
+    const randomNum = Math.floor(10000 + Math.random() * 90000);
+    const cardNumber = randomNum.toString().padStart(5, '0');
+    
+    if (!existingNumbers.has(cardNumber)) {
+      return cardNumber;
     }
   }
 
-  numbers.sort((a, b) => a - b);
-
-  let nextNumber = 1;
-  for (const num of numbers) {
-    if (num === nextNumber) {
-      nextNumber++;
-    } else if (num > nextNumber) {
-      break;
-    }
+  // Fallback: use timestamp-based unique number
+  const timestamp = Date.now().toString().slice(-5);
+  const fallbackNumber = timestamp.padStart(5, '0');
+  
+  // If even the fallback exists (unlikely), add a random suffix
+  if (existingNumbers.has(fallbackNumber)) {
+    const suffix = Math.floor(100 + Math.random() * 900).toString();
+    return (parseInt(fallbackNumber) + parseInt(suffix)).toString().padStart(5, '0').slice(-5);
   }
-
-  return nextNumber.toString().padStart(5, '0');
+  
+  return fallbackNumber;
 }
 
 // ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
@@ -144,10 +151,6 @@ export async function POST(req: NextRequest) {
     let whatsappCount = 0;
     let smsCount = 0;
 
-    // ─── Get next available card number ──────────────────────────────────
-    let nextCardNumber = await getNextCardNumber(eventId);
-    let currentNumber = parseInt(nextCardNumber, 10);
-
     const guestsToInsert = [];
 
     // ─── Sort guests by name to maintain consistent ordering ────────────
@@ -182,10 +185,9 @@ export async function POST(req: NextRequest) {
         smsCount++;
       }
 
-      // ─── Assign card number (auto-generated, NOT from PDF) ──────────────
-      // ✅ Always use auto-generated card number, ignore whatever is in the file
-      const cardNumber = currentNumber.toString().padStart(5, '0');
-      currentNumber++;
+      // ─── Generate UNIQUE RANDOM card number ──────────────────────────
+      // ✅ Generate a random 5-digit number for each guest
+      const cardNumber = await generateUniqueCardNumber(eventId);
 
       // ─── Validate guest type ──────────────────────────────────────────
       const guestType = validateGuestType(g.guestType);
@@ -194,7 +196,7 @@ export async function POST(req: NextRequest) {
         name: g.name.trim(),
         phone: g.phone,
         title: g.title || '',
-        cardNumber: cardNumber, // ✅ Auto-generated
+        cardNumber: cardNumber, // ✅ Random 5-digit number
         guestType: guestType,
         email: null,
         eventId,
