@@ -12,9 +12,6 @@ import {
 import toast from 'react-hot-toast';
 
 // ─── Shared canvas constants ─────────────────────────────────────────────
-// IMPORTANT: these must exactly match DESIGNER_WIDTH / DESIGNER_HEIGHT in
-// lib/image-storage.ts. Every x/y/fontSize/width/height value saved by this
-// designer is defined relative to this logical canvas size.
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -39,7 +36,8 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false,
   id: generateId(),
   type: 'text',
   x, y, rotation: 0,
-  text, fontSize: 24, fontFamily: 'Playfair Display',
+  text, fontSize: 36,
+  fontFamily: 'Playfair Display',
   color: '#ffffff', align: 'center',
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
   visible: true, locked: false,
@@ -116,40 +114,45 @@ export default function InvitationDesigner() {
   const [resizing, setResizing] = useState<{ index: number; type: string } | null>(null);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, initialSize: 0, initialWidth: 0, initialHeight: 0, initialFontSize: 0 });
 
-  // ─── Canvas scaling ───────────────────────────────────────────────────
-  // outerWrapperRef = flexible-width parent that just supplies available width
-  // canvasBox = the EXACT pixel box (width, height, scale) the card should
-  //             render at, computed from BOTH available width and available
-  //             height (capped at 70vh), so the box can never be clamped
-  //             independently of the scale applied to the inner canvas —
-  //             which is what caused the cropping bug.
-  // canvasRef = fixed DESIGNER_WIDTH x DESIGNER_HEIGHT logical canvas,
-  //             visually scaled via CSS transform to fit canvasBox exactly.
-  const outerWrapperRef = useRef<HTMLDivElement>(null);
+  // ─── Canvas scaling with proper aspect ratio ────────────────────────
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [canvasBox, setCanvasBox] = useState({ width: DESIGNER_WIDTH, height: DESIGNER_HEIGHT, scale: 1 });
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    const wrapper = outerWrapperRef.current;
-    if (!wrapper) return;
+    const container = canvasContainerRef.current;
+    if (!container) return;
 
-    const compute = () => {
-      const availWidth = wrapper.clientWidth;
-      const availHeight = window.innerHeight * 0.7; // matches old 70vh cap
-      if (availWidth <= 0) return;
-      const scaleW = availWidth / DESIGNER_WIDTH;
-      const scaleH = availHeight / DESIGNER_HEIGHT;
-      const s = Math.min(scaleW, scaleH); // whichever constraint binds first
-      setCanvasBox({ width: DESIGNER_WIDTH * s, height: DESIGNER_HEIGHT * s, scale: s });
+    const computeScale = () => {
+      const containerWidth = container.clientWidth;
+      if (containerWidth <= 0) return;
+      
+      // ✅ Maintain aspect ratio 800:1200 = 2:3
+      const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
+      const idealHeight = containerWidth * aspectRatio;
+      
+      // ✅ Limit max height to 70vh so it doesn't take over the page
+      const maxHeight = window.innerHeight * 0.7;
+      const finalHeight = Math.min(idealHeight, maxHeight);
+      const finalWidth = finalHeight / aspectRatio;
+      
+      // ✅ Calculate scale
+      const scaleX = finalWidth / DESIGNER_WIDTH;
+      const scaleY = finalHeight / DESIGNER_HEIGHT;
+      const scale = Math.min(scaleX, scaleY, 0.8);
+      
+      setContainerSize({ width: finalWidth, height: finalHeight });
+      setCanvasScale(scale);
     };
 
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(wrapper);
-    window.addEventListener('resize', compute);
+    computeScale();
+    const ro = new ResizeObserver(computeScale);
+    ro.observe(container);
+    window.addEventListener('resize', computeScale);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', compute);
+      window.removeEventListener('resize', computeScale);
     };
   }, []);
 
@@ -619,12 +622,6 @@ export default function InvitationDesigner() {
       const shadow = layer.shadow
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
-      
-      // ✅ FIX: Scale font size for preview readability
-      // When canvas is scaled down, multiply font size by inverse of scale
-      const previewScaleFactor = Math.max(1 / canvasBox.scale, 1);
-      const displayFontSize = layer.fontSize * Math.min(previewScaleFactor, 3);
-      
       return (
         <div
           key={layer.id}
@@ -635,7 +632,7 @@ export default function InvitationDesigner() {
             left: `${layer.x}%`,
             top: `${layer.y}%`,
             transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)`,
-            fontSize: `${displayFontSize}px`,
+            fontSize: `${layer.fontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
             textAlign: layer.align || 'center',
@@ -916,37 +913,25 @@ export default function InvitationDesigner() {
               <span className="text-[10px] sm:text-xs text-gray-400">Drag to reposition</span>
             </div>
 
-            {/* Flexible-width wrapper — just supplies the available width to
-                the scale calculation. Height is NOT constrained here. */}
-            <div ref={outerWrapperRef} className="mx-auto" style={{ width: '100%', maxWidth: 480 }}>
-              {/* Box sized EXACTLY to the computed canvas dimensions (both
-                  width and height derived together from a single scale
-                  factor) — so it can never crop or letterbox the canvas
-                  scaled inside it. */}
-              <div
-                className="relative rounded-xl overflow-hidden bg-gray-100 mx-auto"
-                style={{ width: canvasBox.width, height: canvasBox.height }}
-                onMouseUp={() => { endDrag(); endResize(); }}
-                onMouseLeave={() => { endDrag(); endResize(); }}
-                onTouchEnd={() => { endDrag(); endResize(); }}
-                onTouchCancel={() => { endDrag(); endResize(); }}
-                onMouseMove={(e) => { moveDrag(e); moveResize(e); }}
-                onTouchMove={(e) => { moveDrag(e); moveResize(e); }}
-              >
-                {/* Inner fixed-size logical canvas — always DESIGNER_WIDTH x
-                    DESIGNER_HEIGHT, visually scaled to fit canvasBox. This
-                    guarantees px values here mean exactly the same thing as
-                    they do in lib/image-storage.ts on the backend. */}
+            {/* ✅ Container with proper aspect ratio - NO CROPPING */}
+            <div 
+              ref={canvasContainerRef}
+              className="mx-auto bg-gray-100 rounded-xl overflow-hidden relative"
+              style={{ 
+                width: containerSize.width || '100%',
+                height: containerSize.height || 'auto',
+                maxWidth: '100%',
+              }}
+            >
+              {containerSize.width > 0 && containerSize.height > 0 && (
                 <div
                   ref={canvasRef}
+                  className="absolute top-1/2 left-1/2 origin-center"
                   style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
                     width: DESIGNER_WIDTH,
                     height: DESIGNER_HEIGHT,
-                    transform: `scale(${canvasBox.scale})`,
-                    transformOrigin: 'top left',
+                    transform: `translate(-50%, -50%) scale(${canvasScale})`,
+                    transformOrigin: 'center center',
                   }}
                 >
                   {templateUrl ? (
@@ -956,7 +941,7 @@ export default function InvitationDesigner() {
 
                       {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                      {/* ─── QR Code - Clean version ─── */}
+                      {/* ─── QR Code ─── */}
                       <div
                         className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                         style={{
@@ -1030,7 +1015,7 @@ export default function InvitationDesigner() {
                     </div>
                   )}
                 </div>
-              </div>
+              )}
             </div>
 
             <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3">
