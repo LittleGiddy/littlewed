@@ -8,7 +8,7 @@ import { fetchTemplateBuffer, generateCardForGuest, runWithConcurrency } from '@
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // Hobby-plan max — a safety net, not the main strategy
-const CONCURRENCY = 5;          // simultaneous sharp/blob/db ops — keep Neon happy
+const CONCURRENCY = 5;          // simultaneous sharp/Cloudinary/db ops — keep Neon happy
 const MAX_PER_REQUEST = 50;     // client chunks the full guest list into pieces this size
 
 export async function POST(req: NextRequest) {
@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
+    const event = await prisma.event.findFirst({ 
+      where: { id: eventId, tenantId } 
+    });
+    
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
@@ -45,8 +48,11 @@ export async function POST(req: NextRequest) {
 
     if (guests.length === 0) {
       return NextResponse.json({
-        success: true, completed: 0, failed: 0,
-        message: 'All selected guests already have cards', results: [],
+        success: true, 
+        completed: 0, 
+        failed: 0,
+        message: 'All selected guests already have cards', 
+        results: [],
       });
     }
 
@@ -55,20 +61,27 @@ export async function POST(req: NextRequest) {
     try {
       cardBuffer = await fetchTemplateBuffer(event.templateCardUrl);
     } catch (error: any) {
-      return NextResponse.json({ error: `Could not load template image: ${error.message}` }, { status: 400 });
+      return NextResponse.json(
+        { error: `Could not load template image: ${error.message}` }, 
+        { status: 400 }
+      );
     }
 
     const results = await runWithConcurrency(guests, CONCURRENCY, async (guest) => {
       try {
         const passCode = guest.passCode || (await generateUniquePassCode(prisma));
         
-        // ─── Generate the card using the new function ─────────────────────
+        // ─── Generate the card using the Cloudinary-enabled function ─────
         // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
+        // The image is now uploaded to Cloudinary instead of Vercel Blob
         const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
         await prisma.guest.update({
           where: { id: guest.id },
-          data: { passCode, invitationCard: imageUrl },
+          data: { 
+            passCode, 
+            invitationCard: imageUrl,
+          },
         });
 
         return { 
@@ -84,7 +97,7 @@ export async function POST(req: NextRequest) {
           guestId: guest.id, 
           name: guest.name, 
           success: false, 
-          error: error.message 
+          error: error.message || 'Unknown error',
         };
       }
     });
@@ -101,6 +114,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Generate batch error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }
