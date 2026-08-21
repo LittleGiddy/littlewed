@@ -6,7 +6,7 @@ import { generateQRFromCardNumber } from './qr';
 import sharp from 'sharp';
 
 // ─── Constants ──────────────────────────────────────────────────────────
-// These should match the designer's canvas size
+// These MUST match the designer's canvas size
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
@@ -261,11 +261,12 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
-      // ✅ Scale position from designer to actual size
+      // ✅ CORRECT: Position using percentage of actual dimensions
+      // The designer uses percentages, so we convert to pixels
       const x = ((layer.x || 50) / 100) * actualWidth;
       const y = ((layer.y || 50) / 100) * actualHeight;
       
-      // ✅ Scale font size proportionally
+      // ✅ CORRECT: Scale font size from designer to actual
       const fontSize = Math.round((layer.fontSize || 24) * scaleFactor);
       
       console.log('[CardGen] Layer:', {
@@ -311,6 +312,7 @@ export async function generateCardForGuest(
   }
 
   // ─── 6. Add QR code ──────────────────────────────────────────────────
+  // ✅ CORRECT: QR size is in pixels from designer, scaled to actual
   const qrSize = Math.round((event.qrSize || 150) * scaleFactor);
   const qrX = event.qrPlacementX ?? 85;
   const qrY = event.qrPlacementY ?? 85;
@@ -320,7 +322,7 @@ export async function generateCardForGuest(
   
   const qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, qrColor);
 
-  // ✅ Position QR at center of percentage position
+  // ✅ CORRECT: QR positioned at percentage of actual dimensions
   const qrTopLeftX = ((qrX) / 100) * actualWidth - qrSize / 2;
   const qrTopLeftY = ((qrY) / 100) * actualHeight - qrSize / 2;
 

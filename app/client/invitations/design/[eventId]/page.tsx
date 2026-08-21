@@ -3,11 +3,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Upload, Move, Maximize2, Save, Loader2, Image as ImageIcon, Trash2, Check, Type, Palette,
-  AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
-  Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
+  AlignLeft, AlignCenter, AlignRight, Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
-  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw,
-  X, Maximize, Minimize, ArrowRight, Zap, Sliders, BringToFront, SendToBack
+  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, RotateCw,
+  X, Maximize, Minimize, ArrowRight, Zap, Sliders
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -804,7 +803,7 @@ export default function InvitationDesigner() {
     <div className="min-h-screen bg-gray-50">
       {/* ─── Top Bar ─── */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push(`/client/events/${eventId}`)}
@@ -813,8 +812,8 @@ export default function InvitationDesigner() {
               <ArrowRight size={18} className="rotate-180" />
             </button>
             <div>
-              <h1 className="font-serif text-lg sm:text-xl font-black text-gray-900">Designer</h1>
-              <p className="text-[10px] text-gray-500 hidden sm:block">{event?.name}</p>
+              <h1 className="font-serif text-base sm:text-xl font-black text-gray-900">Designer</h1>
+              <p className="text-[9px] sm:text-[10px] text-gray-500 hidden sm:block">{event?.name}</p>
             </div>
           </div>
           
@@ -824,7 +823,7 @@ export default function InvitationDesigner() {
               className={`p-1.5 sm:p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               title="Toggle grid"
             >
-              <Grid size={16} />
+              <Grid size={15} />
             </button>
             <button
               onClick={undo}
@@ -832,7 +831,7 @@ export default function InvitationDesigner() {
               className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
               title="Undo"
             >
-              <Undo size={16} />
+              <Undo size={15} />
             </button>
             <button
               onClick={redo}
@@ -840,89 +839,87 @@ export default function InvitationDesigner() {
               className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition"
               title="Redo"
             >
-              <Redo size={16} />
+              <Redo size={15} />
             </button>
             <button
               onClick={() => setIsFullPreview(!isFullPreview)}
               className="p-1.5 sm:p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition"
               title={isFullPreview ? 'Minimize preview' : 'Maximize preview'}
             >
-              {isFullPreview ? <Minimize size={16} /> : <Maximize size={16} />}
+              {isFullPreview ? <Minimize size={15} /> : <Maximize size={15} />}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !templateUrl}
+              className="px-3 sm:px-4 py-1.5 bg-[#0D4F4F] text-white rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              <span className="hidden sm:inline">{saving ? 'Saving...' : 'Save'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
         {/* ─── Template Gallery ─── */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 mb-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm">
-              <ImageIcon size={16} className="text-[#0D4F4F]" /> Template
-            </h2>
-            <div className="flex gap-2">
-              <label className="cursor-pointer bg-[#0D4F4F] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1.5">
-                <Upload size={14} /> Upload
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageUpload} 
-                  className="hidden" 
-                  ref={fileInputRef} 
-                />
-              </label>
-              {uploading && <Loader2 size={14} className="animate-spin text-[#0D4F4F]" />}
-              {templateUrl && (
-                <button
-                  onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
-                  className="bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-100 transition flex items-center gap-1.5"
-                >
-                  <Trash2 size={14} /> Remove
-                </button>
-              )}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-2 sm:p-3 mb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ImageIcon size={14} className="text-[#0D4F4F]" />
+              <span className="text-xs font-medium text-gray-700">Template</span>
             </div>
+            <label className="cursor-pointer bg-[#0D4F4F] text-white px-2.5 py-1 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1">
+              <Upload size={12} /> Upload
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+                className="hidden" 
+                ref={fileInputRef} 
+              />
+            </label>
           </div>
           
           {templates.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+            <div className="flex gap-1.5 overflow-x-auto pb-1.5 mt-2 scrollbar-thin">
               {templates.map((t) => (
                 <div
                   key={t.id}
                   onClick={() => selectTemplate(t)}
-                  className={`flex-shrink-0 w-16 sm:w-20 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
+                  className={`flex-shrink-0 w-14 sm:w-16 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
                     selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'
                   }`}
                 >
                   <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
                   <div className="p-0.5 text-center">
-                    <p className="text-[6px] sm:text-[8px] text-gray-500 truncate">{t.name}</p>
+                    <p className="text-[6px] text-gray-500 truncate">{t.name}</p>
                   </div>
                 </div>
               ))}
             </div>
           )}
           {templateUrl && !templates.some(t => t.imageUrl === templateUrl) && (
-            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
-              <Check size={12} className="text-green-600" /> Custom uploaded card
+            <p className="text-[10px] text-gray-500 mt-1 flex items-center gap-1">
+              <Check size={10} className="text-green-600" /> Custom uploaded
             </p>
           )}
         </div>
 
-        {/* ─── Main Content ─── */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* ─── Main Content: Preview + Controls Side by Side ─── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           {/* ─── Preview ─── */}
-          <div className={`lg:col-span-${isFullPreview ? '4' : '3'}`}>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4">
-              <div className="flex items-center justify-between mb-3">
+          <div className={`${isFullPreview ? 'lg:col-span-12' : 'lg:col-span-7'} order-1`}>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+              <div className="flex items-center justify-between mb-2">
                 <h2 className="font-semibold flex items-center gap-1.5 text-sm">
-                  <Maximize2 size={16} className="text-[#0D4F4F]" /> Preview
+                  <Maximize2 size={15} className="text-[#0D4F4F]" /> Preview
                 </h2>
-                <span className="text-[10px] text-gray-400">Drag to reposition</span>
+                <span className="text-[9px] text-gray-400">Drag to reposition</span>
               </div>
 
               <div ref={outerWrapperRef} className="mx-auto" style={{ width: '100%', maxWidth: 480 }}>
                 <div
-                  className="relative rounded-xl overflow-hidden bg-gray-100 mx-auto shadow-inner"
+                  className="relative rounded-lg overflow-hidden bg-gray-100 mx-auto"
                   style={{ width: canvasBox.width, height: canvasBox.height }}
                   onMouseUp={() => { endDrag(); endResize(); }}
                   onMouseLeave={() => { endDrag(); endResize(); }}
@@ -945,19 +942,15 @@ export default function InvitationDesigner() {
                   >
                     {templateUrl ? (
                       <>
-                        {/* Background Image */}
                         <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
-                        
-                        {/* Overlay - sits behind layers */}
                         <div className="absolute inset-0 pointer-events-none" style={{ 
                           backgroundColor: overlayColor, 
                           opacity: overlayOpacity 
                         }} />
 
-                        {/* Layers - rendered on top of overlay */}
                         {layers.map((layer, idx) => renderLayer(layer, idx))}
 
-                        {/* QR Code - Clean version */}
+                        {/* ─── QR Code ─── */}
                         <div
                           className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
                           style={{
@@ -1003,22 +996,20 @@ export default function InvitationDesigner() {
                               backgroundImage: `radial-gradient(circle at 2px 2px, ${qrColor} 1px, transparent 1px)`,
                               backgroundSize: '6px 6px'
                             }} />
-                            
                             <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
                               <QrCode 
                                 size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
                                 style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
                                 className="drop-shadow-sm"
                               />
-                              <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
+                              <span className="text-[7px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
                                 SCAN ME
                               </span>
                             </div>
-
-                            <div className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
-                            <div className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                            <div className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                            <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-t-2 opacity-30" style={{ borderColor: qrColor }} />
+                            <div className="absolute bottom-1.5 left-1.5 w-2.5 h-2.5 border-l-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
+                            <div className="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 border-r-2 border-b-2 opacity-30" style={{ borderColor: qrColor }} />
                           </div>
                         </div>
                       </>
@@ -1026,57 +1017,51 @@ export default function InvitationDesigner() {
                       <div className="absolute inset-0 flex items-center justify-center text-gray-400">
                         <div className="text-center p-4">
                           <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">Select a template or upload your own</p>
+                          <p className="text-xs">Select a template or upload your own</p>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
-
-              <p className="text-[10px] text-gray-400 text-center mt-3">
-                Click a layer to edit properties below
-              </p>
             </div>
           </div>
 
           {/* ─── Controls Panel ─── */}
           {!isFullPreview && (
-            <div className="lg:col-span-1 space-y-3">
+            <div className="lg:col-span-5 order-2 space-y-3">
               {/* ─── Quick Add ─── */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5 mb-2">
                   <Zap size={12} className="text-[#0D4F4F]" /> Quick Add
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button onClick={addGuestNameLayer} className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <User size={12} /> Name
+                <div className="grid grid-cols-4 gap-1.5">
+                  <button onClick={addGuestNameLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                    <User size={11} /> Name
                   </button>
-                  <button onClick={addGuestTitleLayer} className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <UserCheck size={12} /> Title
+                  <button onClick={addGuestTitleLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                    <UserCheck size={11} /> Title
                   </button>
-                  <button onClick={addGuestTypeLayer} className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <Users size={12} /> Type
+                  <button onClick={addGuestTypeLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                    <Users size={11} /> Type
                   </button>
-                  <button onClick={addCardNumberLayer} className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
-                    <Hash size={12} /> Card
+                  <button onClick={addCardNumberLayer} className="bg-[#0D4F4F] text-white px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1">
+                    <Hash size={11} /> Card
                   </button>
-                  <button onClick={addTextLayer} className="col-span-2 bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Type size={12} /> Custom Text
+                  <button onClick={addTextLayer} className="col-span-2 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                    <Type size={11} /> Custom Text
                   </button>
-                </div>
-                <div className="flex gap-1.5 mt-2">
-                  <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 py-1 rounded-lg text-[10px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Square size={12} /> Rect
+                  <button onClick={addRectLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                    <Square size={11} /> Rect
                   </button>
-                  <button onClick={addLineLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 py-1 rounded-lg text-[10px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
-                    <Minus size={12} /> Line
+                  <button onClick={addLineLayer} className="col-span-1 bg-gray-200 text-gray-700 px-1.5 py-1.5 rounded-lg text-[9px] font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
+                    <Minus size={11} /> Line
                   </button>
                 </div>
               </div>
 
               {/* ─── Tabs ─── */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 <div className="flex border-b border-gray-100">
                   {[
                     { id: 'layers', label: 'Layers', icon: Layers },
@@ -1086,7 +1071,7 @@ export default function InvitationDesigner() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex-1 py-2 text-[10px] font-semibold transition flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-2 text-[10px] font-semibold transition flex items-center justify-center gap-1 ${
                         activeTab === tab.id
                           ? 'text-[#0D4F4F] border-b-2 border-[#0D4F4F] bg-[#0D4F4F]/5'
                           : 'text-gray-500 hover:text-gray-700'
@@ -1130,8 +1115,8 @@ export default function InvitationDesigner() {
                         </div>
                       </div>
                       {layers.length === 0 ? (
-                        <div className="text-center py-6 text-gray-400 text-xs">
-                          <Layers size={20} className="mx-auto mb-2 opacity-30" />
+                        <div className="text-center py-4 text-gray-400 text-xs">
+                          <Layers size={18} className="mx-auto mb-1 opacity-30" />
                           No layers yet
                         </div>
                       ) : (
@@ -1139,42 +1124,42 @@ export default function InvitationDesigner() {
                           {layers.map((layer, idx) => (
                             <div
                               key={layer.id}
-                              className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
-                                idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-4 border-[#0D4F4F]' : ''
+                              className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition ${
+                                idx === selectedLayerIndex ? 'bg-[#0D4F4F]/10 border-l-3 border-[#0D4F4F]' : ''
                               }`}
                               onClick={() => setSelectedLayerIndex(idx)}
                             >
                               <span className="text-[10px] truncate flex items-center gap-1.5">
-                                {layer.type === 'text' && <Type size={10} />}
-                                {layer.type === 'rect' && <Square size={10} />}
-                                {layer.type === 'line' && <Minus size={10} />}
-                                {layer.isGuestName && <User size={10} className="text-[#0D4F4F]" />}
-                                {layer.isGuestType && <UserCheck size={10} className="text-[#0D4F4F]" />}
-                                {layer.isCardNumber && <Hash size={10} className="text-[#0D4F4F]" />}
-                                <span className="truncate max-w-[60px]">
+                                {layer.type === 'text' && <Type size={9} />}
+                                {layer.type === 'rect' && <Square size={9} />}
+                                {layer.type === 'line' && <Minus size={9} />}
+                                {layer.isGuestName && <User size={9} className="text-[#0D4F4F]" />}
+                                {layer.isGuestType && <UserCheck size={9} className="text-[#0D4F4F]" />}
+                                {layer.isCardNumber && <Hash size={9} className="text-[#0D4F4F]" />}
+                                <span className="truncate max-w-[50px]">
                                   {layer.type === 'text' 
-                                    ? (layer.text || 'Text').substring(0, 12) 
-                                    : layer.type === 'rect' ? 'Rectangle' : 'Line'}
+                                    ? (layer.text || 'Text').substring(0, 10) 
+                                    : layer.type === 'rect' ? 'Rect' : 'Line'}
                                 </span>
                               </span>
                               <div className="flex gap-0.5">
                                 <button onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Toggle">
-                                  {layer.visible ? <Eye size={10} /> : <EyeOff size={10} />}
+                                  {layer.visible ? <Eye size={9} /> : <EyeOff size={9} />}
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); toggleLayerLock(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Lock">
-                                  {layer.locked ? <Lock size={10} /> : <Unlock size={10} />}
+                                  {layer.locked ? <Lock size={9} /> : <Unlock size={9} />}
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); duplicateLayer(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Duplicate">
-                                  <Copy size={10} />
+                                  <Copy size={9} />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); moveLayerUp(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Up">
-                                  <ArrowUp size={10} />
+                                  <ArrowUp size={9} />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); moveLayerDown(idx); }} className="p-1 hover:bg-gray-200 rounded" title="Down">
-                                  <ArrowDown size={10} />
+                                  <ArrowDown size={9} />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); deleteLayer(idx); }} className="p-1 hover:bg-red-100 rounded text-red-500" title="Delete">
-                                  <Trash2 size={10} />
+                                  <Trash2 size={9} />
                                 </button>
                               </div>
                             </div>
@@ -1188,8 +1173,7 @@ export default function InvitationDesigner() {
                   {activeTab === 'properties' && (
                     <div>
                       {selectedLayer ? (
-                        <div className="space-y-3">
-                          {/* Position */}
+                        <div className="space-y-2.5">
                           <div className="grid grid-cols-2 gap-2">
                             <RangeSlider
                               label="X Position"
@@ -1216,26 +1200,26 @@ export default function InvitationDesigner() {
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
                                 <textarea
-                                  className="w-full p-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                                   rows={2}
                                   value={selectedLayer.text}
                                   onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                                 />
                                 {selectedLayer.isGuestName && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with guest's name</p>
+                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Guest's name</p>
                                 )}
                                 {selectedLayer.isGuestType && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with "Single" or "Double"</p>
+                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Single/Double</p>
                                 )}
                                 {selectedLayer.isCardNumber && (
-                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">Replaced with card number</p>
+                                  <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Card number</p>
                                 )}
                               </div>
 
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Font</label>
                                 <select
-                                  className="w-full p-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                                   value={selectedLayer.fontFamily}
                                   onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
                                 >
@@ -1271,14 +1255,14 @@ export default function InvitationDesigner() {
                                     type="color"
                                     value={selectedLayer.color}
                                     onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                                    className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200 p-1"
+                                    className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                                   />
                                   <div className="flex gap-1 flex-1">
                                     {ALIGN_H.map((a) => (
                                       <button
                                         key={a.value}
                                         onClick={() => updateLayer(selectedLayerIndex!, { align: a.value })}
-                                        className={`flex-1 p-1.5 rounded-lg border transition ${
+                                        className={`flex-1 p-1 rounded-lg border transition ${
                                           selectedLayer.align === a.value ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
                                         }`}
                                       >
@@ -1317,7 +1301,7 @@ export default function InvitationDesigner() {
                                   type="color"
                                   value={selectedLayer.fill || '#ffffff'}
                                   onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-1"
+                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                                 />
                               </div>
                               <div>
@@ -1326,7 +1310,7 @@ export default function InvitationDesigner() {
                                   type="color"
                                   value={selectedLayer.borderColor || '#ffffff'}
                                   onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-1"
+                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                                 />
                               </div>
                               <RangeSlider
@@ -1379,7 +1363,7 @@ export default function InvitationDesigner() {
                                   type="color"
                                   value={selectedLayer.strokeColor || '#ffffff'}
                                   onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-1"
+                                  className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                                 />
                               </div>
                               <RangeSlider
@@ -1394,7 +1378,7 @@ export default function InvitationDesigner() {
                               <div>
                                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash Style</label>
                                 <select
-                                  className="w-full p-2 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
                                   value={selectedLayer.dashArray || 'solid'}
                                   onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
                                 >
@@ -1407,8 +1391,8 @@ export default function InvitationDesigner() {
                           )}
                         </div>
                       ) : (
-                        <div className="text-center py-6 text-gray-400 text-xs">
-                          <Settings size={20} className="mx-auto mb-2 opacity-30" />
+                        <div className="text-center py-4 text-gray-400 text-xs">
+                          <Settings size={18} className="mx-auto mb-1 opacity-30" />
                           Select a layer to edit
                         </div>
                       )}
@@ -1417,14 +1401,14 @@ export default function InvitationDesigner() {
 
                   {/* ─── Settings Tab ─── */}
                   {activeTab === 'settings' && (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       <div>
                         <label className="block text-[10px] font-medium text-gray-600 mb-1">Overlay Color</label>
                         <input
                           type="color"
                           value={overlayColor}
                           onChange={e => setOverlayColor(e.target.value)}
-                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-1"
+                          className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                         />
                       </div>
                       <RangeSlider
@@ -1438,13 +1422,13 @@ export default function InvitationDesigner() {
                         showInput
                       />
 
-                      <div className="border-t border-gray-100 pt-3 mt-2">
+                      <div className="border-t border-gray-100 pt-2.5 mt-2">
                         <p className="text-[10px] font-medium text-gray-600 mb-2 flex items-center gap-1.5">
                           <QrCode size={12} className="text-[#0D4F4F]" /> QR Code Settings
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                           <RangeSlider
-                            label="X Position"
+                            label="X"
                             value={Math.round(qrX)}
                             onChange={(v: number) => setQrX(v)}
                             min={0}
@@ -1453,7 +1437,7 @@ export default function InvitationDesigner() {
                             showInput
                           />
                           <RangeSlider
-                            label="Y Position"
+                            label="Y"
                             value={Math.round(qrY)}
                             onChange={(v: number) => setQrY(v)}
                             min={0}
@@ -1487,14 +1471,14 @@ export default function InvitationDesigner() {
                             type="color"
                             value={qrColor}
                             onChange={e => setQrColor(e.target.value)}
-                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-1"
+                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                           />
                         </div>
                         <div className="flex gap-1 mt-1">
                           {[
-                            { label: 'Small', size: 80 },
-                            { label: 'Medium', size: 150 },
-                            { label: 'Large', size: 200 },
+                            { label: 'S', size: 80 },
+                            { label: 'M', size: 150 },
+                            { label: 'L', size: 200 },
                             { label: 'XL', size: 250 },
                           ].map(preset => (
                             <button
@@ -1515,16 +1499,6 @@ export default function InvitationDesigner() {
                   )}
                 </div>
               </div>
-
-              {/* ─── Save Button ─── */}
-              <button
-                onClick={handleSave}
-                disabled={saving || !templateUrl}
-                className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm"
-              >
-                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                {saving ? 'Saving...' : 'Save Design'}
-              </button>
             </div>
           )}
         </div>
