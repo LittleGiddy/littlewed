@@ -210,10 +210,11 @@ export async function generateCardForGuest(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
-  // ─── 4. Add text layers using pure SVG ──────────────────────────────
+  // ─── 4. Add ALL text layers from design ──────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
+    // ✅ Process ALL text layers - including guest name, type, card number
     const textLayers = designLayers.filter(l => l.type === 'text');
     
     const guestFullName = getGuestFullName(guest);
@@ -233,6 +234,7 @@ export async function generateCardForGuest(
       
       let text = layer.text || '';
       
+      // ─── Replace placeholders with actual guest data ──────────────────
       if (layer.isGuestName) {
         text = guestFullName;
       } else if (layer.isGuestType) {
@@ -342,79 +344,7 @@ export async function generateCardForGuest(
     console.error('Failed to composite QR code:', qrError);
   }
 
-  // ─── 6. Add card number if not already in layers ────────────────────
-  const hasCardNumberLayer = designLayers.some(l => l.isCardNumber);
-  if (guest.cardNumber && !hasCardNumberLayer) {
-    try {
-      const cardNumberImage = await renderTextSvg(
-        `#${guest.cardNumber}`,
-        {
-          fontSize: 16,
-          fontFamily: 'monospace',
-          color: 'rgba(255,255,255,0.7)',
-          align: 'right',
-          width: width,
-          height: height,
-          // ✅ Position at bottom-right with margin
-          x: width - 40,
-          y: height - 30,
-          rotation: 0,
-          shadow: false,
-        }
-      );
-      
-      finalBuffer = await sharp(finalBuffer)
-        .composite([
-          {
-            input: cardNumberImage,
-            top: 0,
-            left: 0,
-          },
-        ])
-        .png()
-        .toBuffer();
-    } catch (cardNumberError) {
-      console.error('Failed to add card number:', cardNumberError);
-    }
-  }
-
-  // ─── 7. Add guest type badge if DOUBLE ─────────────────────────────
-  const hasGuestTypeLayer = designLayers.some(l => l.isGuestType);
-  if (guest.guestType === 'DOUBLE' && !hasGuestTypeLayer) {
-    try {
-      const guestTypeImage = await renderTextSvg(
-        '+1 Guest',
-        {
-          fontSize: 11,
-          fontFamily: 'Arial',
-          color: 'rgba(255,255,255,0.6)',
-          align: 'center',
-          width: width,
-          height: height,
-          // ✅ Position at bottom-right with margin
-          x: width - 80,
-          y: height - 55,
-          rotation: 0,
-          shadow: false,
-        }
-      );
-      
-      finalBuffer = await sharp(finalBuffer)
-        .composite([
-          {
-            input: guestTypeImage,
-            top: 0,
-            left: 0,
-          },
-        ])
-        .png()
-        .toBuffer();
-    } catch (guestTypeError) {
-      console.error('Failed to add guest type badge:', guestTypeError);
-    }
-  }
-
-  // ─── 8. Upload to Vercel Blob ──────────────────────────────────────
+  // ─── 6. Upload to Vercel Blob ──────────────────────────────────────
   const blob = await put(`guests/${event.tenantId}/${guest.id}.png`, finalBuffer, {
     access: 'public',
     contentType: 'image/png',
