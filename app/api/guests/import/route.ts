@@ -150,7 +150,19 @@ export async function POST(req: NextRequest) {
 
     const guestsToInsert = [];
 
-    for (const g of uniqueGuests) {
+    // ─── Sort guests by name to maintain consistent ordering ────────────
+    const sortedGuests = [...uniqueGuests].sort((a, b) => {
+      // If cardNumber exists in the data, use it for sorting (for PDF imports)
+      const aCard = a.cardNumber ? parseInt(a.cardNumber, 10) : 999999;
+      const bCard = b.cardNumber ? parseInt(b.cardNumber, 10) : 999999;
+      if (aCard !== 999999 && bCard !== 999999 && aCard !== bCard) {
+        return aCard - bCard;
+      }
+      // Otherwise sort by name
+      return a.name.localeCompare(b.name);
+    });
+
+    for (const g of sortedGuests) {
       let routingChannel = 'sms';
       
       if (detectWhatsApp && g.phone) {
@@ -170,12 +182,10 @@ export async function POST(req: NextRequest) {
         smsCount++;
       }
 
-      // ─── Assign card number ──────────────────────────────────────────────
-      let cardNumber = g.cardNumber || null;
-      if (!cardNumber) {
-        cardNumber = currentNumber.toString().padStart(5, '0');
-        currentNumber++;
-      }
+      // ─── Assign card number (auto-generated, NOT from PDF) ──────────────
+      // ✅ Always use auto-generated card number, ignore whatever is in the file
+      const cardNumber = currentNumber.toString().padStart(5, '0');
+      currentNumber++;
 
       // ─── Validate guest type ──────────────────────────────────────────
       const guestType = validateGuestType(g.guestType);
@@ -184,8 +194,8 @@ export async function POST(req: NextRequest) {
         name: g.name.trim(),
         phone: g.phone,
         title: g.title || '',
-        cardNumber: cardNumber,
-        guestType: guestType, // ✅ SINGLE or DOUBLE
+        cardNumber: cardNumber, // ✅ Auto-generated
+        guestType: guestType,
         email: null,
         eventId,
         routingChannel,
