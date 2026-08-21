@@ -8,7 +8,7 @@ import {
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
   Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw,
   X, Maximize, Minimize, ArrowRight, Zap, Sliders, Move as MoveIcon, 
-  GripVertical, Crosshair
+  GripVertical, Crosshair, Dot
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,13 @@ const FONTS = [
   'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
   'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
   'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
+];
+
+// ─── Alignment options with icons ──────────────────────────────────────
+const ALIGN_OPTIONS = [
+  { value: 'left', label: 'Left', icon: AlignLeft, description: 'Text starts at X position' },
+  { value: 'center', label: 'Center', icon: AlignCenter, description: 'Text centered at X position' },
+  { value: 'right', label: 'Right', icon: AlignRight, description: 'Text ends at X position' },
 ];
 
 // ─── Layer creators ──────────────────────────────────────────────────────
@@ -507,7 +514,6 @@ export default function InvitationDesigner() {
     const x = layer.x ?? 50;
     const y = layer.y ?? 50;
     
-    // Calculate offset in percentage points
     const offsetX = (clientX - rect.left) / rect.width * 100 - x;
     const offsetY = (clientY - rect.top) / rect.height * 100 - y;
     
@@ -650,13 +656,19 @@ export default function InvitationDesigner() {
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
       
-      // ✅ Fix alignment positioning
-      // left: text starts at X position (anchor left)
-      // center: text centered at X position (anchor middle)
-      // right: text ends at X position (anchor right)
-      const alignStyle = layer.align === 'left' ? { left: `${layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` }
-        : layer.align === 'right' ? { right: `${100 - layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` }
-        : { left: `${layer.x}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)` };
+      // ✅ Fix alignment positioning based on user selection
+      // The X position defines where the text anchor point is
+      let alignStyle;
+      if (layer.align === 'left') {
+        // Left: text starts at X position (anchor at left edge)
+        alignStyle = { left: `${layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` };
+      } else if (layer.align === 'right') {
+        // Right: text ends at X position (anchor at right edge)
+        alignStyle = { right: `${100 - layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` };
+      } else {
+        // Center: text centered at X position (anchor at middle)
+        alignStyle = { left: `${layer.x}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)` };
+      }
       
       return (
         <div
@@ -873,6 +885,7 @@ export default function InvitationDesigner() {
   }
 
   const selectedLayer = selectedLayerIndex !== null ? layers[selectedLayerIndex] : null;
+  const isTextLayer = selectedLayer?.type === 'text';
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -1016,7 +1029,6 @@ export default function InvitationDesigner() {
               </span>
             </div>
 
-            {/* ✅ Preview Container */}
             <div 
               ref={canvasContainerRef}
               className="mx-auto bg-gray-100 rounded-xl overflow-hidden relative"
@@ -1235,7 +1247,7 @@ export default function InvitationDesigner() {
               <Section title="Properties" section="properties" icon={<Settings size={14} />}>
                 {selectedLayer ? (
                   <div className="space-y-3 max-h-48 overflow-y-auto">
-                    {/* ✅ Enhanced Position Controls with Range Sliders and Number Inputs */}
+                    {/* ─── Position Controls ─── */}
                     <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
                       <p className="text-[9px] font-medium text-gray-500 mb-2 flex items-center gap-1">
                         <Crosshair size={10} className="text-[#0D4F4F]" />
@@ -1291,8 +1303,48 @@ export default function InvitationDesigner() {
                       </div>
                     </div>
 
-                    {selectedLayer.type === 'text' && (
+                    {isTextLayer && (
                       <>
+                        {/* ─── Alignment Selector ─── */}
+                        <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
+                          <p className="text-[9px] font-medium text-gray-600 mb-1.5 flex items-center gap-1">
+                            <AlignCenter size={10} className="text-[#0D4F4F]" />
+                            Text Alignment
+                            <span className="text-[8px] text-gray-400 font-normal ml-1">(Anchor position)</span>
+                          </p>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {ALIGN_OPTIONS.map((opt) => {
+                              const Icon = opt.icon;
+                              const isActive = selectedLayer.align === opt.value;
+                              return (
+                                <button
+                                  key={opt.value}
+                                  onClick={() => updateLayer(selectedLayerIndex!, { align: opt.value })}
+                                  className={`p-1.5 rounded-lg border-2 transition flex flex-col items-center gap-0.5 ${
+                                    isActive 
+                                      ? 'bg-[#0D4F4F] text-white border-[#0D4F4F] shadow-sm' 
+                                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                  }`}
+                                  title={opt.description}
+                                >
+                                  <Icon size={14} className={isActive ? 'text-white' : 'text-gray-600'} />
+                                  <span className={`text-[7px] font-medium ${isActive ? 'text-white' : 'text-gray-500'}`}>
+                                    {opt.label}
+                                  </span>
+                                  <span className={`text-[5px] ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                                    {opt.value === 'left' ? '↗' : opt.value === 'right' ? '↖' : '●'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[7px] text-gray-400 mt-1 text-center">
+                            {selectedLayer.align === 'left' && 'Text starts at X position →'}
+                            {selectedLayer.align === 'center' && 'Text centered at X position ●'}
+                            {selectedLayer.align === 'right' && 'Text ends at X position ←'}
+                          </p>
+                        </div>
+
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
                           <textarea
@@ -1353,19 +1405,6 @@ export default function InvitationDesigner() {
                               onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
                               className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
                             />
-                            <div className="flex gap-1 flex-1">
-                              {['left', 'center', 'right'].map(a => (
-                                <button
-                                  key={a}
-                                  onClick={() => updateLayer(selectedLayerIndex!, { align: a })}
-                                  className={`flex-1 p-1 rounded-lg border transition ${
-                                    selectedLayer.align === a ? 'bg-[#0D4F4F] text-white border-[#0D4F4F]' : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
-                                  }`}
-                                >
-                                  {a === 'left' ? <AlignLeft size={12} /> : a === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                                </button>
-                              ))}
-                            </div>
                           </div>
                         </div>
 
