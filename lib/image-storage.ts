@@ -1,5 +1,5 @@
 // lib/image-storage.ts
-import './fonts'; // MUST be the first import — sets FONTCONFIG_FILE before sharp initializes
+import './fonts';
 import { put } from '@vercel/blob';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
@@ -40,9 +40,6 @@ export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buff
   return Buffer.from(await response.arrayBuffer());
 }
 
-/**
- * Escape XML special characters
- */
 function escapeXml(str: string): string {
   if (!str) return '';
   return str
@@ -53,9 +50,6 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
-/**
- * Map Google Font names to system fonts available on Vercel
- */
 function getSystemFont(fontFamily: string): string {
   const fontMap: Record<string, string> = {
     'Playfair Display': 'Georgia',
@@ -83,9 +77,6 @@ function getSystemFont(fontFamily: string): string {
   return fontMap[fontFamily] || 'Georgia';
 }
 
-/**
- * Apply overlay to the card
- */
 async function applyOverlay(
   cardBuffer: Buffer,
   overlayColor: string,
@@ -95,10 +86,15 @@ async function applyOverlay(
     return cardBuffer;
   }
 
+  // Get actual image dimensions
+  const metadata = await sharp(cardBuffer).metadata();
+  const width = metadata.width || 3508;
+  const height = metadata.height || 4961;
+
   const overlayBuffer = await sharp({
     create: {
-      width: 800,
-      height: 1200,
+      width: width,
+      height: height,
       channels: 4,
       background: overlayColor,
     },
@@ -119,9 +115,6 @@ async function applyOverlay(
     .toBuffer();
 }
 
-/**
- * Render text as SVG with system fonts
- */
 async function renderTextSvg(
   text: string,
   options: {
@@ -178,7 +171,14 @@ export async function generateCardForGuest(
   event: EventLike,
   cardBuffer: Buffer
 ): Promise<string> {
-  // ─── 1. Apply overlay ──────────────────────────────────────────────────
+  // ─── 1. Get actual image dimensions ──────────────────────────────────
+  const metadata = await sharp(cardBuffer).metadata();
+  const width = metadata.width || 3508;  // A5 at 300 DPI
+  const height = metadata.height || 4961; // A5 at 300 DPI
+
+  console.log('[CardGen] A5 Card dimensions:', { width, height });
+
+  // ─── 2. Apply overlay ──────────────────────────────────────────────────
   let processedBuffer = cardBuffer;
   
   if (event.overlayColor && event.overlayOpacity && event.overlayOpacity > 0) {
@@ -189,7 +189,7 @@ export async function generateCardForGuest(
     );
   }
 
-  // ─── 2. Parse design layers ────────────────────────────────────────────
+  // ─── 3. Parse design layers ────────────────────────────────────────────
   let designLayers: any[] = [];
   try {
     if (event.designLayers) {
@@ -204,17 +204,12 @@ export async function generateCardForGuest(
     designLayers = [];
   }
 
-  // ─── 3. Get image dimensions ───────────────────────────────────────────
-  const image = sharp(processedBuffer);
-  const metadata = await image.metadata();
-  const width = metadata.width || 800;
-  const height = metadata.height || 1200;
+  console.log('[CardGen] Design layers count:', designLayers.length);
 
   // ─── 4. Add ALL text layers from design ──────────────────────────────
   const textComposites: sharp.OverlayOptions[] = [];
   
   if (designLayers.length > 0) {
-    // ✅ Process ALL text layers - including guest name, type, card number
     const textLayers = designLayers.filter(l => l.type === 'text');
     
     const guestFullName = getGuestFullName(guest);
@@ -254,13 +249,28 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
-      // ✅ Convert percentage to pixels for positioning
+      // ✅ Convert percentage to pixels based on A5 dimensions
       const x = ((layer.x || 50) / 100) * width;
       const y = ((layer.y || 50) / 100) * height;
       
+      // ✅ Scale font size proportionally if needed
+      // If the designer used 800x1200 preview, scale to A5
+      const scaleFactor = Math.min(width / 800, height / 1200);
+      const fontSize = (layer.fontSize || 24) * scaleFactor;
+      
+      console.log('[CardGen] Layer:', {
+        text: text.substring(0, 20),
+        layerX: layer.x,
+        layerY: layer.y,
+        convertedX: Math.round(x),
+        convertedY: Math.round(y),
+        fontSize: Math.round(fontSize),
+        fontFamily: layer.fontFamily
+      });
+      
       try {
         const textImage = await renderTextSvg(text, {
-          fontSize: layer.fontSize || 24,
+          fontSize: fontSize,
           fontFamily: layer.fontFamily || 'Playfair Display',
           color: layer.color || '#ffffff',
           align: layer.align || 'center',
@@ -291,37 +301,46 @@ export async function generateCardForGuest(
   }
 
   // ─── 5. Add QR code ──────────────────────────────────────────────────
-  // ✅ QR position values are percentages (0-100) from the designer
-  // ✅ QR size is in pixels from the designer
-  const qrPosition = {
-    x: event.qrPlacementX ?? 85,
-    y: event.qrPlacementY ?? 85,
-    size: event.qrSize ?? 150,
-  };
-
-  // ✅ Use brand color as default if not set
+  // ✅ QR size is in pixels from designer, but we need to scale it for A5
+  const qrSize = event.qrSize ?? 150;
+  const scaleFactor = Math.min(width / 800, height / 1200);
+  const scaledQrSize = Math.round(qrSize * scaleFactor);
+  
+  // ✅ QR position is percentage (0-100) from designer
+  const qrX = event.qrPlacementX ?? 85;
+  const qrY = event.qrPlacementY ?? 85;
+  
   const qrColor = event.qrColor || '#0D4F4F';
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
   
-  // ✅ Generate QR with proper size
-  const qrBuffer = await generateQRFromCardNumber(cardNumber, qrPosition.size, qrColor);
+  // ✅ Generate QR with scaled size
+  const qrBuffer = await generateQRFromCardNumber(cardNumber, scaledQrSize, qrColor);
 
-  // ✅ Convert percentage to pixels for QR positioning (SAME as text layers)
-  // The x and y are the center point of the QR code (percentage based)
-  // Subtract half the size to get the top-left corner for sharp
-  const qrTopLeftX = ((qrPosition.x) / 100) * width - qrPosition.size / 2;
-  const qrTopLeftY = ((qrPosition.y) / 100) * height - qrPosition.size / 2;
+  // ✅ Convert percentage to pixels for QR positioning
+  // The QR is centered at the percentage position
+  const qrTopLeftX = ((qrX) / 100) * width - scaledQrSize / 2;
+  const qrTopLeftY = ((qrY) / 100) * height - scaledQrSize / 2;
 
-  // ✅ Ensure QR code stays within card bounds (with margin)
-  const margin = 20;
-  const clampedX = Math.max(margin, Math.min(width - qrPosition.size - margin, qrTopLeftX));
-  const clampedY = Math.max(margin, Math.min(height - qrPosition.size - margin, qrTopLeftY));
+  // ✅ Ensure QR code stays within card bounds
+  const margin = Math.round(40 * scaleFactor); // Scaled margin
+  const clampedX = Math.max(margin, Math.min(width - scaledQrSize - margin, qrTopLeftX));
+  const clampedY = Math.max(margin, Math.min(height - scaledQrSize - margin, qrTopLeftY));
+
+  console.log('[CardGen] QR:', {
+    designerSize: qrSize,
+    scaledSize: scaledQrSize,
+    qrX: qrX,
+    qrY: qrY,
+    topLeftX: Math.round(qrTopLeftX),
+    topLeftY: Math.round(qrTopLeftY),
+    clampedX: Math.round(clampedX),
+    clampedY: Math.round(clampedY)
+  });
 
   let finalBuffer = processedBuffer;
   
   try {
-    // ✅ Rotate QR if needed
     let qrToComposite = qrBuffer;
     if (qrRotation !== 0) {
       qrToComposite = await sharp(qrBuffer)
@@ -351,6 +370,7 @@ export async function generateCardForGuest(
     allowOverwrite: true,
   });
 
+  console.log('[CardGen] ✅ Card generated:', blob.url);
   return blob.url;
 }
 
