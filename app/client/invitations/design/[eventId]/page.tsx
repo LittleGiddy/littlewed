@@ -32,13 +32,6 @@ const FONTS = [
   'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
 ];
 
-// ─── Alignment options with icons ──────────────────────────────────────
-const ALIGN_OPTIONS = [
-  { value: 'left', label: 'Left', icon: AlignLeft, description: 'Text starts at X position' },
-  { value: 'center', label: 'Center', icon: AlignCenter, description: 'Text centered at X position' },
-  { value: 'right', label: 'Right', icon: AlignRight, description: 'Text ends at X position' },
-];
-
 // ─── Layer creators ──────────────────────────────────────────────────────
 const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false, isCardNumber = false) => ({
   id: generateId(),
@@ -46,7 +39,7 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false,
   x, y, rotation: 0,
   text, fontSize: 36,
   fontFamily: 'Playfair Display',
-  color: '#ffffff', align: 'center',
+  color: '#ffffff',
   shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
   visible: true, locked: false,
   isGuestName,
@@ -115,7 +108,7 @@ export default function InvitationDesigner() {
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Drag state
-  const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end' } | null>(null);
+  const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end'; isTouch?: boolean } | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Resize state
@@ -499,7 +492,7 @@ export default function InvitationDesigner() {
     scheduleHistory(newLayers);
   };
 
-  // ─── Drag handlers with mobile support ─────────────────────────────
+  // ─── Drag handlers with mobile and QR support ─────────────────────
   const startDrag = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     if (!canvasRef.current) return;
@@ -507,8 +500,9 @@ export default function InvitationDesigner() {
     e.preventDefault();
     e.stopPropagation();
     
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const isTouch = 'touches' in e;
+    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     const rect = canvasRef.current.getBoundingClientRect();
     const layer = layers[index];
     const x = layer.x ?? 50;
@@ -518,14 +512,34 @@ export default function InvitationDesigner() {
     const offsetY = (clientY - rect.top) / rect.height * 100 - y;
     
     setDragOffset({ x: offsetX, y: offsetY });
-    setDragging({ type: 'layer', index });
+    setDragging({ type: 'layer', index, isTouch });
+  };
+
+  // ─── QR Code drag handlers ──────────────────────────────────────────
+  const startQrDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!canvasRef.current) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const isTouch = 'touches' in e;
+    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const rect = canvasRef.current.getBoundingClientRect();
+    
+    const offsetX = (clientX - rect.left) / rect.width * 100 - qrX;
+    const offsetY = (clientY - rect.top) / rect.height * 100 - qrY;
+    
+    setDragOffset({ x: offsetX, y: offsetY });
+    setDragging({ type: 'qr', index: -1, isTouch });
   };
 
   const startDragLinePoint = (index: number, point: 'start' | 'end') => (e: React.MouseEvent | React.TouchEvent) => {
     if (layers[index]?.locked) return;
     e.stopPropagation();
     e.preventDefault();
-    setDragging({ type: 'linePoint', index, point });
+    const isTouch = 'touches' in e;
+    setDragging({ type: 'linePoint', index, point, isTouch });
   };
 
   const moveDrag = (e: React.MouseEvent | React.TouchEvent) => {
@@ -533,8 +547,9 @@ export default function InvitationDesigner() {
     
     e.preventDefault();
     
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const isTouch = 'touches' in e;
+    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     const rect = canvasRef.current.getBoundingClientRect();
     
     let newX = (clientX - rect.left) / rect.width * 100 - dragOffset.x;
@@ -588,7 +603,12 @@ export default function InvitationDesigner() {
     }
   };
 
-  const endDrag = () => setDragging(null);
+  const endDrag = (e?: React.MouseEvent | React.TouchEvent) => {
+    // Don't clear immediately for touch to prevent ghost clicks
+    setTimeout(() => {
+      setDragging(null);
+    }, 10);
+  };
 
   // ─── Resize handlers ──────────────────────────────────────────────────
   const startResize = (index: number) => (e: React.MouseEvent | React.TouchEvent) => {
@@ -656,20 +676,7 @@ export default function InvitationDesigner() {
         ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || 'rgba(0,0,0,0.3)'}`
         : 'none';
       
-      // ✅ Fix alignment positioning based on user selection
-      // The X position defines where the text anchor point is
-      let alignStyle;
-      if (layer.align === 'left') {
-        // Left: text starts at X position (anchor at left edge)
-        alignStyle = { left: `${layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` };
-      } else if (layer.align === 'right') {
-        // Right: text ends at X position (anchor at right edge)
-        alignStyle = { right: `${100 - layer.x}%`, transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)` };
-      } else {
-        // Center: text centered at X position (anchor at middle)
-        alignStyle = { left: `${layer.x}%`, transform: `translate(-50%, -50%) rotate(${layer.rotation || 0}deg)` };
-      }
-      
+      // ✅ Text always starts at X position (left-aligned)
       return (
         <div
           key={layer.id}
@@ -678,12 +685,13 @@ export default function InvitationDesigner() {
             ...commonStyle,
             cursor: isLocked ? 'default' : 'grab',
             position: 'absolute',
+            left: `${layer.x}%`,
             top: `${layer.y}%`,
-            ...alignStyle,
+            transform: `translate(0, -50%) rotate(${layer.rotation || 0}deg)`,
             fontSize: `${layer.fontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
-            textAlign: layer.align || 'center',
+            textAlign: 'left',
             textShadow: shadow,
             width: 'auto',
             maxWidth: '80%',
@@ -1037,6 +1045,12 @@ export default function InvitationDesigner() {
                 height: containerSize.height || 500,
                 maxWidth: '100%',
               }}
+              onMouseUp={endDrag}
+              onMouseLeave={endDrag}
+              onTouchEnd={endDrag}
+              onTouchCancel={endDrag}
+              onMouseMove={moveDrag}
+              onTouchMove={moveDrag}
             >
               <div
                 ref={canvasRef}
@@ -1057,7 +1071,7 @@ export default function InvitationDesigner() {
 
                     {/* ─── QR Code ─── */}
                     <div
-                      className="absolute flex items-center justify-center cursor-move touch-none select-none pointer-events-auto group"
+                      className="absolute flex items-center justify-center cursor-grab touch-none select-none pointer-events-auto group"
                       style={{
                         left: `${qrX}%`,
                         top: `${qrY}%`,
@@ -1066,27 +1080,8 @@ export default function InvitationDesigner() {
                         transform: `translate(-50%, -50%) rotate(${qrRotation}deg)`,
                         zIndex: 20,
                       }}
-                      onMouseDown={(e) => {
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        const clientX = e.clientX;
-                        const clientY = e.clientY;
-                        setDragOffset({
-                          x: clientX - rect.left - (qrX / 100) * rect.width,
-                          y: clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
-                      onTouchStart={(e) => {
-                        const touch = e.touches[0];
-                        const rect = canvasRef.current!.getBoundingClientRect();
-                        setDragOffset({
-                          x: touch.clientX - rect.left - (qrX / 100) * rect.width,
-                          y: touch.clientY - rect.top - (qrY / 100) * rect.height,
-                        });
-                        setDragging({ type: 'qr', index: -1 });
-                        e.preventDefault();
-                      }}
+                      onMouseDown={startQrDrag}
+                      onTouchStart={startQrDrag}
                     >
                       <div 
                         className="w-full h-full rounded-lg flex flex-col items-center justify-center relative overflow-hidden"
@@ -1305,46 +1300,6 @@ export default function InvitationDesigner() {
 
                     {isTextLayer && (
                       <>
-                        {/* ─── Alignment Selector ─── */}
-                        <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-                          <p className="text-[9px] font-medium text-gray-600 mb-1.5 flex items-center gap-1">
-                            <AlignCenter size={10} className="text-[#0D4F4F]" />
-                            Text Alignment
-                            <span className="text-[8px] text-gray-400 font-normal ml-1">(Anchor position)</span>
-                          </p>
-                          <div className="grid grid-cols-3 gap-1.5">
-                            {ALIGN_OPTIONS.map((opt) => {
-                              const Icon = opt.icon;
-                              const isActive = selectedLayer.align === opt.value;
-                              return (
-                                <button
-                                  key={opt.value}
-                                  onClick={() => updateLayer(selectedLayerIndex!, { align: opt.value })}
-                                  className={`p-1.5 rounded-lg border-2 transition flex flex-col items-center gap-0.5 ${
-                                    isActive 
-                                      ? 'bg-[#0D4F4F] text-white border-[#0D4F4F] shadow-sm' 
-                                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                  }`}
-                                  title={opt.description}
-                                >
-                                  <Icon size={14} className={isActive ? 'text-white' : 'text-gray-600'} />
-                                  <span className={`text-[7px] font-medium ${isActive ? 'text-white' : 'text-gray-500'}`}>
-                                    {opt.label}
-                                  </span>
-                                  <span className={`text-[5px] ${isActive ? 'text-white/70' : 'text-gray-400'}`}>
-                                    {opt.value === 'left' ? '↗' : opt.value === 'right' ? '↖' : '●'}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                          <p className="text-[7px] text-gray-400 mt-1 text-center">
-                            {selectedLayer.align === 'left' && 'Text starts at X position →'}
-                            {selectedLayer.align === 'center' && 'Text centered at X position ●'}
-                            {selectedLayer.align === 'right' && 'Text ends at X position ←'}
-                          </p>
-                        </div>
-
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
                           <textarea
@@ -1398,14 +1353,12 @@ export default function InvitationDesigner() {
 
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
-                          <div className="flex gap-2 items-center">
-                            <input
-                              type="color"
-                              value={selectedLayer.color}
-                              onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                              className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
-                            />
-                          </div>
+                          <input
+                            type="color"
+                            value={selectedLayer.color}
+                            onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
+                            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                          />
                         </div>
 
                         <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
