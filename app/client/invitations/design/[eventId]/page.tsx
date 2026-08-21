@@ -124,9 +124,10 @@ export default function InvitationDesigner() {
       const containerHeight = container.clientHeight;
       if (containerWidth <= 0 || containerHeight <= 0) return;
       
+      // ✅ Allow scaling up to 2x so the card fills the container
       const scaleX = containerWidth / DESIGNER_WIDTH;
       const scaleY = containerHeight / DESIGNER_HEIGHT;
-      const scale = Math.min(scaleX, scaleY, 1.2);
+      const scale = Math.min(scaleX, scaleY, 2);
       setCanvasScale(scale);
     };
 
@@ -861,43 +862,43 @@ export default function InvitationDesigner() {
       {/* ─── Main Content ─── */}
       <div className="flex-1 flex overflow-hidden">
         {/* ─── Preview Area ─── */}
-        <div className="flex-1 flex items-center justify-center p-3 sm:p-4 overflow-auto">
-          <div className="w-full max-w-[600px] h-full max-h-[85vh] flex flex-col">
-            {/* Template selector */}
-            <div className="flex items-center gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
-              <span className="text-[10px] font-medium text-gray-500 flex-shrink-0">Template:</span>
-              <div className="flex gap-1.5">
-                {templates.slice(0, 8).map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => selectTemplate(t)}
-                    className={`flex-shrink-0 w-10 h-14 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
-                      selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'
-                    }`}
-                  >
-                    <img src={t.imageUrl} alt={t.name} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                <label className="flex-shrink-0 w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-[#0D4F4F] transition">
-                  <Upload size={14} className="text-gray-400" />
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" ref={fileInputRef} />
-                </label>
-                {uploading && <Loader2 size={14} className="animate-spin text-[#0D4F4F] flex-shrink-0" />}
-                {templateUrl && (
-                  <button
-                    onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
-                    className="flex-shrink-0 text-red-500 hover:text-red-700 transition p-1"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
+        <div className="flex-1 flex flex-col p-3 sm:p-4 overflow-hidden">
+          {/* Template selector */}
+          <div className="flex items-center gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
+            <span className="text-[10px] font-medium text-gray-500 flex-shrink-0">Template:</span>
+            <div className="flex gap-1.5">
+              {templates.slice(0, 8).map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => selectTemplate(t)}
+                  className={`flex-shrink-0 w-10 h-14 rounded-lg overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${
+                    selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'
+                  }`}
+                >
+                  <img src={t.imageUrl} alt={t.name} className="w-full h-full object-cover" />
+                </div>
+              ))}
+              <label className="flex-shrink-0 w-10 h-14 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-[#0D4F4F] transition">
+                <Upload size={14} className="text-gray-400" />
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" ref={fileInputRef} />
+              </label>
+              {uploading && <Loader2 size={14} className="animate-spin text-[#0D4F4F] flex-shrink-0" />}
+              {templateUrl && (
+                <button
+                  onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
+                  className="flex-shrink-0 text-red-500 hover:text-red-700 transition p-1"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
+          </div>
 
-            {/* Card Preview */}
+          {/* Card Preview - takes up most of the space */}
+          <div className="flex-1 flex items-center justify-center min-h-0">
             <div 
               ref={canvasContainerRef}
-              className="flex-1 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative min-h-[400px]"
+              className="w-full h-full max-w-[700px] max-h-[90vh] bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden relative"
             >
               <div
                 ref={canvasRef}
@@ -989,11 +990,11 @@ export default function InvitationDesigner() {
                 )}
               </div>
             </div>
-
-            <p className="text-[9px] text-gray-400 text-center mt-2 flex-shrink-0">
-              Click a layer to edit · Drag to reposition · {layers.length} layers
-            </p>
           </div>
+
+          <p className="text-[9px] text-gray-400 text-center mt-2 flex-shrink-0">
+            Click a layer to edit · Drag to reposition · {layers.length} layers
+          </p>
         </div>
 
         {/* ─── Controls Panel ─── */}
