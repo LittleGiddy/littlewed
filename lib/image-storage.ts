@@ -91,7 +91,6 @@ async function applyOverlay(
     return cardBuffer;
   }
 
-  // Get actual image dimensions
   const metadata = await sharp(cardBuffer).metadata();
   const width = metadata.width || 3508;
   const height = metadata.height || 4961;
@@ -181,12 +180,9 @@ export async function generateCardForGuest(
   const actualWidth = metadata.width || 3508;
   const actualHeight = metadata.height || 4961;
 
-  // ─── 2. Calculate scale factor from designer preview ────────────────
-  // The designer uses a fixed canvas size (800x1200)
-  // We need to scale from that to the actual card size
+  // ─── 2. Calculate scale factor ──────────────────────────────────────
   const scaleX = actualWidth / DESIGNER_WIDTH;
   const scaleY = actualHeight / DESIGNER_HEIGHT;
-  // Use the minimum scale to maintain aspect ratio
   const scaleFactor = Math.min(scaleX, scaleY);
 
   console.log('[CardGen] Scaling:', {
@@ -246,7 +242,6 @@ export async function generateCardForGuest(
       
       let text = layer.text || '';
       
-      // ─── Replace placeholders with actual guest data ──────────────────
       if (layer.isGuestName) {
         text = guestFullName;
       } else if (layer.isGuestType) {
@@ -266,13 +261,12 @@ export async function generateCardForGuest(
 
       if (!text || text.trim() === '') continue;
 
-      // ✅ Convert percentage to pixels using scale factor
-      // Position: percentage of designer canvas, then scaled to actual size
-      const x = ((layer.x || 50) / 100) * DESIGNER_WIDTH * scaleFactor;
-      const y = ((layer.y || 50) / 100) * DESIGNER_HEIGHT * scaleFactor;
+      // ✅ Scale position from designer to actual size
+      const x = ((layer.x || 50) / 100) * actualWidth;
+      const y = ((layer.y || 50) / 100) * actualHeight;
       
-      // ✅ Scale font size from designer to actual size
-      const fontSize = (layer.fontSize || 24) * scaleFactor;
+      // ✅ Scale font size proportionally
+      const fontSize = Math.round((layer.fontSize || 24) * scaleFactor);
       
       console.log('[CardGen] Layer:', {
         text: text.substring(0, 20),
@@ -280,7 +274,7 @@ export async function generateCardForGuest(
         layerY: layer.y,
         convertedX: Math.round(x),
         convertedY: Math.round(y),
-        fontSize: Math.round(fontSize),
+        fontSize: fontSize,
         fontFamily: layer.fontFamily
       });
       
@@ -317,34 +311,26 @@ export async function generateCardForGuest(
   }
 
   // ─── 6. Add QR code ──────────────────────────────────────────────────
-  // ✅ QR size is from designer, scaled to actual size
-  const qrSize = event.qrSize ?? 150;
-  const scaledQrSize = Math.round(qrSize * scaleFactor);
-  
-  // ✅ QR position is percentage from designer, scaled to actual size
+  const qrSize = Math.round((event.qrSize || 150) * scaleFactor);
   const qrX = event.qrPlacementX ?? 85;
   const qrY = event.qrPlacementY ?? 85;
-  
   const qrColor = event.qrColor || '#0D4F4F';
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
   
-  // ✅ Generate QR with scaled size
-  const qrBuffer = await generateQRFromCardNumber(cardNumber, scaledQrSize, qrColor);
+  const qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, qrColor);
 
-  // ✅ Convert percentage to pixels for QR positioning
-  // The QR is centered at the percentage position
-  const qrTopLeftX = ((qrX) / 100) * DESIGNER_WIDTH * scaleFactor - scaledQrSize / 2;
-  const qrTopLeftY = ((qrY) / 100) * DESIGNER_HEIGHT * scaleFactor - scaledQrSize / 2;
+  // ✅ Position QR at center of percentage position
+  const qrTopLeftX = ((qrX) / 100) * actualWidth - qrSize / 2;
+  const qrTopLeftY = ((qrY) / 100) * actualHeight - qrSize / 2;
 
-  // ✅ Ensure QR code stays within card bounds
   const margin = Math.round(20 * scaleFactor);
-  const clampedX = Math.max(margin, Math.min(actualWidth - scaledQrSize - margin, qrTopLeftX));
-  const clampedY = Math.max(margin, Math.min(actualHeight - scaledQrSize - margin, qrTopLeftY));
+  const clampedX = Math.max(margin, Math.min(actualWidth - qrSize - margin, qrTopLeftX));
+  const clampedY = Math.max(margin, Math.min(actualHeight - qrSize - margin, qrTopLeftY));
 
   console.log('[CardGen] QR:', {
-    designerSize: qrSize,
-    scaledSize: scaledQrSize,
+    designerSize: event.qrSize || 150,
+    scaledSize: qrSize,
     qrX: qrX,
     qrY: qrY,
     topLeftX: Math.round(qrTopLeftX),
