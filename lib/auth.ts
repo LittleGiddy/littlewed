@@ -61,8 +61,6 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     // ── signIn ────────────────────────────────────────────────────────────────
-    // This callback runs BEFORE a user is signed in. It decides whether to
-    // allow or block the sign-in attempt.
     async signIn({ user, account }) {
       // Only apply custom logic for Google sign‑in
       if (account?.provider === 'google') {
@@ -71,7 +69,6 @@ export const authOptions: NextAuthOptions = {
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
             include: {
-              // Include the Account relation to see if they have a Google link
               accounts: {
                 where: { provider: 'google' },
                 select: { provider: true },
@@ -84,55 +81,36 @@ export const authOptions: NextAuthOptions = {
             const hasGoogleAccount = existingUser.accounts.length > 0;
 
             if (hasGoogleAccount) {
-              // ✅ They have a Google link → allow sign‑in, even if they also have a password
+              // ✅ They have a Google link → allow sign‑in
               return true;
             }
 
             // No Google link → check if they have a password (email/password signup)
             if (existingUser.password) {
               // ❌ This is an email/password account → block Google sign‑in
-              // (prevents account takeover)
               return false;
             }
 
-            // User exists with no password and no Google link (should not happen,
-            // but allow for safety)
+            // User exists with no password and no Google link
             return true;
           }
 
           // ── First‑time Google user ──
-          // Create a new user with password = null (OAuth users have no password)
-          await prisma.user.create({
+          // ✅ Create user WITHOUT a tenant
+          const newUser = await prisma.user.create({
             data: {
               email: user.email!,
               name: user.name ?? 'New User',
-              password: null, // important: null means no password
+              password: null,
               role: 'CLIENT',
-              isActive: false, // admin must approve
+              isActive: true, // ✅ Auto-activate so they can sign in
               emailVerified: new Date(),
-              // We do NOT create an Account record here because we're not using
-              // the Prisma adapter. The `accounts` table is only used to check
-              // if a user already has a Google link (it will be empty for new users).
-              // The next time this user signs in with Google, we will see that they
-              // have no password and no Google link, so we'll allow it (since
-              // password is null, they are an OAuth user).
-              // However, if they later set a password via "Forgot Password", the
-              // password becomes non‑null. Then, on the next Google sign‑in, we'll
-              // check if they have a Google link. Since we didn't create one,
-              // they won't have one, and we'll block them. To avoid that,
-              // we SHOULD create an Account record here.
-              // So let's also create an Account record to mark that this user
-              // is a Google user.
+              // ✅ No tenantId set here - they'll create one during sign-in flow
             },
           });
 
-          // After creating the user, we need to fetch the new user's ID
-          const newUser = await prisma.user.findUnique({
-            where: { email: user.email! },
-          });
-
+          // Create an Account record to link the Google provider
           if (newUser) {
-            // Create an Account record to link the Google provider
             await prisma.account.create({
               data: {
                 userId: newUser.id,
@@ -155,7 +133,7 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // For other providers (credentials), always allow (already validated)
+      // For other providers (credentials), always allow
       return true;
     },
 
@@ -163,8 +141,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       if (user) {
         if (account?.provider === 'google') {
-          // Google sign‑in: `user` only has id/name/email/image from provider.
-          // Fetch our DB record to get role, tenantId, isActive, etc.
+          // Google sign‑in: fetch our DB record to get role, tenantId, isActive, etc.
           const dbUser = await prisma.user.findUnique({
             where: { email: token.email! },
             include: { tenant: true },
@@ -217,11 +194,9 @@ export const authOptions: NextAuthOptions = {
 
   pages: {
     signIn: '/login',
-    error: '/login', // redirect ?error= back to login
+    error: '/login',
   },
 
-  // ── Cookies ─────────────────────────────────────────────────────────────────
-  // Do NOT set `domain` — let the browser inherit from the host.
   cookies: {
     sessionToken: {
       name: `next-auth.session-token`,
@@ -230,7 +205,6 @@ export const authOptions: NextAuthOptions = {
         sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
-        // domain intentionally omitted
       },
     },
   },

@@ -2,10 +2,12 @@
 
 import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, User, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,9 +17,14 @@ export default function LoginPage() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+  
+  // Google Sign-Up Flow States
+  const [showOrgPrompt, setShowOrgPrompt] = useState(false);
+  const [orgName, setOrgName] = useState('');
+  const [googleUser, setGoogleUser] = useState<any>(null);
+  const [creatingOrg, setCreatingOrg] = useState(false);
 
-  // Hero carousel content — drives both the desktop image panel and the
-  // mobile hero banner from one source of truth.
+  // Hero carousel content
   const heroSlides = [
     {
       image: '/Gemini_Generated_Image_shs33shs33shs33s.png',
@@ -60,6 +67,35 @@ export default function LoginPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── Check if user has a tenant ──────────────────────────────────────
+  const checkUserTenant = async (session: any) => {
+    try {
+      const res = await fetch('/api/auth/check-tenant');
+      const data = await res.json();
+      
+      if (data.hasTenant) {
+        // User has a tenant, redirect to dashboard
+        const role = session?.user?.role;
+        if (role === 'SUPER_ADMIN') {
+          window.location.href = '/admin/dashboard';
+        } else if (role === 'STAFF') {
+          window.location.href = '/client/staff/dashboard';
+        } else {
+          window.location.href = '/client/dashboard';
+        }
+      } else {
+        // User needs to create an organization
+        setGoogleUser(session?.user);
+        setShowOrgPrompt(true);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error checking tenant:', error);
+      setError('Failed to check organization status. Please try again.');
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -80,14 +116,8 @@ export default function LoginPage() {
           return;
         }
 
-        const role = session?.user?.role;
-        if (role === 'SUPER_ADMIN') {
-          window.location.href = '/admin/dashboard';
-        } else if (role === 'STAFF') {
-          window.location.href = '/client/staff/dashboard';
-        } else {
-          window.location.href = '/client/dashboard';
-        }
+        // Check if user has a tenant
+        await checkUserTenant(session);
       } else {
         setError('Invalid email or password. Please try again.');
         setLoading(false);
@@ -102,10 +132,57 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      await signIn('google', { callbackUrl: '/client/dashboard' });
+      const result = await signIn('google', { redirect: false });
+      
+      if (result?.ok && !result?.error) {
+        // Get session to check if user has tenant
+        const res = await fetch('/api/auth/session');
+        const session = await res.json();
+        
+        await checkUserTenant(session);
+      } else {
+        setError('Failed to sign in with Google. Please try again.');
+        setLoading(false);
+      }
     } catch {
       setError('Failed to sign in with Google. Please try again.');
       setLoading(false);
+    }
+  };
+
+  // ─── Create Organization for Google User ─────────────────────────────
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgName.trim()) {
+      setError('Please enter an organization name.');
+      return;
+    }
+
+    setCreatingOrg(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/create-tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationName: orgName.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        // Organization created successfully, redirect to dashboard
+        toast.success('Organization created successfully!');
+        window.location.href = '/client/dashboard';
+      } else {
+        setError(data.error || 'Failed to create organization. Please try again.');
+        setCreatingOrg(false);
+      }
+    } catch {
+      setError('Network error. Please try again.');
+      setCreatingOrg(false);
     }
   };
 
@@ -121,7 +198,6 @@ export default function LoginPage() {
     />
   );
 
-  // Each link carries a `slug`, used to target it with its own accent color
   const navLinks = [
     { href: '/about', label: 'About', slug: 'about' },
     { href: '/pricing', label: 'Pricing', slug: 'pricing' },
@@ -212,7 +288,6 @@ export default function LoginPage() {
           pointer-events: none;
         }
 
-        /* ── Nav overlaid on the hero image ── */
         .left-hero-nav {
           position: absolute;
           top: 0;
@@ -264,11 +339,6 @@ export default function LoginPage() {
           color: white;
           transform: translateY(-2px);
           box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-        }
-
-        .hero-nav-link:focus-visible {
-          outline: 2px solid white;
-          outline-offset: 2px;
         }
 
         .left-content {
@@ -367,7 +437,6 @@ export default function LoginPage() {
           color: #E8A598;
         }
 
-        /* ── Carousel dot indicators ── */
         .hero-dots {
           display: flex;
           gap: 8px;
@@ -387,11 +456,6 @@ export default function LoginPage() {
 
         .hero-dot:hover { background: rgba(255,255,255,0.5); }
         .hero-dot.active { background: #E8A598; width: 34px; }
-
-        .hero-dot:focus-visible {
-          outline: 2px solid white;
-          outline-offset: 2px;
-        }
 
         /* ── Right panel ── */
         .right {
@@ -419,7 +483,7 @@ export default function LoginPage() {
           align-items: center;
         }
 
-        /* ── Navigation (card version — mobile only) ── */
+        /* ── Navigation ── */
         .nav {
           width: 100%;
           display: flex;
@@ -434,7 +498,6 @@ export default function LoginPage() {
         }
 
         .nav-left { display: flex; align-items: center; flex-shrink: 0; }
-
         .nav-desktop { display: flex; gap: 24px; align-items: center; }
 
         .nav-link {
@@ -442,7 +505,7 @@ export default function LoginPage() {
           text-decoration: none;
           font-size: 13.5px;
           font-weight: 600;
-          transition: color 0.2s, filter 0.2s;
+          transition: color 0.2s;
           position: relative;
           border-radius: 6px;
         }
@@ -455,19 +518,11 @@ export default function LoginPage() {
           width: 0;
           height: 2px;
           background: #0D4F4F;
-          transition: width 0.3s, background 0.3s;
+          transition: width 0.3s;
         }
 
         .nav-link:hover { color: #0D4F4F; }
         .nav-link:hover::after { width: 100%; }
-
-        .nav-link.link-about { color: #0D4B4B; }
-        .nav-link.link-about::after { background: #D9480F; }
-        .nav-link.link-about:hover { color: #B23A0C; }
-
-        .nav-link.link-pricing { color: #0D4B4B; }
-        .nav-link.link-pricing::after { background: #9C6B00; }
-        .nav-link.link-pricing:hover { color: #7A5400; }
 
         .nav-link.cta {
           background: #0D4F4F;
@@ -483,16 +538,6 @@ export default function LoginPage() {
           background: #0A3D3D;
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(13,79,79,0.3);
-        }
-
-        .nav-link:focus-visible,
-        .hero-nav-link:focus-visible,
-        .mobile-menu-btn:focus-visible,
-        .eye-btn:focus-visible,
-        .btn:focus-visible,
-        .btn-google:focus-visible {
-          outline: 2px solid #0D4F4F;
-          outline-offset: 2px;
         }
 
         .mobile-menu-btn {
@@ -526,11 +571,8 @@ export default function LoginPage() {
         }
 
         .mobile-menu.open { display: flex; }
-
         .mobile-menu .nav-link { padding: 10px 16px; border-radius: 8px; }
         .mobile-menu .nav-link:hover { background: rgba(13,79,79,0.06); }
-        .mobile-menu .nav-link.link-about:hover { background: rgba(217,72,15,0.06); }
-        .mobile-menu .nav-link.link-pricing:hover { background: rgba(156,107,0,0.06); }
         .mobile-menu .nav-link.cta { margin: 4px 16px; }
 
         /* ── Card ── */
@@ -550,7 +592,7 @@ export default function LoginPage() {
 
         .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
 
-        /* ── Mobile hero carousel ── */
+        /* ── Mobile hero ── */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -643,6 +685,152 @@ export default function LoginPage() {
         .mobile-hero-dots .hero-dot { width: 16px; height: 3px; }
         .mobile-hero-dots .hero-dot.active { width: 24px; }
 
+        /* ── Organization Prompt Modal ── */
+        .org-prompt-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          padding: 20px;
+          animation: fadeInOverlay 0.3s ease;
+        }
+
+        @keyframes fadeInOverlay {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .org-prompt-modal {
+          background: white;
+          border-radius: 24px;
+          max-width: 480px;
+          width: 100%;
+          padding: 40px 36px;
+          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(30px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .org-prompt-icon {
+          width: 64px;
+          height: 64px;
+          border-radius: 16px;
+          background: rgba(13, 79, 79, 0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #0D4F4F;
+          margin: 0 auto 16px;
+        }
+
+        .org-prompt-title {
+          font-family: 'Playfair Display', serif;
+          font-size: 24px;
+          font-weight: 800;
+          color: #0D1B1B;
+          text-align: center;
+          margin-bottom: 8px;
+        }
+
+        .org-prompt-sub {
+          text-align: center;
+          color: #7A8FA6;
+          font-size: 14px;
+          line-height: 1.6;
+          margin-bottom: 24px;
+        }
+
+        .org-prompt-input {
+          width: 100%;
+          padding: 14px 16px;
+          border: 1.5px solid #E2EAF0;
+          border-radius: 13px;
+          font-size: 15px;
+          font-family: inherit;
+          outline: none;
+          color: #0D1B1B;
+          background: white;
+          font-weight: 500;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .org-prompt-input:focus {
+          border-color: #0D4F4F;
+          box-shadow: 0 0 0 4px rgba(13, 79, 79, 0.08);
+        }
+
+        .org-prompt-input::placeholder {
+          color: #9BAAB8;
+        }
+
+        .org-prompt-actions {
+          display: flex;
+          gap: 12px;
+          margin-top: 20px;
+        }
+
+        .org-prompt-btn {
+          flex: 1;
+          padding: 14px;
+          border: none;
+          border-radius: 13px;
+          font-size: 14px;
+          font-weight: 700;
+          font-family: inherit;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: center;
+        }
+
+        .org-prompt-btn.primary {
+          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          color: white;
+          box-shadow: 0 4px 16px rgba(13, 79, 79, 0.3);
+        }
+
+        .org-prompt-btn.primary:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(13, 79, 79, 0.4);
+        }
+
+        .org-prompt-btn.primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .org-prompt-btn.secondary {
+          background: transparent;
+          color: #7A8FA6;
+          border: 1.5px solid #E2EAF0;
+        }
+
+        .org-prompt-btn.secondary:hover {
+          background: #F5F8FA;
+          border-color: #C8D4DE;
+        }
+
+        .org-prompt-error {
+          background: #FEF2F2;
+          border: 1px solid #FECACA;
+          color: #C0392B;
+          padding: 10px 14px;
+          border-radius: 11px;
+          font-size: 13px;
+          font-weight: 600;
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
         /* Form body */
         .form-body { padding: clamp(18px, 3vh, 28px) 28px clamp(16px, 2.5vh, 22px); }
 
@@ -671,7 +859,6 @@ export default function LoginPage() {
           line-height: 1.5;
         }
 
-        /* Fields */
         .field { position: relative; margin-bottom: 13px; }
         .flabel {
           position: absolute;
@@ -737,7 +924,6 @@ export default function LoginPage() {
         }
         .forgot:hover { opacity: 0.65; }
 
-        /* Error */
         .err-box {
           background: #FEF2F2;
           border: 1px solid #FECACA;
@@ -759,7 +945,6 @@ export default function LoginPage() {
           80% { transform: translateX(-3px); }
         }
 
-        /* Button */
         .btn {
           width: 100%;
           padding: 14px;
@@ -805,7 +990,6 @@ export default function LoginPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Divider */
         .divider {
           display: flex;
           align-items: center;
@@ -817,7 +1001,6 @@ export default function LoginPage() {
         }
         .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #EEF2F6; }
 
-        /* Google button */
         .btn-google {
           width: 100%;
           padding: 12px;
@@ -839,7 +1022,6 @@ export default function LoginPage() {
         .btn-google:hover { border-color: #0D4F4F; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,79,79,0.08); }
         .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
 
-        /* Footer */
         .card-footer {
           text-align: center;
           font-size: 12.5px;
@@ -849,7 +1031,6 @@ export default function LoginPage() {
         .card-footer a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
         .card-footer a:hover { text-decoration: underline; }
 
-        /* ── Professional footer ── */
         .page-footer {
           width: 100%;
           margin-top: clamp(10px, 2vh, 20px);
@@ -886,7 +1067,6 @@ export default function LoginPage() {
         .footer-link:hover { color: #0D4F4F; }
         .footer-sep { color: #DCE4EA; font-weight: 300; }
 
-        /* ── Decorative floating elements ── */
         .float-element {
           position: absolute;
           border-radius: 50%;
@@ -906,12 +1086,10 @@ export default function LoginPage() {
           66% { transform: translate(-8px, 10px) scale(0.95); }
         }
 
-        /* ── Tablet ── */
         @media (max-width: 1024px) {
           .left { width: 38%; min-width: 300px; }
         }
 
-        /* ── Mobile ── */
         @media (max-width: 768px) {
           html, body { overflow: auto; }
           .page { height: auto; min-height: 100dvh; overflow: visible; }
@@ -979,9 +1157,21 @@ export default function LoginPage() {
 
           .page-footer { flex-direction: column; text-align: center; padding: 16px 0 8px; gap: 10px; }
           .footer-links { justify-content: center; }
+
+          .org-prompt-modal {
+            padding: 32px 24px;
+            margin: 16px;
+          }
+
+          .org-prompt-title {
+            font-size: 20px;
+          }
+
+          .org-prompt-actions {
+            flex-direction: column;
+          }
         }
 
-        /* ── Small phones ── */
         @media (max-width: 380px) {
           .form-body { padding: 18px 16px 16px; }
           .mobile-hero { min-height: 170px; }
@@ -995,7 +1185,7 @@ export default function LoginPage() {
       `}</style>
 
       <div className="page">
-        {/* ── Desktop left panel — hero carousel ── */}
+        {/* ── Desktop left panel ── */}
         <div className="left">
           {heroSlides.map((s, i) => (
             <img
@@ -1015,7 +1205,6 @@ export default function LoginPage() {
           <div className="float-element"></div>
           <div className="float-element"></div>
 
-          {/* Logo + nav links on the hero image (desktop only) */}
           <div className="left-hero-nav">
             <Logo />
             <div className="hero-nav-links">
@@ -1069,7 +1258,7 @@ export default function LoginPage() {
         {/* ── Right panel ── */}
         <div className="right">
           <div className="right-inner">
-            {/* ── Card nav — visible on mobile only ── */}
+            {/* ── Navigation ── */}
             <div className="nav nav--card">
               <div className="nav-left">
                 <Logo />
@@ -1117,7 +1306,7 @@ export default function LoginPage() {
             </div>
 
             <div className="card">
-              {/* ── Mobile hero carousel ── */}
+              {/* ── Mobile hero ── */}
               <div className="mobile-hero">
                 {heroSlides.map((s, i) => (
                   <img
@@ -1273,6 +1462,77 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Organization Prompt Modal ── */}
+      {showOrgPrompt && (
+        <div className="org-prompt-overlay">
+          <div className="org-prompt-modal">
+            <div className="org-prompt-icon">
+              <Building size={32} />
+            </div>
+            <h2 className="org-prompt-title">Create Your Organization</h2>
+            <p className="org-prompt-sub">
+              You're signed in as <strong>{googleUser?.name || googleUser?.email}</strong>.<br />
+              To get started, create an organization for your events.
+            </p>
+
+            <form onSubmit={handleCreateOrganization}>
+              <div className="field">
+                <label className={`flabel ${orgName ? 'up' : ''}`} htmlFor="orgName">
+                  Organization Name
+                </label>
+                <input
+                  id="orgName"
+                  type="text"
+                  className={`org-prompt-input ${error ? 'err' : ''}`}
+                  value={orgName}
+                  onChange={e => setOrgName(e.target.value)}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  placeholder="e.g., ABC Events"
+                  disabled={creatingOrg}
+                  autoFocus
+                />
+              </div>
+
+              {error && (
+                <div className="org-prompt-error">
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="org-prompt-actions">
+                <button
+                  type="button"
+                  className="org-prompt-btn secondary"
+                  onClick={() => {
+                    setShowOrgPrompt(false);
+                    window.location.href = '/';
+                  }}
+                  disabled={creatingOrg}
+                >
+                  Go Back
+                </button>
+                <button
+                  type="submit"
+                  className="org-prompt-btn primary"
+                  disabled={creatingOrg || !orgName.trim()}
+                >
+                  {creatingOrg ? (
+                    <>
+                      <div className="spinner" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Organization'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
