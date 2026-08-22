@@ -10,18 +10,6 @@ import { prisma } from './prisma';
 // the cookie – no adapter needed.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { NextAuthOptions } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import GoogleProvider from 'next-auth/providers/google';
-import bcrypt from 'bcryptjs';
-import { prisma } from './prisma';
-
-// ─── We intentionally do NOT add `adapter: PrismaAdapter(prisma)` ──────────
-// Using a database adapter with CredentialsProvider + JWT strategy caused a
-// redirect loop. With JWT strategy, NextAuth stores everything encrypted in
-// the cookie – no adapter needed.
-// ────────────────────────────────────────────────────────────────────────────
-
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
