@@ -16,7 +16,7 @@ model User {
   name          String
   role          String    @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
   tenantId      String?
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   createdAt     DateTime  @default(now())
   phone         String?   // optional, for admin use
   emailVerified DateTime? // null = not verified (for email/password users)
@@ -69,7 +69,6 @@ model VerificationToken {
 
 // ─── Your Existing Models ────────────────────────────────────────────────
 
-// Renamed from "VerificationToken" to avoid conflict with NextAuth
 model EmailVerificationToken {
   id         String   @id @default(cuid())
   email      String
@@ -114,7 +113,7 @@ model Event {
   total_budget    Int?
   commission_paid Boolean  @default(false)
   tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guests          Guest[]
   createdAt       DateTime @default(now())
   status        String   @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
@@ -124,7 +123,7 @@ model Event {
   reminderSent  Boolean  @default(false) // track if 24h reminder was sent
   expiredNotified Boolean @default(false) // track if expiration email was sent
   checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
-  qrRotation       Float?   @default(0)  // ✅ Add this field
+  qrRotation       Float?   @default(0)
 
   // ─── Wedding-specific fields ─────────────────────────────────────────
   hostFamily  String?  // e.g., "Mr & Mrs Allan Swai"
@@ -194,7 +193,7 @@ model PendingEvent {
   total_budget Int
   commission   Int
   tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   expiresAt    DateTime
   guestCount   Int?
@@ -210,33 +209,31 @@ model Guest {
   checkedIn      Boolean   @default(false)
   checkedInAt    DateTime?
   invitationCard String?
-  checkInCount   Int       @default(0)  // ✅ Track number of check-ins
-  maxCheckIns    Int       @default(1)  // ✅ 1 for SINGLE, 2 for DOUBLE
+  checkInCount   Int       @default(0)
+  maxCheckIns    Int       @default(1)
   qrToken        String?
   routingChannel String    @default("sms") @map("routing_channel")
   eventId        String
-  event          Event     @relation(fields: [eventId], references: [id])
+  event          Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   createdAt      DateTime  @default(now())
   invitationSentAt   DateTime?
   invitationDeliveredAt DateTime?
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
-  guestType  String?   @default("SINGLE") // ✅ Add default
-  title          String?   @default("Mr") // "Mr", "Miss", "Mrs", "Dr"
-  cardNumber     String?   @unique       // ✅ 5-digit numeric code (e.g., "00001", "23790")
+  guestType  String?   @default("SINGLE")
+  title          String?   @default("Mr")
+  cardNumber     String?   @unique
   waId           String?   // WhatsApp ID from Meta
-
-    // ─── NEW: Pass Code for dynamic card generation ──────────────────────
-  passCode       String?   @unique  // e.g., "WED-8F92"
+  passCode       String?   @unique
 
   // ─── Relations ──────────────────────────────────────────────────────────
   messageLogs MessageLog[]
 
   @@index([eventId])
   @@index([phone])
-  @@index([cardNumber])  // ✅ Added index for faster lookups
-  @@index([passCode])  // ✅ Add index for faster lookups
+  @@index([cardNumber])
+  @@index([passCode])
 }
 
 model UsageRecord {
@@ -260,7 +257,7 @@ model Transaction {
   updatedAt       DateTime @updatedAt
   userId          String?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model PasswordResetToken {
@@ -274,7 +271,7 @@ model PasswordResetToken {
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String?
   type      String   // "info", "warning", "success", "alert"

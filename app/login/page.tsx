@@ -17,9 +17,7 @@ export default function LoginPage() {
   const [activeSlide, setActiveSlide] = useState(0);
 
   // Hero carousel content — drives both the desktop image panel and the
-  // mobile hero banner from one source of truth. Swap in different photos
-  // per slide here once you have more assets; all three currently point
-  // at the same image.
+  // mobile hero banner from one source of truth.
   const heroSlides = [
     {
       image: '/Gemini_Generated_Image_shs33shs33shs33s.png',
@@ -100,8 +98,15 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleSignIn = () => {
-    signIn('google', { callbackUrl: '/client/dashboard' });
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await signIn('google', { callbackUrl: '/client/dashboard' });
+    } catch {
+      setError('Failed to sign in with Google. Please try again.');
+      setLoading(false);
+    }
   };
 
   const Logo = ({ size = 'default' }: { size?: 'default' | 'mobile' }) => (
@@ -117,8 +122,6 @@ export default function LoginPage() {
   );
 
   // Each link carries a `slug`, used to target it with its own accent color
-  // (see .link-about / .link-pricing rules below) — one source of truth
-  // shared by the hero nav, the card nav, and the mobile menu.
   const navLinks = [
     { href: '/about', label: 'About', slug: 'about' },
     { href: '/pricing', label: 'Pricing', slug: 'pricing' },
@@ -209,7 +212,7 @@ export default function LoginPage() {
           pointer-events: none;
         }
 
-        /* ── Nav overlaid on the hero image (desktop only — .left is hidden on mobile) ── */
+        /* ── Nav overlaid on the hero image ── */
         .left-hero-nav {
           position: absolute;
           top: 0;
@@ -241,11 +244,10 @@ export default function LoginPage() {
 
         .hero-nav-link:hover { filter: brightness(1.15); }
 
-        /* Colorful accents — tuned to stay legible over the dark hero overlay */
-        .hero-nav-link.link-about { color: #0D4B4B; }
+        .hero-nav-link.link-about { color: rgba(255,255,255,0.9); }
         .hero-nav-link.link-about:hover { color: #FF8A65; }
 
-        .hero-nav-link.link-pricing { color: #0D4B4B; }
+        .hero-nav-link.link-pricing { color: rgba(255,255,255,0.9); }
         .hero-nav-link.link-pricing:hover { color: #FF8A65; }
 
         .hero-nav-link.cta {
@@ -269,8 +271,6 @@ export default function LoginPage() {
           outline-offset: 2px;
         }
 
-        /* Text block is pulled up off the bottom edge via bottom padding,
-           and capped with a max-height so it never crowds the frame. */
         .left-content {
           position: relative;
           z-index: 2;
@@ -419,7 +419,7 @@ export default function LoginPage() {
           align-items: center;
         }
 
-        /* ── Navigation (card version — mobile only; desktop uses .left-hero-nav) ── */
+        /* ── Navigation (card version — mobile only) ── */
         .nav {
           width: 100%;
           display: flex;
@@ -429,8 +429,6 @@ export default function LoginPage() {
           position: relative;
         }
 
-        /* On desktop the logo + links already live on the hero image, so this
-           card-based nav (still needed on mobile) is hidden above the breakpoint. */
         @media (min-width: 769px) {
           .nav--card { display: none; }
         }
@@ -463,7 +461,6 @@ export default function LoginPage() {
         .nav-link:hover { color: #0D4F4F; }
         .nav-link:hover::after { width: 100%; }
 
-        /* Colorful accents — tuned for contrast on the white card / mobile menu */
         .nav-link.link-about { color: #0D4B4B; }
         .nav-link.link-about::after { background: #D9480F; }
         .nav-link.link-about:hover { color: #B23A0C; }
@@ -950,8 +947,6 @@ export default function LoginPage() {
           .form-title { font-size: 19px; }
           .card-footer { padding: 10px 20px 16px; }
 
-          /* Nav becomes fixed once the page scrolls, so the logo and links
-             stay reachable — mobile only, desktop nav lives on the hero image. */
           .nav--card {
             position: sticky;
             top: 0;
@@ -1020,9 +1015,7 @@ export default function LoginPage() {
           <div className="float-element"></div>
           <div className="float-element"></div>
 
-          {/* Logo + nav links live on the hero image on desktop.
-              Same Logo component and navLinks array as the mobile nav below —
-              one source of truth for both. */}
+          {/* Logo + nav links on the hero image (desktop only) */}
           <div className="left-hero-nav">
             <Logo />
             <div className="hero-nav-links">
@@ -1038,7 +1031,6 @@ export default function LoginPage() {
           </div>
 
           <div className="left-content">
-            {/* key={activeSlide} replays the fade-up animation on every slide change */}
             <div className="hero-text" key={activeSlide}>
               <div className="hero-badge">
                 <Heart size={12} fill="currentColor" />
@@ -1077,8 +1069,7 @@ export default function LoginPage() {
         {/* ── Right panel ── */}
         <div className="right">
           <div className="right-inner">
-            {/* ── Card nav — visible on mobile only; desktop uses .left-hero-nav above.
-                 Becomes sticky once scrolled, see .nav--card in the mobile media query. ── */}
+            {/* ── Card nav — visible on mobile only ── */}
             <div className="nav nav--card">
               <div className="nav-left">
                 <Logo />
