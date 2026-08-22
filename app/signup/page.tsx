@@ -71,7 +71,7 @@ export default function SignupPage() {
   const handleSubmit = async () => {
     setLoading(true); setError('');
     try {
-      const res = await fetch('/api/register', {
+      const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, emailVerified: true }),
@@ -91,10 +91,10 @@ export default function SignupPage() {
 
   // ── Google Sign‑up handler ──
   const handleGoogleSignup = () => {
-    // Save business name and subdomain to localStorage so we can create the tenant after sign‑in
+    // Save business name and subdomain to localStorage
     localStorage.setItem('signup_business_name', form.business_name);
     localStorage.setItem('signup_subdomain', form.subdomain);
-    // Redirect to Google, and after successful sign‑in, we will go to /signup/complete
+    // Redirect to Google, and after successful sign‑in, go to /signup/complete
     signIn('google', { callbackUrl: '/signup/complete' });
   };
 
@@ -166,7 +166,6 @@ export default function SignupPage() {
           50%      { transform: translate(-15px,15px) scale(1.08); }
         }
 
-        /* Logo wrapper — flex-isolated so it never pushes siblings */
         .left-logo {
           position: relative; z-index: 2;
           display: flex; align-items: flex-start;
@@ -248,7 +247,6 @@ export default function SignupPage() {
           animation: floatB 10s ease-in-out infinite;
         }
 
-        /* Mobile logo wrapper — centered, flex-isolated */
         .mobile-logo-wrap {
           position: relative; z-index: 2;
           display: flex; justify-content: center;
@@ -390,7 +388,6 @@ export default function SignupPage() {
         }
         .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; background: #F5FAF9; }
 
-        /* Google button on signup (matches login) */
         .btn-google {
           width: 100%; padding: 14px; border: 1.5px solid #E2EAF0; border-radius: 13px;
           background: white; color: #4A6072; font-size: 14px; font-weight: 600;
@@ -615,12 +612,10 @@ export default function SignupPage() {
                       )}
                     </div>
 
-                    {/* Email/Password sign‑up button */}
                     <button className="btn-primary" disabled={!isStep2Valid || loading} onClick={sendVerification}>
                       {loading ? <><div className="spinner" /> Sending code…</> : 'Verify Email →'}
                     </button>
 
-                    {/* ── Google Sign‑Up Button ── */}
                     <div className="divider" style={{ margin: '16px 0 8px' }}>or</div>
                     <button
                       onClick={handleGoogleSignup}
