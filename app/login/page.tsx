@@ -1,7 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,6 +14,53 @@ export default function LoginPage() {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  // Hero carousel content — drives both the desktop image panel and the
+  // mobile hero banner from one source of truth. Swap in different photos
+  // per slide here once you have more assets; all three currently point
+  // at the same image.
+  const heroSlides = [
+    {
+      image: '/Gemini_Generated_Image_shs33shs33shs33s.png',
+      badge: 'For Couples & Planners',
+      titleLine1: 'Weddings,',
+      titleHighlight: 'Beautifully Managed',
+      sub: 'Send invitations, track RSVPs, and check guests in all from one simple dashboard.',
+      mobileSub: 'Invitations, RSVPs, and check-in — all in one place.',
+    },
+    {
+      image: '/Gemini_Generated_Image_shs33shs33shs33s.png',
+      badge: 'Invitations',
+      titleLine1: 'Every guest,',
+      titleHighlight: 'perfectly invited',
+      sub: 'Reach every guest instantly with custom WhatsApp, SMS, and printable invitation cards.',
+      mobileSub: 'Custom invitations sent over WhatsApp & SMS.',
+    },
+    {
+      image: '/Gemini_Generated_Image_shs33shs33shs33s.png',
+      badge: 'On The Day',
+      titleLine1: 'Check-in,',
+      titleHighlight: 'without the chaos',
+      sub: 'Scan a QR code at the door and watch your guest list update in real time.',
+      mobileSub: 'QR check-in that updates your guest list live.',
+    },
+  ];
+
+  useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion) return;
+
+    const id = setInterval(() => {
+      setActiveSlide((s) => (s + 1) % heroSlides.length);
+    }, 6000);
+
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +131,8 @@ export default function LoginPage() {
     { icon: <FileHeart size={14} />, label: 'Custom invitation cards' },
   ];
 
+  const slide = heroSlides[activeSlide];
+
   return (
     <div style={{ height: '100dvh', fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       <style>{`
@@ -109,7 +158,7 @@ export default function LoginPage() {
           overflow: hidden;
         }
 
-        /* ── Left panel with hero image ── */
+        /* ── Left panel with hero carousel ── */
         .left {
           width: 42%;
           max-width: 520px;
@@ -131,11 +180,16 @@ export default function LoginPage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          opacity: 0;
+          transition: opacity 1.1s ease;
         }
+
+        .left-image.is-active { opacity: 1; }
 
         .left-overlay {
           position: absolute;
           inset: 0;
+          z-index: 1;
           background: linear-gradient(
             to top,
             rgba(13, 79, 79, 0.94) 0%,
@@ -148,6 +202,7 @@ export default function LoginPage() {
         .left-texture {
           position: absolute;
           inset: 0;
+          z-index: 1;
           background:
             radial-gradient(ellipse at 20% 50%, rgba(232, 165, 152, 0.10) 0%, transparent 60%),
             radial-gradient(ellipse at 80% 80%, rgba(232, 165, 152, 0.06) 0%, transparent 50%);
@@ -191,7 +246,7 @@ export default function LoginPage() {
         .hero-nav-link.link-about:hover { color: #FF8A65; }
 
         .hero-nav-link.link-pricing { color: #0D4B4B; }
-        .hero-nav-link.link-pricing:hover { color: #FFCB5C; }
+        .hero-nav-link.link-pricing:hover { color: #FF8A65; }
 
         .hero-nav-link.cta {
           background: rgba(255,255,255,0.95);
@@ -229,11 +284,11 @@ export default function LoginPage() {
         .hero-text {
           position: relative;
           z-index: 2;
-          animation: fadeUp 0.8s 0.35s cubic-bezier(0.16,1,0.3,1) both;
+          animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) both;
         }
 
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(16px); }
           to   { opacity: 1; transform: translateY(0); }
         }
 
@@ -267,7 +322,7 @@ export default function LoginPage() {
         }
 
         .hero-title span {
-          background: linear-gradient(135deg, #E8A598, #D4A08E);
+          background: linear-gradient(135deg, #FFD1CF, #FC8C86);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -279,6 +334,7 @@ export default function LoginPage() {
           line-height: 1.55;
           font-weight: 400;
           max-width: 320px;
+          min-height: 44px;
         }
 
         .features {
@@ -286,7 +342,7 @@ export default function LoginPage() {
           flex-direction: column;
           gap: 8px;
           margin-top: 20px;
-          animation: fadeUp 0.6s 0.55s cubic-bezier(0.16,1,0.3,1) both;
+          animation: fadeUp 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
 
         .feat {
@@ -309,6 +365,32 @@ export default function LoginPage() {
           align-items: center;
           justify-content: center;
           color: #E8A598;
+        }
+
+        /* ── Carousel dot indicators ── */
+        .hero-dots {
+          display: flex;
+          gap: 8px;
+          margin-top: 22px;
+        }
+
+        .hero-dot {
+          width: 22px;
+          height: 4px;
+          border-radius: 4px;
+          background: rgba(255,255,255,0.3);
+          border: none;
+          padding: 0;
+          cursor: pointer;
+          transition: background 0.3s, width 0.3s;
+        }
+
+        .hero-dot:hover { background: rgba(255,255,255,0.5); }
+        .hero-dot.active { background: #E8A598; width: 34px; }
+
+        .hero-dot:focus-visible {
+          outline: 2px solid white;
+          outline-offset: 2px;
         }
 
         /* ── Right panel ── */
@@ -382,11 +464,11 @@ export default function LoginPage() {
         .nav-link:hover::after { width: 100%; }
 
         /* Colorful accents — tuned for contrast on the white card / mobile menu */
-        .nav-link.link-about { color: #D9480F; }
+        .nav-link.link-about { color: #0D4B4B; }
         .nav-link.link-about::after { background: #D9480F; }
         .nav-link.link-about:hover { color: #B23A0C; }
 
-        .nav-link.link-pricing { color: #9C6B00; }
+        .nav-link.link-pricing { color: #0D4B4B; }
         .nav-link.link-pricing::after { background: #9C6B00; }
         .nav-link.link-pricing:hover { color: #7A5400; }
 
@@ -471,7 +553,7 @@ export default function LoginPage() {
 
         .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
 
-        /* ── Mobile hero ── */
+        /* ── Mobile hero carousel ── */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -488,11 +570,16 @@ export default function LoginPage() {
           width: 100%;
           height: 100%;
           object-fit: cover;
+          opacity: 0;
+          transition: opacity 1.1s ease;
         }
+
+        .mobile-hero-image.is-active { opacity: 1; }
 
         .mobile-hero-overlay {
           position: absolute;
           inset: 0;
+          z-index: 1;
           background: linear-gradient(
             to bottom,
             rgba(13, 79, 79, 0.45) 0%,
@@ -503,7 +590,7 @@ export default function LoginPage() {
 
         .mobile-hero-content {
           position: relative;
-          z-index: 1;
+          z-index: 2;
           padding: 24px 22px 20px;
           width: 100%;
         }
@@ -524,6 +611,7 @@ export default function LoginPage() {
           font-size: 12.5px;
           line-height: 1.45;
           margin-bottom: 12px;
+          min-height: 34px;
         }
 
         .mobile-features {
@@ -547,6 +635,16 @@ export default function LoginPage() {
         }
 
         .mobile-feat-pill svg { color: #E8A598; flex-shrink: 0; }
+
+        .mobile-hero-dots {
+          display: flex;
+          gap: 6px;
+          justify-content: center;
+          margin-top: 12px;
+        }
+
+        .mobile-hero-dots .hero-dot { width: 16px; height: 3px; }
+        .mobile-hero-dots .hero-dot.active { width: 24px; }
 
         /* Form body */
         .form-body { padding: clamp(18px, 3vh, 28px) 28px clamp(16px, 2.5vh, 22px); }
@@ -798,11 +896,12 @@ export default function LoginPage() {
           background: rgba(255,255,255,0.04);
           pointer-events: none;
           animation: float 14s ease-in-out infinite;
+          z-index: 1;
         }
 
-        .float-element:nth-child(1) { width: 110px; height: 110px; top: 12%; right: 10%; animation-delay: 0s; }
-        .float-element:nth-child(2) { width: 70px; height: 70px; bottom: 30%; left: 8%; animation-delay: 4s; }
-        .float-element:nth-child(3) { width: 50px; height: 50px; top: 55%; right: 20%; animation-delay: 8s; }
+        .float-element:nth-child(2) { width: 110px; height: 110px; top: 12%; right: 10%; animation-delay: 0s; }
+        .float-element:nth-child(3) { width: 70px; height: 70px; bottom: 30%; left: 8%; animation-delay: 4s; }
+        .float-element:nth-child(4) { width: 50px; height: 50px; top: 55%; right: 20%; animation-delay: 8s; }
 
         @keyframes float {
           0%,100% { transform: translate(0, 0) scale(1); }
@@ -815,7 +914,7 @@ export default function LoginPage() {
           .left { width: 38%; min-width: 300px; }
         }
 
-        /* ── Mobile (unchanged from before) ── */
+        /* ── Mobile ── */
         @media (max-width: 768px) {
           html, body { overflow: auto; }
           .page { height: auto; min-height: 100dvh; overflow: visible; }
@@ -851,7 +950,20 @@ export default function LoginPage() {
           .form-title { font-size: 19px; }
           .card-footer { padding: 10px 20px 16px; }
 
-          .nav { padding: 10px 0 14px; }
+          /* Nav becomes fixed once the page scrolls, so the logo and links
+             stay reachable — mobile only, desktop nav lives on the hero image. */
+          .nav--card {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: rgba(245, 248, 250, 0.92);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 2px 14px rgba(13, 79, 79, 0.08);
+            margin: 0 -16px;
+            padding: calc(10px + env(safe-area-inset-top)) 16px 12px;
+          }
+
           .nav-desktop { display: none; }
 
           .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
@@ -888,14 +1000,18 @@ export default function LoginPage() {
       `}</style>
 
       <div className="page">
-        {/* ── Desktop left panel with hero image ── */}
+        {/* ── Desktop left panel — hero carousel ── */}
         <div className="left">
-          <img
-            src="/Gemini_Generated_Image_shs33shs33shs33s.png"
-            alt=""
-            className="left-image"
-            fetchPriority="high"
-          />
+          {heroSlides.map((s, i) => (
+            <img
+              key={s.image + i}
+              src={s.image}
+              alt=""
+              className={`left-image ${i === activeSlide ? 'is-active' : ''}`}
+              fetchPriority={i === 0 ? 'high' : undefined}
+              loading={i === 0 ? 'eager' : 'lazy'}
+            />
+          ))}
 
           <div className="left-overlay"></div>
           <div className="left-texture"></div>
@@ -922,26 +1038,38 @@ export default function LoginPage() {
           </div>
 
           <div className="left-content">
-            <div className="hero-text">
+            {/* key={activeSlide} replays the fade-up animation on every slide change */}
+            <div className="hero-text" key={activeSlide}>
               <div className="hero-badge">
                 <Heart size={12} fill="currentColor" />
-                For Couples &amp; Planners
+                {slide.badge}
               </div>
               <h1 className="hero-title">
-                Weddings,<br /><span>beautifully managed</span>
+                {slide.titleLine1}<br /><span>{slide.titleHighlight}</span>
               </h1>
-              <p className="hero-sub">
-                Send invitations, track RSVPs, and check guests in — all from one simple dashboard.
-              </p>
+              <p className="hero-sub">{slide.sub}</p>
+            </div>
 
-              <div className="features">
-                {features.map(({ icon, label }) => (
-                  <div className="feat" key={label}>
-                    <div className="feat-dot">{icon}</div>
-                    <span>{label}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="features">
+              {features.map(({ icon, label }) => (
+                <div className="feat" key={label}>
+                  <div className="feat-dot">{icon}</div>
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="hero-dots">
+              {heroSlides.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`hero-dot ${i === activeSlide ? 'active' : ''}`}
+                  onClick={() => setActiveSlide(i)}
+                  aria-label={`Show slide ${i + 1} of ${heroSlides.length}`}
+                  aria-current={i === activeSlide}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -949,7 +1077,8 @@ export default function LoginPage() {
         {/* ── Right panel ── */}
         <div className="right">
           <div className="right-inner">
-            {/* ── Card nav — visible on mobile only; desktop uses .left-hero-nav above ── */}
+            {/* ── Card nav — visible on mobile only; desktop uses .left-hero-nav above.
+                 Becomes sticky once scrolled, see .nav--card in the mobile media query. ── */}
             <div className="nav nav--card">
               <div className="nav-left">
                 <Logo />
@@ -997,27 +1126,40 @@ export default function LoginPage() {
             </div>
 
             <div className="card">
-              {/* ── Mobile hero with image ── */}
+              {/* ── Mobile hero carousel ── */}
               <div className="mobile-hero">
-                <img
-                  src="/Gemini_Generated_Image_shs33shs33shs33s.png"
-                  alt=""
-                  className="mobile-hero-image"
-                  loading="lazy"
-                />
+                {heroSlides.map((s, i) => (
+                  <img
+                    key={s.image + i}
+                    src={s.image}
+                    alt=""
+                    className={`mobile-hero-image ${i === activeSlide ? 'is-active' : ''}`}
+                    loading={i === 0 ? 'eager' : 'lazy'}
+                  />
+                ))}
                 <div className="mobile-hero-overlay"></div>
                 <div className="mobile-hero-content">
                   <div className="mobile-tagline">
-                    Weddings,<br /><span>beautifully managed</span>
+                    {slide.titleLine1}<br /><span>{slide.titleHighlight}</span>
                   </div>
-                  <p className="mobile-sub">
-                    Invitations, RSVPs, and check-in — all in one place.
-                  </p>
+                  <p className="mobile-sub">{slide.mobileSub}</p>
                   <div className="mobile-features">
                     {features.slice(0, 2).map(({ icon, label }) => (
                       <div className="mobile-feat-pill" key={label}>
                         {icon}<span>{label}</span>
                       </div>
+                    ))}
+                  </div>
+                  <div className="mobile-hero-dots">
+                    {heroSlides.map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`hero-dot ${i === activeSlide ? 'active' : ''}`}
+                        onClick={() => setActiveSlide(i)}
+                        aria-label={`Show slide ${i + 1} of ${heroSlides.length}`}
+                        aria-current={i === activeSlide}
+                      />
                     ))}
                   </div>
                 </div>
