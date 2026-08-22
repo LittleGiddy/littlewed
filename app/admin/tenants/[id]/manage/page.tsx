@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Search, Filter, Plus, ChevronDown, ChevronUp, MoreVertical, ArrowUpDown } from 'lucide-react';
+import { Building2, Search, Filter, Plus, ChevronDown, ChevronUp, MoreVertical, ArrowUpDown, RefreshCw, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Tenant {
@@ -25,6 +25,7 @@ export default function AdminTenantsPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortField, setSortField] = useState('createdAt');
   const [sortDirection, setSortDirection] = useState('desc');
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   const fetchTenants = async () => {
     setLoading(true);
@@ -35,7 +36,6 @@ export default function AdminTenantsPage() {
         throw new Error(errorData.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      // ✅ Support both array and object responses
       const tenantList = Array.isArray(data) ? data : data.tenants || [];
       setTenants(tenantList);
     } catch (err: any) {
@@ -46,6 +46,45 @@ export default function AdminTenantsPage() {
   };
 
   useEffect(() => { fetchTenants(); }, []);
+
+  // ─── Toggle Tenant Status ──────────────────────────────────────────────
+  const toggleTenantStatus = async (tenantId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    
+    if (!confirm(`Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this tenant?`)) {
+      return;
+    }
+
+    setUpdatingStatus(tenantId);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+        credentials: 'include',
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(`Tenant ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
+        // Update the tenant in the local state
+        setTenants(prev =>
+          prev.map(t =>
+            t.id === tenantId
+              ? { ...t, subscriptionStatus: newStatus }
+              : t
+          )
+        );
+      } else {
+        toast.error(data.error || 'Failed to update tenant status');
+      }
+    } catch (error) {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
 
   const filteredTenants = tenants
     .filter(t => {
@@ -70,6 +109,23 @@ export default function AdminTenantsPage() {
       setSortField(field);
       setSortDirection('asc');
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    if (status === 'active') {
+      return (
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+          <CheckCircle size={12} />
+          Active
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-700">
+        <XCircle size={12} />
+        Inactive
+      </span>
+    );
   };
 
   return (
@@ -114,8 +170,9 @@ export default function AdminTenantsPage() {
         </select>
         <button
           onClick={fetchTenants}
-          className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
+          className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold hover:bg-gray-50 transition flex items-center gap-1.5"
         >
+          <RefreshCw size={14} />
           Refresh
         </button>
       </div>
@@ -180,29 +237,60 @@ export default function AdminTenantsPage() {
                       <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{tenant.plan}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        tenant.subscriptionStatus === 'active' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {tenant.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
-                      </span>
+                      {getStatusBadge(tenant.subscriptionStatus)}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium">{tenant.credits}</td>
                     <td className="px-4 py-3 text-sm">{tenant.users.length}</td>
                     <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/tenants/${tenant.id}/manage`}
-                        className="text-sm font-bold text-[#0D4F4F] hover:underline"
-                      >
-                        Manage →
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/tenants/${tenant.id}/manage`}
+                          className="text-sm font-bold text-[#0D4F4F] hover:underline"
+                        >
+                          Manage
+                        </Link>
+                        <button
+                          onClick={() => toggleTenantStatus(tenant.id, tenant.subscriptionStatus)}
+                          disabled={updatingStatus === tenant.id}
+                          className={`text-sm font-semibold px-3 py-1 rounded-lg transition ${
+                            tenant.subscriptionStatus === 'active'
+                              ? 'text-red-600 hover:bg-red-50 border border-red-200 hover:border-red-300'
+                              : 'text-green-600 hover:bg-green-50 border border-green-200 hover:border-green-300'
+                          } ${updatingStatus === tenant.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {updatingStatus === tenant.id ? (
+                            <span className="flex items-center gap-1">
+                              <RefreshCw size={12} className="animate-spin" />
+                              Updating...
+                            </span>
+                          ) : (
+                            tenant.subscriptionStatus === 'active' ? 'Deactivate' : 'Activate'
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Stats Footer */}
+      <div className="mt-4 text-sm text-gray-500 flex items-center justify-between flex-wrap gap-2">
+        <span>
+          Showing {filteredTenants.length} of {tenants.length} tenants
+        </span>
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+            Active: {tenants.filter(t => t.subscriptionStatus === 'active').length}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+            Inactive: {tenants.filter(t => t.subscriptionStatus === 'inactive').length}
+          </span>
         </div>
       </div>
     </div>

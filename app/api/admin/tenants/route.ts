@@ -1,5 +1,4 @@
 // app/api/admin/tenants/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -31,11 +30,24 @@ export async function GET(request: NextRequest) {
         users: {
           select: { id: true },
         },
+        // Optionally include event count
+        _count: {
+          select: {
+            events: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(tenants);
+    // Format the response with additional stats
+    const formattedTenants = tenants.map(tenant => ({
+      ...tenant,
+      eventsCount: tenant._count.events,
+      _count: undefined, // Remove the _count field
+    }));
+
+    return NextResponse.json(formattedTenants);
   } catch (error: any) {
     console.error('[Admin Tenants] GET Error:', error);
     return NextResponse.json(
@@ -67,27 +79,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // Generate subdomain from name
     const subdomain = name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
+    // Check if subdomain is taken
     const existing = await prisma.tenant.findUnique({
       where: { subdomain },
     });
     if (existing) {
-      return NextResponse.json({ error: 'Subdomain already taken' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Subdomain already taken. Please choose a different name.' },
+        { status: 400 }
+      );
     }
 
+    // Create tenant with all required fields
     const tenant = await prisma.tenant.create({
       data: {
         name,
         subdomain,
         plan: plan || 'BASIC',
+        subscriptionStatus: 'active', // ✅ Default to active
+        status: 'ACTIVE',
+        maxGuests: 200,
+        credits: 0,
+        simpleEventMode: false,
+        bypassPayment: false,
+        testMode: false,
       },
     });
 
+    // Hash password and create user
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
@@ -96,12 +122,26 @@ export async function POST(req: NextRequest) {
         name: name,
         role: 'CLIENT',
         tenantId: tenant.id,
-        isActive: true, // ✅ auto-activate the admin user
+        isActive: true, // ✅ Auto-activate the admin user
       },
     });
 
     return NextResponse.json(
-      { success: true, tenant, user: { id: user.id, email: user.email } },
+      {
+        success: true,
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          subdomain: tenant.subdomain,
+          plan: tenant.plan,
+          subscriptionStatus: tenant.subscriptionStatus,
+        },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      },
       { status: 201 }
     );
   } catch (error: any) {
