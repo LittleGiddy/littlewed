@@ -2,7 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
-import { Eye, EyeOff, ArrowRight, Mail, CheckCircle, Globe, Building } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -13,15 +13,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (!email || !password) { setError('Please enter both email and password.'); return; }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
-      console.log('signIn result:', result);
+
       if (result?.ok && !result?.error) {
         const res = await fetch('/api/auth/session');
         const session = await res.json();
@@ -59,133 +63,265 @@ export default function LoginPage() {
       alt="Little Wed"
       style={{
         display: 'block',
-        width: size === 'mobile' ? '160px' : '100%',
-        maxWidth: size === 'mobile' ? '160px' : '220px',
+        width: size === 'mobile' ? '100px' : '132px',
         height: 'auto',
       }}
     />
   );
 
+  // Each link carries a `slug`, used to target it with its own accent color
+  // (see .link-about / .link-pricing rules below) — one source of truth
+  // shared by the hero nav, the card nav, and the mobile menu.
+  const navLinks = [
+    { href: '/about', label: 'About', slug: 'about' },
+    { href: '/pricing', label: 'Pricing', slug: 'pricing' },
+  ];
+
   const features = [
-    { icon: <Mail size={14} />, label: 'WhatsApp & SMS invitations' },
-    { icon: <CheckCircle size={14} />, label: 'QR code check-in system' },
-    { icon: <Globe size={14} />, label: 'Real-time guest dashboard' },
-    { icon: <Building size={14} />, label: 'Custom invitation cards' },
+    { icon: <MessageCircle size={14} />, label: 'WhatsApp & SMS invitations' },
+    { icon: <ScanLine size={14} />, label: 'QR code check-in system' },
+    { icon: <LayoutDashboard size={14} />, label: 'Real-time guest dashboard' },
+    { icon: <FileHeart size={14} />, label: 'Custom invitation cards' },
   ];
 
   return (
-    <div style={{ minHeight: '100vh', fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
+    <div style={{ height: '100dvh', fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        .page {
-          display: flex;
-          min-height: 100vh;
+        html, body {
+          height: 100%;
+          overflow: hidden;
         }
 
-        /* ── Left panel ── */
-        .left {
-          width: 420px;
-          flex-shrink: 0;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+
+        .page {
           display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 52px 44px;
+          height: 100dvh;
+          overflow: hidden;
+        }
+
+        /* ── Left panel with hero image ── */
+        .left {
+          width: 42%;
+          max-width: 520px;
+          min-width: 400px;
+          flex-shrink: 0;
           position: relative;
           overflow: hidden;
           animation: panelIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
         }
 
         @keyframes panelIn {
-          from { opacity: 0; transform: translateX(-32px); }
+          from { opacity: 0; transform: translateX(-24px); }
           to   { opacity: 1; transform: translateX(0); }
         }
 
-        .left::before {
-          content: ''; position: absolute; top: -100px; right: -100px;
-          width: 340px; height: 340px; border-radius: 50%;
-          background: rgba(255,255,255,0.04);
-          animation: floatA 8s ease-in-out infinite;
-        }
-        .left::after {
-          content: ''; position: absolute; bottom: -80px; left: -80px;
-          width: 280px; height: 280px; border-radius: 50%;
-          background: rgba(232,165,152,0.07);
-          animation: floatB 10s ease-in-out infinite;
+        .left-image {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
-        @keyframes floatA {
-          0%,100% { transform: translate(0,0) scale(1); }
-          50%      { transform: translate(20px,-20px) scale(1.05); }
-        }
-        @keyframes floatB {
-          0%,100% { transform: translate(0,0) scale(1); }
-          50%      { transform: translate(-15px,15px) scale(1.08); }
+        .left-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            to top,
+            rgba(13, 79, 79, 0.94) 0%,
+            rgba(13, 79, 79, 0.62) 42%,
+            rgba(13, 79, 79, 0.22) 72%,
+            rgba(13, 79, 79, 0.06) 100%
+          );
         }
 
-        /* Logo wrapper on desktop left panel */
-        .left-logo {
+        .left-texture {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse at 20% 50%, rgba(232, 165, 152, 0.10) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 80%, rgba(232, 165, 152, 0.06) 0%, transparent 50%);
+          pointer-events: none;
+        }
+
+        /* ── Nav overlaid on the hero image (desktop only — .left is hidden on mobile) ── */
+        .left-hero-nav {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 3;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: clamp(20px, 4vh, 32px) clamp(28px, 4vw, 48px) 0;
+          animation: fadeUp 0.7s 0.2s cubic-bezier(0.16,1,0.3,1) both;
+        }
+
+        .hero-nav-links {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+        }
+
+        .hero-nav-link {
+          color: rgba(255,255,255,0.82);
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 600;
+          transition: color 0.2s, filter 0.2s;
+          border-radius: 6px;
+        }
+
+        .hero-nav-link:hover { filter: brightness(1.15); }
+
+        /* Colorful accents — tuned to stay legible over the dark hero overlay */
+        .hero-nav-link.link-about { color: #0D4B4B; }
+        .hero-nav-link.link-about:hover { color: #FF8A65; }
+
+        .hero-nav-link.link-pricing { color: #0D4B4B; }
+        .hero-nav-link.link-pricing:hover { color: #FFCB5C; }
+
+        .hero-nav-link.cta {
+          background: rgba(255,255,255,0.95);
+          color: #0D4F4F;
+          padding: 8px 18px;
+          border-radius: 20px;
+          font-weight: 700;
+          transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.15s;
+        }
+
+        .hero-nav-link.cta:hover {
+          background: #E8A598;
+          color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+        }
+
+        .hero-nav-link:focus-visible {
+          outline: 2px solid white;
+          outline-offset: 2px;
+        }
+
+        /* Text block is pulled up off the bottom edge via bottom padding,
+           and capped with a max-height so it never crowds the frame. */
+        .left-content {
           position: relative;
           z-index: 2;
-          animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
-          /* Give it breathing room without affecting siblings */
           display: flex;
-          align-items: flex-start;
+          flex-direction: column;
+          justify-content: flex-end;
+          height: 100%;
+          padding: clamp(24px, 5vh, 40px) clamp(28px, 4vw, 48px) clamp(64px, 14vh, 120px);
         }
 
-        .left-copy {
-          position: relative; z-index: 2;
-          animation: fadeDown 0.6s 0.35s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes fadeDown {
-          from { opacity: 0; transform: translateY(-16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .tagline {
-          font-family: 'Playfair Display', serif;
-          font-size: 38px; font-weight: 900;
-          color: white; line-height: 1.15;
-          margin-bottom: 14px; letter-spacing: -0.5px;
-        }
-        .tagline span { color: #E8A598; }
-
-        .tagline-sub {
-          color: rgba(255,255,255,0.5);
-          font-size: 14px; line-height: 1.65; font-weight: 400;
-        }
-
-        .features {
-          position: relative; z-index: 2;
-          display: flex; flex-direction: column; gap: 12px;
-          animation: fadeUp 0.6s 0.5s cubic-bezier(0.16,1,0.3,1) both;
+        .hero-text {
+          position: relative;
+          z-index: 2;
+          animation: fadeUp 0.8s 0.35s cubic-bezier(0.16,1,0.3,1) both;
         }
 
         @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
+          from { opacity: 0; transform: translateY(20px); }
           to   { opacity: 1; transform: translateY(0); }
         }
 
-        .feat {
-          display: flex; align-items: center; gap: 12px;
-          color: rgba(255,255,255,0.72); font-size: 13.5px; font-weight: 500;
+        .hero-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(255,255,255,0.12);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.16);
+          padding: 5px 14px 5px 11px;
+          border-radius: 50px;
+          color: rgba(255,255,255,0.9);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          margin-bottom: 16px;
         }
+
+        .hero-badge svg { color: #E8A598; }
+
+        .hero-title {
+          font-family: 'Playfair Display', serif;
+          font-size: clamp(26px, 3.4vh, 40px);
+          font-weight: 900;
+          color: white;
+          line-height: 1.12;
+          margin-bottom: 12px;
+          letter-spacing: -0.5px;
+        }
+
+        .hero-title span {
+          background: linear-gradient(135deg, #E8A598, #D4A08E);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        .hero-sub {
+          color: rgba(255,255,255,0.88);
+          font-size: 14px;
+          line-height: 1.55;
+          font-weight: 400;
+          max-width: 320px;
+        }
+
+        .features {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 20px;
+          animation: fadeUp 0.6s 0.55s cubic-bezier(0.16,1,0.3,1) both;
+        }
+
+        .feat {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          color: rgba(255,255,255,0.75);
+          font-size: 12.5px;
+          font-weight: 500;
+        }
+
         .feat-dot {
-          width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-          background: rgba(232,165,152,0.18); border: 1px solid rgba(232,165,152,0.28);
-          display: flex; align-items: center; justify-content: center; color: #E8A598;
+          width: 26px;
+          height: 26px;
+          border-radius: 8px;
+          flex-shrink: 0;
+          background: rgba(232,165,152,0.15);
+          border: 1px solid rgba(232,165,152,0.22);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #E8A598;
         }
 
         /* ── Right panel ── */
         .right {
           flex: 1;
-          display: flex; align-items: center; justify-content: center;
-          padding: 40px 24px;
-          background: #F0F4F8;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: clamp(12px, 3vh, 28px) 32px;
+          background: #F5F8FA;
           animation: fadeIn 0.6s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+          overflow-y: auto;
         }
 
         @keyframes fadeIn {
@@ -193,17 +329,143 @@ export default function LoginPage() {
           to   { opacity: 1; }
         }
 
-        .right-inner { width: 100%; max-width: 460px; }
+        .right-inner {
+          width: 100%;
+          max-width: 430px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        /* ── Navigation (card version — mobile only; desktop uses .left-hero-nav) ── */
+        .nav {
+          width: 100%;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 0 clamp(10px, 2vh, 18px);
+          position: relative;
+        }
+
+        /* On desktop the logo + links already live on the hero image, so this
+           card-based nav (still needed on mobile) is hidden above the breakpoint. */
+        @media (min-width: 769px) {
+          .nav--card { display: none; }
+        }
+
+        .nav-left { display: flex; align-items: center; flex-shrink: 0; }
+
+        .nav-desktop { display: flex; gap: 24px; align-items: center; }
+
+        .nav-link {
+          color: #4A6072;
+          text-decoration: none;
+          font-size: 13.5px;
+          font-weight: 600;
+          transition: color 0.2s, filter 0.2s;
+          position: relative;
+          border-radius: 6px;
+        }
+
+        .nav-link::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 0;
+          width: 0;
+          height: 2px;
+          background: #0D4F4F;
+          transition: width 0.3s, background 0.3s;
+        }
+
+        .nav-link:hover { color: #0D4F4F; }
+        .nav-link:hover::after { width: 100%; }
+
+        /* Colorful accents — tuned for contrast on the white card / mobile menu */
+        .nav-link.link-about { color: #D9480F; }
+        .nav-link.link-about::after { background: #D9480F; }
+        .nav-link.link-about:hover { color: #B23A0C; }
+
+        .nav-link.link-pricing { color: #9C6B00; }
+        .nav-link.link-pricing::after { background: #9C6B00; }
+        .nav-link.link-pricing:hover { color: #7A5400; }
+
+        .nav-link.cta {
+          background: #0D4F4F;
+          color: white;
+          padding: 8px 20px;
+          border-radius: 20px;
+          font-weight: 600;
+        }
+
+        .nav-link.cta::after { display: none; }
+
+        .nav-link.cta:hover {
+          background: #0A3D3D;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(13,79,79,0.3);
+        }
+
+        .nav-link:focus-visible,
+        .hero-nav-link:focus-visible,
+        .mobile-menu-btn:focus-visible,
+        .eye-btn:focus-visible,
+        .btn:focus-visible,
+        .btn-google:focus-visible {
+          outline: 2px solid #0D4F4F;
+          outline-offset: 2px;
+        }
+
+        .mobile-menu-btn {
+          display: none;
+          background: none;
+          border: none;
+          color: #0D4F4F;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 8px;
+          transition: background 0.2s;
+        }
+
+        .mobile-menu-btn:hover { background: rgba(13,79,79,0.08); }
+
+        .mobile-menu {
+          display: none;
+          flex-direction: column;
+          gap: 4px;
+          padding: 12px 0;
+          width: 100%;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+          margin-top: 8px;
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          z-index: 50;
+        }
+
+        .mobile-menu.open { display: flex; }
+
+        .mobile-menu .nav-link { padding: 10px 16px; border-radius: 8px; }
+        .mobile-menu .nav-link:hover { background: rgba(13,79,79,0.06); }
+        .mobile-menu .nav-link.link-about:hover { background: rgba(217,72,15,0.06); }
+        .mobile-menu .nav-link.link-pricing:hover { background: rgba(156,107,0,0.06); }
+        .mobile-menu .nav-link.cta { margin: 4px 16px; }
 
         /* ── Card ── */
         .card {
-          background: white; border-radius: 24px; overflow: hidden;
+          width: 100%;
+          background: white;
+          border-radius: 22px;
+          overflow: hidden;
           box-shadow: 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.07), 0 24px 48px rgba(0,0,0,0.05);
-          animation: cardIn 0.65s 0.25s cubic-bezier(0.16,1,0.3,1) both;
+          animation: cardIn 0.65s 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
 
         @keyframes cardIn {
-          from { opacity: 0; transform: translateY(24px) scale(0.98); }
+          from { opacity: 0; transform: translateY(16px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
@@ -214,75 +476,119 @@ export default function LoginPage() {
           display: none;
           flex-direction: column;
           align-items: center;
-          padding: 40px 28px 32px;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
           position: relative;
           overflow: hidden;
           text-align: center;
+          min-height: 180px;
         }
 
-        .mobile-hero::before {
-          content: ''; position: absolute; top: -60px; right: -60px;
-          width: 200px; height: 200px; border-radius: 50%;
-          background: rgba(255,255,255,0.04);
-          animation: floatA 8s ease-in-out infinite;
+        .mobile-hero-image {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
-        /* Mobile logo wrapper — sized to feel prominent */
-        .mobile-logo {
+        .mobile-hero-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            to bottom,
+            rgba(13, 79, 79, 0.45) 0%,
+            rgba(13, 79, 79, 0.82) 60%,
+            rgba(13, 79, 79, 0.96) 100%
+          );
+        }
+
+        .mobile-hero-content {
           position: relative;
           z-index: 1;
-          margin-bottom: 24px;
-          display: flex;
-          justify-content: center;
+          padding: 24px 22px 20px;
+          width: 100%;
         }
 
         .mobile-tagline {
-          position: relative; z-index: 1;
           font-family: 'Playfair Display', serif;
-          font-size: 24px; font-weight: 900; color: white;
-          line-height: 1.2; margin-bottom: 8px;
+          font-size: clamp(21px, 5.2vw, 25px);
+          font-weight: 900;
+          color: white;
+          line-height: 1.18;
+          margin-bottom: 6px;
         }
+
         .mobile-tagline span { color: #E8A598; }
 
         .mobile-sub {
-          position: relative; z-index: 1;
-          color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
-          margin-bottom: 22px;
+          color: rgba(255,255,255,0.75);
+          font-size: 12.5px;
+          line-height: 1.45;
+          margin-bottom: 12px;
         }
 
         .mobile-features {
-          position: relative; z-index: 1;
-          display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: center;
         }
 
         .mobile-feat-pill {
-          display: flex; align-items: center; gap: 6px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-          border-radius: 20px; padding: 5px 12px;
-          color: rgba(255,255,255,0.8); font-size: 12px; font-weight: 500;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.14);
+          border-radius: 20px;
+          padding: 4px 10px;
+          color: rgba(255,255,255,0.85);
+          font-size: 11px;
+          font-weight: 500;
         }
+
         .mobile-feat-pill svg { color: #E8A598; flex-shrink: 0; }
 
         /* Form body */
-        .form-body { padding: 36px 36px 32px; }
+        .form-body { padding: clamp(18px, 3vh, 28px) 28px clamp(16px, 2.5vh, 22px); }
 
         .eyebrow {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
+          font-size: 10.5px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          color: #0D4F4F;
+          text-transform: uppercase;
+          margin-bottom: 4px;
         }
+
         .form-title {
-          font-family: 'Playfair Display', serif; font-size: 24px;
-          font-weight: 800; color: #0D1B1B; margin-bottom: 4px; letter-spacing: -0.3px;
+          font-family: 'Playfair Display', serif;
+          font-size: 20px;
+          font-weight: 800;
+          color: #0D1B1B;
+          margin-bottom: 4px;
+          letter-spacing: -0.3px;
         }
-        .form-sub { font-size: 13.5px; color: #7A8FA6; margin-bottom: 28px; line-height: 1.5; }
+
+        .form-sub {
+          font-size: 12.5px;
+          color: #7A8FA6;
+          margin-bottom: clamp(14px, 2.5vh, 20px);
+          line-height: 1.5;
+        }
 
         /* Fields */
-        .field { position: relative; margin-bottom: 18px; }
+        .field { position: relative; margin-bottom: 13px; }
         .flabel {
-          position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
-          font-size: 14px; color: #9BAAB8; pointer-events: none; background: white;
-          padding: 0 4px; font-weight: 500;
+          position: absolute;
+          left: 15px;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 14px;
+          color: #9BAAB8;
+          pointer-events: none;
+          background: white;
+          padding: 0 4px;
+          font-weight: 500;
           transition: top 0.2s cubic-bezier(0.4,0,0.2,1),
                       font-size 0.2s cubic-bezier(0.4,0,0.2,1),
                       color 0.2s cubic-bezier(0.4,0,0.2,1);
@@ -290,56 +596,103 @@ export default function LoginPage() {
         .flabel.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
 
         .finput {
-          width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          font-size: 14px; font-family: inherit; outline: none; color: #0D1B1B;
-          background: white; font-weight: 500;
+          width: 100%;
+          padding: 13px 15px;
+          border: 1.5px solid #E2EAF0;
+          border-radius: 13px;
+          font-size: 16px;
+          font-family: inherit;
+          outline: none;
+          color: #0D1B1B;
+          background: white;
+          font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
         .finput:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
-        .finput.err   { border-color: #E05C5C; box-shadow: 0 0 0 4px rgba(224,92,92,0.08); }
+        .finput.err { border-color: #E05C5C; box-shadow: 0 0 0 4px rgba(224,92,92,0.08); }
+        .finput:disabled { background: #F7F9FB; cursor: not-allowed; }
 
         .eye-btn {
-          position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
-          background: none; border: none; cursor: pointer; color: #9BAAB8;
-          display: flex; align-items: center; padding: 4px; transition: color 0.15s;
+          position: absolute;
+          right: 13px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #9BAAB8;
+          display: flex;
+          align-items: center;
+          padding: 4px;
+          border-radius: 6px;
+          transition: color 0.15s;
         }
         .eye-btn:hover { color: #0D4F4F; }
 
         .forgot {
-          display: block; text-align: right; margin-top: -10px; margin-bottom: 22px;
-          font-size: 12.5px; font-weight: 700; color: #0D4F4F; text-decoration: none;
+          display: block;
+          text-align: right;
+          margin-top: -6px;
+          margin-bottom: 14px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #0D4F4F;
+          text-decoration: none;
           transition: opacity 0.15s;
         }
         .forgot:hover { opacity: 0.65; }
 
         /* Error */
         .err-box {
-          background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B;
-          padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
-          margin-bottom: 18px; display: flex; gap: 8px; align-items: flex-start;
+          background: #FEF2F2;
+          border: 1px solid #FECACA;
+          color: #C0392B;
+          padding: 9px 13px;
+          border-radius: 11px;
+          font-size: 12.5px;
+          font-weight: 600;
+          margin-bottom: 13px;
+          display: flex;
+          gap: 8px;
+          align-items: flex-start;
           animation: shake 0.35s ease;
         }
         @keyframes shake {
           0%,100% { transform: translateX(0); }
-          20%      { transform: translateX(-6px); }
-          60%      { transform: translateX(6px); }
-          80%      { transform: translateX(-3px); }
+          20% { transform: translateX(-6px); }
+          60% { transform: translateX(6px); }
+          80% { transform: translateX(-3px); }
         }
 
         /* Button */
         .btn {
-          width: 100%; padding: 15px; border: none; border-radius: 13px;
+          width: 100%;
+          padding: 14px;
+          border: none;
+          border-radius: 13px;
           background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white; font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+          color: white;
+          font-size: 14.5px;
+          font-weight: 700;
+          font-family: inherit;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
           box-shadow: 0 4px 16px rgba(13,79,79,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-          letter-spacing: 0.2px; position: relative; overflow: hidden;
+          letter-spacing: 0.2px;
+          position: relative;
+          overflow: hidden;
         }
         .btn::after {
-          content: ''; position: absolute; inset: 0;
+          content: '';
+          position: absolute;
+          inset: 0;
           background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
-          opacity: 0; transition: opacity 0.2s;
+          opacity: 0;
+          transition: opacity 0.2s;
         }
         .btn:hover:not(:disabled)::after { opacity: 1; }
         .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
@@ -347,148 +700,329 @@ export default function LoginPage() {
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .spinner {
-          width: 17px; height: 17px;
-          border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
-          border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 0.7s linear infinite;
+          flex-shrink: 0;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* Divider */
         .divider {
-          display: flex; align-items: center; gap: 10px;
-          margin: 20px 0 0; color: #C8D4DE; font-size: 11.5px; font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 14px 0 0;
+          color: #C8D4DE;
+          font-size: 11px;
+          font-weight: 600;
         }
         .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #EEF2F6; }
 
         /* Google button */
         .btn-google {
-          width: 100%; padding: 14px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          background: white; color: #4A6072; font-size: 14px; font-weight: 600;
-          font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+          width: 100%;
+          padding: 12px;
+          border: 1.5px solid #E2EAF0;
+          border-radius: 13px;
+          background: white;
+          color: #4A6072;
+          font-size: 13.5px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
           margin-top: 8px;
         }
         .btn-google:hover { border-color: #0D4F4F; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,79,79,0.08); }
+        .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* Footer */
         .card-footer {
-          text-align: center; font-size: 13px; color: #7A8FA6;
-          padding: 16px 36px 22px;
+          text-align: center;
+          font-size: 12.5px;
+          color: #7A8FA6;
+          padding: 12px 28px 16px;
         }
         .card-footer a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
         .card-footer a:hover { text-decoration: underline; }
 
+        /* ── Professional footer ── */
         .page-footer {
-          text-align: center; padding: 18px 24px 28px;
-          font-size: 11px; color: #B0BEC8; line-height: 1.8; font-weight: 500;
-          letter-spacing: 0.1px;
+          width: 100%;
+          margin-top: clamp(10px, 2vh, 20px);
+          padding: 10px 0 4px;
+          border-top: 1px solid #E8EEF2;
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          align-items: center;
+          gap: 16px;
         }
-        .page-footer-sep { margin: 0 7px; opacity: 0.45; }
-        .page-footer strong { color: #9BAAB8; font-weight: 700; }
 
-        /* ── Mobile ── */
+        .footer-brand {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #7A8FA6;
+          font-size: 11.5px;
+          font-weight: 500;
+        }
+
+        .footer-brand strong { color: #0D4F4F; font-weight: 700; }
+        .footer-heart { color: #E8A598; }
+
+        .footer-links { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+        .footer-link {
+          color: #9BAAB8;
+          text-decoration: none;
+          font-size: 11.5px;
+          font-weight: 500;
+          transition: color 0.2s;
+        }
+        .footer-link:hover { color: #0D4F4F; }
+        .footer-sep { color: #DCE4EA; font-weight: 300; }
+
+        /* ── Decorative floating elements ── */
+        .float-element {
+          position: absolute;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.04);
+          pointer-events: none;
+          animation: float 14s ease-in-out infinite;
+        }
+
+        .float-element:nth-child(1) { width: 110px; height: 110px; top: 12%; right: 10%; animation-delay: 0s; }
+        .float-element:nth-child(2) { width: 70px; height: 70px; bottom: 30%; left: 8%; animation-delay: 4s; }
+        .float-element:nth-child(3) { width: 50px; height: 50px; top: 55%; right: 20%; animation-delay: 8s; }
+
+        @keyframes float {
+          0%,100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(10px, -15px) scale(1.05); }
+          66% { transform: translate(-8px, 10px) scale(0.95); }
+        }
+
+        /* ── Tablet ── */
+        @media (max-width: 1024px) {
+          .left { width: 38%; min-width: 300px; }
+        }
+
+        /* ── Mobile (unchanged from before) ── */
         @media (max-width: 768px) {
+          html, body { overflow: auto; }
+          .page { height: auto; min-height: 100dvh; overflow: visible; }
+
           .left { display: none; }
 
           .right {
-            padding: 0;
-            background: #F0F4F8;
-            align-items: flex-start;
+            height: auto;
+            min-height: 100dvh;
+            padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+            background: #F5F8FA;
+            justify-content: flex-start;
+            overflow: visible;
           }
 
           .right-inner { max-width: 100%; }
 
           .card {
-            border-radius: 0 0 28px 28px;
+            border-radius: 0 0 24px 24px;
             animation: cardInMobile 0.65s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+            overflow: hidden;
           }
 
           @keyframes cardInMobile {
-            from { opacity: 0; transform: translateY(-20px); }
+            from { opacity: 0; transform: translateY(-16px); }
             to   { opacity: 1; transform: translateY(0); }
           }
 
-          .mobile-hero { display: flex; }
+          .mobile-hero { display: flex; min-height: 200px; }
           .card-bar { display: none; }
 
-          .form-body { padding: 28px 24px 24px; }
-          .form-title { font-size: 22px; }
-          .card-footer { padding: 12px 24px 24px; }
+          .form-body { padding: 22px 20px 18px; }
+          .form-title { font-size: 19px; }
+          .card-footer { padding: 10px 20px 16px; }
 
-          .mobile-bottom {
-            padding: 24px 20px 32px;
-            display: flex; flex-direction: column; gap: 10px;
-          }
+          .nav { padding: 10px 0 14px; }
+          .nav-desktop { display: none; }
 
-          .mobile-bottom-feat {
-            display: flex; align-items: center; gap: 10px;
-            color: #4A6072; font-size: 13px; font-weight: 500;
-          }
+          .mobile-menu-btn { display: flex; align-items: center; justify-content: center; }
 
-          .mobile-bottom-dot {
-            width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-            background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-            display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          .mobile-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            padding: 8px 0;
+            z-index: 50;
           }
+          .mobile-menu.open { display: flex; }
+
+          .page-footer { flex-direction: column; text-align: center; padding: 16px 0 8px; gap: 10px; }
+          .footer-links { justify-content: center; }
+        }
+
+        /* ── Small phones ── */
+        @media (max-width: 380px) {
+          .form-body { padding: 18px 16px 16px; }
+          .mobile-hero { min-height: 170px; }
+          .mobile-hero-content { padding: 20px 16px 16px; }
         }
 
         @media (min-width: 769px) {
-          .mobile-bottom { display: none; }
+          .mobile-menu-btn { display: none; }
+          .mobile-menu { display: none !important; }
         }
       `}</style>
 
       <div className="page">
-        {/* ── Desktop left panel ── */}
+        {/* ── Desktop left panel with hero image ── */}
         <div className="left">
-          <div className="left-logo">
+          <img
+            src="/Gemini_Generated_Image_shs33shs33shs33s.png"
+            alt=""
+            className="left-image"
+            fetchPriority="high"
+          />
+
+          <div className="left-overlay"></div>
+          <div className="left-texture"></div>
+
+          <div className="float-element"></div>
+          <div className="float-element"></div>
+          <div className="float-element"></div>
+
+          {/* Logo + nav links live on the hero image on desktop.
+              Same Logo component and navLinks array as the mobile nav below —
+              one source of truth for both. */}
+          <div className="left-hero-nav">
             <Logo />
-          </div>
-
-          <div className="left-copy">
-            <div className="tagline">
-              Welcome<br /><span>back.</span>
+            <div className="hero-nav-links">
+              {navLinks.map((link) => (
+                <Link key={link.href} href={link.href} className={`hero-nav-link link-${link.slug}`}>
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/signup" className="hero-nav-link cta">
+                Get Started
+              </Link>
             </div>
-            <p className="tagline-sub">
-              Sign in to manage your events, guests, and invitations, all in one place.
-            </p>
           </div>
 
-          <div className="features">
-            {features.map(({ icon, label }) => (
-              <div className="feat" key={label}>
-                <div className="feat-dot">{icon}</div>
-                <span>{label}</span>
+          <div className="left-content">
+            <div className="hero-text">
+              <div className="hero-badge">
+                <Heart size={12} fill="currentColor" />
+                For Couples &amp; Planners
               </div>
-            ))}
+              <h1 className="hero-title">
+                Weddings,<br /><span>beautifully managed</span>
+              </h1>
+              <p className="hero-sub">
+                Send invitations, track RSVPs, and check guests in — all from one simple dashboard.
+              </p>
+
+              <div className="features">
+                {features.map(({ icon, label }) => (
+                  <div className="feat" key={label}>
+                    <div className="feat-dot">{icon}</div>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* ── Right panel ── */}
         <div className="right">
           <div className="right-inner">
-            <div className="card">
+            {/* ── Card nav — visible on mobile only; desktop uses .left-hero-nav above ── */}
+            <div className="nav nav--card">
+              <div className="nav-left">
+                <Logo />
+              </div>
 
-              {/* Mobile hero */}
+              <div className="nav-desktop">
+                {navLinks.map((link) => (
+                  <Link key={link.href} href={link.href} className={`nav-link link-${link.slug}`}>
+                    {link.label}
+                  </Link>
+                ))}
+                <Link href="/signup" className="nav-link cta">
+                  Get Started
+                </Link>
+              </div>
+
+              <button
+                className="mobile-menu-btn"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+              >
+                {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+
+              <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`nav-link link-${link.slug}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+                <Link
+                  href="/signup"
+                  className="nav-link cta"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started
+                </Link>
+              </div>
+            </div>
+
+            <div className="card">
+              {/* ── Mobile hero with image ── */}
               <div className="mobile-hero">
-                <div className="mobile-logo">
-                  <Logo size="mobile" />
-                </div>
-                <div className="mobile-tagline">
-                  Welcome <span>back.</span>
-                </div>
-                <p className="mobile-sub">
-                  Sign in to manage your events, guests, and invitations.
-                </p>
-                <div className="mobile-features">
-                  {features.map(({ icon, label }) => (
-                    <div className="mobile-feat-pill" key={label}>
-                      {icon}<span>{label}</span>
-                    </div>
-                  ))}
+                <img
+                  src="/Gemini_Generated_Image_shs33shs33shs33s.png"
+                  alt=""
+                  className="mobile-hero-image"
+                  loading="lazy"
+                />
+                <div className="mobile-hero-overlay"></div>
+                <div className="mobile-hero-content">
+                  <div className="mobile-tagline">
+                    Weddings,<br /><span>beautifully managed</span>
+                  </div>
+                  <p className="mobile-sub">
+                    Invitations, RSVPs, and check-in — all in one place.
+                  </p>
+                  <div className="mobile-features">
+                    {features.slice(0, 2).map(({ icon, label }) => (
+                      <div className="mobile-feat-pill" key={label}>
+                        {icon}<span>{label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Desktop top bar */}
               <div className="card-bar" />
 
               <div className="form-body">
@@ -497,24 +1031,27 @@ export default function LoginPage() {
                 <p className="form-sub">Enter your credentials to access your dashboard.</p>
 
                 {error && (
-                  <div className="err-box">
-                    <span>⚠️</span><span>{error}</span>
+                  <div className="err-box" role="alert" aria-live="assertive">
+                    <span aria-hidden="true">⚠️</span><span>{error}</span>
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} onKeyDown={e => { if (e.key === 'Enter') handleSubmit(e); }} noValidate>
+                <form onSubmit={handleSubmit} noValidate>
                   <div className="field">
                     <label className={`flabel ${emailFocused || email ? 'up' : ''}`} htmlFor="email">
                       Email address
                     </label>
                     <input
-                      id="email" type="email"
+                      id="email"
+                      type="email"
                       className={`finput${error ? ' err' : ''}`}
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                       onFocus={() => setEmailFocused(true)}
                       onBlur={() => setEmailFocused(false)}
                       autoComplete="email"
+                      disabled={loading}
+                      aria-invalid={!!error}
                     />
                   </div>
 
@@ -531,18 +1068,26 @@ export default function LoginPage() {
                       onFocus={() => setPasswordFocused(true)}
                       onBlur={() => setPasswordFocused(false)}
                       autoComplete="current-password"
+                      disabled={loading}
+                      aria-invalid={!!error}
                       style={{ paddingRight: 46 }}
                     />
-                    <button type="button" className="eye-btn" onClick={() => setShowPassword(s => !s)} tabIndex={-1}>
+                    <button
+                      type="button"
+                      className="eye-btn"
+                      onClick={() => setShowPassword(s => !s)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      tabIndex={-1}
+                    >
                       {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
                   </div>
 
-                  <Link href="/forgot-password" className="text-sm text-[#0D4F4F] hover:underline mt-2 block text-right">
+                  <Link href="/forgot-password" className="forgot">
                     Forgot password?
                   </Link>
 
-                  <button type="button" className="btn" disabled={loading} onClick={handleSubmit}>
+                  <button type="submit" className="btn" disabled={loading}>
                     {loading
                       ? <><div className="spinner" /> Signing in…</>
                       : <>Sign In <ArrowRight size={16} /></>
@@ -552,13 +1097,13 @@ export default function LoginPage() {
 
                 <div className="divider">or</div>
 
-                {/* ── Google Sign‑In Button ── */}
                 <button
                   onClick={handleGoogleSignIn}
                   className="btn-google"
                   type="button"
+                  disabled={loading}
                 >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
+                  <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }} aria-hidden="true">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
                     <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                     <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
@@ -569,31 +1114,28 @@ export default function LoginPage() {
               </div>
 
               <div className="card-footer">
-                Don't have an account? <a href="/signup">Create one</a>
+                Don&apos;t have an account? <a href="/signup">Create one</a>
               </div>
             </div>
 
-            {/* Mobile bottom features */}
-            <div className="mobile-bottom">
-              {features.map(({ icon, label }) => (
-                <div className="mobile-bottom-feat" key={label}>
-                  <div className="mobile-bottom-dot">{icon}</div>
-                  <span>{label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Page footer */}
+            {/* ── Footer ── */}
             <div className="page-footer">
-          
-              <Link href="/privacy-policy" className="text-sm text-gray-500 hover:text-[#0D4F4F] transition">
-                Privacy Policy
-              </Link>
-              <Link href="/data-deletion" className="block text-sm text-gray-500 hover:text-[#0D4F4F] transition">
-                Data Deletion
-              </Link>
-              <div>© 2026 <strong>LittleWed</strong>. All rights reserved.</div>
-              <div>Managed by <strong>MAHIRI GLOBAL LTD</strong></div>
+              <div className="footer-brand">
+                <span>© 2026</span>
+                <strong>LittleWed</strong>
+                <span className="footer-heart">♥</span>
+                <span>by <strong>MAHIRI GLOBAL LTD</strong></span>
+              </div>
+
+              <div className="footer-links">
+                <Link href="/about" className="footer-link">About</Link>
+                <span className="footer-sep">|</span>
+                <Link href="/pricing" className="footer-link">Pricing</Link>
+                <span className="footer-sep">|</span>
+                <Link href="/privacy-policy" className="footer-link">Privacy</Link>
+                <span className="footer-sep">|</span>
+                <Link href="/data-deletion" className="footer-link">Data Deletion</Link>
+              </div>
             </div>
           </div>
         </div>

@@ -104,7 +104,7 @@ export default function SignupPage() {
 
   const Logo = ({ size = 'default' }: { size?: 'default' | 'mobile' }) => (
     <img
-      src="/Little Wed Logo.svg"
+      src="/White Little Wed Logo.svg"
       alt="Little Wed"
       style={{
         display: 'block',
