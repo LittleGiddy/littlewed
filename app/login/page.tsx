@@ -1,15 +1,12 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, User, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast'; 
-
+import toast from 'react-hot-toast';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -66,14 +63,18 @@ export default function LoginPage() {
     }, 6000);
 
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Check if user has a tenant ──────────────────────────────────────
   const checkUserTenant = async (session: any) => {
     try {
-      const res = await fetch('/api/auth/check-tenant');
+      const res = await fetch('/api/auth/check-tenant', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       const data = await res.json();
+      
+      console.log('[Login] Tenant check result:', data);
       
       if (data.hasTenant) {
         // User has a tenant, redirect to dashboard
@@ -92,12 +93,13 @@ export default function LoginPage() {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error checking tenant:', error);
+      console.error('[Login] Error checking tenant:', error);
       setError('Failed to check organization status. Please try again.');
       setLoading(false);
     }
   };
 
+  // ─── Handle credential sign-in ─────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -130,23 +132,41 @@ export default function LoginPage() {
     }
   };
 
+  // ─── Handle Google sign-in ─────────────────────────────────────────────
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
     try {
-      const result = await signIn('google', { redirect: false });
+      const result = await signIn('google', { 
+        redirect: false,
+      });
       
-      if (result?.ok && !result?.error) {
-        // Get session to check if user has tenant
-        const res = await fetch('/api/auth/session');
-        const session = await res.json();
-        
-        await checkUserTenant(session);
-      } else {
+      if (result?.error) {
+        console.error('[Login] Google sign-in error:', result.error);
         setError('Failed to sign in with Google. Please try again.');
         setLoading(false);
+        return;
       }
-    } catch {
+
+      // After Google sign-in, get the session
+      const res = await fetch('/api/auth/session', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      const session = await res.json();
+      
+      if (!session || !session.user) {
+        setError('Failed to get session after Google sign-in.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login] Google sign-in successful, session:', session);
+      
+      // Check if user has a tenant
+      await checkUserTenant(session);
+    } catch (error) {
+      console.error('[Login] Google sign-in error:', error);
       setError('Failed to sign in with Google. Please try again.');
       setLoading(false);
     }
@@ -163,20 +183,36 @@ export default function LoginPage() {
     setCreatingOrg(true);
     setError('');
 
+    // Generate subdomain from organization name
+    const subdomain = orgName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
     try {
-      const res = await fetch('/api/auth/create-tenant', {
+      const res = await fetch('/api/auth/complete-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organizationName: orgName.trim(),
+          businessName: orgName.trim(),
+          subdomain: subdomain,
         }),
+        credentials: 'include',
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // Organization created successfully, redirect to dashboard
-        toast.success('Organization created successfully!');
+        toast.success('Organization created successfully! 🎉');
+        // Force a session refresh
+        await fetch('/api/auth/session', { 
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        // Redirect to dashboard
         window.location.href = '/client/dashboard';
       } else {
         setError(data.error || 'Failed to create organization. Please try again.');

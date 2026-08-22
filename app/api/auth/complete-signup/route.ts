@@ -6,8 +6,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the session to ensure the user is authenticated
     const session = await getServerSession(authOptions);
+    
+    console.log('[CompleteSignup] Session:', session?.user?.email);
     
     if (!session || !session.user) {
       return NextResponse.json(
@@ -30,7 +31,13 @@ export async function POST(req: NextRequest) {
     // Check if user already has a tenant
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { tenantId: true },
+      select: { tenantId: true, isActive: true },
+    });
+
+    console.log('[CompleteSignup] Existing user:', {
+      userId,
+      hasTenant: !!existingUser?.tenantId,
+      isActive: existingUser?.isActive,
     });
 
     if (existingUser?.tenantId) {
@@ -52,32 +59,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the Tenant with all required fields
+    // Create the Tenant
     const tenant = await prisma.tenant.create({
       data: {
         name: businessName,
         subdomain,
         plan: 'BASIC',
         status: 'ACTIVE',
-        subscriptionStatus: 'active', // ✅ Changed from 'inactive' to 'active'
+        subscriptionStatus: 'active',
         maxGuests: 200,
         credits: 0,
-        // ✅ Add default values for other fields if they're required
         simpleEventMode: false,
         bypassPayment: false,
         testMode: false,
       },
     });
 
-    // Update the User with tenantId and set role to CLIENT
+    console.log('[CompleteSignup] Tenant created:', tenant.id);
+
+    // Update the User with tenantId and activate them
     const user = await prisma.user.update({
       where: { id: userId },
       data: {
         tenantId: tenant.id,
         role: 'CLIENT',
-        isActive: true, // ✅ Activate the user
+        isActive: true,
       },
     });
+
+    console.log('[CompleteSignup] User updated:', user.id);
 
     return NextResponse.json({
       success: true,
@@ -90,10 +100,11 @@ export async function POST(req: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        isActive: user.isActive,
       },
     });
   } catch (error) {
-    console.error('Complete signup error:', error);
+    console.error('[CompleteSignup] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
