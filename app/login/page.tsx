@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, User, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast'; 
+
 
 export default function LoginPage() {
   const router = useRouter();
