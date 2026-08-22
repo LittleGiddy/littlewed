@@ -10,6 +10,18 @@ import { prisma } from './prisma';
 // the cookie – no adapter needed.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { NextAuthOptions } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import GoogleProvider from 'next-auth/providers/google';
+import bcrypt from 'bcryptjs';
+import { prisma } from './prisma';
+
+// ─── We intentionally do NOT add `adapter: PrismaAdapter(prisma)` ──────────
+// Using a database adapter with CredentialsProvider + JWT strategy caused a
+// redirect loop. With JWT strategy, NextAuth stores everything encrypted in
+// the cookie – no adapter needed.
+// ────────────────────────────────────────────────────────────────────────────
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
@@ -61,10 +73,12 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     // ── signIn ────────────────────────────────────────────────────────────────
-    async signIn({ user, account }) {
+    async signIn({ user, account, profile }) {
       // Only apply custom logic for Google sign‑in
       if (account?.provider === 'google') {
         try {
+          console.log('[NextAuth] Google signIn attempt for:', user.email);
+
           // Check if a user with this email already exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
@@ -81,51 +95,86 @@ export const authOptions: NextAuthOptions = {
             const hasGoogleAccount = existingUser.accounts.length > 0;
 
             if (hasGoogleAccount) {
-              // ✅ They have a Google link → allow sign‑in
+              console.log('[NextAuth] Google sign-in allowed (existing user with Google link)');
               return true;
             }
 
-            // No Google link → check if they have a password (email/password signup)
+            // No Google link → check if they have a password
             if (existingUser.password) {
-              // ❌ This is an email/password account → block Google sign‑in
-              return false;
+              // ✅ Instead of blocking, link the Google account
+              // This allows users to sign in with either method
+              console.log('[NextAuth] Linking Google account to existing user');
+              
+              // Check if the Google account is already linked to another user
+              const existingAccount = await prisma.account.findUnique({
+                where: {
+                  provider_providerAccountId: {
+                    provider: account.provider,
+                    providerAccountId: account.providerAccountId,
+                  },
+                },
+              });
+
+              if (existingAccount) {
+                // This Google account is already linked to another user
+                console.log('[NextAuth] Google account already linked to another user');
+                // You could redirect to a page explaining this
+                return false;
+              }
+
+              // Link the Google account to the existing user
+              await prisma.account.create({
+                data: {
+                  userId: existingUser.id,
+                  type: account.type,
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  access_token: account.access_token,
+                  expires_at: account.expires_at,
+                  token_type: account.token_type,
+                  scope: account.scope,
+                  id_token: account.id_token,
+                },
+              });
+
+              console.log('[NextAuth] Google account linked successfully');
+              return true;
             }
 
             // User exists with no password and no Google link
+            console.log('[NextAuth] Google sign-in allowed (user exists with no password)');
             return true;
           }
 
           // ── First‑time Google user ──
-          // ✅ Create user WITHOUT a tenant
+          console.log('[NextAuth] First-time Google user, creating account...');
+
           const newUser = await prisma.user.create({
             data: {
               email: user.email!,
               name: user.name ?? 'New User',
               password: null,
               role: 'CLIENT',
-              isActive: true, // ✅ Auto-activate so they can sign in
+              isActive: true,
               emailVerified: new Date(),
-              // ✅ No tenantId set here - they'll create one during sign-in flow
             },
           });
 
-          // Create an Account record to link the Google provider
-          if (newUser) {
-            await prisma.account.create({
-              data: {
-                userId: newUser.id,
-                type: account.type,
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-                access_token: account.access_token,
-                expires_at: account.expires_at,
-                token_type: account.token_type,
-                scope: account.scope,
-                id_token: account.id_token,
-              },
-            });
-          }
+          await prisma.account.create({
+            data: {
+              userId: newUser.id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          });
 
+          console.log('[NextAuth] User created and Google account linked');
           return true;
         } catch (err) {
           console.error('[NextAuth] Google signIn error:', err);
