@@ -19,19 +19,13 @@ export async function DELETE(
     // Check if user exists and is not super admin
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { 
-        role: true, 
-        tenantId: true,
-        // Include counts to know what will be deleted
-        _count: {
+      include: {
+        tenant: {
           select: {
-            notifications: true,
-            accounts: true,
-            sessions: true,
-            events: true,
-            guests: true,
-          }
-        }
+            id: true,
+          },
+        },
+        // Count related records using separate queries
       },
     });
 
@@ -43,13 +37,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete super admin' }, { status: 403 });
     }
 
+    // Get counts of related records for logging and confirmation
+    const [notificationCount, accountCount, sessionCount, guestCount, eventCount] = await Promise.all([
+      prisma.notification.count({ where: { userId } }),
+      prisma.account.count({ where: { userId } }),
+      prisma.session.count({ where: { userId } }),
+      prisma.guest.count({ where: { event: { tenantId: user.tenantId || undefined } } }),
+      prisma.event.count({ where: { tenantId: user.tenantId || undefined } }),
+    ]);
+
     // Log what will be deleted (optional but helpful for auditing)
-    console.log(`Deleting user ${userId} with:`, {
-      notifications: user._count.notifications,
-      accounts: user._count.accounts,
-      sessions: user._count.sessions,
-      events: user._count.events,
-      guests: user._count.guests,
+    console.log(`Deleting user ${userId} (${user.name}) with:`, {
+      notifications: notificationCount,
+      accounts: accountCount,
+      sessions: sessionCount,
+      guests: guestCount,
+      events: eventCount,
     });
 
     // With cascading deletes, this will automatically delete all related records
@@ -74,7 +77,18 @@ export async function DELETE(
 
     return NextResponse.json({ 
       success: true,
-      message: 'User and all related records deleted successfully'
+      message: 'User and all related records deleted successfully',
+      details: {
+        userId,
+        userName: user.name,
+        deleted: {
+          notifications: notificationCount,
+          accounts: accountCount,
+          sessions: sessionCount,
+          guests: guestCount,
+          events: eventCount,
+        }
+      }
     });
 
   } catch (error: any) {
