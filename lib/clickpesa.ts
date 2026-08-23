@@ -9,23 +9,20 @@ const WEBHOOK_URL = process.env.CLICKPESA_WEBHOOK_URL;
 export async function getAccessToken(): Promise<string> {
   try {
     console.log('[ClickPesa] Getting token...');
-    console.log('[ClickPesa] Base URL:', BASE_URL);
 
     if (!CLIENT_ID || !API_KEY) {
       throw new Error('CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY is missing');
     }
 
-    // ClickPesa API Integration uses client-id and api-key in the body
-    const res = await fetch(`${BASE_URL}/oauth/token`, {
+    // ✅ Use the same format as the working app
+    const res = await fetch(`${BASE_URL}/generate-token`, {
       method: 'POST',
       headers: {
+        'client-id': CLIENT_ID,
+        'api-key': API_KEY,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({
-        clientId: CLIENT_ID,
-        apiKey: API_KEY,
-      }),
     });
 
     const responseText = await res.text();
@@ -36,28 +33,15 @@ export async function getAccessToken(): Promise<string> {
       throw new Error(`Token generation failed (${res.status}): ${responseText}`);
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      throw new Error(`Invalid JSON response: ${responseText}`);
-    }
-
-    console.log('[ClickPesa] Parsed token response:', JSON.stringify(data, null, 2));
-
-    // Try different possible token field names
-    const token = data.token || data.access_token || data.accessToken || data.Token || data.AccessToken;
+    const data = JSON.parse(responseText);
+    const token = data.token || data.accessToken || data.access_token;
 
     if (!token) {
-      console.error('[ClickPesa] No token found. Available keys:', Object.keys(data));
-      throw new Error(`No token returned. Response: ${JSON.stringify(data)}`);
+      console.error('[ClickPesa] No token in response:', data);
+      throw new Error(`No token returned: ${JSON.stringify(data)}`);
     }
 
-    // Ensure token has Bearer prefix
-    const formattedToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    console.log('[ClickPesa] Token obtained successfully');
-
-    return formattedToken;
+    return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   } catch (error) {
     console.error('[ClickPesa] Token generation error:', error);
     throw error;
@@ -109,30 +93,15 @@ export async function generateCheckoutLink(params: {
     }
 
     const data = JSON.parse(responseText);
-    console.log('[ClickPesa] Parsed checkout response:', JSON.stringify(data, null, 2));
-
-    // Try different possible checkout URL field names
-    const checkoutUrl = data.checkoutLink || 
-                        data.checkoutUrl || 
-                        data.checkout_url || 
-                        data.redirectUrl || 
-                        data.redirect_url || 
-                        data.link ||
-                        data.url;
-
-    const orderId = data.orderId || data.order_id || data.id || data.reference;
+    const checkoutUrl = data.checkoutLink || data.checkoutUrl || data.checkout_url;
+    const orderId = data.orderId || data.order_id || data.id;
 
     if (!checkoutUrl) {
-      console.error('[ClickPesa] No checkout URL. Available keys:', Object.keys(data));
-      throw new Error(`No checkout URL returned. Response: ${JSON.stringify(data)}`);
+      console.error('[ClickPesa] No checkout URL:', data);
+      throw new Error(`No checkout URL returned: ${JSON.stringify(data)}`);
     }
 
-    console.log('[ClickPesa] Checkout URL generated:', checkoutUrl);
-
-    return { 
-      checkoutUrl,
-      orderId,
-    };
+    return { checkoutUrl, orderId };
   } catch (error) {
     console.error('[ClickPesa] Generate checkout error:', error);
     throw error;
