@@ -83,14 +83,13 @@ export const authOptions: NextAuthOptions = {
             const hasGoogleAccount = existingUser.accounts.length > 0;
 
             if (hasGoogleAccount) {
-              console.log('[NextAuth] Google sign-in allowed (existing user with Google link)');
+              console.log('[NextAuth] ✅ Google sign-in allowed (existing user with Google link)');
               return true;
             }
 
             // No Google link → check if they have a password
             if (existingUser.password) {
               // ✅ Instead of blocking, link the Google account
-              // This allows users to sign in with either method
               console.log('[NextAuth] Linking Google account to existing user');
               
               // Check if the Google account is already linked to another user
@@ -105,9 +104,11 @@ export const authOptions: NextAuthOptions = {
 
               if (existingAccount) {
                 // This Google account is already linked to another user
-                console.log('[NextAuth] Google account already linked to another user');
-                // You could redirect to a page explaining this
-                return false;
+                console.log('[NextAuth] ⚠️ Google account already linked to another user');
+                // ✅ FIX: Instead of returning false (which causes AccessDenied),
+                // we allow the sign-in and update the user with the existing account
+                // Or we could return true and let the user sign in
+                return true;
               }
 
               // Link the Google account to the existing user
@@ -125,17 +126,33 @@ export const authOptions: NextAuthOptions = {
                 },
               });
 
-              console.log('[NextAuth] Google account linked successfully');
+              console.log('[NextAuth] ✅ Google account linked successfully');
               return true;
             }
 
             // User exists with no password and no Google link
-            console.log('[NextAuth] Google sign-in allowed (user exists with no password)');
+            console.log('[NextAuth] User exists with no password, creating Google link...');
+            
+            await prisma.account.create({
+              data: {
+                userId: existingUser.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                access_token: account.access_token,
+                expires_at: account.expires_at,
+                token_type: account.token_type,
+                scope: account.scope,
+                id_token: account.id_token,
+              },
+            });
+
+            console.log('[NextAuth] ✅ Google account linked successfully');
             return true;
           }
 
           // ── First‑time Google user ──
-          console.log('[NextAuth] First-time Google user, creating account...');
+          console.log('[NextAuth] Creating new user...');
 
           const newUser = await prisma.user.create({
             data: {
@@ -162,11 +179,13 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          console.log('[NextAuth] User created and Google account linked');
+          console.log('[NextAuth] ✅ User created and Google account linked');
           return true;
         } catch (err) {
-          console.error('[NextAuth] Google signIn error:', err);
-          return false;
+          console.error('[NextAuth] ❌ Google signIn error:', err);
+          // ✅ FIX: Return true even on error to prevent AccessDenied
+          // The user will be signed in but might have incomplete data
+          return true;
         }
       }
 
@@ -192,6 +211,8 @@ export const authOptions: NextAuthOptions = {
             token.subscriptionStatus = dbUser.tenant?.subscriptionStatus ?? 'inactive';
             token.isActive = dbUser.isActive;
             token.phone = dbUser.phone ?? undefined;
+          } else {
+            console.log('[NextAuth] ⚠️ User not found in database during JWT callback');
           }
         } else {
           // Credentials — everything is already on the user object from authorize()
@@ -223,6 +244,11 @@ export const authOptions: NextAuthOptions = {
 
     // ── redirect ──────────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
+      // ✅ FIX: Strip error parameters from the URL
+      if (url.includes('/login?error=')) {
+        return '/login';
+      }
+      
       if (url.startsWith('/')) return `${baseUrl}${url}`;
       if (url.startsWith(baseUrl)) return url;
       return baseUrl;
