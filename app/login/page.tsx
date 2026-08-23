@@ -64,13 +64,21 @@ export default function LoginPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const errorParam = urlParams.get('error');
     const fromGoogle = urlParams.get('from');
-    
+
+
+    if (errorParam === 'UserNotFound') {
+      setError('No account found with this email. Please sign up first.');
+      setIsInactiveUser(false);
+      setLoading(false);
+      return;
+    }
+
     if (errorParam === 'AccessDenied') {
       setError('Your account is pending activation. Please contact support or wait for a super admin to activate your account.');
       setIsInactiveUser(true);
       setLoading(false);
     }
-    
+
     // If coming back from Google sign-in, check status
     if (fromGoogle === 'google') {
       routeAfterAuth();

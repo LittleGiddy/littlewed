@@ -1,4 +1,4 @@
-// lib/auth.ts - Updated signIn callback
+// lib/auth.ts - Updated to prevent auto-creation for non-existent users
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
@@ -58,6 +58,7 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider !== 'google') return true;
 
       try {
+        // ✅ Check if user exists
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
           include: { 
@@ -65,65 +66,42 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        if (existingUser) {
-          const hasGoogleAccount = existingUser.accounts.length > 0;
-
-          if (!existingUser.isActive) {
-            // User exists but is inactive - allow sign-in but they'll be redirected to pending activation
-            console.log('[NextAuth] User exists but is inactive. Allowing sign-in with pending activation.');
-            return true;
-          }
-
-          if (!hasGoogleAccount) {
-            await prisma.account.create({
-              data: {
-                userId: existingUser.id,
-                type: account.type,
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-                access_token: account.access_token,
-                expires_at: account.expires_at,
-                token_type: account.token_type,
-                scope: account.scope,
-                id_token: account.id_token,
-              },
-            });
-          }
-
-          return true;
+        // ❌ If user doesn't exist, redirect to signup instead of auto-creating
+        if (!existingUser) {
+          console.log('[NextAuth] User not found, redirecting to signup:', user.email);
+          // Return false with a specific error message
+          return '/login?error=UserNotFound';
         }
 
-        // ── Brand-new Google user ──
-        const newUser = await prisma.user.create({
-          data: {
-            email: user.email!,
-            name: user.name ?? 'New User',
-            password: null,
-            role: 'CLIENT',
-            isActive: false,
-            emailVerified: new Date(),
-          },
-        });
+        // User exists - check if they're active
+        if (!existingUser.isActive) {
+          console.log('[NextAuth] User exists but is inactive.');
+          return true; // Allow sign-in, login page will handle pending activation
+        }
 
-        await prisma.account.create({
-          data: {
-            userId: newUser.id,
-            type: account.type,
-            provider: account.provider,
-            providerAccountId: account.providerAccountId,
-            access_token: account.access_token,
-            expires_at: account.expires_at,
-            token_type: account.token_type,
-            scope: account.scope,
-            id_token: account.id_token,
-          },
-        });
+        // Link Google account if not already linked
+        const hasGoogleAccount = existingUser.accounts.length > 0;
+        if (!hasGoogleAccount) {
+          await prisma.account.create({
+            data: {
+              userId: existingUser.id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          });
+        }
 
-        console.log('[NextAuth] ✅ New user created (inactive). Allowing sign-in...');
+        console.log('[NextAuth] ✅ User exists and is active, allowing sign-in');
         return true;
       } catch (error) {
         console.error('[NextAuth] Google signIn error:', error);
-        return true;
+        return false;
       }
     },
 
@@ -189,19 +167,15 @@ export const authOptions: NextAuthOptions = {
 
     // ── redirect ─────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
-      // If the URL has a callbackUrl parameter, extract it
-      const callbackUrl = new URL(url, baseUrl).searchParams.get('callbackUrl');
-      
-      // If there's a callback URL and it's the dashboard, redirect to pending activation instead
-      if (callbackUrl && callbackUrl.includes('/client/dashboard')) {
-        // Check if the user is inactive by fetching the session
-        // We can't access session here, so we'll handle this in the page itself
-        // Instead, just return the callback URL and let the page handle the redirect
-        return callbackUrl;
-      }
-
+      // Handle error redirects
       if (url.includes('/login?error=')) {
         return url.startsWith('http') ? url : `${baseUrl}${url}`;
+      }
+
+      // If the URL has a callbackUrl parameter
+      const callbackUrl = new URL(url, baseUrl).searchParams.get('callbackUrl');
+      if (callbackUrl) {
+        return url;
       }
       
       if (url.includes('/api/auth/callback')) return url;
