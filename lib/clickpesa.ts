@@ -14,7 +14,7 @@ export async function getAccessToken(): Promise<string> {
       throw new Error('CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY is missing');
     }
 
-    // ✅ Use the same format as the working app
+    // ✅ Correct endpoint for both Hosted and API integration
     const res = await fetch(`${BASE_URL}/generate-token`, {
       method: 'POST',
       headers: {
@@ -34,12 +34,17 @@ export async function getAccessToken(): Promise<string> {
     }
 
     const data = JSON.parse(responseText);
+    
+    // The token field name might vary
     const token = data.token || data.accessToken || data.access_token;
 
     if (!token) {
       console.error('[ClickPesa] No token in response:', data);
       throw new Error(`No token returned: ${JSON.stringify(data)}`);
     }
+
+    // JWT token is valid for 1 hour
+    console.log('[ClickPesa] Token obtained successfully, valid for 1 hour');
 
     return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   } catch (error) {
@@ -69,7 +74,7 @@ export async function generateCheckoutLink(params: {
       customerPhone: params.customerPhone || '',
       description: params.description || '',
       callbackUrl: WEBHOOK_URL,
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL}/client/dashboard`,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/client/dashboard`,
     };
 
     console.log('[ClickPesa] Checkout payload:', JSON.stringify(payload, null, 2));
