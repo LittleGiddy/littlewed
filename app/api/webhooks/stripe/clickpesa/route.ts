@@ -1,8 +1,7 @@
-// app/api/webhooks/clickpesa/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-const CREDIT_COST = 300;
+const CREDIT_COST = 500;
 
 export async function POST(req: NextRequest) {
   try {
