@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Mail, CheckCircle, Shield, KeyRound } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle, Shield, KeyRound, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
@@ -11,12 +11,14 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  // ─── Step 1: Send OTP ──────────────────────────────────────────────────
   const handleSendOtp = async () => {
     if (!email) {
       setError('Email required');
@@ -29,11 +31,13 @@ export default function ForgotPasswordPage() {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
-      setSuccess('OTP sent to your email');
+      
+      // Always show success message (even if email doesn't exist)
+      setSuccess('If an account exists with this email, we\'ve sent a password reset code.');
       setStep(2);
     } catch (err: any) {
       setError(err.message);
@@ -42,6 +46,42 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  // ─── Step 2: Verify OTP ───────────────────────────────────────────────
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter the 6-digit OTP');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const res = await fetch('/api/auth/verify-reset-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: email.trim(), 
+          otp: otp 
+        }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Invalid or expired OTP');
+      
+      // Store reset token for the next step
+      setResetToken(data.resetToken);
+      setSuccess('OTP verified! Now set your new password.');
+      setStep(3);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── Step 3: Reset Password ───────────────────────────────────────────
   const handleResetPassword = async () => {
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
@@ -51,21 +91,25 @@ export default function ForgotPasswordPage() {
       setError('Password must be at least 8 characters');
       return;
     }
-    if (!otp || otp.length !== 6) {
-      setError('Please enter the 6-digit OTP');
-      return;
-    }
+    
     setLoading(true);
     setError('');
     setSuccess('');
+    
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, newPassword }),
+        body: JSON.stringify({ 
+          email: email.trim(), 
+          resetToken: resetToken,
+          newPassword 
+        }),
       });
       const data = await res.json();
+      
       if (!res.ok) throw new Error(data.error || 'Reset failed');
+      
       setSuccess('Password reset successful! Redirecting to login...');
       setTimeout(() => router.push('/login'), 2000);
     } catch (err: any) {
@@ -170,7 +214,6 @@ export default function ForgotPasswordPage() {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* Mobile hero */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -348,8 +391,8 @@ export default function ForgotPasswordPage() {
                   <>
                     <div className="form-title">Forgot password?</div>
                     <p className="form-subtitle">Enter your email address and we'll send you a code to reset your password.</p>
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
-                    {success && <div className="success-box"><span>✓</span><span>{success}</span></div>}
+                    {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
+                    {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'email' || email ? 'up' : ''}`}>Email Address</label>
                       <input
@@ -368,18 +411,18 @@ export default function ForgotPasswordPage() {
                       ← Back to Login
                     </Link>
                   </>
-                ) : (
+                ) : step === 2 ? (
                   <>
-                    <div className="form-title">Reset Password</div>
-                    <p className="form-subtitle">Enter the code sent to <strong>{email}</strong> and choose a new password.</p>
+                    <div className="form-title">Verify Code</div>
+                    <p className="form-subtitle">Enter the 6-digit code sent to <strong>{email}</strong>.</p>
 
-                    {/* ── Google user note ── */}
                     <div className="google-note">
-                      💡 <strong>Did you sign up with Google?</strong> You can still use this form to set a password for your account – after that, you'll be able to sign in with either method.
+                      💡 <strong>Google user?</strong> If you signed up with Google, you can still set a password here to use both sign-in methods.
                     </div>
 
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
-                    {success && <div className="success-box"><span>✓</span><span>{success}</span></div>}
+                    {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
+                    {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
+
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'otp' || otp ? 'up' : ''}`}>Verification Code</label>
                       <input
@@ -390,8 +433,26 @@ export default function ForgotPasswordPage() {
                         onBlur={() => setFocused(null)}
                         maxLength={6}
                         placeholder="000000"
+                        type="text"
+                        inputMode="numeric"
                       />
                     </div>
+
+                    <button className="btn-primary" disabled={loading} onClick={handleVerifyOtp}>
+                      {loading ? <><div className="spinner" /> Verifying...</> : 'Verify Code'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => { setStep(1); setError(''); setSuccess(''); }}>
+                      ← Back to email
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="form-title">New Password</div>
+                    <p className="form-subtitle">Create a new password for your account.</p>
+
+                    {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
+                    {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
+
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'newPassword' || newPassword ? 'up' : ''}`}>New Password</label>
                       <input
@@ -414,6 +475,7 @@ export default function ForgotPasswordPage() {
                         onBlur={() => setFocused(null)}
                       />
                     </div>
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
                       <button
                         onClick={() => setShowPassword(!showPassword)}
@@ -422,11 +484,12 @@ export default function ForgotPasswordPage() {
                         {showPassword ? 'Hide' : 'Show'} passwords
                       </button>
                     </div>
+
                     <button className="btn-primary" disabled={loading} onClick={handleResetPassword}>
                       {loading ? <><div className="spinner" /> Resetting...</> : 'Reset Password'}
                     </button>
-                    <button className="btn-secondary" onClick={() => setStep(1)}>
-                      ← Back to email
+                    <button className="btn-secondary" onClick={() => { setStep(2); setError(''); setSuccess(''); }}>
+                      ← Back to verification
                     </button>
                   </>
                 )}
