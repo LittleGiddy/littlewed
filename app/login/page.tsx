@@ -298,10 +298,10 @@ export default function LoginPage() {
 
         .hero-nav-link:hover { filter: brightness(1.15); }
 
-        .hero-nav-link.link-about { color: rgba(255,255,255,0.9); }
+        .hero-nav-link.link-about { color: #0A3837; }
         .hero-nav-link.link-about:hover { color: #FF8A65; }
 
-        .hero-nav-link.link-pricing { color: rgba(255,255,255,0.9); }
+        .hero-nav-link.link-pricing { color: #0A3837; }
         .hero-nav-link.link-pricing:hover { color: #FF8A65; }
 
         .hero-nav-link.cta {

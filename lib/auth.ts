@@ -1,3 +1,4 @@
+// lib/auth.ts - Updated signIn callback
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
@@ -67,9 +68,13 @@ export const authOptions: NextAuthOptions = {
         if (existingUser) {
           const hasGoogleAccount = existingUser.accounts.length > 0;
 
-          // ✅ Allow sign-in even if inactive - we'll handle it in the login page
+          if (!existingUser.isActive) {
+            // User exists but is inactive - allow sign-in but they'll be redirected to pending activation
+            console.log('[NextAuth] User exists but is inactive. Allowing sign-in with pending activation.');
+            return true;
+          }
+
           if (!hasGoogleAccount) {
-            // Existing user signing in with Google for the first time — link it
             await prisma.account.create({
               data: {
                 userId: existingUser.id,
@@ -85,21 +90,17 @@ export const authOptions: NextAuthOptions = {
             });
           }
 
-          // ✅ Always return true - let the login page handle the activation status
           return true;
         }
 
         // ── Brand-new Google user ──
-        // Create user with isActive: false (requires super admin activation)
-        console.log('[NextAuth] Creating new inactive user...');
-        
         const newUser = await prisma.user.create({
           data: {
             email: user.email!,
             name: user.name ?? 'New User',
             password: null,
             role: 'CLIENT',
-            isActive: false, // ❗ REQUIRES SUPER ADMIN ACTIVATION
+            isActive: false,
             emailVerified: new Date(),
           },
         });
@@ -119,12 +120,9 @@ export const authOptions: NextAuthOptions = {
         });
 
         console.log('[NextAuth] ✅ New user created (inactive). Allowing sign-in...');
-        
-        // ✅ Return true to allow sign-in, but user will see "pending activation" in the login page
         return true;
       } catch (error) {
         console.error('[NextAuth] Google signIn error:', error);
-        // ✅ Return true to prevent AccessDenied - let the login page handle errors
         return true;
       }
     },
@@ -191,7 +189,17 @@ export const authOptions: NextAuthOptions = {
 
     // ── redirect ─────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
-      // Don't strip error parameters - let the login page handle them
+      // If the URL has a callbackUrl parameter, extract it
+      const callbackUrl = new URL(url, baseUrl).searchParams.get('callbackUrl');
+      
+      // If there's a callback URL and it's the dashboard, redirect to pending activation instead
+      if (callbackUrl && callbackUrl.includes('/client/dashboard')) {
+        // Check if the user is inactive by fetching the session
+        // We can't access session here, so we'll handle this in the page itself
+        // Instead, just return the callback URL and let the page handle the redirect
+        return callbackUrl;
+      }
+
       if (url.includes('/login?error=')) {
         return url.startsWith('http') ? url : `${baseUrl}${url}`;
       }
