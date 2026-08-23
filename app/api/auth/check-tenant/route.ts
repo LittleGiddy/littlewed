@@ -8,12 +8,10 @@ export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
-    console.log('[CheckTenant] Session:', session?.user?.email);
-    
     if (!session || !session.user) {
       return NextResponse.json({ 
         hasTenant: false,
-        error: 'Unauthorized' 
+        isActive: false,
       }, { status: 401 });
     }
 
@@ -28,14 +26,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    console.log('[CheckTenant] User found:', {
-      userId,
-      hasTenant: !!user?.tenantId,
-      isActive: user?.isActive,
-      role: user?.role,
-    });
-
-    // If user is not active, they shouldn't be able to access the dashboard
+    // If user is not active, return isActive: false
     if (!user?.isActive) {
       return NextResponse.json({ 
         hasTenant: false,
@@ -52,7 +43,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('[CheckTenant] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to check tenant status', hasTenant: false },
+      { error: 'Failed to check tenant status', hasTenant: false, isActive: false },
       { status: 500 }
     );
   }

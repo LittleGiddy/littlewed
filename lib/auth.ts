@@ -67,17 +67,9 @@ export const authOptions: NextAuthOptions = {
         if (existingUser) {
           const hasGoogleAccount = existingUser.accounts.length > 0;
 
-          // ✅ CHECK: If user exists but is inactive, block sign-in
-          if (!existingUser.isActive) {
-            console.log('[NextAuth] ⚠️ User exists but is inactive. Blocking sign-in.');
-            // Return false to deny sign-in, which will show AccessDenied
-            // We'll handle this gracefully in the login page
-            return false;
-          }
-
+          // ✅ Allow sign-in even if inactive - we'll handle it in the login page
           if (!hasGoogleAccount) {
-            // Existing (credentials) user signing in with Google for the
-            // first time — link it, don't create a duplicate user.
+            // Existing user signing in with Google for the first time — link it
             await prisma.account.create({
               data: {
                 userId: existingUser.id,
@@ -93,13 +85,12 @@ export const authOptions: NextAuthOptions = {
             });
           }
 
-          console.log('[NextAuth] ✅ User is active, allowing sign-in');
+          // ✅ Always return true - let the login page handle the activation status
           return true;
         }
 
         // ── Brand-new Google user ──
-        // isActive: false and no tenantId until /auth/google-callback
-        // walks them through creating an organization.
+        // Create user with isActive: false (requires super admin activation)
         console.log('[NextAuth] Creating new inactive user...');
         
         const newUser = await prisma.user.create({
@@ -127,15 +118,14 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        console.log('[NextAuth] ✅ New user created (inactive). Blocking sign-in.');
+        console.log('[NextAuth] ✅ New user created (inactive). Allowing sign-in...');
         
-        // ✅ Return false to block sign-in
-        // The user will see AccessDenied error which we'll handle in the login page
-        return false;
+        // ✅ Return true to allow sign-in, but user will see "pending activation" in the login page
+        return true;
       } catch (error) {
         console.error('[NextAuth] Google signIn error:', error);
-        // ✅ Return false to deny sign-in
-        return false;
+        // ✅ Return true to prevent AccessDenied - let the login page handle errors
+        return true;
       }
     },
 
@@ -169,8 +159,6 @@ export const authOptions: NextAuthOptions = {
           token.phone = (user as any).phone;
         }
       } else if (trigger === 'update' && token.id) {
-        // Lets the client call session.update() right after org creation so
-        // the JWT reflects the new tenant without forcing a full re-login.
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
           include: { tenant: true },
@@ -203,20 +191,14 @@ export const authOptions: NextAuthOptions = {
 
     // ── redirect ─────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
-      // ✅ Keep the error parameter for the login page to display messages
+      // Don't strip error parameters - let the login page handle them
       if (url.includes('/login?error=')) {
         return url.startsWith('http') ? url : `${baseUrl}${url}`;
       }
       
-      // Handle callback URLs
       if (url.includes('/api/auth/callback')) return url;
-      
-      // Handle relative URLs
       if (url.startsWith('/')) return `${baseUrl}${url}`;
-      
-      // Handle absolute URLs
       if (url.startsWith(baseUrl)) return url;
-      
       return baseUrl;
     },
   },

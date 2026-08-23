@@ -2,7 +2,7 @@
 
 import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function LoginPage() {
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [isInactiveUser, setIsInactiveUser] = useState(false);
 
   // Hero carousel content
   const heroSlides = [
@@ -58,6 +59,24 @@ export default function LoginPage() {
     return () => clearInterval(id);
   }, []);
 
+  // ─── Check for error parameters on mount ──────────────────────────────
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const errorParam = urlParams.get('error');
+    const fromGoogle = urlParams.get('from');
+    
+    if (errorParam === 'AccessDenied') {
+      setError('Your account is pending activation. Please contact support or wait for a super admin to activate your account.');
+      setIsInactiveUser(true);
+      setLoading(false);
+    }
+    
+    // If coming back from Google sign-in, check status
+    if (fromGoogle === 'google') {
+      routeAfterAuth();
+    }
+  }, []);
+
   // ─── Route the user after a confirmed session ─────────────────────────
   const routeAfterAuth = async () => {
     try {
@@ -67,16 +86,24 @@ export default function LoginPage() {
       });
       const data = await res.json();
 
+      console.log('[Login] routeAfterAuth data:', data);
+
       if (!data.authenticated) {
         setError('Something went wrong signing you in. Please try again.');
         setLoading(false);
         return;
       }
 
+      // ✅ Check if user is inactive (pending activation)
+      if (data.isActive === false) {
+        setError('Your account is pending activation. Please contact support or wait for a super admin to activate your account.');
+        setIsInactiveUser(true);
+        setLoading(false);
+        return;
+      }
+
       if (!data.hasTenant) {
-        // Credentials users should always have a tenant already (signup
-        // creates it atomically). If we land here, something's off —
-        // don't guess, send them somewhere that can actually fix it.
+        // Redirect to Google callback to handle tenant creation
         window.location.href = '/auth/google-callback?intent=login';
         return;
       }
@@ -103,6 +130,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     setError('');
+    setIsInactiveUser(false);
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
 
@@ -123,15 +151,13 @@ export default function LoginPage() {
   };
 
   // ─── Handle Google sign-in ─────────────────────────────────────────────
-  // Always land on /auth/google-callback — it's the one place that decides
-  // "does this person have an org yet" for every Google entry point
-  // (login AND signup). intent=login only changes the copy shown there.
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
+    setIsInactiveUser(false);
     try {
       await signIn('google', {
-        callbackUrl: '/auth/google-callback?intent=login',
+        callbackUrl: '/login?from=google',
       });
     } catch (error) {
       console.error('[Login] Google sign-in error:', error);
@@ -1141,7 +1167,8 @@ export default function LoginPage() {
 
                 {error && (
                   <div className="err-box" role="alert" aria-live="assertive">
-                    <span aria-hidden="true">⚠️</span><span>{error}</span>
+                    <AlertCircle size={16} className="flex-shrink-0" />
+                    <span>{error}</span>
                   </div>
                 )}
 
