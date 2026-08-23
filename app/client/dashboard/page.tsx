@@ -2,7 +2,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { Sparkles } from 'lucide-react';
 import DashboardContent from './DashboardContent';
 
 export default async function ClientDashboard() {
@@ -14,20 +13,11 @@ export default async function ClientDashboard() {
   const tenantId = (session.user as any).tenantId;
 
   if (!tenantId) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6 font-['DM_Sans']">
-        <div className="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-lg border border-gray-100">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#FF6B35] to-[#F7931E] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/25">
-            <Sparkles className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="font-serif text-2xl font-black text-gray-900 mb-2">Welcome, {session.user.name}</h1>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            You are logged in as <strong className="text-[#FF6B35]">{(session.user as any).role}</strong>.<br />
-            No organisation is linked to this account.
-          </p>
-        </div>
-      </div>
-    );
+    // No dead end — send them to finish account setup (org creation).
+    // This is the same page Google sign-in/sign-up routes through, so it
+    // works whether they got here via Google or somehow via credentials
+    // with a missing tenant.
+    redirect('/auth/google-callback?intent=login');
   }
 
   const tenant = await prisma.tenant.findUnique({

@@ -2,9 +2,8 @@
 
 import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart } from 'lucide-react';
 import Link from 'next/link';
-import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -16,12 +15,6 @@ export default function LoginPage() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
-  
-  // Google Sign-Up Flow States
-  const [showOrgPrompt, setShowOrgPrompt] = useState(false);
-  const [orgName, setOrgName] = useState('');
-  const [googleUser, setGoogleUser] = useState<any>(null);
-  const [creatingOrg, setCreatingOrg] = useState(false);
 
   // Hero carousel content
   const heroSlides = [
@@ -65,36 +58,38 @@ export default function LoginPage() {
     return () => clearInterval(id);
   }, []);
 
-  // ─── Check if user has a tenant ──────────────────────────────────────
-  const checkUserTenant = async (session: any) => {
+  // ─── Route the user after a confirmed session ─────────────────────────
+  const routeAfterAuth = async () => {
     try {
       const res = await fetch('/api/auth/check-tenant', {
         credentials: 'include',
         cache: 'no-store',
       });
       const data = await res.json();
-      
-      console.log('[Login] Tenant check result:', data);
-      
-      if (data.hasTenant) {
-        // User has a tenant, redirect to dashboard
-        const role = session?.user?.role;
-        if (role === 'SUPER_ADMIN') {
-          window.location.href = '/admin/dashboard';
-        } else if (role === 'STAFF') {
-          window.location.href = '/client/staff/dashboard';
-        } else {
-          window.location.href = '/client/dashboard';
-        }
-      } else {
-        // User needs to create an organization
-        setGoogleUser(session?.user);
-        setShowOrgPrompt(true);
+
+      if (!data.authenticated) {
+        setError('Something went wrong signing you in. Please try again.');
         setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('[Login] Error checking tenant:', error);
-      setError('Failed to check organization status. Please try again.');
+
+      if (!data.hasTenant) {
+        // Credentials users should always have a tenant already (signup
+        // creates it atomically). If we land here, something's off —
+        // don't guess, send them somewhere that can actually fix it.
+        window.location.href = '/auth/google-callback?intent=login';
+        return;
+      }
+
+      if (data.role === 'SUPER_ADMIN') {
+        window.location.href = '/admin/dashboard';
+      } else if (data.role === 'STAFF') {
+        window.location.href = '/client/staff/dashboard';
+      } else {
+        window.location.href = '/client/dashboard';
+      }
+    } catch {
+      setError('Failed to check your account status. Please try again.');
       setLoading(false);
     }
   };
@@ -112,16 +107,11 @@ export default function LoginPage() {
       const result = await signIn('credentials', { email, password, redirect: false });
 
       if (result?.ok && !result?.error) {
-        const res = await fetch('/api/auth/session');
-        const session = await res.json();
-
         if (email === 'super@littlewed.com') {
           window.location.href = '/admin/dashboard';
           return;
         }
-
-        // Check if user has a tenant
-        await checkUserTenant(session);
+        await routeAfterAuth();
       } else {
         setError('Invalid email or password. Please try again.');
         setLoading(false);
@@ -133,73 +123,20 @@ export default function LoginPage() {
   };
 
   // ─── Handle Google sign-in ─────────────────────────────────────────────
+  // Always land on /auth/google-callback — it's the one place that decides
+  // "does this person have an org yet" for every Google entry point
+  // (login AND signup). intent=login only changes the copy shown there.
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError('');
     try {
-      // Use redirect: true to let NextAuth handle the redirect properly
-      await signIn('google', { 
-        callbackUrl: '/login?from=google',
+      await signIn('google', {
+        callbackUrl: '/auth/google-callback?intent=login',
       });
-      
-      // The page will redirect, so we don't need to handle the session here
-      // NextAuth will handle the redirect based on the callbackUrl
     } catch (error) {
       console.error('[Login] Google sign-in error:', error);
       setError('Failed to sign in with Google. Please try again.');
       setLoading(false);
-    }
-  };
-
-  // ─── Create Organization for Google User ─────────────────────────────
-  const handleCreateOrganization = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!orgName.trim()) {
-      setError('Please enter an organization name.');
-      return;
-    }
-
-    setCreatingOrg(true);
-    setError('');
-
-    // Generate subdomain from organization name
-    const subdomain = orgName
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-
-    try {
-      const res = await fetch('/api/auth/complete-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessName: orgName.trim(),
-          subdomain: subdomain,
-        }),
-        credentials: 'include',
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success('Organization created successfully! 🎉');
-        // Force a session refresh
-        await fetch('/api/auth/session', { 
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
-        // Redirect to dashboard
-        window.location.href = '/client/dashboard';
-      } else {
-        setError(data.error || 'Failed to create organization. Please try again.');
-        setCreatingOrg(false);
-      }
-    } catch {
-      setError('Network error. Please try again.');
-      setCreatingOrg(false);
     }
   };
 
@@ -254,7 +191,6 @@ export default function LoginPage() {
           overflow: hidden;
         }
 
-        /* ── Left panel with hero carousel ── */
         .left {
           width: 42%;
           max-width: 520px;
@@ -474,7 +410,6 @@ export default function LoginPage() {
         .hero-dot:hover { background: rgba(255,255,255,0.5); }
         .hero-dot.active { background: #E8A598; width: 34px; }
 
-        /* ── Right panel ── */
         .right {
           flex: 1;
           display: flex;
@@ -500,7 +435,6 @@ export default function LoginPage() {
           align-items: center;
         }
 
-        /* ── Navigation ── */
         .nav {
           width: 100%;
           display: flex;
@@ -592,7 +526,6 @@ export default function LoginPage() {
         .mobile-menu .nav-link:hover { background: rgba(13,79,79,0.06); }
         .mobile-menu .nav-link.cta { margin: 4px 16px; }
 
-        /* ── Card ── */
         .card {
           width: 100%;
           background: white;
@@ -609,7 +542,6 @@ export default function LoginPage() {
 
         .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
 
-        /* ── Mobile hero ── */
         .mobile-hero {
           display: none;
           flex-direction: column;
@@ -702,153 +634,6 @@ export default function LoginPage() {
         .mobile-hero-dots .hero-dot { width: 16px; height: 3px; }
         .mobile-hero-dots .hero-dot.active { width: 24px; }
 
-        /* ── Organization Prompt Modal ── */
-        .org-prompt-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(8px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100;
-          padding: 20px;
-          animation: fadeInOverlay 0.3s ease;
-        }
-
-        @keyframes fadeInOverlay {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .org-prompt-modal {
-          background: white;
-          border-radius: 24px;
-          max-width: 480px;
-          width: 100%;
-          padding: 40px 36px;
-          box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
-          animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(30px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .org-prompt-icon {
-          width: 64px;
-          height: 64px;
-          border-radius: 16px;
-          background: rgba(13, 79, 79, 0.08);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #0D4F4F;
-          margin: 0 auto 16px;
-        }
-
-        .org-prompt-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 24px;
-          font-weight: 800;
-          color: #0D1B1B;
-          text-align: center;
-          margin-bottom: 8px;
-        }
-
-        .org-prompt-sub {
-          text-align: center;
-          color: #7A8FA6;
-          font-size: 14px;
-          line-height: 1.6;
-          margin-bottom: 24px;
-        }
-
-        .org-prompt-input {
-          width: 100%;
-          padding: 14px 16px;
-          border: 1.5px solid #E2EAF0;
-          border-radius: 13px;
-          font-size: 15px;
-          font-family: inherit;
-          outline: none;
-          color: #0D1B1B;
-          background: white;
-          font-weight: 500;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .org-prompt-input:focus {
-          border-color: #0D4F4F;
-          box-shadow: 0 0 0 4px rgba(13, 79, 79, 0.08);
-        }
-
-        .org-prompt-input::placeholder {
-          color: #9BAAB8;
-        }
-
-        .org-prompt-actions {
-          display: flex;
-          gap: 12px;
-          margin-top: 20px;
-        }
-
-        .org-prompt-btn {
-          flex: 1;
-          padding: 14px;
-          border: none;
-          border-radius: 13px;
-          font-size: 14px;
-          font-weight: 700;
-          font-family: inherit;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-align: center;
-        }
-
-        .org-prompt-btn.primary {
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white;
-          box-shadow: 0 4px 16px rgba(13, 79, 79, 0.3);
-        }
-
-        .org-prompt-btn.primary:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(13, 79, 79, 0.4);
-        }
-
-        .org-prompt-btn.primary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .org-prompt-btn.secondary {
-          background: transparent;
-          color: #7A8FA6;
-          border: 1.5px solid #E2EAF0;
-        }
-
-        .org-prompt-btn.secondary:hover {
-          background: #F5F8FA;
-          border-color: #C8D4DE;
-        }
-
-        .org-prompt-error {
-          background: #FEF2F2;
-          border: 1px solid #FECACA;
-          color: #C0392B;
-          padding: 10px 14px;
-          border-radius: 11px;
-          font-size: 13px;
-          font-weight: 600;
-          margin-top: 12px;
-          display: flex;
-          gap: 8px;
-          align-items: center;
-        }
-
-        /* Form body */
         .form-body { padding: clamp(18px, 3vh, 28px) 28px clamp(16px, 2.5vh, 22px); }
 
         .eyebrow {
@@ -1174,19 +959,6 @@ export default function LoginPage() {
 
           .page-footer { flex-direction: column; text-align: center; padding: 16px 0 8px; gap: 10px; }
           .footer-links { justify-content: center; }
-
-          .org-prompt-modal {
-            padding: 32px 24px;
-            margin: 16px;
-          }
-
-          .org-prompt-title {
-            font-size: 20px;
-          }
-
-          .org-prompt-actions {
-            flex-direction: column;
-          }
         }
 
         @media (max-width: 380px) {
@@ -1275,7 +1047,6 @@ export default function LoginPage() {
         {/* ── Right panel ── */}
         <div className="right">
           <div className="right-inner">
-            {/* ── Navigation ── */}
             <div className="nav nav--card">
               <div className="nav-left">
                 <Logo />
@@ -1323,7 +1094,6 @@ export default function LoginPage() {
             </div>
 
             <div className="card">
-              {/* ── Mobile hero ── */}
               <div className="mobile-hero">
                 {heroSlides.map((s, i) => (
                   <img
@@ -1457,7 +1227,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* ── Footer ── */}
             <div className="page-footer">
               <div className="footer-brand">
                 <span>© 2026</span>
@@ -1479,77 +1248,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-
-      {/* ── Organization Prompt Modal ── */}
-      {showOrgPrompt && (
-        <div className="org-prompt-overlay">
-          <div className="org-prompt-modal">
-            <div className="org-prompt-icon">
-              <Building size={32} />
-            </div>
-            <h2 className="org-prompt-title">Create Your Organization</h2>
-            <p className="org-prompt-sub">
-              You're signed in as <strong>{googleUser?.name || googleUser?.email}</strong>.<br />
-              To get started, create an organization for your events.
-            </p>
-
-            <form onSubmit={handleCreateOrganization}>
-              <div className="field">
-                <label className={`flabel ${orgName ? 'up' : ''}`} htmlFor="orgName">
-                  Organization Name
-                </label>
-                <input
-                  id="orgName"
-                  type="text"
-                  className={`org-prompt-input ${error ? 'err' : ''}`}
-                  value={orgName}
-                  onChange={e => setOrgName(e.target.value)}
-                  onFocus={() => setEmailFocused(true)}
-                  onBlur={() => setEmailFocused(false)}
-                  placeholder="e.g., ABC Events"
-                  disabled={creatingOrg}
-                  autoFocus
-                />
-              </div>
-
-              {error && (
-                <div className="org-prompt-error">
-                  <AlertCircle size={16} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <div className="org-prompt-actions">
-                <button
-                  type="button"
-                  className="org-prompt-btn secondary"
-                  onClick={() => {
-                    setShowOrgPrompt(false);
-                    window.location.href = '/';
-                  }}
-                  disabled={creatingOrg}
-                >
-                  Go Back
-                </button>
-                <button
-                  type="submit"
-                  className="org-prompt-btn primary"
-                  disabled={creatingOrg || !orgName.trim()}
-                >
-                  {creatingOrg ? (
-                    <>
-                      <div className="spinner" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Organization'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

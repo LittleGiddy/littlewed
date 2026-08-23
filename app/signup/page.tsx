@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight, Phone } from 'lucide-react';
+import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
 export default function SignupPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = choose method, 1-3 = email flow
   const [form, setForm] = useState({
     business_name: '',
     subdomain: '',
@@ -89,13 +89,15 @@ export default function SignupPage() {
     }
   };
 
-  // ── Google Sign‑up handler ──
+  // ── Google Sign-up handler ──
+  // No localStorage hand-off anymore — the org name/subdomain is collected
+  // AFTER Google auth completes, on /auth/google-callback. That's what
+  // guarantees a Google user always ends up with a tenant before they can
+  // reach a dashboard.
   const handleGoogleSignup = () => {
-    // Save business name and subdomain to localStorage
-    localStorage.setItem('signup_business_name', form.business_name);
-    localStorage.setItem('signup_subdomain', form.subdomain);
-    // Redirect to Google, and after successful sign‑in, go to /signup/complete
-    signIn('google', { callbackUrl: '/signup/complete' });
+    setLoading(true);
+    setError('');
+    signIn('google', { callbackUrl: '/auth/google-callback?intent=signup' });
   };
 
   const isStep1Valid = form.business_name.trim() && form.subdomain.trim();
@@ -122,6 +124,10 @@ export default function SignupPage() {
     { icon: <Building size={14} />, label: 'Custom invitation cards' },
   ];
 
+  // Steps shown in the progress bar/dots exclude step 0 (the method choice)
+  const progressStep = step === 0 ? 0 : step;
+  const totalSteps = 3;
+
   return (
     <div style={{ minHeight: '100vh', fontFamily: "'DM Sans', 'Segoe UI', sans-serif" }}>
       <style>{`
@@ -130,7 +136,6 @@ export default function SignupPage() {
 
         .page { display: flex; min-height: 100vh; }
 
-        /* Left panel (desktop) */
         .left {
           width: 420px; flex-shrink: 0;
           background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
@@ -205,7 +210,6 @@ export default function SignupPage() {
           display: flex; align-items: center; justify-content: center; color: #E8A598;
         }
 
-        /* Right panel */
         .right {
           flex: 1; display: flex; align-items: center; justify-content: center;
           padding: 40px 24px; background: #F0F4F8;
@@ -227,7 +231,6 @@ export default function SignupPage() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* Mobile hero */
         .mobile-hero {
           display: none; flex-direction: column; align-items: center;
           padding: 40px 28px 32px;
@@ -281,7 +284,6 @@ export default function SignupPage() {
         }
         .pill svg { color: #E8A598; flex-shrink: 0; }
 
-        /* Step bar */
         .step-bar-wrap { background: #EEF2F6; height: 4px; }
         .step-bar-fill {
           height: 100%;
@@ -290,7 +292,6 @@ export default function SignupPage() {
           transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
         }
 
-        /* Form */
         .form-body { padding: 36px 36px 32px; }
         .step-label {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
@@ -302,7 +303,6 @@ export default function SignupPage() {
         }
         .form-subtitle { font-size: 13.5px; color: #7A8FA6; margin-bottom: 28px; line-height: 1.5; }
 
-        /* Fields */
         .field-wrap { position: relative; margin-bottom: 18px; }
         .field-label {
           position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
@@ -389,13 +389,27 @@ export default function SignupPage() {
         .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; background: #F5FAF9; }
 
         .btn-google {
-          width: 100%; padding: 14px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          background: white; color: #4A6072; font-size: 14px; font-weight: 600;
+          width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
+          background: white; color: #4A6072; font-size: 14.5px; font-weight: 700;
           font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
-          margin-top: 8px;
         }
         .btn-google:hover { border-color: #0D4F4F; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,79,79,0.08); }
+        .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .method-divider {
+          display: flex; align-items: center; gap: 10px; margin: 18px 0;
+          color: #C8D4DE; font-size: 11px; font-weight: 600;
+        }
+        .method-divider::before, .method-divider::after { content: ''; flex: 1; height: 1px; background: #EEF2F6; }
+
+        .btn-email-choice {
+          width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
+          background: white; color: #0D4F4F; font-size: 14.5px; font-weight: 700;
+          font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+          transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
+        }
+        .btn-email-choice:hover { border-color: #0D4F4F; background: #F5FAF9; transform: translateY(-1px); }
 
         .spinner {
           width: 17px; height: 17px; border: 2px solid rgba(255,255,255,0.3);
@@ -494,11 +508,44 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              <div className="step-bar-wrap">
-                <div className="step-bar-fill" style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }} />
-              </div>
+              {step > 0 && (
+                <div className="step-bar-wrap">
+                  <div className="step-bar-fill" style={{ width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }} />
+                </div>
+              )}
 
               <div className="form-body">
+                {step === 0 && (
+                  <>
+                    <div className="step-label">Get Started</div>
+                    <div className="form-title">Create your account</div>
+                    <p className="form-subtitle">Choose how you'd like to sign up. You'll set up your organization right after.</p>
+                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+
+                    <button onClick={handleGoogleSignup} className="btn-google" type="button" disabled={loading}>
+                      {loading ? (
+                        <><div className="spinner" style={{ borderTopColor: '#0D4F4F', borderColor: 'rgba(13,79,79,0.2)' }} /> Redirecting…</>
+                      ) : (
+                        <>
+                          <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          Continue with Google
+                        </>
+                      )}
+                    </button>
+
+                    <div className="method-divider">or</div>
+
+                    <button onClick={() => setStep(1)} className="btn-email-choice" type="button" disabled={loading}>
+                      <Mail size={17} /> Continue with Email
+                    </button>
+                  </>
+                )}
+
                 {step === 1 && (
                   <>
                     <div className="step-label">Step 1 of 3</div>
@@ -538,6 +585,7 @@ export default function SignupPage() {
                     >
                       Continue <ArrowRight size={16} />
                     </button>
+                    <button className="btn-secondary" onClick={() => setStep(0)}>← Back</button>
                   </>
                 )}
 
@@ -545,7 +593,7 @@ export default function SignupPage() {
                   <>
                     <div className="step-label">Step 2 of 3</div>
                     <div className="form-title">Your Account</div>
-                    <p className="form-subtitle">Create your login credentials or sign up with Google.</p>
+                    <p className="form-subtitle">Create your login credentials.</p>
                     {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'name' || form.name ? 'up' : ''}`}>Full Name</label>
@@ -615,22 +663,6 @@ export default function SignupPage() {
                     <button className="btn-primary" disabled={!isStep2Valid || loading} onClick={sendVerification}>
                       {loading ? <><div className="spinner" /> Sending code…</> : 'Verify Email →'}
                     </button>
-
-                    <div className="divider" style={{ margin: '16px 0 8px' }}>or</div>
-                    <button
-                      onClick={handleGoogleSignup}
-                      className="btn-google"
-                      type="button"
-                    >
-                      <svg className="h-5 w-5" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                      </svg>
-                      Continue with Gmail
-                    </button>
-
                     <button className="btn-secondary" onClick={() => setStep(1)}>← Back</button>
                   </>
                 )}
@@ -671,11 +703,13 @@ export default function SignupPage() {
                   </>
                 )}
 
-                <div className="step-dots">
-                  <div className={`dot ${step === 1 ? 'active' : ''}`} />
-                  <div className={`dot ${step === 2 ? 'active' : ''}`} />
-                  <div className={`dot ${step >= 3 ? 'active' : ''}`} />
-                </div>
+                {step > 0 && (
+                  <div className="step-dots">
+                    <div className={`dot ${progressStep === 1 ? 'active' : ''}`} />
+                    <div className={`dot ${progressStep === 2 ? 'active' : ''}`} />
+                    <div className={`dot ${progressStep >= 3 ? 'active' : ''}`} />
+                  </div>
+                )}
               </div>
             </div>
 

@@ -12,9 +12,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
 
-  // Mobile drawer open/closed
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Desktop sidebar collapsed/expanded (persistent, pushes content)
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
 
@@ -38,6 +36,21 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     if (role !== 'CLIENT' && role !== 'STAFF') { router.push('/login'); return; }
 
+    // ── Tenant check comes BEFORE the isActive check ──────────────────
+    // isActive:false has two different real-world meanings that must not
+    // be collapsed into one redirect target:
+    //   1. Brand-new Google user, no organization created yet → needs
+    //      /auth/google-callback to finish signup.
+    //   2. Organization exists, but is pending admin/subscription
+    //      approval → needs /client/pending-activation.
+    // Checking tenantId first disambiguates these. Without this, a
+    // Google user who never finished org creation lands on
+    // pending-activation with no way out.
+    if (!user.tenantId) {
+      router.push('/auth/google-callback?intent=login');
+      return;
+    }
+
     if (role === 'CLIENT' && !user.isActive && pathname !== '/client/pending-activation') {
       router.push('/client/pending-activation');
       return;
@@ -47,12 +60,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   }, [session, status, router, pathname]);
 
-  // Close mobile drawer on navigation
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
 
-  // Close mobile drawer on Escape
   useEffect(() => {
     if (!sidebarOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -62,7 +73,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return () => window.removeEventListener('keydown', onKey);
   }, [sidebarOpen]);
 
-  // Single toggle handler that does the right thing per screen size
   const toggleSidebar = () => {
     if (isLargeScreen) {
       setDesktopSidebarOpen((o) => !o);
@@ -71,7 +81,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     }
   };
 
-  // Whether the hamburger should render as an "X" (i.e. something is currently open)
   const isMenuOpenState = isLargeScreen ? desktopSidebarOpen : sidebarOpen;
 
   if (status === 'loading') {
@@ -171,7 +180,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           font-family: 'DM Sans', 'Segoe UI', sans-serif;
         }
 
-        /* ── Desktop sidebar (always in DOM at lg+, fixed, collapsible) ── */
         .cl-desktop-sidebar {
           display: none;
         }
@@ -203,7 +211,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
         .cl-logo { height: 52px; width: auto; object-fit: contain; max-width: 100%; }
 
-        /* User card */
         .cl-user-card {
           display: flex; align-items: center; gap: 12px;
           background: rgba(13,79,79,0.04); border: 1.5px solid rgba(13,79,79,0.08);
@@ -221,7 +228,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         .cl-user-name { font-size: 13.5px; font-weight: 700; color: #0D1B1B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
         .cl-user-email { font-size: 11.5px; color: #9BAAB8; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0 0; }
 
-        /* Nav */
         .cl-nav { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
         .cl-nav-link {
           display: flex; align-items: center; gap: 12px;
@@ -238,7 +244,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         .cl-nav-icon { flex-shrink: 0; }
         .cl-nav-link.active .cl-nav-icon { color: white; }
 
-        /* Footer */
         .cl-sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1.5px solid #F0F4F8; }
         .cl-signout-btn {
           width: 100%; display: flex; align-items: center; gap: 12px;
@@ -248,7 +253,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
         .cl-signout-btn:hover { background: #FEF2F2; color: #C0392B; }
 
-        /* ── Mobile drawer ── */
         .cl-mobile-sidebar {
           position: fixed; left: 0; top: 0; bottom: 0;
           width: min(280px, 84vw); z-index: 50;
@@ -261,7 +265,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           backdrop-filter: blur(2px); z-index: 40;
         }
 
-        /* ── Main content area ── */
         .cl-main-wrap {
           min-height: 100vh;
         }
@@ -275,7 +278,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           }
         }
 
-        /* Top header */
         .cl-topbar {
           position: sticky; top: 0; z-index: 20;
           background: white; border-bottom: 1.5px solid #E2EAF0;
@@ -329,19 +331,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           font-family: 'Playfair Display', serif;
         }
 
-        /* Page content */
         .cl-page-content { padding: 24px 18px 48px; }
         @media (min-width: 1024px) {
           .cl-page-content { padding: 32px 32px 56px; }
         }
       `}</style>
 
-      {/* Desktop sidebar — collapsible via the hamburger, slides fully off-canvas */}
       <aside className={`cl-desktop-sidebar${!desktopSidebarOpen ? ' collapsed' : ''}`}>
         <SidebarContent />
       </aside>
 
-      {/* Mobile drawer — only rendered/animated when toggled, and only below lg */}
       <AnimatePresence>
         {sidebarOpen && !isLargeScreen && (
           <>
@@ -366,7 +365,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         )}
       </AnimatePresence>
 
-      {/* Main content — margin-left collapses with the desktop sidebar; drawer overlays on mobile */}
       <div className={`cl-main-wrap${isLargeScreen && !desktopSidebarOpen ? ' sidebar-collapsed' : ''}`}>
         <div className="cl-topbar">
           <div className="cl-topbar-left">
