@@ -1,182 +1,124 @@
+// app/api/payment/create-checkout/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { generateCheckoutLink } from '@/lib/clickpesa';
 
 const CREDIT_COST = 300; // TZS per credit
 
-async function getClickPesaToken(clientId: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.clickpesa.com/third-parties/generate-token', {
-    method: 'POST',
-    headers: {
-      'client-id': clientId,
-      'api-key': apiKey,
-    },
-  });
-
-  const data = await res.json();
-  console.log('[ClickPesa] Token response:', JSON.stringify(data, null, 2));
-
-  if (!res.ok || !data.token) {
-    throw new Error(data.message || `Token generation failed (HTTP ${res.status})`);
-  }
-
-  // Normalise — ensure it has the "Bearer " prefix
-  return data.token.startsWith('Bearer ') ? data.token : `Bearer ${data.token}`;
-}
-
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const tenantId = (session.user as any).tenantId;
-  const { amount, returnUrl } = await req.json();
-
-  if (!amount || amount < CREDIT_COST) {
-    return NextResponse.json(
-      { error: `Minimum purchase is ${CREDIT_COST} TZS (1 credit)` },
-      { status: 400 }
-    );
-  }
-
-  const credits = Math.floor(amount / CREDIT_COST);
-  const totalPrice = credits * CREDIT_COST;
-
-  // ── Create pending transaction ─────────────────────────────────────────────
-  const transaction = await prisma.transaction.create({
-    data: {
-      tenantId,
-      amount: totalPrice,
-      userId: session.user.id, //  store user who made the purchase
-      type: 'CREDIT_PURCHASE',
-      status: 'PENDING',
-    },
-  });
-
-  // ── Build orderReference ───────────────────────────────────────────────────
-  //
-  // IMPORTANT: store this exact string in stripeSessionId so the webhook
-  // can do a simple findFirst({ where: { stripeSessionId: orderReference } }).
-  // Keep it short — ClickPesa may truncate long references.
-  //
-  const orderReference = `cred${transaction.id.replace(/-/g, '').slice(0, 20)}`;
-
-  // Store immediately so the webhook can always find the transaction,
-  // even if the checkout request fails partway through.
-  await prisma.transaction.update({
-    where: { id: transaction.id },
-    data: { stripeSessionId: orderReference },
-  });
-
-  // ── Validate env credentials ───────────────────────────────────────────────
-  const clientId = process.env.CLICKPESA_CLIENT_ID;
-  const apiKey = process.env.CLICKPESA_API_KEY;
-
-  if (!clientId || !apiKey) {
-    console.error('[ClickPesa] Missing CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY in environment');
-    await prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { status: 'FAILED' },
-    });
-    return NextResponse.json(
-      { error: 'Payment gateway not configured. Set CLICKPESA_CLIENT_ID and CLICKPESA_API_KEY in Vercel environment variables.' },
-      { status: 500 }
-    );
-  }
-
-  // ── Step 1: Get JWT ────────────────────────────────────────────────────────
-  let jwtToken: string;
   try {
-    jwtToken = await getClickPesaToken(clientId, apiKey);
-  } catch (err: any) {
-    console.error('[ClickPesa] Auth error:', err.message);
-    await prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { status: 'FAILED' },
-    });
-    return NextResponse.json(
-      { error: `Payment gateway auth failed: ${err.message}` },
-      { status: 500 }
-    );
-  }
+    const session = await getServerSession(authOptions);
+    
+    if (!session || !['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  const user = session.user as any;
+    const tenantId = (session.user as any).tenantId;
+    const userId = (session.user as any).id;
+    const { amount, returnUrl } = await req.json();
 
-  // ClickPesa requires phone without leading '+'
-  const rawPhone = (user.phone || '255712345678').replace(/^\+/, '');
-
-  const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
-
-  const payload = {
-    totalPrice: totalPrice.toString(),
-    orderReference,
-    orderCurrency: 'TZS',
-    customerName: user.name || 'Client',
-    customerEmail: user.email || 'client@example.com',
-    customerPhone: rawPhone,
-    description: `Purchase ${credits} credit${credits !== 1 ? 's' : ''} for LittleWed`,
-    callbackUrl: `${appUrl}/api/webhooks/stripe/clickpesa`,
-    redirectUrl: returnUrl || `${appUrl}/client/dashboard`,
-  };
-
-  console.log('[ClickPesa] Checkout payload:', JSON.stringify(payload, null, 2));
-
-  // ── Step 2: Generate checkout link ─────────────────────────────────────────
-  try {
-    const response = await fetch(
-      'https://api.clickpesa.com/third-parties/checkout-link/generate-checkout-url',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: jwtToken,
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const data = await response.json();
-
-    console.log('[ClickPesa] Checkout response status:', response.status);
-    console.log('[ClickPesa] Checkout response body:', JSON.stringify(data, null, 2));
-
-    if (!response.ok) {
-      await prisma.transaction.update({
-        where: { id: transaction.id },
-        data: { status: 'FAILED' },
-      });
+    if (!amount || amount < CREDIT_COST) {
       return NextResponse.json(
-        { error: data.message || 'Payment initiation failed' },
-        { status: response.status }
+        { error: `Minimum purchase is ${CREDIT_COST} TZS (1 credit)` },
+        { status: 400 }
       );
     }
 
-    const checkoutUrl: string | null = data.checkoutLink ?? null;
+    // Calculate credits
+    const credits = Math.floor(amount / CREDIT_COST);
+    const totalPrice = credits * CREDIT_COST;
 
-    if (!checkoutUrl) {
-      console.error('[ClickPesa] No checkoutLink in response:', data);
-      await prisma.transaction.update({
-        where: { id: transaction.id },
-        data: { status: 'FAILED' },
-      });
+    // ── Validate environment credentials ────────────────────────────────────
+    const apiKey = process.env.CLICKPESA_API_KEY;
+    const apiSecret = process.env.CLICKPESA_API_SECRET;
+
+    if (!apiKey || !apiSecret) {
+      console.error('[ClickPesa] Missing CLICKPESA_API_KEY or CLICKPESA_API_SECRET');
       return NextResponse.json(
-        { error: 'Payment gateway returned no checkout URL' },
+        { error: 'Payment gateway not configured. Set CLICKPESA_API_KEY and CLICKPESA_API_SECRET in environment variables.' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ checkoutUrl });
+    // ── Create pending transaction ──────────────────────────────────────────
+    const transaction = await prisma.transaction.create({
+      data: {
+        tenantId,
+        amount: totalPrice,
+        userId: userId,
+        type: 'CREDIT_PURCHASE',
+        status: 'PENDING',
+      },
+    });
 
-  } catch (err: any) {
-    console.error('[ClickPesa] Request failed:', err);
+    // ── Generate order reference ─────────────────────────────────────────────
+    const orderReference = `LITTLEWED-${transaction.id.slice(0, 8)}-${Date.now().toString().slice(-6)}`;
+
+    // Update transaction with reference
     await prisma.transaction.update({
       where: { id: transaction.id },
-      data: { status: 'FAILED' },
+      data: { stripeSessionId: orderReference },
     });
+
+    const user = session.user as any;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+
+    // ── Generate ClickPesa checkout link ────────────────────────────────────
+    const { checkoutUrl, orderId } = await generateCheckoutLink({
+      amount: totalPrice,
+      orderReference: orderReference,
+      customerName: user.name || 'Client',
+      customerEmail: user.email || 'client@example.com',
+      customerPhone: user.phone || '255712345678',
+      description: `Purchase ${credits} credit${credits !== 1 ? 's' : ''} for LittleWed`,
+    });
+
+    console.log('[ClickPesa] Checkout created:', {
+      transactionId: transaction.id,
+      orderReference,
+      orderId,
+      checkoutUrl,
+    });
+
+    return NextResponse.json({ 
+      checkoutUrl,
+      transactionId: transaction.id,
+    });
+
+  } catch (error: any) {
+    console.error('[ClickPesa] Error:', error);
+    
+    // Update transaction to failed if it exists
+    try {
+      const session = await getServerSession(authOptions);
+      if (session) {
+        const tenantId = (session.user as any).tenantId;
+        const userId = (session.user as any).id;
+        const { amount } = await req.json().catch(() => ({}));
+        
+        if (amount) {
+          const credits = Math.floor(amount / CREDIT_COST);
+          const totalPrice = credits * CREDIT_COST;
+          
+          const transaction = await prisma.transaction.create({
+            data: {
+              tenantId,
+              amount: totalPrice,
+              userId: userId,
+              type: 'CREDIT_PURCHASE',
+              status: 'FAILED',
+            },
+          });
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
     return NextResponse.json(
-      { error: 'Network error contacting payment gateway' },
+      { error: error.message || 'Failed to create payment' },
       { status: 500 }
     );
   }
