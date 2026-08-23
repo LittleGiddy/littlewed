@@ -5,9 +5,22 @@ import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, resetToken, newPassword } = await req.json();
+    const body = await req.json();
+    const { email, resetToken, newPassword } = body;
 
+    console.log('[ResetPassword] Request received:', { 
+      email, 
+      hasResetToken: !!resetToken,
+      hasNewPassword: !!newPassword 
+    });
+
+    // ✅ Check all required fields
     if (!email || !resetToken || !newPassword) {
+      console.log('[ResetPassword] Missing fields:', { 
+        hasEmail: !!email, 
+        hasResetToken: !!resetToken, 
+        hasNewPassword: !!newPassword 
+      });
       return NextResponse.json(
         { error: 'All fields are required' },
         { status: 400 }
@@ -24,7 +37,7 @@ export async function POST(req: NextRequest) {
     // Verify reset token
     const resetSession = await prisma.passwordResetSession.findFirst({
       where: {
-        email: email,
+        email: email.toLowerCase().trim(),
         token: resetToken,
         expiresAt: {
           gt: new Date(),
@@ -33,6 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!resetSession) {
+      console.log('[ResetPassword] Invalid or expired reset token for:', email);
       return NextResponse.json(
         { error: 'Invalid or expired reset link. Please request a new one.' },
         { status: 400 }
@@ -43,20 +57,22 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update user password
-    const user = await prisma.user.update({
-      where: { email: email },
+    await prisma.user.update({
+      where: { email: email.toLowerCase().trim() },
       data: { password: hashedPassword },
     });
 
     // Delete used reset sessions
     await prisma.passwordResetSession.deleteMany({
-      where: { email: email },
+      where: { email: email.toLowerCase().trim() },
     });
 
     // Also delete any remaining OTPs
     await prisma.passwordResetToken.deleteMany({
-      where: { email: email },
+      where: { email: email.toLowerCase().trim() },
     });
+
+    console.log('[ResetPassword] Password reset successful for:', email);
 
     return NextResponse.json({
       success: true,

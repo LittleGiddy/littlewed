@@ -1,10 +1,14 @@
 // app/api/auth/verify-reset-otp/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, otp } = await req.json();
+    const body = await req.json();
+    const { email, otp } = body;
+
+    console.log('[VerifyResetOTP] Request received:', { email, otp });
 
     if (!email || !otp) {
       return NextResponse.json(
@@ -16,8 +20,8 @@ export async function POST(req: NextRequest) {
     // Find valid OTP
     const token = await prisma.passwordResetToken.findFirst({
       where: {
-        email,
-        otp,
+        email: email.toLowerCase().trim(),
+        otp: otp,
         expiresAt: {
           gt: new Date(), // Not expired
         },
@@ -25,6 +29,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!token) {
+      console.log('[VerifyResetOTP] Invalid or expired OTP for:', email);
       return NextResponse.json(
         { error: 'Invalid or expired code. Please request a new one.' },
         { status: 400 }
@@ -32,32 +37,23 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ OTP is valid - generate a temporary reset token
-    // This token will be used to reset the password
-    const resetToken = crypto.randomUUID();
+    const resetToken = randomUUID();
     
-    // Store the reset token (you might want a separate table for this)
-    // Or we can use the existing token and mark it as used
-    await prisma.passwordResetToken.update({
-      where: { id: token.id },
-      data: {
-        // We'll use the same token but store the reset token in a new field
-        // Or we can create a new table for reset sessions
-      },
-    });
-
-    // For simplicity, we'll delete the OTP and create a new reset session
+    // Delete the used OTP
     await prisma.passwordResetToken.delete({
       where: { id: token.id },
     });
 
-    // Store reset token in a separate table
+    // Store reset token in the session table
     await prisma.passwordResetSession.create({
       data: {
-        email: email,
+        email: email.toLowerCase().trim(),
         token: resetToken,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
       },
     });
+
+    console.log('[VerifyResetOTP] OTP verified successfully for:', email);
 
     return NextResponse.json({
       success: true,
