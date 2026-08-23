@@ -44,10 +44,10 @@ export async function POST(req: NextRequest) {
       phone: phone || null, // was silently dropped before — never got saved
       role: 'CLIENT',
       tenantId: tenant.id,
-      isActive: true,
+      isActive: false,
       emailVerified: new Date(),
     },
   });
 
   return NextResponse.json({ success: true, tenantId: tenant.id });
-}
+} 

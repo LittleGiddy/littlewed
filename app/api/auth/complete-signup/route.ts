@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       data: {
         tenantId: tenant.id,
         role: 'CLIENT',
-        isActive: true,
+        
       },
     });
 

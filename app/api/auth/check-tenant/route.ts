@@ -10,9 +10,10 @@ export async function GET(req: NextRequest) {
     
     if (!session || !session.user) {
       return NextResponse.json({ 
+        authenticated: false,
         hasTenant: false,
         isActive: false,
-      }, { status: 401 });
+      });
     }
 
     const userId = (session.user as any).id;
@@ -26,24 +27,22 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // If user is not active, return isActive: false
-    if (!user?.isActive) {
-      return NextResponse.json({ 
-        hasTenant: false,
-        isActive: false,
-        message: 'Account is pending activation. Please contact support.'
-      });
-    }
-
-    return NextResponse.json({ 
+    console.log('[CheckTenant] User check:', {
+      userId,
       hasTenant: !!user?.tenantId,
       isActive: user?.isActive,
+    });
+
+    return NextResponse.json({ 
+      authenticated: true,
+      hasTenant: !!user?.tenantId,
+      isActive: user?.isActive ?? false,
       role: user?.role,
     });
   } catch (error) {
     console.error('[CheckTenant] Error:', error);
     return NextResponse.json(
-      { error: 'Failed to check tenant status', hasTenant: false, isActive: false },
+      { error: 'Failed to check tenant status', authenticated: false, hasTenant: false, isActive: false },
       { status: 500 }
     );
   }
