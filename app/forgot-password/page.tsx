@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
 
   const Logo = () => (
     <img
-      src="/Little Wed Logo.svg"
+      src="/White Little Wed Logo.svg"
       alt="Little Wed"
       style={{ display: 'block', width: '180px', height: 'auto' }}
     />
