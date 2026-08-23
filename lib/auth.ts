@@ -4,20 +4,13 @@ import GoogleProvider from 'next-auth/providers/google';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 
-// ─── We intentionally do NOT add `adapter: PrismaAdapter(prisma)` ──────────
-// Using a database adapter with CredentialsProvider + JWT strategy caused a
-// redirect loop. With JWT strategy, NextAuth stores everything encrypted in
-// the cookie – no adapter needed.
-// ────────────────────────────────────────────────────────────────────────────
-
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 24 * 60 * 60,
   },
 
   providers: [
-    // ── Credentials (email/password) ──────────────────────────────────────────
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -52,7 +45,6 @@ export const authOptions: NextAuthOptions = {
       },
     }),
 
-    // ── Google OAuth ──────────────────────────────────────────────────────────
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
@@ -61,78 +53,38 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     // ── signIn ────────────────────────────────────────────────────────────────
-    async signIn({ user, account, profile }) {
-      // Only apply custom logic for Google sign‑in
+    async signIn({ user, account }) {
+      console.log('[NextAuth] signIn - Provider:', account?.provider);
+      console.log('[NextAuth] signIn - User email:', user?.email);
+
       if (account?.provider === 'google') {
         try {
-          console.log('[NextAuth] Google signIn attempt for:', user.email);
-
-          // Check if a user with this email already exists
+          // Check if user exists
           const existingUser = await prisma.user.findUnique({
             where: { email: user.email! },
             include: {
               accounts: {
                 where: { provider: 'google' },
-                select: { provider: true },
               },
             },
           });
 
+          console.log('[NextAuth] Existing user:', !!existingUser);
+
           if (existingUser) {
-            // User exists → check if they already have a Google account linked
             const hasGoogleAccount = existingUser.accounts.length > 0;
+            console.log('[NextAuth] Has Google account:', hasGoogleAccount);
 
             if (hasGoogleAccount) {
-              console.log('[NextAuth] ✅ Google sign-in allowed (existing user with Google link)');
+              // ✅ User already has Google account - allow sign in
+              console.log('[NextAuth] ✅ User has Google account, allowing sign-in');
               return true;
             }
 
-            // No Google link → check if they have a password
-            if (existingUser.password) {
-              // ✅ Instead of blocking, link the Google account
-              console.log('[NextAuth] Linking Google account to existing user');
-              
-              // Check if the Google account is already linked to another user
-              const existingAccount = await prisma.account.findUnique({
-                where: {
-                  provider_providerAccountId: {
-                    provider: account.provider,
-                    providerAccountId: account.providerAccountId,
-                  },
-                },
-              });
+            // User exists but doesn't have Google account linked
+            console.log('[NextAuth] User exists, linking Google account...');
 
-              if (existingAccount) {
-                // This Google account is already linked to another user
-                console.log('[NextAuth] ⚠️ Google account already linked to another user');
-                // ✅ FIX: Instead of returning false (which causes AccessDenied),
-                // we allow the sign-in and update the user with the existing account
-                // Or we could return true and let the user sign in
-                return true;
-              }
-
-              // Link the Google account to the existing user
-              await prisma.account.create({
-                data: {
-                  userId: existingUser.id,
-                  type: account.type,
-                  provider: account.provider,
-                  providerAccountId: account.providerAccountId,
-                  access_token: account.access_token,
-                  expires_at: account.expires_at,
-                  token_type: account.token_type,
-                  scope: account.scope,
-                  id_token: account.id_token,
-                },
-              });
-
-              console.log('[NextAuth] ✅ Google account linked successfully');
-              return true;
-            }
-
-            // User exists with no password and no Google link
-            console.log('[NextAuth] User exists with no password, creating Google link...');
-            
+            // Link the Google account
             await prisma.account.create({
               data: {
                 userId: existingUser.id,
@@ -151,7 +103,7 @@ export const authOptions: NextAuthOptions = {
             return true;
           }
 
-          // ── First‑time Google user ──
+          // ── Create new user ──
           console.log('[NextAuth] Creating new user...');
 
           const newUser = await prisma.user.create({
@@ -164,6 +116,8 @@ export const authOptions: NextAuthOptions = {
               emailVerified: new Date(),
             },
           });
+
+          console.log('[NextAuth] User created:', newUser.id);
 
           await prisma.account.create({
             data: {
@@ -179,31 +133,33 @@ export const authOptions: NextAuthOptions = {
             },
           });
 
-          console.log('[NextAuth] ✅ User created and Google account linked');
+          console.log('[NextAuth] ✅ New user created and Google account linked');
           return true;
-        } catch (err) {
-          console.error('[NextAuth] ❌ Google signIn error:', err);
-          // ✅ FIX: Return true even on error to prevent AccessDenied
+        } catch (error) {
+          console.error('[NextAuth] Google signIn error:', error);
+          // ⚠️ IMPORTANT: Return true to prevent AccessDenied
           // The user will be signed in but might have incomplete data
           return true;
         }
       }
 
-      // For other providers (credentials), always allow
       return true;
     },
 
     // ── jwt ────────────────────────────────────────────────────────────────────
     async jwt({ token, user, account }) {
+      console.log('[NextAuth] JWT - User:', user?.email);
+
       if (user) {
         if (account?.provider === 'google') {
-          // Google sign‑in: fetch our DB record to get role, tenantId, isActive, etc.
+          // Fetch user from database
           const dbUser = await prisma.user.findUnique({
             where: { email: token.email! },
             include: { tenant: true },
           });
 
           if (dbUser) {
+            console.log('[NextAuth] JWT - DB user found:', dbUser.id);
             token.id = dbUser.id;
             token.role = dbUser.role;
             token.tenantId = dbUser.tenantId ?? undefined;
@@ -212,10 +168,12 @@ export const authOptions: NextAuthOptions = {
             token.isActive = dbUser.isActive;
             token.phone = dbUser.phone ?? undefined;
           } else {
-            console.log('[NextAuth] ⚠️ User not found in database during JWT callback');
+            console.log('[NextAuth] JWT - DB user NOT found!');
+            // Use the user from the token
+            token.id = (user as any).id;
           }
         } else {
-          // Credentials — everything is already on the user object from authorize()
+          // Credentials
           token.id = (user as any).id;
           token.role = (user as any).role;
           token.tenantId = (user as any).tenantId;
@@ -225,11 +183,14 @@ export const authOptions: NextAuthOptions = {
           token.phone = (user as any).phone;
         }
       }
+
       return token;
     },
 
     // ── session ────────────────────────────────────────────────────────────────
     async session({ session, token }) {
+      console.log('[NextAuth] Session - User:', session.user?.email);
+
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
@@ -239,16 +200,26 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).isActive = token.isActive;
         (session.user as any).phone = token.phone;
       }
+
       return session;
     },
 
     // ── redirect ──────────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
-      // ✅ FIX: Strip error parameters from the URL
+      console.log('[NextAuth] Redirect - URL:', url);
+      console.log('[NextAuth] Redirect - Base:', baseUrl);
+
+      // Handle error redirects
       if (url.includes('/login?error=')) {
         return '/login';
       }
-      
+
+      // If the URL is the callback URL, redirect to the appropriate dashboard
+      if (url.includes('/api/auth/callback')) {
+        // Let NextAuth handle the callback redirect
+        return url;
+      }
+
       if (url.startsWith('/')) return `${baseUrl}${url}`;
       if (url.startsWith(baseUrl)) return url;
       return baseUrl;

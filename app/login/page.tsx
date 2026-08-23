@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn, signOut } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowRight, MessageCircle, ScanLine, LayoutDashboard, FileHeart, Menu, X, Heart, Building, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -137,34 +137,13 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const result = await signIn('google', { 
-        redirect: false,
+      // Use redirect: true to let NextAuth handle the redirect properly
+      await signIn('google', { 
+        callbackUrl: '/login?from=google',
       });
       
-      if (result?.error) {
-        console.error('[Login] Google sign-in error:', result.error);
-        setError('Failed to sign in with Google. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      // After Google sign-in, get the session
-      const res = await fetch('/api/auth/session', {
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      const session = await res.json();
-      
-      if (!session || !session.user) {
-        setError('Failed to get session after Google sign-in.');
-        setLoading(false);
-        return;
-      }
-
-      console.log('[Login] Google sign-in successful, session:', session);
-      
-      // Check if user has a tenant
-      await checkUserTenant(session);
+      // The page will redirect, so we don't need to handle the session here
+      // NextAuth will handle the redirect based on the callbackUrl
     } catch (error) {
       console.error('[Login] Google sign-in error:', error);
       setError('Failed to sign in with Google. Please try again.');
