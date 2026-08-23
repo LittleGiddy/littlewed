@@ -1,3 +1,4 @@
+// app/client/dashboard/page.tsx
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -10,13 +11,17 @@ export default async function ClientDashboard() {
   if (!session) redirect('/login');
   if (!['CLIENT', 'SUPER_ADMIN'].includes((session.user as any).role)) redirect('/login');
 
+  // ✅ Check if user is active - redirect to pending activation if not
+  const isActive = (session.user as any).isActive;
+  if (!isActive) {
+    // Redirect to pending activation page (make sure this path matches your actual file)
+    redirect('/client/pending-activation');
+  }
+
   const tenantId = (session.user as any).tenantId;
 
   if (!tenantId) {
-    // No dead end — send them to finish account setup (org creation).
-    // This is the same page Google sign-in/sign-up routes through, so it
-    // works whether they got here via Google or somehow via credentials
-    // with a missing tenant.
+    // Send them to finish account setup (org creation)
     redirect('/auth/google-callback?intent=login');
   }
 
