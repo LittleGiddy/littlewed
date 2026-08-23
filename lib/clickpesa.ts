@@ -10,21 +10,22 @@ export async function getAccessToken(): Promise<string> {
   try {
     console.log('[ClickPesa] Getting token...');
     console.log('[ClickPesa] Base URL:', BASE_URL);
-    console.log('[ClickPesa] Client ID:', CLIENT_ID ? '***' : 'MISSING');
-    console.log('[ClickPesa] API Key:', API_KEY ? '***' : 'MISSING');
 
     if (!CLIENT_ID || !API_KEY) {
       throw new Error('CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY is missing');
     }
 
-    const res = await fetch(`${BASE_URL}/generate-token`, {
+    // ClickPesa API Integration uses client-id and api-key in the body
+    const res = await fetch(`${BASE_URL}/oauth/token`, {
       method: 'POST',
       headers: {
-        'client-id': CLIENT_ID,
-        'api-key': API_KEY,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      body: JSON.stringify({
+        clientId: CLIENT_ID,
+        apiKey: API_KEY,
+      }),
     });
 
     const responseText = await res.text();
@@ -35,7 +36,6 @@ export async function getAccessToken(): Promise<string> {
       throw new Error(`Token generation failed (${res.status}): ${responseText}`);
     }
 
-    // Try to parse the response
     let data;
     try {
       data = JSON.parse(responseText);
@@ -49,8 +49,8 @@ export async function getAccessToken(): Promise<string> {
     const token = data.token || data.access_token || data.accessToken || data.Token || data.AccessToken;
 
     if (!token) {
-      console.error('[ClickPesa] No token found in response. Available keys:', Object.keys(data));
-      throw new Error(`No token returned from ClickPesa. Response: ${JSON.stringify(data)}`);
+      console.error('[ClickPesa] No token found. Available keys:', Object.keys(data));
+      throw new Error(`No token returned. Response: ${JSON.stringify(data)}`);
     }
 
     // Ensure token has Bearer prefix
@@ -123,8 +123,8 @@ export async function generateCheckoutLink(params: {
     const orderId = data.orderId || data.order_id || data.id || data.reference;
 
     if (!checkoutUrl) {
-      console.error('[ClickPesa] No checkout URL in response. Available keys:', Object.keys(data));
-      throw new Error(`ClickPesa did not return a checkout URL. Response: ${JSON.stringify(data)}`);
+      console.error('[ClickPesa] No checkout URL. Available keys:', Object.keys(data));
+      throw new Error(`No checkout URL returned. Response: ${JSON.stringify(data)}`);
     }
 
     console.log('[ClickPesa] Checkout URL generated:', checkoutUrl);

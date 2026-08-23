@@ -10,57 +10,105 @@ export async function GET(req: NextRequest) {
     const apiKey = process.env.CLICKPESA_API_KEY;
     const baseUrl = process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com';
 
-    console.log('[Debug Token] Testing with:', {
-      clientId: clientId ? '***' : 'MISSING',
-      apiKey: apiKey ? '***' : 'MISSING',
-      baseUrl,
-    });
+    const results: any = {};
 
-    if (!clientId || !apiKey) {
-      return NextResponse.json({
-        error: 'Missing credentials',
-        clientId: !!clientId,
-        apiKey: !!apiKey,
-      }, { status: 400 });
+    // ─── Test 1: oauth/token ──────────────────────────────────────────────
+    try {
+      console.log('[Debug] Testing /oauth/token...');
+      const res = await fetch(`${baseUrl}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          apiKey: apiKey,
+        }),
+      });
+
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = null; }
+
+      results.oauthToken = {
+        status: res.status,
+        statusText: res.statusText,
+        response: json || text,
+      };
+    } catch (error: any) {
+      results.oauthToken = { error: error.message };
     }
 
-    const res = await fetch(`${baseUrl}/generate-token`, {
-      method: 'POST',
-      headers: {
-        'client-id': clientId,
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    const status = res.status;
-    const statusText = res.statusText;
-    const responseText = await res.text();
-
-    console.log('[Debug Token] Response:', {
-      status,
-      statusText,
-      responseText,
-    });
-
-    let json;
+    // ─── Test 2: /auth/token ──────────────────────────────────────────────
     try {
-      json = JSON.parse(responseText);
-    } catch {
-      json = null;
+      console.log('[Debug] Testing /auth/token...');
+      const res = await fetch(`${baseUrl}/auth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          apiKey: apiKey,
+        }),
+      });
+
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = null; }
+
+      results.authToken = {
+        status: res.status,
+        statusText: res.statusText,
+        response: json || text,
+      };
+    } catch (error: any) {
+      results.authToken = { error: error.message };
+    }
+
+    // ─── Test 3: /token ────────────────────────────────────────────────────
+    try {
+      console.log('[Debug] Testing /token...');
+      const res = await fetch(`${baseUrl}/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          clientId: clientId,
+          apiKey: apiKey,
+        }),
+      });
+
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = null; }
+
+      results.token = {
+        status: res.status,
+        statusText: res.statusText,
+        response: json || text,
+      };
+    } catch (error: any) {
+      results.token = { error: error.message };
     }
 
     return NextResponse.json({
-      status,
-      statusText,
-      rawResponse: responseText,
-      parsedResponse: json,
-      headers: Object.fromEntries(res.headers.entries()),
+      success: true,
+      baseUrl,
+      credentials: {
+        clientId: clientId ? '✅ Set' : '❌ Missing',
+        apiKey: apiKey ? '✅ Set' : '❌ Missing',
+      },
+      results,
+      timestamp: new Date().toISOString(),
     });
 
   } catch (error: any) {
-    console.error('[Debug Token] Error:', error);
+    console.error('[Debug] Error:', error);
     return NextResponse.json({
       error: error.message,
       stack: error.stack,
