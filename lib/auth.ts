@@ -53,22 +53,27 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     // ── signIn ───────────────────────────────────────────────────────────
-    // IMPORTANT: this callback only proves "this is a real Google account
-    // and NextAuth is allowed to issue a session." It must NEVER decide the
-    // account is "complete." Whether the person has an org/tenant is checked
-    // afterwards, on /auth/google-callback. That separation is what fixes
-    // "No organization is linked with this account."
     async signIn({ user, account }) {
       if (account?.provider !== 'google') return true;
 
       try {
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email! },
-          include: { accounts: { where: { provider: 'google' } } },
+          include: { 
+            accounts: { where: { provider: 'google' } },
+          },
         });
 
         if (existingUser) {
           const hasGoogleAccount = existingUser.accounts.length > 0;
+
+          // ✅ CHECK: If user exists but is inactive, block sign-in
+          if (!existingUser.isActive) {
+            console.log('[NextAuth] ⚠️ User exists but is inactive. Blocking sign-in.');
+            // Return false to deny sign-in, which will show AccessDenied
+            // We'll handle this gracefully in the login page
+            return false;
+          }
 
           if (!hasGoogleAccount) {
             // Existing (credentials) user signing in with Google for the
@@ -88,19 +93,22 @@ export const authOptions: NextAuthOptions = {
             });
           }
 
+          console.log('[NextAuth] ✅ User is active, allowing sign-in');
           return true;
         }
 
-        // Brand-new Google user → minimal shell account only.
+        // ── Brand-new Google user ──
         // isActive: false and no tenantId until /auth/google-callback
-        // walks them through creating (or being assigned) an organization.
+        // walks them through creating an organization.
+        console.log('[NextAuth] Creating new inactive user...');
+        
         const newUser = await prisma.user.create({
           data: {
             email: user.email!,
             name: user.name ?? 'New User',
             password: null,
             role: 'CLIENT',
-            isActive: false,
+            isActive: false, // ❗ REQUIRES SUPER ADMIN ACTIVATION
             emailVerified: new Date(),
           },
         });
@@ -119,12 +127,15 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        return true;
+        console.log('[NextAuth] ✅ New user created (inactive). Blocking sign-in.');
+        
+        // ✅ Return false to block sign-in
+        // The user will see AccessDenied error which we'll handle in the login page
+        return false;
       } catch (error) {
         console.error('[NextAuth] Google signIn error:', error);
-        // Fail loudly and visibly instead of letting a half-created
-        // account slip through with `return true`.
-        return '/login?error=GoogleSignInFailed';
+        // ✅ Return false to deny sign-in
+        return false;
       }
     },
 
@@ -192,15 +203,20 @@ export const authOptions: NextAuthOptions = {
 
     // ── redirect ─────────────────────────────────────────────────────────
     async redirect({ url, baseUrl }) {
-      // Previous version stripped the error query string here, so
-      // /login?error=... always rendered as a plain /login — no message
-      // ever showed. Preserve the full URL instead.
+      // ✅ Keep the error parameter for the login page to display messages
       if (url.includes('/login?error=')) {
         return url.startsWith('http') ? url : `${baseUrl}${url}`;
       }
+      
+      // Handle callback URLs
       if (url.includes('/api/auth/callback')) return url;
+      
+      // Handle relative URLs
       if (url.startsWith('/')) return `${baseUrl}${url}`;
+      
+      // Handle absolute URLs
       if (url.startsWith(baseUrl)) return url;
+      
       return baseUrl;
     },
   },
