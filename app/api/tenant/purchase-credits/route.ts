@@ -1,114 +1,147 @@
-// lib/clickpesa.ts
+// app/api/webhooks/clickpesa/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-const CLIENT_ID = process.env.CLICKPESA_CLIENT_ID!;
-const API_KEY = process.env.CLICKPESA_API_KEY!;
-const BASE_URL = process.env.CLICKPESA_BASE_URL!;
-const WEBHOOK_URL = process.env.CLICKPESA_WEBHOOK_URL;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// ─── Get Access Token ────────────────────────────────────────────────────
-export async function getAccessToken(): Promise<string> {
+const CREDIT_COST = 500;
+
+export async function POST(req: NextRequest) {
   try {
-    const res = await fetch(`${BASE_URL}/generate-token`, {
-      method: 'POST',
-      headers: {
-        'client-id': CLIENT_ID,
-        'api-key': API_KEY,
-      },
+    const rawBody = await req.text();
+    console.log('[ClickPesa Webhook] Raw body:', rawBody);
+
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (err) {
+      console.error('[ClickPesa Webhook] JSON parse error:', err);
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    console.log('[ClickPesa Webhook] Parsed payload:', JSON.stringify(body, null, 2));
+
+    // Extract data - ClickPesa wraps data in a 'data' object
+    const { data } = body;
+    if (!data) {
+      console.warn('[ClickPesa Webhook] No data object in payload');
+      return NextResponse.json({ received: true });
+    }
+
+    const orderReference = data.orderReference;
+    const status = data.status;
+    const collectedAmount = data.collectedAmount;
+
+    console.log('[ClickPesa Webhook] Extracted:', { orderReference, status, collectedAmount });
+
+    if (!orderReference) {
+      console.warn('[ClickPesa Webhook] No orderReference in payload — ignoring');
+      return NextResponse.json({ received: true });
+    }
+
+    // Only process successful payments
+    const successStatuses = ['SUCCESS', 'COMPLETED', 'success', 'completed'];
+    if (!successStatuses.includes(status)) {
+      console.log(`[ClickPesa Webhook] Payment not successful: ${status}`);
+      
+      // Update transaction to FAILED if found
+      const transaction = await prisma.transaction.findFirst({
+        where: { stripeSessionId: orderReference },
+      });
+
+      if (transaction && transaction.status !== 'COMPLETED') {
+        await prisma.transaction.update({
+          where: { id: transaction.id },
+          data: { status: 'FAILED' },
+        });
+      }
+
+      return NextResponse.json({ received: true });
+    }
+
+    // Find the transaction
+    const transaction = await prisma.transaction.findFirst({
+      where: { stripeSessionId: orderReference },
     });
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('[ClickPesa] Token error:', errorText);
-      throw new Error(`Failed to generate ClickPesa token: ${errorText}`);
+    if (!transaction) {
+      console.warn(`[ClickPesa Webhook] Transaction not found for reference: ${orderReference}`);
+      return NextResponse.json({ received: true });
     }
 
-    const data = await res.json();
-    console.log('[ClickPesa] Token response:', data);
-    
-    const token = data.token;
-    
-    if (!token) {
-      console.error('[ClickPesa] No token in response:', data);
-      throw new Error('No token returned from ClickPesa');
+    if (transaction.status === 'COMPLETED') {
+      console.log(`[ClickPesa Webhook] Transaction ${transaction.id} already completed.`);
+      return NextResponse.json({ received: true });
     }
 
-    return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    // Calculate credits
+    let actualAmount = transaction.amount;
+    if (collectedAmount) {
+      const parsed = parseFloat(collectedAmount);
+      if (!isNaN(parsed) && parsed > 0) {
+        actualAmount = Math.round(parsed);
+      }
+    }
+
+    console.log(`[ClickPesa Webhook] Intended amount: ${transaction.amount}, Actual amount: ${actualAmount}`);
+
+    const creditsToAdd = Math.floor(actualAmount / CREDIT_COST);
+    if (creditsToAdd <= 0) {
+      console.warn(`[ClickPesa Webhook] Actual amount (${actualAmount} TZS) too low for any credit.`);
+      await prisma.transaction.update({
+        where: { id: transaction.id },
+        data: { status: 'FAILED' },
+      });
+      return NextResponse.json({ received: true });
+    }
+
+    // Update transaction, tenant credits, and create notification
+    await prisma.$transaction([
+      prisma.transaction.update({
+        where: { id: transaction.id },
+        data: { 
+          status: 'COMPLETED', 
+          amount: actualAmount,
+        },
+      }),
+      prisma.tenant.update({
+        where: { id: transaction.tenantId },
+        data: { credits: { increment: creditsToAdd } },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: transaction.userId!,
+          title: 'Credits Purchased 🎉',
+          message: `You have successfully purchased ${creditsToAdd} credit${creditsToAdd > 1 ? 's' : ''}! (${actualAmount.toLocaleString()} TZS)`,
+          type: 'success',
+        },
+      }),
+    ]);
+
+    console.log(`[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
+    console.log(`[ClickPesa Webhook] ✅ Notification created for user ${transaction.userId}`);
+
+    return NextResponse.json({ 
+      received: true, 
+      processed: true,
+      creditsAdded: creditsToAdd,
+    });
+
   } catch (error) {
-    console.error('[ClickPesa] Token generation error:', error);
-    throw error;
+    console.error('[ClickPesa Webhook] Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
-// ─── Generate Checkout Link ──────────────────────────────────────────────
-export async function generateCheckoutLink(params: {
-  amount: number;
-  orderReference: string;
-  customerName?: string;
-  customerEmail?: string;
-  customerPhone?: string;
-  description?: string;
-}): Promise<{ checkoutUrl: string; orderId?: string }> {
-  try {
-    const token = await getAccessToken();
-
-    const payload = {
-      totalPrice: params.amount.toString(),
-      orderReference: params.orderReference,
-      orderCurrency: 'TZS',
-      customerName: params.customerName || '',
-      customerEmail: params.customerEmail || '',
-      customerPhone: params.customerPhone || '',
-      description: params.description || '',
-      callbackUrl: WEBHOOK_URL,
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/client/dashboard`,
-    };
-
-    console.log('[ClickPesa] Creating payment:', {
-      orderReference: params.orderReference,
-      amount: params.amount,
-      callbackUrl: WEBHOOK_URL,
-    });
-
-    const res = await fetch(`${BASE_URL}/checkout-link/generate-checkout-url`, {
-      method: 'POST',
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseText = await res.text();
-    
-    if (!res.ok) {
-      console.error('[ClickPesa] Checkout error:', responseText);
-      throw new Error(`ClickPesa checkout error: ${responseText}`);
-    }
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch {
-      throw new Error(`ClickPesa returned invalid JSON: ${responseText}`);
-    }
-
-    console.log('[ClickPesa] Checkout response:', data);
-
-    const checkoutUrl = data.checkoutLink || data.checkoutUrl || data.checkout_url;
-    const orderId = data.orderId || data.order_id || data.id;
-
-    if (!checkoutUrl) {
-      console.error('[ClickPesa] No checkout URL in response:', data);
-      throw new Error(`ClickPesa did not return a checkout URL: ${JSON.stringify(data)}`);
-    }
-
-    return { 
-      checkoutUrl,
-      orderId,
-    };
-  } catch (error) {
-    console.error('[ClickPesa] Generate checkout error:', error);
-    throw error;
-  }
+// ─── GET endpoint for webhook verification ──────────────────────────────
+export async function GET() {
+  return NextResponse.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    message: 'ClickPesa webhook endpoint is active'
+  });
 }
