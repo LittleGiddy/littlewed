@@ -19,45 +19,32 @@ export async function POST(req: NextRequest) {
 
     console.log('[ClickPesa Webhook] Parsed payload:', JSON.stringify(body, null, 2));
 
-    // ─── Extract data (supports both old and new formats) ────────────────
-    // New API Application format: { data: { ... } }
-    // Old Hosted format: { ... }
-    let data = body.data || body;
-    if (body.data && typeof body.data === 'object') {
-      data = body.data;
+    // Extract data - ClickPesa wraps data in a 'data' object
+    const { data } = body;
+    if (!data) {
+      console.warn('[ClickPesa Webhook] No data object in payload');
+      return NextResponse.json({ received: true });
     }
 
-    // ─── Extract fields from both formats ────────────────────────────────
-    const orderReference = data.orderReference || data.order_reference || data.order_ref;
-    const status = data.status || data.payment_status;
-    const collectedAmount = data.collectedAmount || data.amount || data.collected_amount;
-    const transactionId = data.transaction_id || data.transactionId || data.id;
+    const orderReference = data.orderReference;
+    const status = data.status;
+    const collectedAmount = data.collectedAmount;
 
-    console.log('[ClickPesa Webhook] Extracted data:', {
-      orderReference,
-      status,
-      collectedAmount,
-      transactionId,
-    });
+    console.log('[ClickPesa Webhook] Extracted:', { orderReference, status, collectedAmount });
 
     if (!orderReference) {
       console.warn('[ClickPesa Webhook] No orderReference in payload — ignoring');
       return NextResponse.json({ received: true });
     }
 
-    // ─── Check if payment was successful ──────────────────────────────────
-    const successStatuses = ['SUCCESS', 'COMPLETED', 'success', 'completed', 'PAID'];
+    // Only process successful payments
+    const successStatuses = ['SUCCESS', 'COMPLETED', 'success', 'completed'];
     if (!successStatuses.includes(status)) {
       console.log(`[ClickPesa Webhook] Payment not successful: ${status}`);
       
-      // Update transaction status to FAILED
+      // Update transaction to FAILED if found
       const transaction = await prisma.transaction.findFirst({
-        where: { 
-          OR: [
-            { stripeSessionId: orderReference },
-            { id: orderReference },
-          ]
-        },
+        where: { stripeSessionId: orderReference },
       });
 
       if (transaction && transaction.status !== 'COMPLETED') {
@@ -65,25 +52,18 @@ export async function POST(req: NextRequest) {
           where: { id: transaction.id },
           data: { status: 'FAILED' },
         });
-        console.log(`[ClickPesa Webhook] Transaction ${transaction.id} marked as FAILED`);
       }
 
       return NextResponse.json({ received: true });
     }
 
-    // ─── Find the transaction ──────────────────────────────────────────────
+    // Find the transaction
     const transaction = await prisma.transaction.findFirst({
-      where: { 
-        OR: [
-          { stripeSessionId: orderReference },
-          { id: orderReference },
-        ]
-      },
+      where: { stripeSessionId: orderReference },
     });
 
     if (!transaction) {
       console.warn(`[ClickPesa Webhook] Transaction not found for reference: ${orderReference}`);
-      // Could be a test webhook or old transaction - ignore
       return NextResponse.json({ received: true });
     }
 
@@ -92,7 +72,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ─── Calculate credits based on actual amount paid ────────────────────
+    // Calculate credits
     let actualAmount = transaction.amount;
     if (collectedAmount) {
       const parsed = parseFloat(collectedAmount);
@@ -113,14 +93,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ─── Update transaction, tenant credits, and create notification ──────
+    // Update transaction, tenant credits, and create notification
     await prisma.$transaction([
       prisma.transaction.update({
         where: { id: transaction.id },
         data: { 
           status: 'COMPLETED', 
           amount: actualAmount,
-          stripeSessionId: transactionId || orderReference,
         },
       }),
       prisma.tenant.update({
@@ -137,7 +116,7 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    console.log(`[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId} (based on actual payment of ${actualAmount} TZS)`);
+    console.log(`[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
     console.log(`[ClickPesa Webhook] ✅ Notification created for user ${transaction.userId}`);
 
     return NextResponse.json({ 
@@ -157,7 +136,6 @@ export async function POST(req: NextRequest) {
 
 // ─── GET endpoint for webhook verification ──────────────────────────────
 export async function GET(req: NextRequest) {
-  // Some payment providers send a GET request for verification
   return NextResponse.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),

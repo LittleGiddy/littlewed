@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateCheckoutLink } from '@/lib/clickpesa';
 
-const CREDIT_COST = 300; // TZS per credit
+const CREDIT_COST = 500; // TZS per credit
 
 export async function POST(req: NextRequest) {
   try {
