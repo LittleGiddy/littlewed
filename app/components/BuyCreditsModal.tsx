@@ -12,7 +12,7 @@ interface BuyCreditsModalProps {
   returnUrl?: string;
 }
 
-const CREDIT_COST = 300; // TZS per credit
+const CREDIT_COST = 500; // TZS per credit
 
 const PRESETS = [
   { credits: 10,  label: '10 credits',  badge: null,        popular: false },
@@ -496,7 +496,7 @@ export default function BuyCreditsModal({
           </div>
 
           <p className="bcm-rate-note">
-            1 credit = <strong>300 TZS</strong> · Secure payment via ClickPesa
+            1 credit = <strong>500 TZS</strong> · Secure payment via ClickPesa
           </p>
         </div>
       </div>
