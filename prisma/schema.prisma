@@ -266,6 +266,21 @@ model PasswordResetToken {
   otp       String
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+// ─── ✅ ADD THIS NEW MODEL ───────────────────────────────────────────────
+model PasswordResetSession {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
 }
 
 model Notification {
