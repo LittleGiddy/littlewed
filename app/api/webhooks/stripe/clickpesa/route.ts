@@ -1,3 +1,4 @@
+// app/api/webhooks/clickpesa/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     console.log('[ClickPesa Webhook] Parsed payload:', JSON.stringify(payload, null, 2));
 
-    // ─── Extract fields - MATCHES THE WORKING WEBHOOK FORMAT ──────────────
+    // ✅ API Integration webhook format
     const { 
       orderReference, 
       status, 
@@ -35,14 +36,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing orderReference' }, { status: 400 });
     }
 
-    console.log('[ClickPesa Webhook] Processing:', { 
-      orderReference, 
-      status, 
-      paymentReference, 
-      collectedAmount 
-    });
-
-    // ─── Find the transaction ──────────────────────────────────────────────
+    // Find transaction
     const transaction = await prisma.transaction.findFirst({
       where: { 
         OR: [
@@ -53,18 +47,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!transaction) {
-      console.warn(`[ClickPesa Webhook] Transaction not found for reference: ${orderReference}`);
-      // Still return 200 to acknowledge receipt
+      console.warn(`[ClickPesa Webhook] Transaction not found: ${orderReference}`);
       return NextResponse.json({ received: true });
     }
 
-    // ─── Check if already processed ─────────────────────────────────────────
     if (transaction.status === 'COMPLETED') {
       console.log(`[ClickPesa Webhook] Transaction ${transaction.id} already completed.`);
       return NextResponse.json({ received: true });
     }
 
-    // ─── Check if payment was successful ────────────────────────────────────
     // ✅ Status is uppercase: 'SUCCESS'
     const isSuccess = status === 'SUCCESS' || status === 'COMPLETED';
 
@@ -77,7 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ─── Calculate credits based on actual amount ──────────────────────────
+    // Calculate credits
     let actualAmount = transaction.amount;
     if (collectedAmount) {
       const parsed = parseFloat(collectedAmount);
@@ -85,8 +76,6 @@ export async function POST(req: NextRequest) {
         actualAmount = Math.round(parsed);
       }
     }
-
-    console.log(`[ClickPesa Webhook] Intended: ${transaction.amount}, Actual: ${actualAmount}`);
 
     const creditsToAdd = Math.floor(actualAmount / CREDIT_COST);
     if (creditsToAdd <= 0) {
@@ -98,7 +87,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ─── Update transaction, tenant credits, and create notification ──────
+    // Update everything
     await prisma.$transaction([
       prisma.transaction.update({
         where: { id: transaction.id },
@@ -122,8 +111,7 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    console.log(`[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits to tenant ${transaction.tenantId}`);
-    console.log(`[ClickPesa Webhook] ✅ Notification created for user ${transaction.userId}`);
+    console.log(`[ClickPesa Webhook] ✅ Added ${creditsToAdd} credits`);
 
     return NextResponse.json({ 
       received: true, 
@@ -140,11 +128,9 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── GET endpoint for webhook verification ──────────────────────────────
 export async function GET() {
   return NextResponse.json({ 
     status: 'ok', 
-    timestamp: new Date().toISOString(),
-    message: 'ClickPesa webhook endpoint is active'
+    timestamp: new Date().toISOString()
   });
 }
