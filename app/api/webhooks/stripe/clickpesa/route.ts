@@ -22,28 +22,25 @@ export async function POST(req: NextRequest) {
 
     console.log('[ClickPesa Webhook] Parsed payload:', JSON.stringify(payload, null, 2));
 
-    // ✅ API Integration webhook format
-    const { 
-      orderReference, 
-      status, 
-      paymentReference, 
-      collectedAmount, 
-      collectedCurrency 
-    } = payload;
+    // Hosted mode webhook format
+    const { data } = payload;
+    if (!data) {
+      console.warn('[ClickPesa Webhook] No data object in payload');
+      return NextResponse.json({ received: true });
+    }
+
+    const orderReference = data.orderReference;
+    const status = data.status;
+    const collectedAmount = data.collectedAmount;
 
     if (!orderReference) {
-      console.error('[ClickPesa Webhook] Missing orderReference');
-      return NextResponse.json({ error: 'Missing orderReference' }, { status: 400 });
+      console.warn('[ClickPesa Webhook] No orderReference');
+      return NextResponse.json({ received: true });
     }
 
     // Find transaction
     const transaction = await prisma.transaction.findFirst({
-      where: { 
-        OR: [
-          { stripeSessionId: orderReference },
-          { id: orderReference },
-        ]
-      },
+      where: { stripeSessionId: orderReference },
     });
 
     if (!transaction) {
@@ -56,10 +53,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // ✅ Status is uppercase: 'SUCCESS'
-    const isSuccess = status === 'SUCCESS' || status === 'COMPLETED';
-
-    if (!isSuccess) {
+    // Check if successful (Hosted mode uses uppercase SUCCESS)
+    if (status !== 'SUCCESS' && status !== 'COMPLETED') {
       console.log(`[ClickPesa Webhook] Payment not successful: ${status}`);
       await prisma.transaction.update({
         where: { id: transaction.id },
@@ -94,7 +89,6 @@ export async function POST(req: NextRequest) {
         data: { 
           status: 'COMPLETED', 
           amount: actualAmount,
-          stripeSessionId: paymentReference || orderReference,
         },
       }),
       prisma.tenant.update({

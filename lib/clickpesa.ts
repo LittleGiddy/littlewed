@@ -1,4 +1,4 @@
-// lib/clickpesa.ts - Full API Integration with custom payment page
+// lib/clickpesa.ts - HOSTED INTEGRATION
 
 const CLIENT_ID = process.env.CLICKPESA_CLIENT_ID!;
 const API_KEY = process.env.CLICKPESA_API_KEY!;
@@ -8,10 +8,13 @@ const WEBHOOK_URL = process.env.CLICKPESA_WEBHOOK_URL;
 // ─── Get Access Token ────────────────────────────────────────────────────
 export async function getAccessToken(): Promise<string> {
   try {
+    console.log('[ClickPesa] Getting token...');
+
     if (!CLIENT_ID || !API_KEY) {
       throw new Error('CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY is missing');
     }
 
+    // ✅ Hosted mode uses the same /generate-token endpoint
     const res = await fetch(`${BASE_URL}/generate-token`, {
       method: 'POST',
       headers: {
@@ -27,6 +30,8 @@ export async function getAccessToken(): Promise<string> {
     }
 
     const data = await res.json();
+    console.log('[ClickPesa] Token response:', data);
+
     const token = data.token || data.accessToken || data.access_token;
 
     if (!token) {
@@ -40,42 +45,35 @@ export async function getAccessToken(): Promise<string> {
   }
 }
 
-// ─── Create Payment Intent ──────────────────────────────────────────────
-export async function createPaymentIntent(params: {
+// ─── Generate Checkout Link ──────────────────────────────────────────────
+export async function generateCheckoutLink(params: {
   amount: number;
   orderReference: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
   description?: string;
-}): Promise<{ 
-  paymentId: string; 
-  clientSecret?: string;
-  status: 'pending' | 'requires_action' | 'succeeded';
-}> {
+}): Promise<{ checkoutUrl: string; orderId?: string }> {
   try {
     const token = await getAccessToken();
 
+    // ✅ Hosted mode payload format
     const payload = {
-      amount: params.amount,
-      currency: 'TZS',
-      order_reference: params.orderReference,
-      customer: {
-        name: params.customerName,
-        email: params.customerEmail,
-        phone: params.customerPhone,
-      },
-      description: params.description || 'Credit purchase',
-      callback_url: WEBHOOK_URL,
-      metadata: {
-        order_reference: params.orderReference,
-        amount: params.amount,
-      },
+      totalPrice: params.amount.toString(),
+      orderReference: params.orderReference,
+      orderCurrency: 'TZS',
+      customerName: params.customerName || '',
+      customerEmail: params.customerEmail || '',
+      customerPhone: params.customerPhone || '',
+      description: params.description || '',
+      callbackUrl: WEBHOOK_URL,
+      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,
     };
 
-    console.log('[ClickPesa] Creating payment intent:', JSON.stringify(payload, null, 2));
+    console.log('[ClickPesa] Checkout payload:', JSON.stringify(payload, null, 2));
 
-    const res = await fetch(`${BASE_URL}/payments`, {
+    // ✅ Hosted mode endpoint
+    const res = await fetch(`${BASE_URL}/checkout-link/generate-checkout-url`, {
       method: 'POST',
       headers: {
         Authorization: token,
@@ -85,121 +83,25 @@ export async function createPaymentIntent(params: {
     });
 
     const responseText = await res.text();
-    console.log('[ClickPesa] Payment intent response:', responseText);
+    console.log('[ClickPesa] Checkout response:', responseText);
 
     if (!res.ok) {
-      throw new Error(`Payment intent failed (${res.status}): ${responseText}`);
+      throw new Error(`ClickPesa checkout error (${res.status}): ${responseText}`);
     }
 
     const data = JSON.parse(responseText);
     
-    return {
-      paymentId: data.id || data.payment_id,
-      clientSecret: data.client_secret || data.clientSecret,
-      status: data.status || 'pending',
-    };
+    // ✅ Hosted mode returns checkoutLink
+    const checkoutUrl = data.checkoutLink || data.checkoutUrl || data.checkout_url;
+    const orderId = data.orderId || data.order_id || data.id;
+
+    if (!checkoutUrl) {
+      throw new Error(`No checkout URL returned: ${JSON.stringify(data)}`);
+    }
+
+    return { checkoutUrl, orderId };
   } catch (error) {
-    console.error('[ClickPesa] Create payment intent error:', error);
-    throw error;
-  }
-}
-
-// ─── Confirm Payment ──────────────────────────────────────────────────────
-export async function confirmPayment(params: {
-  paymentId: string;
-  paymentMethod: 'mpesa' | 'airtel_money' | 'tigo_pesa' | 'halopesa' | 'card' | 'bank';
-  phoneNumber?: string;
-  cardDetails?: {
-    number: string;
-    expiryMonth: string;
-    expiryYear: string;
-    cvc: string;
-  };
-}): Promise<{ 
-  status: 'succeeded' | 'failed' | 'pending';
-  transactionId?: string;
-}> {
-  try {
-    const token = await getAccessToken();
-
-    const payload: any = {
-      payment_method: params.paymentMethod,
-    };
-
-    if (params.phoneNumber) {
-      payload.phone_number = params.phoneNumber;
-    }
-
-    if (params.cardDetails) {
-      payload.card = {
-        number: params.cardDetails.number,
-        expiry_month: params.cardDetails.expiryMonth,
-        expiry_year: params.cardDetails.expiryYear,
-        cvc: params.cardDetails.cvc,
-      };
-    }
-
-    console.log('[ClickPesa] Confirming payment:', JSON.stringify(payload, null, 2));
-
-    const res = await fetch(`${BASE_URL}/payments/${params.paymentId}/confirm`, {
-      method: 'POST',
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const responseText = await res.text();
-    console.log('[ClickPesa] Confirm payment response:', responseText);
-
-    if (!res.ok) {
-      throw new Error(`Payment confirmation failed (${res.status}): ${responseText}`);
-    }
-
-    const data = JSON.parse(responseText);
-    
-    return {
-      status: data.status || 'pending',
-      transactionId: data.transaction_id || data.transactionId,
-    };
-  } catch (error) {
-    console.error('[ClickPesa] Confirm payment error:', error);
-    throw error;
-  }
-}
-
-// ─── Get Payment Status ──────────────────────────────────────────────────
-export async function getPaymentStatus(paymentId: string): Promise<{
-  status: 'pending' | 'succeeded' | 'failed';
-  amount?: number;
-  transactionId?: string;
-}> {
-  try {
-    const token = await getAccessToken();
-
-    const res = await fetch(`${BASE_URL}/payments/${paymentId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: token,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`Get payment failed (${res.status}): ${errorText}`);
-    }
-
-    const data = await res.json();
-    
-    return {
-      status: data.status || 'pending',
-      amount: data.amount,
-      transactionId: data.transaction_id || data.transactionId,
-    };
-  } catch (error) {
-    console.error('[ClickPesa] Get payment status error:', error);
+    console.error('[ClickPesa] Generate checkout error:', error);
     throw error;
   }
 }

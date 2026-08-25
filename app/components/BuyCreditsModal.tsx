@@ -68,6 +68,7 @@ export default function BuyCreditsModal({
   const deficit = requiredCredits - currentCredits;
   const isDeficit = deficit > 0;
 
+  // In the handlePurchase function
   const handlePurchase = async () => {
     if (activeCredits < 1) { toast.error('Please select at least 1 credit'); return; }
     setLoading(true);
@@ -80,9 +81,9 @@ export default function BuyCreditsModal({
       });
       const data = await res.json();
 
-      if (res.ok && data.paymentId) {
-        // ✅ Redirect to custom checkout page
-        window.location.href = `/payment/checkout?paymentId=${data.paymentId}&amount=${data.amount}&credits=${data.credits}`;
+      if (res.ok && data.checkoutUrl) {
+        // ✅ Redirect to ClickPesa hosted payment page
+        window.location.href = data.checkoutUrl;
       } else {
         toast.error(data.error || 'Failed to initiate payment');
         setLoading(false);

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { createPaymentIntent } from '@/lib/clickpesa';
+import { generateCheckoutLink } from '@/lib/clickpesa';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // ── Generate order reference ─────────────────────────────────────────────
     const orderReference = `cred${transaction.id.replace(/-/g, '').slice(0, 20)}`;
 
     await prisma.transaction.update({
@@ -52,32 +53,24 @@ export async function POST(req: NextRequest) {
 
     const user = session.user as any;
 
-    // ── Create ClickPesa payment intent ────────────────────────────────────
-    const payment = await createPaymentIntent({
+    // ── Generate ClickPesa checkout link ────────────────────────────────────
+    const { checkoutUrl } = await generateCheckoutLink({
       amount: totalPrice,
       orderReference: orderReference,
       customerName: user.name || 'Client',
       customerEmail: user.email || 'client@example.com',
       customerPhone: user.phone || '255712345678',
-      description: `Purchase ${credits} credits for LittleWed`,
+      description: `Purchase ${credits} credit${credits !== 1 ? 's' : ''} for LittleWed`,
     });
 
-    // Store payment ID in transaction
-    await prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { stripeSessionId: payment.paymentId }, // Store payment ID for reference
-    });
-
-    console.log('[PurchaseCredits] Payment intent created:', payment);
+    console.log('[PurchaseCredits] Checkout URL generated:', checkoutUrl);
 
     return NextResponse.json({ 
       success: true,
-      paymentId: payment.paymentId,
-      clientSecret: payment.clientSecret,
+      checkoutUrl,
       transactionId: transaction.id,
       credits,
       amount: totalPrice,
-      status: payment.status,
     });
 
   } catch (error: any) {
