@@ -15,10 +15,10 @@ interface BuyCreditsModalProps {
 const CREDIT_COST = 500; // TZS per credit
 
 const PRESETS = [
-  { credits: 10,  label: '10 credits',  badge: null,        popular: false },
-  { credits: 25,  label: '25 credits',  badge: 'Popular',   popular: true  },
-  { credits: 50,  label: '50 credits',  badge: 'Best value', popular: false },
-  { credits: 100, label: '100 credits', badge: null,        popular: false },
+  { credits: 10, label: '10 credits', badge: null, popular: false },
+  { credits: 25, label: '25 credits', badge: 'Popular', popular: true },
+  { credits: 50, label: '50 credits', badge: 'Best value', popular: false },
+  { credits: 100, label: '100 credits', badge: null, popular: false },
 ];
 
 export default function BuyCreditsModal({
@@ -75,12 +75,14 @@ export default function BuyCreditsModal({
       const res = await fetch('/api/tenant/purchase-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: totalTZS, returnUrl }),
+        body: JSON.stringify({ amount: totalTZS }),
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+
+      if (res.ok && data.paymentId) {
+        // ✅ Redirect to custom checkout page
+        window.location.href = `/payment/checkout?paymentId=${data.paymentId}&amount=${data.amount}&credits=${data.credits}`;
       } else {
         toast.error(data.error || 'Failed to initiate payment');
         setLoading(false);
@@ -90,7 +92,6 @@ export default function BuyCreditsModal({
       setLoading(false);
     }
   };
-
   if (!isOpen || !mounted) return null;
 
   return createPortal(
