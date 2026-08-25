@@ -1,16 +1,16 @@
 // app/payment/checkout/page.tsx
-'use client';
+'use client'; // This component must be a Client Component to handle state and interactivity
 
 import { useState, useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2, CheckCircle, XCircle, ArrowLeft, Smartphone, CreditCard, Building2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, CheckCircle, XCircle, ArrowLeft, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type PaymentMethod = 'mpesa' | 'airtel_money' | 'tigo_pesa' | 'halopesa';
 
 export default function PaymentCheckoutPage() {
-  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [paymentId, setPaymentId] = useState('');
@@ -21,6 +21,7 @@ export default function PaymentCheckoutPage() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
 
   useEffect(() => {
+    // Get query parameters from the URL
     const paymentIdParam = searchParams.get('paymentId');
     const amountParam = searchParams.get('amount');
     const creditsParam = searchParams.get('credits');
@@ -42,6 +43,7 @@ export default function PaymentCheckoutPage() {
       }, 5000);
       return () => clearInterval(interval);
     }
+    // The dependency array should include searchParams and any other state used inside the effect
   }, [searchParams]);
 
   const fetchPaymentStatus = async (id: string) => {
@@ -52,6 +54,8 @@ export default function PaymentCheckoutPage() {
       if (data.status === 'succeeded') {
         setStatus('success');
         toast.success('Payment successful! Credits added.');
+        // Optionally redirect after a delay
+        setTimeout(() => router.push('/client/dashboard'), 3000);
       } else if (data.status === 'failed') {
         setStatus('failed');
         toast.error('Payment failed. Please try again.');
