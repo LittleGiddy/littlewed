@@ -66,11 +66,37 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
-        // ❌ If user doesn't exist, redirect to signup instead of auto-creating
+        // ✅ If user doesn't exist, create them from Google profile
         if (!existingUser) {
-          console.log('[NextAuth] User not found, redirecting to signup:', user.email);
-          // Return false with a specific error message
-          return '/login?error=UserNotFound';
+          console.log('[NextAuth] User not found, creating from Google:', user.email);
+          const newUser = await prisma.user.create({
+            data: {
+              email: user.email!,
+              name: user.name || '',
+              image: user.image ?? null,
+              role: 'CLIENT',
+              isActive: false,
+            },
+          });
+
+          // Link the Google account
+          await prisma.account.create({
+            data: {
+              userId: newUser.id,
+              type: account.type,
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              access_token: account.access_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          });
+
+          // Update the user object so the jwt callback has the correct id
+          user.id = newUser.id;
+          return true;
         }
 
         // User exists - check if they're active

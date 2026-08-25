@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/prisma'; // ✅ correct root import
+import { prisma } from '@/lib/prisma';
 import { headers } from 'next/headers';
 
 // ─── Types ──────────────────────────────────────────────────────────────
