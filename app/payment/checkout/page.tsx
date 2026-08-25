@@ -1,14 +1,14 @@
 // app/payment/checkout/page.tsx
 'use client'; // This component must be a Client Component to handle state and interactivity
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, CheckCircle, XCircle, ArrowLeft, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type PaymentMethod = 'mpesa' | 'airtel_money' | 'tigo_pesa' | 'halopesa';
 
-export default function PaymentCheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -50,7 +50,7 @@ export default function PaymentCheckoutPage() {
     try {
       const res = await fetch(`/api/payment/status?paymentId=${id}`);
       const data = await res.json();
-      
+
       if (data.status === 'succeeded') {
         setStatus('success');
         toast.success('Payment successful! Credits added.');
@@ -240,5 +240,21 @@ export default function PaymentCheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CheckoutFallback() {
+  return (
+    <div className="min-h-screen bg-[#F5F8FA] flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-[#0D4F4F] animate-spin" />
+    </div>
+  );
+}
+
+export default function PaymentCheckoutPage() {
+  return (
+    <Suspense fallback={<CheckoutFallback />}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
