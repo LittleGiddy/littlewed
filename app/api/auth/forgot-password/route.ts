@@ -51,8 +51,12 @@ export async function POST(req: NextRequest) {
     });
 
     // Send email
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ForgotPassword] OTP for', email, ':', otp);
+    }
+
     try {
-      await resend.emails.send({
+      const { error } = await resend.emails.send({
         from: 'LittleWed <noreply@littlewed.co.tz>',
         to: [email],
         subject: 'Reset your password',
@@ -68,9 +72,14 @@ export async function POST(req: NextRequest) {
           </div>
         `,
       });
+
+      if (error) {
+        console.error('[ForgotPassword] Resend error:', error);
+        return NextResponse.json({ error: error.message || 'Failed to send email' }, { status: 500 });
+      }
     } catch (emailError) {
       console.error('[ForgotPassword] Email send error:', emailError);
-      // Still return success to avoid revealing email existence
+      return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 });
     }
 
     return NextResponse.json({ 
