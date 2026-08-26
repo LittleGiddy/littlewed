@@ -6,21 +6,11 @@ import { prisma } from '@/lib/prisma';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { email, resetToken, newPassword } = body;
+    const { email, otp, newPassword } = body;
 
-    console.log('[ResetPassword] Request received:', { 
-      email, 
-      hasResetToken: !!resetToken,
-      hasNewPassword: !!newPassword 
-    });
+    console.log('[ResetPassword] Request received:', { email });
 
-    // ✅ Check all required fields
-    if (!email || !resetToken || !newPassword) {
-      console.log('[ResetPassword] Missing fields:', { 
-        hasEmail: !!email, 
-        hasResetToken: !!resetToken, 
-        hasNewPassword: !!newPassword 
-      });
+    if (!email || !otp || !newPassword) {
       return NextResponse.json(
         { error: 'All fields are required' },
         { status: 400 }
@@ -34,21 +24,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify reset token
-    const resetSession = await prisma.passwordResetSession.findFirst({
+    // Find valid OTP
+    const token = await prisma.passwordResetToken.findFirst({
       where: {
         email: email.toLowerCase().trim(),
-        token: resetToken,
-        expiresAt: {
-          gt: new Date(),
-        },
+        otp: otp,
+        expiresAt: { gt: new Date() },
       },
     });
 
-    if (!resetSession) {
-      console.log('[ResetPassword] Invalid or expired reset token for:', email);
+    if (!token) {
       return NextResponse.json(
-        { error: 'Invalid or expired reset link. Please request a new one.' },
+        { error: 'Invalid or expired OTP' },
         { status: 400 }
       );
     }
@@ -56,27 +43,22 @@ export async function POST(req: NextRequest) {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update user password
+    // ✅ Update user password (works for both Google-only and existing password users)
     await prisma.user.update({
       where: { email: email.toLowerCase().trim() },
       data: { password: hashedPassword },
     });
 
-    // Delete used reset sessions
-    await prisma.passwordResetSession.deleteMany({
-      where: { email: email.toLowerCase().trim() },
-    });
-
-    // Also delete any remaining OTPs
+    // Delete used token
     await prisma.passwordResetToken.deleteMany({
       where: { email: email.toLowerCase().trim() },
     });
 
-    console.log('[ResetPassword] Password reset successful for:', email);
+    console.log(`[ResetPassword] Password ${await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } }).then(u => u?.password ? 'updated' : 'set')} for: ${email}`);
 
     return NextResponse.json({
       success: true,
-      message: 'Password reset successfully. You can now log in.',
+      message: 'Password set successfully. You can now sign in with email and password.',
     });
 
   } catch (error) {

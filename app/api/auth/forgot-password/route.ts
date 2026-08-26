@@ -19,22 +19,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if user exists and has a password
+    // Check if user exists
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
       select: { id: true, password: true },
     });
 
-    // If user doesn't exist OR is Google-only (no password), don't send OTP
-    // But still return success message (security)
-    if (!user || !user.password) {
-      console.log(`[ForgotPassword] ${!user ? 'Email not found' : 'Google-only account'}: ${email}`);
+    // ─── Case 1: User doesn't exist ──────────────────────────────────────────
+    if (!user) {
+      console.log(`[ForgotPassword] Email not found: ${email}`);
+      // Security: Always return the same message
       return NextResponse.json({ 
-        message: 'If an account exists with this email, we\'ve sent a password reset code.' 
+        message: 'If an account exists, we\'ve sent a verification code.' 
       });
     }
 
-    // Delete any previous OTP for this email
+    // ─── Case 2: Google-only account (no password) ──────────────────────────
+    if (!user.password) {
+      console.log(`[ForgotPassword] Google-only account setting password: ${email}`);
+      // ✅ Allow Google users to set a password
+      // Send OTP to verify email ownership
+    }
+
+    // ─── Delete any previous OTP for this email ─────────────────────────────
     await prisma.passwordResetToken.deleteMany({
       where: { email: email.toLowerCase().trim() },
     });
@@ -50,41 +57,77 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Send email
+    // ─── Send email ───────────────────────────────────────────────────────────
     if (process.env.NODE_ENV === 'development') {
-      console.log('[ForgotPassword] OTP for', email, ':', otp);
+      console.log('🔑 OTP for', email, ':', otp);
     }
 
     try {
+      // Determine email subject and message based on user type
+      const isGoogleUser = user && !user.password;
+      const subject = isGoogleUser 
+        ? 'Set a password for your Google account' 
+        : 'Reset your password';
+      
+      const introText = isGoogleUser
+        ? 'You requested to set a password for your Google account. This will allow you to sign in with either method.'
+        : 'We received a request to reset your password.';
+
       const { error } = await resend.emails.send({
         from: 'LittleWed <noreply@littlewed.co.tz>',
         to: [email],
-        subject: 'Reset your password',
+        subject: subject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-            <h2 style="color: #0D4F4F;">Password Reset Request</h2>
-            <p>Use this OTP to reset your password:</p>
-            <div style="background: #F0F4F8; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px;">${otp}</span>
+            <div style="text-align: center; padding: 20px 0;">
+              <h1 style="color: #0D4F4F; font-size: 24px; margin: 0;">LittleWed</h1>
             </div>
-            <p>This code expires in 10 minutes.</p>
-            <p>If you didn't request this, please ignore this email.</p>
+            <div style="background: #F5F8FA; border-radius: 12px; padding: 30px; border: 1px solid #E8EEF2;">
+              <h2 style="color: #0D1B1B; font-size: 20px; margin-top: 0;">${isGoogleUser ? 'Set Your Password' : 'Reset Your Password'}</h2>
+              <p style="color: #4A6072; font-size: 15px; line-height: 1.6;">
+                ${introText}
+              </p>
+              ${isGoogleUser ? `
+                <div style="background: #E8F5E9; padding: 12px; border-radius: 8px; margin: 16px 0;">
+                  <p style="color: #2E7D32; font-size: 13px; margin: 0;">
+                    ✅ After setting a password, you can sign in with either Google or email/password.
+                  </p>
+                </div>
+              ` : ''}
+              <div style="background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 1px solid #E2EAF0;">
+                <span style="font-size: 36px; font-weight: bold; letter-spacing: 6px; color: #0D4F4F;">${otp}</span>
+              </div>
+              <p style="color: #7A8FA6; font-size: 13px; margin-bottom: 0;">
+                This code will expire in <strong>10 minutes</strong>.
+              </p>
+            </div>
+            <p style="color: #B0BEC8; font-size: 12px; text-align: center; margin-top: 20px;">
+              If you didn't request this, please ignore this email.
+            </p>
           </div>
         `,
       });
 
       if (error) {
         console.error('[ForgotPassword] Resend error:', error);
-        return NextResponse.json({ error: error.message || 'Failed to send email' }, { status: 500 });
+        return NextResponse.json({ 
+          error: 'Failed to send email. Please try again.' 
+        }, { status: 500 });
       }
+
+      console.log(`[ForgotPassword] OTP sent successfully to: ${email}`);
+      
+      return NextResponse.json({ 
+        message: 'If an account exists, we\'ve sent a verification code.',
+        googleAccount: isGoogleUser,
+      });
+
     } catch (emailError) {
       console.error('[ForgotPassword] Email send error:', emailError);
-      return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Failed to send email. Please try again.' 
+      }, { status: 500 });
     }
-
-    return NextResponse.json({ 
-      message: 'If an account exists with this email, we\'ve sent a password reset code.' 
-    });
 
   } catch (error) {
     console.error('[ForgotPassword] Error:', error);

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Mail, CheckCircle, Shield, KeyRound, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Mail, CheckCircle, Shield, KeyRound, AlertCircle, Info } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
@@ -17,6 +17,7 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleUser, setIsGoogleUser] = useState(false);
 
   // ─── Step 1: Send OTP ──────────────────────────────────────────────────
   const handleSendOtp = async () => {
@@ -27,6 +28,8 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError('');
     setSuccess('');
+    setError('');
+    setIsGoogleUser(false);
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
@@ -34,10 +37,20 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: email.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+      
+      if (!res.ok) {
+        // Check if it's a Google-only account
+        if (data.googleAccount) {
+          setIsGoogleUser(true);
+          setError('This email is linked to a Google account. You can set a password to also sign in with email.');
+          return;
+        }
+        throw new Error(data.error || 'Something went wrong');
+      }
       
       // Always show success message (even if email doesn't exist)
-      setSuccess('If an account exists with this email, we\'ve sent a password reset code.');
+      setIsGoogleUser(data.googleAccount || false);
+      setSuccess('If an account exists with this email, we\'ve sent a verification code.');
       setStep(2);
     } catch (err: any) {
       setError(err.message);
@@ -110,7 +123,11 @@ export default function ForgotPasswordPage() {
       
       if (!res.ok) throw new Error(data.error || 'Reset failed');
       
-      setSuccess('Password reset successful! Redirecting to login...');
+      const successMessage = isGoogleUser 
+        ? 'Password set successfully! You can now sign in with email or Google.'
+        : 'Password reset successful! Redirecting to login...';
+      
+      setSuccess(successMessage);
       setTimeout(() => router.push('/login'), 2000);
     } catch (err: any) {
       setError(err.message);
@@ -264,8 +281,10 @@ export default function ForgotPasswordPage() {
 
         .form-body { padding: 36px 36px 32px; }
         .form-title {
-          font-family: 'Playfair Display', serif; font-size: 28px;
-          font-weight: 800; color: #0D1B1B; margin-bottom: 8px; letter-spacing: -0.3px;
+          font-family: 'Playfair Display', serif;
+          font-size: 28px;
+          font-weight: 800;
+          color: #0D1B1B; margin-bottom: 8px; letter-spacing: -0.3px;
         }
         .form-subtitle { font-size: 13.5px; color: #7A8FA6; margin-bottom: 28px; line-height: 1.5; }
 
@@ -326,6 +345,14 @@ export default function ForgotPasswordPage() {
           padding: 11px 14px; border-radius: 11px; font-size: 13px; font-weight: 600;
           margin-bottom: 18px; display: flex; gap: 8px; align-items: center;
         }
+
+        .info-box {
+          background: #E3F2FD; border: 1px solid #90CAF9; color: #0D47A1;
+          padding: 12px 14px; border-radius: 11px; font-size: 13px; font-weight: 500;
+          margin-bottom: 18px; display: flex; gap: 10px; align-items: flex-start;
+          line-height: 1.5;
+        }
+        .info-box svg { flex-shrink: 0; margin-top: 1px; }
 
         .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 28px; }
         .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
@@ -391,8 +418,20 @@ export default function ForgotPasswordPage() {
                   <>
                     <div className="form-title">Forgot password?</div>
                     <p className="form-subtitle">Enter your email address and we'll send you a code to reset your password.</p>
-                    {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
+                    
+                    {error && (
+                      <div className="err-box">
+                        <AlertCircle size={16} />
+                        <span>{error}</span>
+                        {error.includes('Google account') && (
+                          <Link href="/login" className="text-sm font-bold text-[#0D4F4F] hover:underline ml-1">
+                            Sign in with Google →
+                          </Link>
+                        )}
+                      </div>
+                    )}
                     {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
+                    
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'email' || email ? 'up' : ''}`}>Email Address</label>
                       <input
@@ -413,12 +452,31 @@ export default function ForgotPasswordPage() {
                   </>
                 ) : step === 2 ? (
                   <>
-                    <div className="form-title">Verify Code</div>
-                    <p className="form-subtitle">Enter the 6-digit code sent to <strong>{email}</strong>.</p>
-
-                    <div className="google-note">
-                      💡 <strong>Google user?</strong> If you signed up with Google, you can still set a password here to use both sign-in methods.
+                    <div className="form-title">
+                      {isGoogleUser ? 'Set Your Password' : 'Verify Code'}
                     </div>
+                    <p className="form-subtitle">
+                      {isGoogleUser ? (
+                        <>Enter the code sent to <strong>{email}</strong> to set a password for your Google account.</>
+                      ) : (
+                        <>Enter the 6-digit code sent to <strong>{email}</strong>.</>
+                      )}
+                    </p>
+
+                    {isGoogleUser && (
+                      <div className="info-box">
+                        <Info size={18} />
+                        <div>
+                          <strong>Google Account:</strong> After setting a password, you'll be able to sign in with <strong>either Google or email/password</strong>.
+                        </div>
+                      </div>
+                    )}
+
+                    {!isGoogleUser && (
+                      <div className="google-note">
+                        💡 <strong>Google user?</strong> If you signed up with Google, you can still set a password here to use both sign-in methods.
+                      </div>
+                    )}
 
                     {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
                     {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
@@ -447,8 +505,16 @@ export default function ForgotPasswordPage() {
                   </>
                 ) : (
                   <>
-                    <div className="form-title">New Password</div>
-                    <p className="form-subtitle">Create a new password for your account.</p>
+                    <div className="form-title">
+                      {isGoogleUser ? 'Set Your Password' : 'New Password'}
+                    </div>
+                    <p className="form-subtitle">
+                      {isGoogleUser ? (
+                        <>Create a password for your Google account. You'll be able to sign in with either method.</>
+                      ) : (
+                        <>Create a new password for your account.</>
+                      )}
+                    </p>
 
                     {error && <div className="err-box"><AlertCircle size={16} /><span>{error}</span></div>}
                     {success && <div className="success-box"><CheckCircle size={16} /><span>{success}</span></div>}
@@ -486,7 +552,7 @@ export default function ForgotPasswordPage() {
                     </div>
 
                     <button className="btn-primary" disabled={loading} onClick={handleResetPassword}>
-                      {loading ? <><div className="spinner" /> Resetting...</> : 'Reset Password'}
+                      {loading ? <><div className="spinner" /> Resetting...</> : (isGoogleUser ? 'Set Password' : 'Reset Password')}
                     </button>
                     <button className="btn-secondary" onClick={() => { setStep(2); setError(''); setSuccess(''); }}>
                       ← Back to verification
