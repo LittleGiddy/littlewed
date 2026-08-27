@@ -11,6 +11,7 @@ import { confirmToast } from '@/lib/confirmToast';
 interface CheckedGuest {
   id: string;
   name: string;
+  checkedIn?: boolean;
   title?: string | null;
   phone?: string | null;
   routingChannel: string;
