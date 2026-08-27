@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
   ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw,
-  ChevronDown, ChevronUp, Copy, Check, Filter,
+  ChevronDown, ChevronUp, Copy, Check, Filter, CheckSquare,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
   HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick
@@ -113,7 +113,12 @@ export default function SendInvitationsPage() {
   const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
   const [switchingAll, setSwitchingAll] = useState(false);
   const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
+  const [cardGenErrors, setCardGenErrors] = useState<{ name: string; error: string }[]>([]);
   const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
+
+  // ─── Selection for "send to selected guests" ─────────────────────────
+  const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
+  const [selecting, setSelecting] = useState(false);
 
   // ─── SMS State ────────────────────────────────────────────────────────
   const [smsVariables, setSmsVariables] = useState<Record<string, string>>({
@@ -241,16 +246,10 @@ export default function SendInvitationsPage() {
           time: eventObj?.time || '',
         });
 
-        // Update template with event data
-        const updatedTemplate = DEFAULT_SMS_TEMPLATE
-          .replace(/{hostFamily}/g, eventObj?.hostFamily || '{hostFamily}')
-          .replace(/{person1}/g, eventObj?.person1 || '{person1}')
-          .replace(/{person2}/g, eventObj?.person2 || '{person2}')
-          .replace(/{eventDate}/g, formattedDate || '{eventDate}')
-          .replace(/{venue}/g, eventObj?.venue || '{venue}')
-          .replace(/{time}/g, eventObj?.time || '{time}');
+        // Keep placeholders in the template; values are substituted at
+        // preview/send time via buildSmsMessage / the backend.
 
-        setSmsTemplate(updatedTemplate);
+        setSmsTemplate(DEFAULT_SMS_TEMPLATE);
       }
 
       // ─── Load saved WhatsApp state ──────────────────────────────────
@@ -305,12 +304,6 @@ export default function SendInvitationsPage() {
   // ─── Update SMS variable ──────────────────────────────────────────────
   const updateSmsVariable = (key: string, value: string) => {
     setSmsVariables(prev => ({ ...prev, [key]: value }));
-    // Also update the template with the new value
-    const updatedTemplate = smsTemplate.replace(
-      new RegExp(`{${key}}`, 'g'),
-      value || `{${key}}`
-    );
-    setSmsTemplate(updatedTemplate);
   };
 
   // ─── Update WhatsApp variable ─────────────────────────────────────────
@@ -324,17 +317,28 @@ export default function SendInvitationsPage() {
     const cardNumber = guest.cardNumber || '';
     const guestType = guest.guestType === 'DOUBLE' ? 'Double' : 'Single';
 
-    return template
-      .replace(/{guestName}/g, fullName)
-      .replace(/{guestTitle}/g, guest.title || '')
-      .replace(/{cardNumber}/g, cardNumber)
-      .replace(/{guestType}/g, guestType)
-      .replace(/{hostFamily}/g, smsVariables.hostFamily || '{hostFamily}')
-      .replace(/{person1}/g, smsVariables.person1 || '{person1}')
-      .replace(/{person2}/g, smsVariables.person2 || '{person2}')
-      .replace(/{eventDate}/g, smsVariables.eventDate || '{eventDate}')
-      .replace(/{venue}/g, smsVariables.venue || '{venue}')
-      .replace(/{time}/g, smsVariables.time || '{time}');
+    const varsMap: Record<string, string> = {
+      guestName: fullName,
+      guestTitle: guest.title || '',
+      title: guest.title || '',
+      name: guest.name || '',
+      fullName,
+      cardNumber,
+      cardNo: cardNumber,
+      guestType,
+      cardType: guestType,
+      hostFamily: smsVariables.hostFamily,
+      person1: smsVariables.person1,
+      person2: smsVariables.person2,
+      eventDate: smsVariables.eventDate,
+      venue: smsVariables.venue,
+      time: smsVariables.time,
+    };
+
+    return template.replace(
+      /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|hostFamily|person1|person2|eventDate|venue|time)\}/g,
+      (match: string, key: string) => varsMap[key] ?? match
+    );
   };
 
   // ─── Get sample SMS preview ──────────────────────────────────────────
@@ -440,6 +444,7 @@ export default function SendInvitationsPage() {
     }
 
     setGeneratingCards(true);
+    setCardGenErrors([]);
     const CHUNK_SIZE = 25;
     const allIds = pendingGuests.map(g => g.id);
     let completed = 0;
@@ -462,6 +467,14 @@ export default function SendInvitationsPage() {
         if (res.ok) {
           completed += data.completed ?? 0;
           failed += data.failed ?? 0;
+          // Surface per-guest errors from the batch results
+          const errs = (data.results || []).filter((r: any) => !r.success);
+          if (errs.length > 0) {
+            setCardGenErrors(prev => [
+              ...prev,
+              ...errs.map((r: any) => ({ name: r.name || r.guestId, error: r.error || 'Unknown error' })),
+            ]);
+          }
         } else {
           failed += chunk.length;
           console.error('Chunk failed:', data.error);
@@ -488,11 +501,10 @@ export default function SendInvitationsPage() {
     }
   };
 
-  // ─── Broadcast to all guests ──────────────────────────────────────────
-  const broadcast = async () => {
-    const targetGuests = getFilteredGuests();
+  // ─── Core send routine (send-batch) ───────────────────────────────────
+  const performSend = async (targetGuests: Guest[], noSelectionMessage?: string) => {
     if (targetGuests.length === 0) {
-      toast.error('No guests matching the current filters');
+      toast.error(noSelectionMessage || 'No guests matching the current filters');
       return;
     }
 
@@ -598,6 +610,23 @@ export default function SendInvitationsPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  // ─── Broadcast to all guests (only guests not yet invited) ────────────
+  const broadcast = async () => {
+    const allTargets = getFilteredGuests();
+    // "Send All" only sends to guests who have not received an invitation yet.
+    const targetGuests = allTargets.filter(g => !g.invitationSentAt);
+    await performSend(targetGuests, allTargets.length > 0
+      ? 'All matching guests have already received their invitations'
+      : 'No guests matching the current filters');
+  };
+
+  // ─── Send to selected guests only ─────────────────────────────────────
+  const sendSelected = async () => {
+    const selected = guests.filter(g => selectedGuests.has(g.id) && !g.invitationSentAt);
+    await performSend(selected, 'No guests selected');
+    setSelectedGuests(new Set());
   };
 
   // ─── Retry Failed Messages ────────────────────────────────────────────
@@ -1260,6 +1289,39 @@ Card No: {cardNumber} {guestType}`}
             <span className="text-[10px] text-gray-400">
               {successCount} sent · {failedCount} failed
             </span>
+
+            {!selecting ? (
+              <button
+                onClick={() => { setSelecting(true); setSelectedGuests(new Set()); }}
+                disabled={sending || loadingGuests}
+                className="px-3 sm:px-4 py-1 sm:py-1.5 border border-[#0D4B4B] text-[#0D4B4B] rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0D4B4B] hover:text-white transition disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <CheckSquare size={14} />
+                Select
+              </button>
+            ) : (
+              <>
+                <span className="text-[10px] font-semibold text-[#0D4B4B]">
+                  {selectedGuests.size} selected
+                </span>
+                <button
+                  onClick={sendSelected}
+                  disabled={sending || selectedGuests.size === 0}
+                  className="px-3 sm:px-4 py-1 sm:py-1.5 bg-[#0D4B4B] text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={14} />}
+                  {sending ? 'Sending...' : `Send Selected (${selectedGuests.size})`}
+                </button>
+                <button
+                  onClick={() => { setSelecting(false); setSelectedGuests(new Set()); }}
+                  disabled={sending}
+                  className="px-2 py-1 text-[10px] sm:text-xs text-gray-500 hover:text-gray-700 font-medium transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+
             <button
               onClick={broadcast}
               disabled={sending || filteredGuests.length === 0 || loadingGuests}
@@ -1309,6 +1371,31 @@ Card No: {cardNumber} {guestType}`}
                   onClick={() => setExpandedGuest(isExpanded ? null : guest.id)}
                 >
                   <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Selection checkbox */}
+                    {selecting && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedGuests(prev => {
+                            const next = new Set(prev);
+                            if (next.has(guest.id)) {
+                              next.delete(guest.id);
+                            } else {
+                              next.add(guest.id);
+                            }
+                            return next;
+                          });
+                        }}
+                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition ${
+                          selectedGuests.has(guest.id)
+                            ? 'bg-[#0D4B4B] border-[#0D4B4B] text-white'
+                            : 'border-gray-300 bg-white hover:border-[#0D4B4B]'
+                        }`}
+                      >
+                        {selectedGuests.has(guest.id) && <Check size={13} />}
+                      </button>
+                    )}
+
                     {/* Avatar */}
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
                       {guest.name.charAt(0).toUpperCase()}
@@ -1508,6 +1595,27 @@ Card No: {cardNumber} {guestType}`}
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {cardGenErrors.length > 0 && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <XCircle size={14} className="text-red-600" />
+            <p className="font-semibold text-red-800 text-xs sm:text-sm">Card Generation Errors</p>
+            <span className="text-[10px] text-red-500">({cardGenErrors.length})</span>
+          </div>
+          <div className="max-h-36 overflow-y-auto text-[11px] sm:text-xs text-red-700 space-y-1 mt-1">
+            {cardGenErrors.map((e, index) => (
+              <div key={index}>• <span className="font-medium">{e.name}:</span> {e.error}</div>
+            ))}
+          </div>
+          <button
+            onClick={() => setCardGenErrors([])}
+            className="mt-2 text-[10px] sm:text-xs text-red-500 hover:text-red-700 font-medium transition"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 

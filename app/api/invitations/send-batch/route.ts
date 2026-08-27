@@ -157,32 +157,39 @@ export async function POST(req: NextRequest) {
             const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
 
             // ─── Base template: prefer the SMS template edited by the user ──
-            let smsTemplateText =
+            const smsTemplateText =
               smsTemplate ||
               message ||
               `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
 
-            // ─── Replace variables with actual values ──────────────────────
-            let smsMessage = smsTemplateText
-              .replace(/{guestName}/g, actualGuestName)
-              .replace(/{guestTitle}/g, guest.title || '')
-              .replace(/{title}/g, guest.title || '')
-              .replace(/{name}/g, guest.name)
-              .replace(/{fullName}/g, actualGuestName)
-              .replace(/{cardNumber}/g, actualCardNumber)
-              .replace(/{cardNo}/g, actualCardNumber)
-              .replace(/{guestType}/g, actualCardType)
-              .replace(/{cardType}/g, actualCardType)
-              .replace(/{passCode}/g, guest.passCode || 'N/A')
-              .replace(/{event}/g, guest.event?.name || '')
-              .replace(/{date}/g, formattedDate)
-              .replace(/{eventDate}/g, formattedDate)
-              .replace(/{venue}/g, vars.venue || guest.event?.venue || '')
-              .replace(/{address}/g, guest.event?.address || '')
-              .replace(/{hostFamily}/g, vars.hostFamily || guest.event?.hostFamily || '')
-              .replace(/{person1}/g, vars.person1 || guest.event?.person1 || '')
-              .replace(/{person2}/g, vars.person2 || guest.event?.person2 || '')
-              .replace(/{time}/g, vars.time || guest.event?.time || '');
+            // ─── Replace variables using a function to avoid $/regex corruption ─
+            const guestTitle = guest.title || '';
+            const varsMap: Record<string, string> = {
+              guestName: actualGuestName,
+              guestTitle,
+              title: guestTitle,
+              name: guest.name || '',
+              fullName: actualGuestName,
+              cardNumber: actualCardNumber,
+              cardNo: actualCardNumber,
+              guestType: actualCardType,
+              cardType: actualCardType,
+              passCode: guest.passCode || 'N/A',
+              event: guest.event?.name || '',
+              date: formattedDate,
+              eventDate: formattedDate,
+              venue: vars.venue || guest.event?.venue || '',
+              address: guest.event?.address || '',
+              hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+              person1: vars.person1 || guest.event?.person1 || '',
+              person2: vars.person2 || guest.event?.person2 || '',
+              time: vars.time || guest.event?.time || '',
+            };
+
+            const smsMessage = smsTemplateText.replace(
+              /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|passCode|event|date|eventDate|venue|address|hostFamily|person1|person2|time)\}/g,
+              (match: string, key: string) => varsMap[key] ?? match
+            );
 
             // ─── Send SMS ──────────────────────────────────────────────────
             const smsResult = await sendSMS({

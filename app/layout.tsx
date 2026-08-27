@@ -19,7 +19,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <AuthProvider>{children}</AuthProvider>
-        <Toaster position="top-right" />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              borderRadius: '12px',
+              background: '#fff',
+              color: '#1f2937',
+              fontSize: '14px',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+            },
+            success: {
+              iconTheme: { primary: '#0D4B4B', secondary: '#fff' },
+              style: { border: '1px solid #0D4B4B', color: '#0D4B4B' },
+            },
+            error: {
+              iconTheme: { primary: '#FF6B5C', secondary: '#fff' },
+              style: { border: '1px solid #FF6B5C', color: '#c0392b' },
+            },
+          }}
+        />
       </body>
     </html>
   );

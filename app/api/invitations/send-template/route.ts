@@ -38,6 +38,19 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // ─── Check credits before sending ─────────────────────────────────
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { credits: true, bypassPayment: true },
+    });
+
+    if (!tenant?.bypassPayment && (tenant?.credits ?? 0) < 1) {
+      return NextResponse.json({
+        error: `Insufficient credits. You have ${tenant?.credits ?? 0} credits. Request more from the admin.`,
+        creditsAvailable: tenant?.credits ?? 0,
+      }, { status: 400 });
+    }
+
     // ─── Ensure guest has a pass code ────────────────────────────────────
     if (!guest.passCode) {
       return NextResponse.json({
@@ -97,6 +110,24 @@ export async function POST(req: NextRequest) {
     console.log('[SendTemplate] Result:', JSON.stringify(result, null, 2));
 
     if (result.success) {
+      // ─── Deduct 1 credit per invitation sent (skip if bypassPayment) ──
+      if (!tenant?.bypassPayment) {
+        await prisma.tenant.update({
+          where: { id: tenantId },
+          data: { credits: { decrement: 1 } },
+        });
+      }
+
+      // ─── Log credit usage ─────────────────────────────────────────────
+      await prisma.usageRecord.create({
+        data: {
+          tenantId,
+          eventId,
+          channel: 'whatsapp',
+          cost: 1,
+        },
+      });
+
       if (result.messageId) {
         await prisma.messageLog.create({
           data: {

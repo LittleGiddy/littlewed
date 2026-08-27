@@ -59,20 +59,27 @@ Ahsante.`;
 
     // ─── If custom message provided, use it ─────────────────────────────
     if (message) {
-      smsMessage = message
-        .replace(/{title}/g, guest.title || '')
-        .replace(/{name}/g, guest.name)
-        .replace(/{fullName}/g, guestFullName)
-        .replace(/{cardNumber}/g, guest.cardNumber || 'N/A')
-        .replace(/{passCode}/g, guest.passCode || 'N/A')
-        .replace(/{event}/g, guest.event?.name || '')
-        .replace(/{date}/g, formattedDate)
-        .replace(/{venue}/g, guest.event?.venue || '')
-        .replace(/{address}/g, guest.event?.address || '')
-        .replace(/{hostFamily}/g, guest.event?.hostFamily || '')
-        .replace(/{person1}/g, guest.event?.person1 || '')
-        .replace(/{person2}/g, guest.event?.person2 || '')
-        .replace(/{time}/g, guest.event?.time || '');
+      // Function-based replace: guarantees full values and avoids any
+      // `$&`/`$'`/`$\`` corruption that string replacement can introduce.
+      const varsMap: Record<string, string> = {
+        title: guest.title || '',
+        name: guest.name || '',
+        fullName: guestFullName,
+        cardNumber: guest.cardNumber || 'N/A',
+        passCode: guest.passCode || 'N/A',
+        event: guest.event?.name || '',
+        date: formattedDate,
+        venue: guest.event?.venue || '',
+        address: guest.event?.address || '',
+        hostFamily: guest.event?.hostFamily || '',
+        person1: guest.event?.person1 || '',
+        person2: guest.event?.person2 || '',
+        time: guest.event?.time || '',
+      };
+      smsMessage = message.replace(
+        /\{(title|name|fullName|cardNumber|passCode|event|date|venue|address|hostFamily|person1|person2|time)\}/g,
+        (match: string, key: string) => varsMap[key] ?? match
+      );
     }
 
     // ─── Check credits before sending ─────────────────────────────────
