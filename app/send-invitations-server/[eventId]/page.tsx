@@ -1,5 +1,6 @@
 // app/send-invitations-server/[eventId]/page.tsx
 import { prisma } from '@/lib/prisma';
+import { CircleCheck, CircleAlert } from 'lucide-react';
 import SendButton from '@/components/SendButtonClient';
 
 export default async function SendInvitationsServerPage({
@@ -44,9 +45,9 @@ export default async function SendInvitationsServerPage({
                   <p className="font-medium text-gray-800">{guest.name}</p>
                   <p className="text-sm text-gray-500">{guest.phone || 'No phone'}</p>
                   {guest.invitationCard ? (
-                    <span className="text-xs text-green-600">✓ QR ready</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-green-600"><CircleCheck size={13} /> QR ready</span>
                   ) : (
-                    <span className="text-xs text-amber-600">⚠ No QR</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-600"><CircleAlert size={13} /> No QR</span>
                   )}
                 </div>
                 <div>

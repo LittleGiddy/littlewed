@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 import {
   CheckCircle, Users, RefreshCw, XCircle, ShieldCheck,
   Clock, Trash2, Search, UserCheck, AlertCircle,
@@ -40,7 +41,8 @@ export default function AdminUsersPage() {
 
   const toggleActive = async (userId: string, currentStatus: boolean) => {
     const action = currentStatus ? 'deactivate' : 'activate';
-    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+    const ok = await confirmToast({ title: `${action === 'activate' ? 'Activate' : 'Deactivate'} this user?`, confirmText: action === 'activate' ? 'Activate' : 'Deactivate' });
+    if (!ok) return;
     setProcessing(userId);
     try {
       const res = await fetch(`/api/admin/users/${userId}/${action}`, {
@@ -61,7 +63,8 @@ export default function AdminUsersPage() {
   };
 
   const deleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`Delete user "${userName}"? This action cannot be undone.`)) return;
+    const ok = await confirmToast({ title: `Delete user "${userName}"?`, message: 'This action cannot be undone.', confirmText: 'Delete', danger: true });
+    if (!ok) return;
     setProcessing(userId);
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {

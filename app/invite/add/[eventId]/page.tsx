@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 export default function AddGuestPage({ params }: { params: { eventId: string } }) {
   const router = useRouter()
@@ -12,15 +13,26 @@ export default function AddGuestPage({ params }: { params: { eventId: string } }
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const res = await fetch('/api/guests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, eventId: params.eventId })
-    })
-    if (res.ok) {
+    let res
+    let errorText = 'Failed to add guest'
+    try {
+      res = await fetch('/api/guests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, eventId: params.eventId })
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        if (data?.error) errorText = data.error
+      }
+    } catch {
+      errorText = 'Network error. Please try again.'
+    }
+    if (res?.ok) {
+      toast.success('Guest added')
       router.push(`/events/${params.eventId}`)
     } else {
-      alert('Failed')
+      toast.error(errorText)
       setLoading(false)
     }
   }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 export default function InvitationDesignerSimple({ params }: { params: Promise<{ eventId: string }> }) {
   const router = useRouter();
@@ -39,9 +40,9 @@ export default function InvitationDesignerSimple({ params }: { params: Promise<{
     const data = await res.json();
     if (res.ok) {
       setUploadedUrl(data.url);
-      alert('Base card uploaded successfully!');
+      toast.success('Base card uploaded successfully!');
     } else {
-      alert('Upload failed: ' + data.error);
+      toast.error('Upload failed: ' + data.error);
     }
     setUploading(false);
   };
@@ -58,7 +59,7 @@ export default function InvitationDesignerSimple({ params }: { params: Promise<{
       router.push(`/send-invitations-server/${eventId}`);
     } else {
       const err = await genRes.json();
-      alert('Generation failed: ' + err.error);
+      toast.error('Generation failed: ' + err.error);
     }
     setGenerating(false);
   };

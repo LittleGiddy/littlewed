@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Event {
@@ -53,7 +53,7 @@ export default function EventSelector({
   if (events.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <div className="text-5xl mb-4">📅</div>
+        <div className="flex justify-center text-[#0D4B4B] mb-4"><Calendar size={52} /></div>
         <h2 className="font-serif text-2xl font-bold text-gray-800 mb-2">No events yet</h2>
         <p className="text-gray-500">Create an event first before {actionLabel.toLowerCase()}.</p>
         <Link

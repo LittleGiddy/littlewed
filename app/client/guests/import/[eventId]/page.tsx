@@ -648,7 +648,7 @@ export default function ImportGuestsPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      let successMsg = `✅ ${data.count} guests imported successfully!`;
+      let successMsg = `${data.count} guests imported successfully!`;
       if (data.whatsappCount !== undefined) {
         successMsg += ` ${data.whatsappCount} on WhatsApp, ${data.smsCount} on SMS.`;
       }

@@ -24,12 +24,12 @@ export default function SendButton({
       });
       const data = await res.json();
       if (res.ok) {
-        setStatus('✅ Sent');
+        setStatus('Sent');
       } else {
-        setStatus(`❌ ${data.error || 'Failed'}`);
+        setStatus(`${data.error || 'Failed'}`);
       }
-    } catch (err) {
-      setStatus('❌ Network error');
+    } catch {
+      setStatus('Network error');
     } finally {
       setLoading(false);
     }

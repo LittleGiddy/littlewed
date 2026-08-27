@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, RefreshCw, MessageCircle, Phone, CheckCircle, Clock, XCircle, Trash2, Edit2, Check, X, Square, CheckSquare } from 'lucide-react';
+import { Send, RefreshCw, MessageCircle, Phone, CheckCircle, Clock, XCircle, Trash2, Edit2, Check, X, Square, CheckSquare, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface Guest {
   id: string;
@@ -83,7 +84,11 @@ export default function GuestsPage() {
       return;
     }
     const ids = Array.from(selected);
-    if (!confirm(`Send invitations to ${ids.length} selected guest${ids.length > 1 ? 's' : ''}?`)) return;
+    const ok = await confirmToast({
+      title: `Send invitations to ${ids.length} guest${ids.length > 1 ? 's' : ''}?`,
+      confirmText: 'Send',
+    });
+    if (!ok) return;
 
     setResending(new Set(ids));
     let success = 0;
@@ -114,7 +119,13 @@ export default function GuestsPage() {
       return;
     }
     const ids = Array.from(selected);
-    if (!confirm(`Delete ${ids.length} selected guest${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    const ok = await confirmToast({
+      title: `Delete ${ids.length} selected guest${ids.length > 1 ? 's' : ''}?`,
+      message: 'This cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
 
     setDeleting(true);
     try {
@@ -140,7 +151,8 @@ export default function GuestsPage() {
   };
 
   const resendInvitation = async (guestId: string) => {
-    if (!confirm('Resend invitation to this guest?')) return;
+    const ok = await confirmToast({ title: 'Resend invitation to this guest?', confirmText: 'Resend' });
+    if (!ok) return;
     setResending(new Set([guestId]));
     try {
       const res = await fetch('/api/invitations/send-whatsapp', {
@@ -200,7 +212,13 @@ export default function GuestsPage() {
   };
 
   const deleteGuest = async (guestId: string) => {
-    if (!confirm('Delete this guest?')) return;
+    const ok = await confirmToast({
+      title: 'Delete this guest?',
+      message: 'This action cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/guests/${guestId}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) {
@@ -763,7 +781,7 @@ export default function GuestsPage() {
           <div className="p-6 text-center">Loading...</div>
         ) : guests.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">👥</div>
+            <div className="empty-icon"><Users size={40} /></div>
             <p className="font-semibold text-gray-700">No guests found</p>
             <p className="text-sm">Add guests to your events to see them here.</p>
           </div>

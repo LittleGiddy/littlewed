@@ -325,8 +325,8 @@ export default function SendInvitationsPage() {
         />
         <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
           <span>{customMessage.length} characters</span>
-          <span className="text-[#0D4B4B] font-medium">
-            {customMessage.includes('{fullName}') ? '✅ Personalized' : '⚠️ No {fullName} placeholder'}
+          <span className="inline-flex items-center gap-1 text-[#0D4B4B] font-medium">
+            {customMessage.includes('{fullName}') ? (<><CheckCircle size={12} /> Personalized</>) : (<><AlertCircle size={12} /> No {`{fullName}`} placeholder</>)}
           </span>
         </div>
       </div>
@@ -617,7 +617,7 @@ export default function SendInvitationsPage() {
                         {guest.checkedIn && (
                           <div className="flex items-center gap-2 text-sm text-blue-600">
                             <CheckCircle size={14} />
-                            <span>Checked In ✅</span>
+                            <span>Checked In</span>
                           </div>
                         )}
                       </div>

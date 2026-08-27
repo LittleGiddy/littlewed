@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Smartphone, RefreshCw, CircleCheck, CircleAlert } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface Guest {
   id: string;
@@ -38,19 +40,19 @@ export default function SendTestPage({ params }: { params: Promise<{ eventId: st
       });
       const data = await res.json();
       if (res.ok) {
-        setResults(prev => ({ ...prev, [guest.id]: '✅ Sent' }));
+        setResults(prev => ({ ...prev, [guest.id]: 'Sent' }));
       } else {
-        setResults(prev => ({ ...prev, [guest.id]: `❌ ${data.error || 'Unknown error'}` }));
+        setResults(prev => ({ ...prev, [guest.id]: data.error || 'Unknown error' }));
       }
-    } catch (err) {
-      setResults(prev => ({ ...prev, [guest.id]: '❌ Network error' }));
+    } catch {
+      setResults(prev => ({ ...prev, [guest.id]: 'Network error' }));
     }
   };
 
   const sendBulkWhatsApp = async () => {
     const eligible = guests.filter(g => g.phone && g.invitationCard);
     if (eligible.length === 0) {
-      alert('No guests with both phone number and invitation card.');
+      toast.error('No guests with both phone number and invitation card.');
       return;
     }
     setSending(true);
@@ -73,15 +75,15 @@ export default function SendTestPage({ params }: { params: Promise<{ eventId: st
           <button
             onClick={sendBulkWhatsApp}
             disabled={sending}
-            className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition disabled:opacity-50"
+            className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition disabled:opacity-50"
           >
-            {sending ? 'Sending...' : '📱 Send All via WhatsApp'}
+            {sending ? 'Sending...' : <><Smartphone size={18} /> Send All via WhatsApp</>}
           </button>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-50"
           >
-            🔄 Refresh
+            <RefreshCw size={16} /> Refresh
           </button>
         </div>
 
@@ -101,9 +103,9 @@ export default function SendTestPage({ params }: { params: Promise<{ eventId: st
                   <p className="font-medium text-gray-800">{guest.name}</p>
                   <p className="text-sm text-gray-500">{guest.phone || 'No phone'}</p>
                   {guest.invitationCard ? (
-                    <span className="text-xs text-green-600">✓ QR ready</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-green-600"><CircleCheck size={13} /> QR ready</span>
                   ) : (
-                    <span className="text-xs text-amber-600">⚠ No QR</span>
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-600"><CircleAlert size={13} /> No QR</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">

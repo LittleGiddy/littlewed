@@ -10,9 +10,10 @@ import {
   ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
-  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save
+  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface Guest {
   id: string;
@@ -364,7 +365,8 @@ export default function SendInvitationsPage() {
       return;
     }
 
-    if (!confirm(`Switch ${smsGuests.length} guests from SMS to WhatsApp?`)) return;
+    const ok = await confirmToast({ title: `Switch ${smsGuests.length} guests from SMS to WhatsApp?`, confirmText: 'Switch' });
+    if (!ok) return;
 
     setSwitchingAll(true);
     let successCount = 0;
@@ -1393,7 +1395,7 @@ Card No: {cardNumber} {guestType}`}
                             cardNumber: guest.cardNumber || undefined
                           })}
                         >
-                          <p className="text-[10px] text-gray-500 mb-1">🖱️ Click to view</p>
+                          <p className="inline-flex items-center gap-1 text-[10px] text-gray-500 mb-1"><MousePointerClick size={11} /> Click to view</p>
                           <img
                             src={guest.invitationCard}
                             alt="Card"

@@ -10,6 +10,7 @@ import {
   FileText, CornerDownRight, Hash
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface Guest {
   id: string;
@@ -102,7 +103,8 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       return;
     }
     const costText = totalCost === 0 ? 'Free' : `${totalCost} TZS`;
-    if (!confirm(`Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}? Cost: ${costText}.`)) return;
+    const ok = await confirmToast({ title: `Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}?`, message: `Cost: ${costText}.`, confirmText: 'Send' });
+    if (!ok) return;
 
     setSending(true);
     try {
@@ -129,7 +131,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
         router.push(`/client/events/${eventId}`);
       } else {
         console.error('Reminder API error:', data.error);
-        toast.error('Failed to send reminders. Please contact support.');
+        toast.error(data.error || 'Failed to send reminders. Please try again.');
       }
     } catch (error) {
       console.error('Network error:', error);

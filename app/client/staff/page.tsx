@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { UserPlus, Trash2, ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { UserPlus, Trash2, ArrowLeft, Eye, EyeOff, Loader2, Users } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<any[]>([]);
@@ -59,7 +60,8 @@ export default function StaffPage() {
   };
 
   const deleteStaff = async (id: string) => {
-    if (confirm('Delete this staff member?')) {
+    const ok = await confirmToast({ title: 'Delete this staff member?', message: 'This action cannot be undone.', confirmText: 'Delete', danger: true });
+    if (ok) {
       try {
         const res = await fetch(`/api/staff/${id}`, { method: 'DELETE', credentials: 'include' });
         if (res.ok) {
@@ -204,7 +206,7 @@ export default function StaffPage() {
           </div>
         ) : staff.length === 0 ? (
           <div className="py-12 text-center">
-            <div className="text-4xl mb-3">👥</div>
+            <div className="flex justify-center text-gray-400 mb-3"><Users size={40} /></div>
             <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No staff members yet</h3>
             <p className="text-sm text-gray-400">Add your first team member to get started.</p>
           </div>

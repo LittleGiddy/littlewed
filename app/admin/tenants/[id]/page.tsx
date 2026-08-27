@@ -11,6 +11,7 @@ import {
   ChevronRight, UserCheck, Send, Smartphone,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 type Tab = 'overview' | 'events' | 'staff' | 'guests' | 'settings';
 
@@ -134,16 +135,22 @@ export default function TenantDetailPage() {
         credentials: 'include',
       });
       if (res.ok) { toast.success(`Tenant ${newStatus}`); fetchTenant(); }
-      else toast.error('Failed');
+      else { const data = await res.json().catch(() => null); toast.error(data?.error || 'Failed to update status'); }
     } catch { toast.error('Network error'); }
   };
 
   const deleteTenant = async () => {
-    if (!confirm(`Delete "${tenant?.name}" and ALL its data? This cannot be undone.`)) return;
+    const ok = await confirmToast({
+      title: `Delete "${tenant?.name}"?`,
+      message: 'This action cannot be undone. It will delete the tenant and ALL its data.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/delete`, { method: 'POST', credentials: 'include' });
       if (res.ok) { toast.success('Tenant deleted'); router.push('/admin/tenants'); }
-      else toast.error('Failed');
+      else { const data = await res.json().catch(() => null); toast.error(data?.error || 'Failed to delete tenant'); }
     } catch { toast.error('Network error'); }
   };
 

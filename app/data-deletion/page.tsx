@@ -1,5 +1,6 @@
 // app/data-deletion/page.tsx
 import Link from 'next/link';
+import { Info } from 'lucide-react';
 
 export const metadata = {
   title: 'Data Deletion Request - LittleWed',
@@ -18,7 +19,7 @@ export default function DataDeletionPage() {
         <div className="space-y-6 text-gray-700 leading-relaxed">
           <div className="bg-[#F0F9F9] rounded-xl p-4 border border-[#0D4B4B]/20">
             <p className="text-sm font-medium text-[#0D4B4B] flex items-center gap-2">
-              <span className="text-xl">ℹ️</span>
+              <Info size={20} className="shrink-0" />
               Important Information
             </p>
             <p className="text-sm mt-1">

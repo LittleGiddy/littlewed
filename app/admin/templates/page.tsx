@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 import { Palette, Plus, Trash2, RefreshCw, Image, Upload, X } from 'lucide-react';
 
 interface Template {
@@ -58,7 +59,8 @@ export default function AdminTemplatesPage() {
   };
 
   const deleteTemplate = async (id: string, templateName: string) => {
-    if (!confirm(`Delete template "${templateName}"?`)) return;
+    const ok = await confirmToast({ title: `Delete template "${templateName}"?`, confirmText: 'Delete', danger: true });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
       if (res.ok) {

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, CheckCircle, Globe, Building, ArrowRight, TriangleAlert } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
 export default function SignupPage() {
@@ -520,7 +520,7 @@ export default function SignupPage() {
                     <div className="step-label">Get Started</div>
                     <div className="form-title">Create your account</div>
                     <p className="form-subtitle">Choose how you'd like to sign up. You'll set up your organization right after.</p>
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+                    {error && <div className="err-box"><TriangleAlert size={16} className="mt-0.5 shrink-0" /><span>{error}</span></div>}
 
                     <button onClick={handleGoogleSignup} className="btn-google" type="button" disabled={loading}>
                       {loading ? (
@@ -551,7 +551,7 @@ export default function SignupPage() {
                     <div className="step-label">Step 1 of 3</div>
                     <div className="form-title">Your Workspace</div>
                     <p className="form-subtitle">Set up your business profile and unique URL.</p>
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+                    {error && <div className="err-box"><TriangleAlert size={16} className="mt-0.5 shrink-0" /><span>{error}</span></div>}
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'business_name' || form.business_name ? 'up' : ''}`}>
                         Business Name
@@ -594,7 +594,7 @@ export default function SignupPage() {
                     <div className="step-label">Step 2 of 3</div>
                     <div className="form-title">Your Account</div>
                     <p className="form-subtitle">Create your login credentials.</p>
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+                    {error && <div className="err-box"><TriangleAlert size={16} className="mt-0.5 shrink-0" /><span>{error}</span></div>}
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'name' || form.name ? 'up' : ''}`}>Full Name</label>
                       <input
@@ -674,7 +674,7 @@ export default function SignupPage() {
                     <p className="form-subtitle">
                       We sent a 6‑digit code to <strong>{form.email}</strong>
                     </p>
-                    {error && <div className="err-box"><span>⚠️</span><span>{error}</span></div>}
+                    {error && <div className="err-box"><TriangleAlert size={16} className="mt-0.5 shrink-0" /><span>{error}</span></div>}
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'otp' || otp ? 'up' : ''}`}>Verification Code</label>
                       <input

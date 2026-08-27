@@ -46,7 +46,7 @@ export default function SignupCompletePage() {
         if (res.ok) {
           localStorage.removeItem('signup_business_name');
           localStorage.removeItem('signup_subdomain');
-          toast.success('Organization created successfully! 🎉');
+          toast.success('Organization created successfully!');
           router.push('/client/dashboard');
         } else {
           toast.error(data.error || 'Failed to create organization');

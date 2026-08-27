@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 export default function InvitationDesigner({ params }: { params: Promise<{ eventId: string }> }) {
   const router = useRouter();
@@ -99,7 +100,7 @@ export default function InvitationDesigner({ params }: { params: Promise<{ event
       router.push(`/invitations/send/${eventId}`);
     } catch (error: any) {
       console.error('Generation error:', error);
-      alert('Generation failed: ' + error.message);
+      toast.error('Generation failed: ' + error.message);
     } finally {
       setGenerating(false);
     }

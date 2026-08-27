@@ -2,6 +2,8 @@
 
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface DeleteTenantButtonProps {
   tenantId: string;
@@ -12,9 +14,13 @@ export default function DeleteTenantButton({ tenantId, tenantName }: DeleteTenan
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm(`Delete "${tenantName}" and ALL its data? This action cannot be undone.`)) {
-      return;
-    }
+    const ok = await confirmToast({
+      title: `Delete "${tenantName}"?`,
+      message: 'This action cannot be undone. It will delete the tenant and ALL its data.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/delete`, {
@@ -24,10 +30,10 @@ export default function DeleteTenantButton({ tenantId, tenantName }: DeleteTenan
         window.location.reload();
       } else {
         const error = await res.json();
-        alert(error.error || 'Failed to delete');
+        toast.error(error.error || 'Failed to delete');
       }
-    } catch (error) {
-      alert('Error deleting organisation');
+    } catch {
+      toast.error('Error deleting organisation');
     } finally {
       setIsDeleting(false);
     }

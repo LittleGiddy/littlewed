@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 export default function NewEventPage() {
   const router = useRouter()
@@ -17,16 +18,27 @@ export default function NewEventPage() {
     e.preventDefault()
     setLoading(true)
 
-    const res = await fetch('/api/events', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    })
+    let res
+    let errorText = 'Failed to create event'
+    try {
+      res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        if (data?.error) errorText = data.error
+      }
+    } catch {
+      errorText = 'Network error. Please try again.'
+    }
 
-    if (res.ok) {
+    if (res?.ok) {
+      toast.success('Event created')
       router.push('/events')
     } else {
-      alert('Failed to create event')
+      toast.error(errorText)
       setLoading(false)
     }
   }

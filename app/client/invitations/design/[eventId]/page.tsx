@@ -1665,7 +1665,7 @@ export default function InvitationDesigner() {
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                 <Check size={32} className="text-green-600" />
               </div>
-              <h2 className="font-serif text-2xl font-bold text-gray-900 mb-2">Design Saved! 🎉</h2>
+              <h2 className="font-serif text-2xl font-bold text-gray-900 mb-2">Design Saved!</h2>
               <p className="text-gray-600 text-sm mb-6">
                 Your invitation design has been saved successfully. 
                 Now it's time to generate personalized cards for your guests.

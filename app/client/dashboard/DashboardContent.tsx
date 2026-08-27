@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 import RequestCreditsButton from '@/app/components/RequestCreditsButton';
 
 interface DashboardContentProps {
@@ -118,17 +120,24 @@ function CompactDeleteButton({ eventId }: { eventId: string }) {
   const handleDelete = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm('Delete this event? This action cannot be undone.')) return;
+    const ok = await confirmToast({
+      title: 'Delete this event?',
+      message: 'This action cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setIsDeleting(true);
     try {
       const res = await fetch(`/api/events/${eventId}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) {
         window.location.reload();
       } else {
-        alert('Failed to delete event');
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || 'Failed to delete event');
       }
     } catch {
-      alert('Network error');
+      toast.error('Network error');
     } finally {
       setIsDeleting(false);
     }

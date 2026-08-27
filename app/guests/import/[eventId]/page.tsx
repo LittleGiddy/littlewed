@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
+import toast from 'react-hot-toast'
 
 interface GuestRow {
   name: string
@@ -75,7 +76,7 @@ export default function ImportGuestsPage({ params }: { params: { eventId: string
     if (res.ok) {
       router.push(`/guests/${params.eventId}`)
     } else {
-      alert('Import failed')
+      toast.error('Import failed')
       setImporting(false)
     }
   }

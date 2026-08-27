@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react' // ✅ add import
+import { Suspense } from 'react'
+import { CircleCheck } from 'lucide-react'
 
 function CheckInContent() {
   const searchParams = useSearchParams()
@@ -10,6 +11,7 @@ function CheckInContent() {
   
   const [code, setCode] = useState('')
   const [message, setMessage] = useState('')
+  const [isSuccess, setIsSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [guestName, setGuestName] = useState('')
 
@@ -24,18 +26,20 @@ function CheckInContent() {
     const res = await fetch('/api/check-in', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include', // ✅ add this for session
+      credentials: 'include',
       body: JSON.stringify({ smsCode: code })
     })
 
     const data = await res.json()
     if (res.ok) {
-      setMessage(`✅ Checked in: ${data.guest.name}`)
+      setIsSuccess(true)
+      setMessage(`Checked in: ${data.guest.name}`)
       setGuestName(data.guest.name)
       setCode('')
       new Audio('/beep.mp3').play().catch(() => {})
     } else {
-      setMessage(`❌ ${data.error}`)
+      setIsSuccess(false)
+      setMessage(data.error)
     }
     setLoading(false)
   }
@@ -65,15 +69,15 @@ function CheckInContent() {
           <button
             type="submit"
             disabled={loading || code.length !== 6}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition"
+            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition"
           >
-            {loading ? 'Checking...' : '✓ Check In'}
+            {loading ? 'Checking...' : <><CircleCheck size={20} /> Check In</>}
           </button>
         </form>
         
         {message && (
           <div className={`mt-6 p-4 rounded-xl text-center font-medium ${
-            message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {message}
           </div>

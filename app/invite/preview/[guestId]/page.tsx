@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import QRCode from 'qrcode';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, FlaskConical, Target } from 'lucide-react';
 
 export default async function PreviewPage({ params }: { params: Promise<{ guestId: string }> }) {
   const { guestId } = await params;
@@ -94,16 +94,16 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
         <div className="mt-4 text-center">
           {isTestMode ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="text-xs text-amber-700 font-medium mb-2">🧪 Test Mode – Preview Only</p>
+              <p className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium mb-2"><FlaskConical size={14} /> Test Mode – Preview Only</p>
               {checkedIn ? (
-                <span className="text-sm text-green-700 font-semibold">✅ Guest is checked in</span>
+                <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-semibold"><CheckCircle size={16} /> Guest is checked in</span>
               ) : (
                 <form action={`/api/check-in?guestId=${guest.id}`} method="POST">
                   <button
                     type="submit"
-                    className="bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0A3939] transition"
+                    className="inline-flex items-center gap-2 bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0A3939] transition"
                   >
-                    🎯 Test Check‑In
+                    <Target size={15} /> Test Check-In
                   </button>
                 </form>
               )}

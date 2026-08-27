@@ -7,6 +7,7 @@ import {
   ArrowUpDown, Users, CreditCard, ExternalLink, Settings, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface Tenant {
   id: string;
@@ -48,7 +49,11 @@ export default function AdminTenantManagePage() {
 
   const toggleTenantStatus = async (tenantId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
-    if (!confirm(`Are you sure you want to ${newStatus === 'active' ? 'activate' : 'deactivate'} this tenant?`)) return;
+    const ok = await confirmToast({
+      title: `${newStatus === 'active' ? 'Activate' : 'Deactivate'} this tenant?`,
+      confirmText: newStatus === 'active' ? 'Activate' : 'Deactivate',
+    });
+    if (!ok) return;
 
     setUpdatingStatus(tenantId);
     try {

@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { generateGuestToken } from '@/lib/qr'; // ✅ Import the function
+import { CircleCheck } from 'lucide-react';
+import { generateGuestToken } from '@/lib/qr';
 
 export default async function GuestPage({ params }: { params: { token: string } }) {
   // ─── Find guest by token ──────────────────────────────────────────────
@@ -58,9 +59,9 @@ export default async function GuestPage({ params }: { params: { token: string } 
 
         <Link
           href={`/guest/confirm/${guest.id}`}
-          className="block w-full mt-4 bg-[#0D4B4B] text-white text-center py-3 rounded-xl font-bold hover:bg-[#0A3939] transition"
+          className="flex items-center justify-center gap-2 w-full mt-4 bg-[#0D4B4B] text-white text-center py-3 rounded-xl font-bold hover:bg-[#0A3939] transition"
         >
-          Confirm Attendance ✅
+          <CircleCheck size={18} /> Confirm Attendance
         </Link>
       </div>
     </div>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
+import { confirmToast } from '@/lib/confirmToast';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 interface Guest {
@@ -198,7 +199,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Resume Event ────────────────────────────────────────────────────
   const handleResumeEvent = async () => {
     if (!eventId) return;
-    if (!confirm('Resume this event? It will become active again for 7 days.')) return;
+    const ok = await confirmToast({ title: 'Resume this event?', message: 'It will become active again for 7 days.', confirmText: 'Resume' });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/events/${eventId}/resume`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
@@ -272,7 +274,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const deleteSelected = async () => {
     if (selectedGuests.size === 0) { toast.error('No guests selected'); return; }
-    if (!confirm(`Delete ${selectedGuests.size} selected guest${selectedGuests.size > 1 ? 's' : ''}? This action cannot be undone.`)) return;
+    const ok = await confirmToast({
+      title: `Delete ${selectedGuests.size} selected guest${selectedGuests.size > 1 ? 's' : ''}?`,
+      message: 'This action cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       const res = await fetch('/api/guests/bulk-delete', {
@@ -287,7 +295,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const deleteGuest = async (guestId: string) => {
-    if (!confirm('Delete this guest?')) return;
+    const ok = await confirmToast({ title: 'Delete this guest?', message: 'This action cannot be undone.', confirmText: 'Delete', danger: true });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/guests/${guestId}`, { method: 'DELETE', credentials: 'include' });
       if (res.ok) { toast.success('Guest deleted'); setGuests(prev => prev.filter(g => g.id !== guestId)); setSelectedGuests(prev => { const s = new Set(prev); s.delete(guestId); return s; }); }
@@ -393,7 +402,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (!thanksMessage.trim()) { toast.error('Please enter a thank-you message.'); return; }
     const totalCost = checkedInCount * 300;
     if (credits !== null && credits < totalCost) { toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`); return; }
-    if (!confirm(`Send thank-you to ${checkedInCount} WhatsApp guest${checkedInCount > 1 ? 's' : ''}? This will cost ${totalCost} TZS.`)) return;
+    const ok = await confirmToast({
+      title: `Send thank-you to ${checkedInCount} WhatsApp guest${checkedInCount > 1 ? 's' : ''}?`,
+      message: `This will cost ${totalCost} TZS.`,
+      confirmText: 'Send',
+    });
+    if (!ok) return;
     setSendingThanks(true);
     let successCount = 0; const errors: string[] = [];
     for (const guest of whatsappCheckedInGuests) {
@@ -429,7 +443,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (!kumbushaMessage.trim()) { toast.error('Andika ujumbe wa kukumbusha.'); return; }
     if (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost) { toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`); return; }
     const costText = isFree ? 'bure' : `${kumbushaTotalCost} TZS`;
-    if (!confirm(`Tuma ukumbusho kwa wageni ${kumbushaCount}? Gharama: ${costText}.`)) return;
+    const ok = await confirmToast({
+      title: `Tuma ukumbusho kwa wageni ${kumbushaCount}?`,
+      message: `Gharama: ${costText}.`,
+      confirmText: 'Tuma',
+    });
+    if (!ok) return;
     setSendingKumbusha(true);
     try {
       const res = await fetch(`/api/events/${eventId}/send-reminders`, {
@@ -723,7 +742,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   // ─── Regenerate single guest card ──────────────────────────────────────
   const regenerateGuestCard = async (guest: Guest) => {
-    if (!confirm(`Regenerate card for ${guest.name}?`)) return;
+    const ok = await confirmToast({ title: `Regenerate card for ${guest.name}?`, confirmText: 'Regenerate' });
+    if (!ok) return;
 
     try {
       const res = await fetch('/api/invitations/generate-batch', {
@@ -738,11 +758,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       const data = await res.json();
 
-      if (data.completed > 0) {
+      if (res.ok && data.completed > 0) {
         toast.success(`Card regenerated for ${guest.name}`);
         await fetchData(eventId!);
       } else {
-        toast.error('Failed to regenerate card');
+        toast.error(data.error || `Failed to regenerate card for ${guest.name}`);
       }
     } catch (error) {
       toast.error('Network error');
@@ -1176,22 +1196,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <button
                     onClick={async () => {
                       setShowManageMenu(false);
-                      if (
-                        !confirm(
-                          'Delete this event and ALL its guests? This action cannot be undone.'
-                        )
-                      )
-                        return;
-                      const res = await fetch(`/api/events/${eventId}`, {
-                        method: 'DELETE',
-                        credentials: 'include',
+                      const confirmed = await confirmToast({
+                        title: 'Delete this event?',
+                        message: 'This action cannot be undone. All guests will be permanently removed.',
+                        confirmText: 'Delete',
+                        danger: true,
                       });
-                      if (res.ok) {
-                        toast.success('Event deleted');
-                        router.push('/client/events');
-                      } else {
-                        const data = await res.json();
-                        toast.error(data.error || 'Failed to delete event');
+                      if (!confirmed) return;
+                      try {
+                        const res = await fetch(`/api/events/${eventId}`, {
+                          method: 'DELETE',
+                          credentials: 'include',
+                        });
+                        if (res.ok) {
+                          toast.success('Event deleted');
+                          router.push('/client/events');
+                        } else {
+                          const data = await res.json();
+                          toast.error(data.error || 'Failed to delete event');
+                        }
+                      } catch {
+                        toast.error('Network error. Please try again.');
                       }
                     }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"

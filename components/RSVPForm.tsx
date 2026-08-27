@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { PartyPopper, Frown, CircleHelp } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 export default function RSVPForm({ guestId, currentStatus }: { guestId: string; currentStatus: string }) {
   const router = useRouter()
@@ -13,17 +15,24 @@ export default function RSVPForm({ guestId, currentStatus }: { guestId: string; 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-
-    const res = await fetch('/api/rsvp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guestId, status, dietary, plusOne })
-    })
-
-    if (res.ok) {
-      router.refresh()
+    try {
+      const res = await fetch('/api/rsvp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestId, status, dietary, plusOne })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success('Thank you! Your RSVP has been saved.')
+        router.refresh()
+      } else {
+        toast.error(data.error || 'Failed to save your RSVP. Please try again.')
+      }
+    } catch {
+      toast.error('Network error. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -36,13 +45,13 @@ export default function RSVPForm({ guestId, currentStatus }: { guestId: string; 
               key={option}
               type="button"
               onClick={() => setStatus(option)}
-              className={`px-6 py-2 rounded-full font-medium transition ${
+              className={`inline-flex items-center gap-2 px-6 py-2 rounded-full font-medium transition ${
                 status === option
                   ? option === 'yes' ? 'bg-green-600 text-white' : option === 'no' ? 'bg-red-600 text-white' : 'bg-gray-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {option === 'yes' ? '🎉 Yes, I&apos;ll attend' : option === 'no' ? '😢 Sadly, no' : '🤔 Maybe'}
+              {option === 'yes' ? (<><PartyPopper size={16} /> Yes, I&apos;ll attend</>) : option === 'no' ? (<><Frown size={16} /> Sadly, no</>) : (<><CircleHelp size={16} /> Maybe</>)}
             </button>
           ))}
         </div>

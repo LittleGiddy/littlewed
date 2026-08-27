@@ -74,6 +74,7 @@ export default function StaffDashboard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrMessage, setQrMessage] = useState('');
+  const [qrMessageType, setQrMessageType] = useState<'success' | 'error' | 'info'>('info');
   const [blockedMessage, setBlockedMessage] = useState('');
   const [availableAt, setAvailableAt] = useState('');
   const [countdown, setCountdown] = useState('');
@@ -214,6 +215,7 @@ export default function StaffDashboard() {
   const processCheckin = async (token: string) => {
     setLoadingCheckin(true);
     setQrMessage('');
+    setQrMessageType('info');
     setBlockedMessage('');
     setAvailableAt('');
     setCheckedIn(false);
@@ -234,6 +236,7 @@ export default function StaffDashboard() {
         setBlockedMessage(data.error);
         setAvailableAt(data.availableAt);
         playSound('fail');
+        setQrMessageType('info');
         setQrMessage(`⏰ ${data.error}`);
         return;
       }
@@ -243,7 +246,8 @@ export default function StaffDashboard() {
         setCheckedIn(true);
         setGuestName(data.guest.name);
         setGuestType(data.guest.guestType || '—');
-        setQrMessage(`✅ ${data.guest.name} checked in`);
+        setQrMessageType('success');
+        setQrMessage(`${data.guest.name} checked in`);
         setTimeout(() => {
           loadGuests(selectedEventId);
           setShowCheckinModal(false);
@@ -254,11 +258,13 @@ export default function StaffDashboard() {
         }, 1500);
       } else {
         playSound('fail');
-        setQrMessage(`❌ ${data.error}`);
+        setQrMessageType('error');
+        setQrMessage(data.error);
       }
     } catch {
       playSound('fail');
-      setQrMessage('❌ Network error');
+      setQrMessageType('error');
+      setQrMessage('Network error');
     } finally {
       setLoadingCheckin(false);
     }
@@ -271,6 +277,7 @@ export default function StaffDashboard() {
 
     setLoadingCheckin(true);
     setQrMessage('');
+    setQrMessageType('info');
     setBlockedMessage('');
     setAvailableAt('');
     setCheckedIn(false);
@@ -291,7 +298,8 @@ export default function StaffDashboard() {
         setBlockedMessage(data.error);
         setAvailableAt(data.availableAt);
         playSound('fail');
-        setQrMessage(`⏰ ${data.error}`);
+        setQrMessageType('info');
+        setQrMessage(data.error);
         setManualCode('');
         return;
       }
@@ -301,7 +309,8 @@ export default function StaffDashboard() {
         setCheckedIn(true);
         setGuestName(data.guest.name);
         setGuestType(data.guest.guestType || '—');
-        setQrMessage(`✅ ${data.guest.name} checked in`);
+        setQrMessageType('success');
+        setQrMessage(`${data.guest.name} checked in`);
         setManualCode('');
         setTimeout(() => {
           loadGuests(selectedEventId);
@@ -313,11 +322,13 @@ export default function StaffDashboard() {
         }, 1500);
       } else {
         playSound('fail');
-        setQrMessage(`❌ ${data.error}`);
+        setQrMessageType('error');
+        setQrMessage(data.error);
       }
     } catch {
       playSound('fail');
-      setQrMessage('❌ Network error');
+      setQrMessageType('error');
+      setQrMessage('Network error');
     } finally {
       setLoadingCheckin(false);
     }
@@ -879,7 +890,7 @@ export default function StaffDashboard() {
 
               {/* ─── Success / Error Message ────────────────────────────── */}
               {qrMessage && !blockedMessage && (
-                <div className={`sd-qr-msg ${qrMessage.includes('✅') ? 'success' : 'error'}`}>
+                <div className={`sd-qr-msg ${qrMessageType === 'success' ? 'success' : 'error'}`}>
                   {qrMessage}
                 </div>
               )}
