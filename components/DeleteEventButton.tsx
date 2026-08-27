@@ -9,7 +9,8 @@ export default function DeleteEventButton({ eventId }: { eventId: string }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
-  const handleDelete = async () => {
+  const handleDelete = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const ok = await confirmToast({
       title: 'Delete this event?',
       message: 'This action cannot be undone. All guests will be permanently removed.',
@@ -38,10 +39,12 @@ export default function DeleteEventButton({ eventId }: { eventId: string }) {
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 transition flex items-center gap-2"
+      className="bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center flex-shrink-0
+                 w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 sm:gap-2"
+      title="Delete Event"
     >
       <Trash2 size={16} />
-      {deleting ? 'Deleting...' : 'Delete Event'}
+      <span className="hidden sm:inline">{deleting ? 'Deleting...' : 'Delete Event'}</span>
     </button>
   );
 }

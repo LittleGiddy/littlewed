@@ -4,8 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import {
   Building2, Users, CreditCard, UserCheck, UserCog,
-  TrendingUp, ArrowUpRight, ChevronRight, Sparkles,
+  TrendingUp, ArrowUpRight, ChevronRight, Sparkles, Activity,
 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { ActivityFeed } from './components/ActivityFeed';
 
@@ -15,7 +16,7 @@ export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== 'SUPER_ADMIN') redirect('/login');
 
-  const [tenants, pendingUsers, totalStaff, totalCredits] = await Promise.all([
+  const [tenants, pendingUsers, totalStaff, totalCredits, messageFailure24h] = await Promise.all([
     prisma.tenant.findMany({
       include: { users: true },
       orderBy: { createdAt: 'desc' }
@@ -23,6 +24,12 @@ export default async function AdminDashboard() {
     prisma.user.count({ where: { isActive: false, role: 'CLIENT' } }),
     prisma.user.count({ where: { role: 'STAFF' } }),
     prisma.tenant.aggregate({ _sum: { credits: true } }),
+    prisma.messageLog.count({
+      where: {
+        status: { in: ['FAILED', 'REJECTED'] },
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+    }),
   ]);
 
   const activeSubscriptions = tenants.filter(t => t.subscriptionStatus === 'active').length;
@@ -50,6 +57,23 @@ export default async function AdminDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Platform overview and quick management</p>
       </div>
+
+      {/* Message failure alert */}
+      {messageFailure24h > 0 && (
+        <Link
+          href="/admin/logs"
+          className="flex items-start gap-3 bg-red-50 border border-red-100 rounded-2xl px-4 py-3 hover:bg-red-100/70 transition group"
+        >
+          <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">
+              {messageFailure24h} message{messageFailure24h > 1 ? 's' : ''} failed in the last 24 hours
+            </p>
+            <p className="text-xs text-red-600 mt-0.5">Click to review message logs and identify tenants with delivery problems.</p>
+          </div>
+          <ArrowUpRight size={16} className="text-red-400 group-hover:text-red-600 transition" />
+        </Link>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -139,6 +163,22 @@ export default async function AdminDashboard() {
                 </div>
               </div>
               <ArrowUpRight size={16} className="text-gray-300 group-hover:text-amber-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </Link>
+
+            <Link
+              href="/admin/logs"
+              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-red-300 transition-all duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                  <Activity size={18} className="text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Message Logs</p>
+                  <p className="text-xs text-gray-400">{messageFailure24h} failures in last 24h</p>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-gray-300 group-hover:text-red-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
             </Link>
           </div>
         </div>

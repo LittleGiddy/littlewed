@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, UserCog, Palette,
   LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Bell, Search, Zap, Coins, BarChart3
+  Bell, Search, Zap, Coins, BarChart3, Activity
 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
@@ -66,6 +66,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { path: '/admin/users', icon: Users, label: 'Users' },
     { path: '/admin/staff', icon: UserCog, label: 'Staff' },
     { path: '/admin/credit-requests', icon: Coins, label: 'Credit Requests' },
+    { path: '/admin/logs', icon: Activity, label: 'Message Logs' },
     { path: '/admin/reports', icon: BarChart3, label: 'Reports' },
     { path: '/admin/templates', icon: Palette, label: 'Templates' },
   ];

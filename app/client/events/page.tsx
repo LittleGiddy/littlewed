@@ -115,7 +115,7 @@ export default function EventsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="flex items-center gap-4 px-5 sm:px-6 py-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60 transition-colors cursor-pointer"
+                className="flex items-center gap-2.5 sm:gap-4 px-4 sm:px-6 py-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60 transition-colors cursor-pointer"
                 onClick={() => window.location.href = `/client/events/${event.id}`}
               >
                 {/* Date Box */}

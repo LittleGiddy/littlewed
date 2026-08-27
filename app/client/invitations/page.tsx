@@ -266,7 +266,7 @@ export default function GuestsPage() {
               onChange={() => toggleSelect(guest.id)}
               className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
             />
-            <div className="flex-1 flex justify-between">
+            <div className="flex-1 min-w-0">
               <div>
                 {isEditingName ? (
                   <div className="flex items-center gap-1">
@@ -299,11 +299,6 @@ export default function GuestsPage() {
                   <div className="guest-phone">{guest.phone}</div>
                 )}
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => startEditing(guest, 'name')} className="text-[#0D4B4B] hover:text-[#0A3939]" title="Edit name"><Edit2 size={14} /></button>
-                <button onClick={() => startEditing(guest, 'phone')} className="text-[#0D4B4B] hover:text-[#0A3939]" title="Edit phone"><Edit2 size={14} /></button>
-                <button onClick={() => deleteGuest(guest.id)} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></button>
-              </div>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -322,14 +317,37 @@ export default function GuestsPage() {
             <span className="event-name">{guest.event.name}</span>
             <span className="event-date ml-2">{new Date(guest.event.date).toLocaleDateString()}</span>
           </div>
-          <div className="mt-2">
+          <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
             <button
-              className="action-btn"
+              className="action-btn flex-1 sm:flex-none"
               onClick={() => resendInvitation(guest.id)}
               disabled={isResending(guest.id)}
             >
-              {isResending(guest.id) ? '...' : (guest.invitationSentAt ? 'Resend' : 'Send Now')}
+              {isResending(guest.id) ? 'Sending...' : (guest.invitationSentAt ? 'Resend Invitation' : 'Send Invitation')}
             </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => startEditing(guest, 'name')}
+                className="mobile-icon-btn"
+                title="Edit name"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                onClick={() => startEditing(guest, 'phone')}
+                className="mobile-icon-btn"
+                title="Edit phone"
+              >
+                <Phone size={14} />
+              </button>
+              <button
+                onClick={() => deleteGuest(guest.id)}
+                className="mobile-icon-btn mobile-icon-danger"
+                title="Delete guest"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -401,16 +419,16 @@ export default function GuestsPage() {
             </span>
           </td>
           <td className="px-4 py-3 text-right">
-            <div className="flex items-center justify-end gap-2">
-              <button onClick={() => startEditing(guest, 'name')} className="text-[#0D4B4B] hover:text-[#0A3939]" title="Edit name"><Edit2 size={14} /></button>
-              <button onClick={() => startEditing(guest, 'phone')} className="text-[#0D4B4B] hover:text-[#0A3939]" title="Edit phone"><Edit2 size={14} /></button>
-              <button onClick={() => deleteGuest(guest.id)} className="text-red-500 hover:text-red-700" title="Delete"><Trash2 size={14} /></button>
+            <div className="flex items-center justify-end gap-1.5">
+              <button onClick={() => startEditing(guest, 'name')} className="p-1.5 rounded-lg text-[#0D4B4B] hover:bg-[#0D4B4B]/5" title="Edit name"><Edit2 size={15} /></button>
+              <button onClick={() => startEditing(guest, 'phone')} className="p-1.5 rounded-lg text-[#0D4B4B] hover:bg-[#0D4B4B]/5" title="Edit phone"><Edit2 size={15} /></button>
+              <button onClick={() => deleteGuest(guest.id)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50" title="Delete guest"><Trash2 size={15} /></button>
               <button
-                className="inv-resend-btn"
+                className="inv-resend-btn ml-1.5"
                 onClick={() => resendInvitation(guest.id)}
                 disabled={isResending(guest.id)}
               >
-                {isResending(guest.id) ? '...' : (guest.invitationSentAt ? 'Resend' : 'Send Now')}
+                {isResending(guest.id) ? 'Sending...' : (guest.invitationSentAt ? 'Resend' : 'Send Now')}
               </button>
             </div>
           </td>
@@ -650,6 +668,30 @@ export default function GuestsPage() {
         .guest-card .action-btn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+        .guest-card .mobile-icon-btn {
+          width: 34px;
+          height: 34px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          border: 1.5px solid #E2EAF0;
+          background: white;
+          color: #0D4B4B;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .guest-card .mobile-icon-btn:hover {
+          background: rgba(13,75,75,0.06);
+          border-color: #0D4B4B;
+        }
+        .guest-card .mobile-icon-danger {
+          color: #C0392B;
+          border-color: #FECACA;
+        }
+        .guest-card .mobile-icon-danger:hover {
+          background: #FEF2F2;
+          border-color: #FCA5A5;
         }
 
         .bulk-bar {

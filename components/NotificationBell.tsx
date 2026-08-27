@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Bell, BellOff, CheckCircle, XCircle, Info, AlertTriangle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 interface Notification {
@@ -164,9 +165,12 @@ export default function NotificationBell() {
 
             {notifications.length > 0 && (
               <div className="border-t border-gray-100 px-4 py-2 text-center">
-                <a href="/client/notifications" className="text-xs text-[#0D4B4B] hover:underline font-medium">
+                <Link
+                  href={(session.user as any)?.role === 'SUPER_ADMIN' ? '/admin/notifications' : '/client/notifications'}
+                  className="text-xs text-[#0D4B4B] hover:underline font-medium"
+                >
                   View all notifications
-                </a>
+                </Link>
               </div>
             )}
           </motion.div>
