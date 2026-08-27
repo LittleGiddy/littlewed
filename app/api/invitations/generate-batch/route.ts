@@ -11,11 +11,32 @@ export const maxDuration = 300; // Hobby-plan max — a safety net, not the main
 const CONCURRENCY = 5;          // simultaneous sharp/Cloudinary/db ops — keep Neon happy
 const MAX_PER_REQUEST = 50;     // client chunks the full guest list into pieces this size
 
+// Fail fast if Cloudinary isn't configured, instead of failing silently
+// for every guest inside the upload step.
+function cloudinaryConfigured(): { ok: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) missing.push('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
+  if (!process.env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
+  if (!process.env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
+  return { ok: missing.length === 0, missing };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session || (session.user as any).role !== 'CLIENT') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const cloudinaryCheck = cloudinaryConfigured();
+    if (!cloudinaryCheck.ok) {
+      console.error('[generate-batch] Cloudinary is not configured. Missing:', cloudinaryCheck.missing);
+      return NextResponse.json(
+        {
+          error: `Card generation is unavailable because Cloudinary is not configured. Missing environment variables: ${cloudinaryCheck.missing.join(', ')}. Add them in Vercel → Settings → Environment Variables.`,
+        },
+        { status: 500 }
+      );
     }
 
     const tenantId = (session.user as any).tenantId;
