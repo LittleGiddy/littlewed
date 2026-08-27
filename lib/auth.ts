@@ -42,6 +42,8 @@ export const authOptions: NextAuthOptions = {
           subscriptionStatus: user.tenant?.subscriptionStatus ?? 'inactive',
           isActive: user.isActive,
           phone: user.phone ?? undefined,
+          createdAt: user.createdAt,
+          emailVerified: user.emailVerified ?? undefined,
         } as any;
       },
     }),
@@ -149,6 +151,8 @@ export const authOptions: NextAuthOptions = {
             token.isActive = dbUser.isActive;
             token.phone = dbUser.phone ?? undefined;
             token.image = dbUser.image ?? undefined;
+            token.createdAt = dbUser.createdAt;
+            token.emailVerified = dbUser.emailVerified ?? undefined;
           } else {
             token.id = (user as any).id;
           }
@@ -161,6 +165,8 @@ export const authOptions: NextAuthOptions = {
           token.isActive = (user as any).isActive;
           token.phone = (user as any).phone;
           token.image = (user as any).image;
+          token.createdAt = (user as any).createdAt;
+          token.emailVerified = (user as any).emailVerified;
         }
       } else if (trigger === 'update' && token.id) {
         const dbUser = await prisma.user.findUnique({
@@ -174,6 +180,8 @@ export const authOptions: NextAuthOptions = {
           token.subscriptionStatus = dbUser.tenant?.subscriptionStatus ?? 'inactive';
           token.isActive = dbUser.isActive;
           token.image = dbUser.image ?? undefined;
+          token.createdAt = dbUser.createdAt;
+          token.emailVerified = dbUser.emailVerified ?? undefined;
         }
       }
 
@@ -190,6 +198,8 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).subscriptionStatus = token.subscriptionStatus;
         (session.user as any).isActive = token.isActive;
         (session.user as any).phone = token.phone;
+        (session.user as any).createdAt = token.createdAt;
+        (session.user as any).emailVerified = token.emailVerified;
         if (token.image) {
           session.user.image = token.image as string;
         }

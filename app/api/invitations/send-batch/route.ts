@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const { 
       eventId, 
       guestIds, 
+      smsTemplate, 
       smsVariables, 
       whatsappVariables, 
       message, 
@@ -60,14 +61,6 @@ export async function POST(req: NextRequest) {
           creditsAvailable: tenant?.credits ?? 0,
         }, { status: 400 });
       }
-    }
-
-    // Deduct credits (1 credit per invitation, skip if bypassPayment)
-    if (!tenant?.bypassPayment) {
-      await prisma.tenant.update({
-        where: { id: tenantId },
-        data: { credits: { decrement: guests.length } },
-      });
     }
 
     const results = [];
@@ -156,45 +149,40 @@ export async function POST(req: NextRequest) {
             // ─── SMS ──────────────────────────────────────────────────────
             console.log(`[Batch] Sending SMS to ${guest.name} (${guest.phone})`);
 
-            // ─── Get SMS variables ────────────────────────────────────────
+            // ─── Get SMS variables & build message from the user's template ─
             const vars = smsVariables || {};
 
-            // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
             const actualCardNumber = guest.cardNumber || vars.cardNumber || '108';
             const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
 
-            // ─── Build SMS message with actual values ────────────────────
-            let smsMessage = `Habari ${actualGuestName},
+            // ─── Base template: prefer the SMS template edited by the user ──
+            let smsTemplateText =
+              smsTemplate ||
+              message ||
+              `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
 
-Familia ya ${vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${vars.person1 || guest.event?.person1 || 'Agape'} na ${vars.person2 || guest.event?.person2 || 'Gladness'} tarehe ${vars.date || formattedDate}.
-
-Venue: ${vars.venue || guest.event?.venue || 'The Embassy Hall'}, saa ${vars.time || guest.event?.time || '5:00 PM'}.
-
-Card No: ${actualCardNumber} • ${actualCardType}
-
-Tafadhali onyesha kadi hii wakati wa kuingia.
-Karibu na ufurahie sherehe!
-
-Ahsante.`;
-
-            // ─── If custom message provided, use it ──────────────────────
-            if (message) {
-              smsMessage = message
-                .replace(/{title}/g, guest.title || '')
-                .replace(/{name}/g, guest.name)
-                .replace(/{fullName}/g, actualGuestName)
-                .replace(/{cardNumber}/g, actualCardNumber)
-                .replace(/{passCode}/g, guest.passCode || 'N/A')
-                .replace(/{event}/g, guest.event?.name || '')
-                .replace(/{date}/g, formattedDate)
-                .replace(/{venue}/g, guest.event?.venue || '')
-                .replace(/{address}/g, guest.event?.address || '')
-                .replace(/{hostFamily}/g, guest.event?.hostFamily || '')
-                .replace(/{person1}/g, guest.event?.person1 || '')
-                .replace(/{person2}/g, guest.event?.person2 || '')
-                .replace(/{time}/g, guest.event?.time || '');
-            }
+            // ─── Replace variables with actual values ──────────────────────
+            let smsMessage = smsTemplateText
+              .replace(/{guestName}/g, actualGuestName)
+              .replace(/{guestTitle}/g, guest.title || '')
+              .replace(/{title}/g, guest.title || '')
+              .replace(/{name}/g, guest.name)
+              .replace(/{fullName}/g, actualGuestName)
+              .replace(/{cardNumber}/g, actualCardNumber)
+              .replace(/{cardNo}/g, actualCardNumber)
+              .replace(/{guestType}/g, actualCardType)
+              .replace(/{cardType}/g, actualCardType)
+              .replace(/{passCode}/g, guest.passCode || 'N/A')
+              .replace(/{event}/g, guest.event?.name || '')
+              .replace(/{date}/g, formattedDate)
+              .replace(/{eventDate}/g, formattedDate)
+              .replace(/{venue}/g, vars.venue || guest.event?.venue || '')
+              .replace(/{address}/g, guest.event?.address || '')
+              .replace(/{hostFamily}/g, vars.hostFamily || guest.event?.hostFamily || '')
+              .replace(/{person1}/g, vars.person1 || guest.event?.person1 || '')
+              .replace(/{person2}/g, vars.person2 || guest.event?.person2 || '')
+              .replace(/{time}/g, vars.time || guest.event?.time || '');
 
             // ─── Send SMS ──────────────────────────────────────────────────
             const smsResult = await sendSMS({
@@ -213,6 +201,25 @@ Ahsante.`;
           // ─── Handle result ─────────────────────────────────────────────
           if (result.success) {
             successCount++;
+
+            // ─── Deduct 1 credit per invitation sent (skip if bypassPayment) ─
+            if (!tenant?.bypassPayment) {
+              await prisma.tenant.update({
+                where: { id: tenantId },
+                data: { credits: { decrement: 1 } },
+              });
+            }
+
+            // ─── Log credit usage ─────────────────────────────────────────
+            await prisma.usageRecord.create({
+              data: {
+                tenantId,
+                eventId,
+                channel: guest.routingChannel === 'whatsapp' ? 'whatsapp' : 'sms',
+                cost: 1,
+              },
+            });
+
             await prisma.guest.update({
               where: { id: guest.id },
               data: { invitationSentAt: new Date() },
