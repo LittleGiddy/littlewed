@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Users, Plus, Coins, Upload, Palette, Send,
   ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, Sparkles, MapPin, Download, Trash2, ArrowUpRight,
+  CheckCircle, Sparkles, MapPin, Download, Trash2, ArrowUpRight, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import BuyCreditsButton from '@/app/components/BuyCreditsButton';
+import RequestCreditsButton from '@/app/components/RequestCreditsButton';
 
 interface DashboardContentProps {
   firstName: string;
@@ -21,21 +21,12 @@ interface DashboardContentProps {
     name: string;
     date: string;
     venue: string;
+    status: string;
     _count: { guests: number };
   }[];
   newEventUrl: string;
 }
 
-// ─── Palette ─────────────────────────────────────────────────────────────
-// Kept your teal/gold identity, but simplified to a flat "material" system:
-// one accent color, one ink color, one muted color, cards on white.
-const INK = '#0D1B1B';
-const MUTED = '#7A8FA6';
-const ACCENT = '#0D4F4F';
-const SURFACE = '#F4F6F9';
-const CARD = '#FFFFFF';
-
-// ─── Hero Carousel ───────────────────────────────────────────────────────
 const carouselImages = [
   {
     id: 1,
@@ -94,11 +85,11 @@ function EventCarousel() {
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-6">
-            <h3 className="font-serif text-2xl font-bold text-white leading-tight">
+          <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
+            <h3 className="font-serif text-xl sm:text-2xl font-bold text-white leading-tight">
               {carouselImages[currentIndex].title}
             </h3>
-            <p className="text-sm text-white/85 mt-1 max-w-[85%]">
+            <p className="text-xs sm:text-sm text-white/85 mt-1 max-w-[85%]">
               {carouselImages[currentIndex].subtitle}
             </p>
           </div>
@@ -121,7 +112,6 @@ function EventCarousel() {
   );
 }
 
-// ─── Delete Event Button ─────────────────────────────────────────────────
 function CompactDeleteButton({ eventId }: { eventId: string }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -165,16 +155,21 @@ export default function DashboardContent({
 }: DashboardContentProps) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasPending, setHasPending] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
+    fetch('/api/credits/pending', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => setHasPending(!!data.pending))
+      .catch(() => {});
   }, []);
 
   const stats = [
-    { label: 'Credits', value: credits, icon: Coins, tint: '#0D4F4F', tintBg: '#E6F0EE' },
-    { label: 'Total Guests', value: totalGuests, icon: Users, tint: '#2563EB', tintBg: '#E8EFFD' },
-    { label: 'Checked In', value: checkedIn, icon: UserCheck, tint: '#1A7A4A', tintBg: '#E7F6EC' },
-    { label: 'Events', value: events.length, icon: CalendarDays, tint: '#C07A20', tintBg: '#FBF0E1' },
+    { label: 'Credits', value: credits, icon: Coins, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', ring: 'ring-[#0D4B4B]/10', isCredits: true },
+    { label: 'Total Guests', value: totalGuests, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100', isCredits: false },
+    { label: 'Checked In', value: checkedIn, icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50', ring: 'ring-green-100', isCredits: false },
+    { label: 'Events', value: events.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100', isCredits: false },
   ];
 
   const categories = [
@@ -185,23 +180,53 @@ export default function DashboardContent({
   ];
 
   const quickActions = [
-    { label: 'New Event', sub: 'Start planning', icon: Plus, href: newEventUrl, tint: '#0D4F4F', tintBg: '#E6F0EE' },
-    { label: 'Import Guests', sub: 'From a file', icon: Upload, href: '/client/guests/import/select-event', tint: '#1A7A4A', tintBg: '#E7F6EC' },
-    { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event', tint: '#C07A20', tintBg: '#FBF0E1' },
-    { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event', tint: '#2563EB', tintBg: '#E8EFFD' },
-    { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup', tint: '#6B3FA0', tintBg: '#F0E9FA' },
+    { label: 'New Event', sub: 'Start planning', icon: Plus, href: newEventUrl, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
+    { label: 'Import Guests', sub: 'From a file', icon: Upload, href: '/client/guests/import/select-event', color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event', color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event', color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup', color: 'text-violet-600', bg: 'bg-violet-50' },
   ];
 
-  const featuredEvents = events.slice(0, 3).map((event, index) => {
+  const eventColors = ['bg-[#0D4B4B]', 'bg-green-600', 'bg-amber-600'];
+
+  const now = new Date();
+  const filteredEvents = events.filter((event) => {
+    switch (activeCategory) {
+      case 'upcoming':
+        return event.status === 'ACTIVE' || event.status === 'DRAFT';
+      case 'live':
+        return event.status === 'LIVE';
+      case 'completed':
+        return event.status === 'EXPIRED' || event.status === 'ARCHIVED';
+      default:
+        return true;
+    }
+  });
+
+  const categoryCounts = {
+    all: events.length,
+    upcoming: events.filter((e) => e.status === 'ACTIVE' || e.status === 'DRAFT').length,
+    live: events.filter((e) => e.status === 'LIVE').length,
+    completed: events.filter((e) => e.status === 'EXPIRED' || e.status === 'ARCHIVED').length,
+  };
+
+  const featuredEvents = filteredEvents.slice(0, 6).map((event, index) => {
     const d = new Date(event.date);
-    const colors = ['#0D4F4F', '#1A7A4A', '#C07A20'];
+    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
+      DRAFT: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
+      ACTIVE: { label: 'Upcoming', color: 'text-blue-600', bg: 'bg-blue-50' },
+      LIVE: { label: 'Live', color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
+      EXPIRED: { label: 'Completed', color: 'text-gray-500', bg: 'bg-gray-50' },
+      ARCHIVED: { label: 'Archived', color: 'text-gray-400', bg: 'bg-gray-50' },
+    };
     return {
       ...event,
-      accentColor: colors[index % colors.length],
+      accentColor: eventColors[index % eventColors.length],
       day: d.getDate(),
       month: d.toLocaleString('default', { month: 'short' }),
       weekday: d.toLocaleString('default', { weekday: 'short' }),
       guestCount: event._count.guests,
+      statusInfo: statusConfig[event.status] || statusConfig.DRAFT,
     };
   });
 
@@ -217,22 +242,20 @@ export default function DashboardContent({
 
   return (
     <motion.div
-      className="min-h-screen pb-10 font-sans"
-      style={{ background: SURFACE }}
+      className="min-h-screen pb-4"
       initial="hidden"
       animate={isLoaded ? 'visible' : 'hidden'}
       variants={containerVariants}
     >
-      <main className="max-w-lg mx-auto px-4 pt-5 pb-8">
+      <div className="max-w-lg mx-auto">
         {/* ─── Header ─── */}
         <motion.div variants={itemVariants} className="flex items-center justify-between mb-5">
           <div>
-            <p className="text-xs font-medium tracking-wide" style={{ color: MUTED }}>WELCOME BACK</p>
-            <h1 className="font-serif text-2xl font-bold mt-0.5" style={{ color: INK }}>
-              {firstName} 👋
+            <p className="text-xs font-medium tracking-wide text-gray-400">WELCOME BACK</p>
+            <h1 className="font-serif text-2xl font-bold mt-0.5 text-gray-900">
+              {firstName}
             </h1>
           </div>
-        
         </motion.div>
 
         {/* ─── Carousel ─── */}
@@ -240,55 +263,62 @@ export default function DashboardContent({
           <EventCarousel />
         </motion.div>
 
-        {/* ─── Stats: large 2x2 grid, flat cards ─── */}
+        {/* ─── Pending Request Banner ─── */}
+        {hasPending && (
+          <motion.div variants={itemVariants} className="mb-4">
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+              <Clock size={18} className="text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-amber-800">Credit request pending</p>
+                <p className="text-xs text-amber-600 mt-0.5">Waiting for admin to review your credit request.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ─── Stats 2x2 Grid ─── */}
         <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 mb-6">
           {stats.map((stat) => (
             <motion.div
               key={stat.label}
               variants={itemVariants}
               whileTap={{ scale: 0.97 }}
-              className="rounded-3xl p-4 flex flex-col justify-between"
-              style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
+              className="bg-white rounded-3xl p-4 flex flex-col justify-between shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
             >
               <div className="flex items-center justify-between mb-3">
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center"
-                  style={{ background: stat.tintBg, color: stat.tint }}
-                >
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${stat.bg} ${stat.color} ring-1 ${stat.ring}`}>
                   <stat.icon size={18} />
                 </div>
-                {stat.label === 'Credits' && <BuyCreditsButton currentCredits={credits} compact />}
+                {stat.isCredits && (
+                  <RequestCreditsButton compact hasPending={hasPending} onRequestSent={() => window.location.reload()} />
+                )}
               </div>
               <div>
-                <p className="font-serif text-2xl font-bold" style={{ color: INK }}>
+                <p className="font-serif text-2xl font-bold text-gray-900">
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </p>
-                <p className="text-xs font-medium mt-0.5" style={{ color: MUTED }}>{stat.label}</p>
+                <p className="text-xs font-medium mt-0.5 text-gray-400">{stat.label}</p>
               </div>
             </motion.div>
           ))}
         </motion.div>
 
-        {/* ─── Quick Actions: modern list-style cards ─── */}
+        {/* ─── Quick Actions ─── */}
         <motion.div variants={itemVariants} className="mb-6">
-          <h2 className="font-serif text-lg font-bold mb-3" style={{ color: INK }}>Quick Actions</h2>
+          <h2 className="font-serif text-lg font-bold mb-3 text-gray-900">Quick Actions</h2>
           <div className="grid grid-cols-2 gap-3">
             {quickActions.map((action) => (
               <Link key={action.label} href={action.href}>
                 <motion.div
                   whileTap={{ scale: 0.96 }}
-                  className="rounded-3xl p-4 h-full flex flex-col justify-between"
-                  style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
+                  className="bg-white rounded-3xl p-4 h-full flex flex-col justify-between shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
                 >
-                  <div
-                    className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4"
-                    style={{ background: action.tintBg, color: action.tint }}
-                  >
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-4 ${action.bg} ${action.color}`}>
                     <action.icon size={20} />
                   </div>
                   <div>
-                    <p className="text-sm font-bold" style={{ color: INK }}>{action.label}</p>
-                    <p className="text-[11px] mt-0.5" style={{ color: MUTED }}>{action.sub}</p>
+                    <p className="text-sm font-bold text-gray-900">{action.label}</p>
+                    <p className="text-[11px] mt-0.5 text-gray-400">{action.sub}</p>
                   </div>
                 </motion.div>
               </Link>
@@ -296,24 +326,27 @@ export default function DashboardContent({
           </div>
         </motion.div>
 
-        {/* ─── Categories: pill tabs ─── */}
+        {/* ─── Category Tabs ─── */}
         <motion.div variants={itemVariants} className="mb-4">
           <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {categories.map((category) => {
               const isActive = activeCategory === category.id;
+              const count = categoryCounts[category.id as keyof typeof categoryCounts];
               return (
                 <button
                   key={category.id}
                   onClick={() => setActiveCategory(category.id)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all"
-                  style={
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all ${
                     isActive
-                      ? { background: ACCENT, color: '#fff' }
-                      : { background: CARD, color: MUTED, boxShadow: '0 2px 8px rgba(20,30,45,0.05)' }
-                  }
+                      ? 'bg-[#0D4B4B] text-white'
+                      : 'bg-white text-gray-400 shadow-[0_2px_8px_rgba(20,30,45,0.05)]'
+                  }`}
                 >
                   <category.icon size={14} />
                   {category.label}
+                  <span className={`ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
+                  }`}>{count}</span>
                 </button>
               );
             })}
@@ -323,30 +356,38 @@ export default function DashboardContent({
         {/* ─── Featured Events ─── */}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-serif text-lg font-bold" style={{ color: INK }}>Your Events</h2>
+            <h2 className="font-serif text-lg font-bold text-gray-900">
+              {activeCategory === 'all' ? 'Your Events' : categories.find((c) => c.id === activeCategory)?.label + ' Events'}
+            </h2>
             <Link
               href="/client/events"
-              className="flex items-center gap-0.5 text-xs font-bold"
-              style={{ color: ACCENT }}
+              className="flex items-center gap-0.5 text-xs font-bold text-[#0D4B4B]"
             >
               See all <ChevronRight size={13} />
             </Link>
           </div>
 
           {featuredEvents.length === 0 ? (
-            <div className="rounded-3xl p-10 text-center" style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}>
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E6F0EE' }}>
-                <Sparkles className="w-8 h-8" style={{ color: ACCENT }} />
+            <div className="bg-white rounded-3xl p-10 text-center shadow-[0_2px_10px_rgba(20,30,45,0.06)]">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-[#0D4B4B]/5">
+                <Sparkles className="w-8 h-8 text-[#0D4B4B]" />
               </div>
-              <h3 className="font-serif text-lg font-bold" style={{ color: INK }}>No events yet</h3>
-              <p className="text-sm mt-1" style={{ color: MUTED }}>Create your first event to get started.</p>
-              <Link
-                href={newEventUrl}
-                className="inline-flex items-center gap-2 mt-5 px-6 py-3 text-white text-sm font-bold rounded-2xl"
-                style={{ background: ACCENT }}
-              >
-                <Plus size={16} /> Create Event
-              </Link>
+              <h3 className="font-serif text-lg font-bold text-gray-900">
+                {activeCategory === 'all' ? 'No events yet' : `No ${activeCategory} events`}
+              </h3>
+              <p className="text-sm mt-1 text-gray-400">
+                {activeCategory === 'all'
+                  ? 'Create your first event to get started.'
+                  : 'Events will appear here when they match this filter.'}
+              </p>
+              {activeCategory === 'all' && (
+                <Link
+                  href={newEventUrl}
+                  className="inline-flex items-center gap-2 mt-5 px-6 py-3 bg-[#0D4B4B] text-white text-sm font-bold rounded-2xl"
+                >
+                  <Plus size={16} /> Create Event
+                </Link>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -356,47 +397,35 @@ export default function DashboardContent({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.06 }}
-                  className="rounded-3xl overflow-hidden"
-                  style={{ background: CARD, boxShadow: '0 2px 10px rgba(20,30,45,0.06)' }}
+                  className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
                 >
                   <Link href={`/client/events/${event.id}`} className="block">
                     <div className="flex items-stretch">
-                      {/* Date block */}
-                      <div
-                        className="w-20 flex flex-col items-center justify-center text-white flex-shrink-0"
-                        style={{ background: event.accentColor }}
-                      >
+                      <div className={`w-20 flex flex-col items-center justify-center text-white shrink-0 ${event.accentColor}`}>
                         <span className="text-[10px] font-bold uppercase opacity-80">{event.weekday}</span>
                         <span className="font-serif text-2xl font-bold leading-none mt-0.5">{event.day}</span>
                         <span className="text-[10px] font-bold uppercase opacity-80 mt-0.5">{event.month}</span>
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0 p-4 flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <h3 className="font-bold text-sm truncate" style={{ color: INK }}>{event.name}</h3>
+                          <h3 className="font-bold text-sm truncate text-gray-900">{event.name}</h3>
                           <div className="flex items-center gap-1 mt-1">
-                            <MapPin size={12} style={{ color: MUTED }} />
-                            <span className="text-xs truncate" style={{ color: MUTED }}>{event.venue}</span>
+                            <MapPin size={12} className="text-gray-400" />
+                            <span className="text-xs truncate text-gray-400">{event.venue}</span>
                           </div>
                           <div className="flex items-center gap-2 mt-2">
-                            <span
-                              className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                              style={{ background: '#E6F0EE', color: ACCENT }}
-                            >
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0D4B4B]/5 text-[#0D4B4B] ring-1 ring-[#0D4B4B]/10">
                               {event.guestCount} guests
                             </span>
-                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ background: '#E7F6EC', color: '#1A7A4A' }}>
-                              Active
+                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${event.statusInfo.bg} ${event.statusInfo.color}`}>
+                              {event.statusInfo.label}
                             </span>
                           </div>
                         </div>
 
-                        <div className="flex flex-col items-center gap-2 flex-shrink-0">
-                          <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center"
-                            style={{ background: SURFACE, color: ACCENT }}
-                          >
+                        <div className="flex flex-col items-center gap-2 shrink-0">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 text-[#0D4B4B]">
                             <ArrowUpRight size={15} />
                           </div>
                           <CompactDeleteButton eventId={event.id} />
@@ -409,7 +438,7 @@ export default function DashboardContent({
             </div>
           )}
         </motion.div>
-      </main>
+      </div>
     </motion.div>
   );
 }

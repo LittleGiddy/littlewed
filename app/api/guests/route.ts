@@ -82,17 +82,25 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: { tenant: { select: { bypassPayment: true } } },
+      include: { tenant: { select: { bypassPayment: true, credits: true } } },
     });
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    if (!event.tenant?.bypassPayment && event.guestCount) {
+    // ─── Guest limit check (tied to credits) ─────────────────────────
+    if (!event.tenant?.bypassPayment) {
       const currentCount = await prisma.guest.count({ where: { eventId } });
-      if (currentCount >= event.guestCount) {
+      const maxGuests = event.guestCount || 0;
+
+      if (maxGuests > 0 && currentCount >= maxGuests) {
         return NextResponse.json(
-          { error: `Guest limit reached (${event.guestCount}).` },
+          {
+            error: `Guest limit reached (${maxGuests}). You've used all your credits for this event. Request more credits from the admin to add additional guests.`,
+            limit: maxGuests,
+            current: currentCount,
+            credits: event.tenant.credits,
+          },
           { status: 400 }
         );
       }
@@ -106,8 +114,8 @@ export async function POST(req: NextRequest) {
     const passCode = await generateUniquePassCode(prisma);
 
     // ─── Validate guest type ──────────────────────────────────────────
-    const validGuestType = guestType && ['SINGLE', 'DOUBLE'].includes(guestType.toUpperCase()) 
-      ? guestType.toUpperCase() 
+    const validGuestType = guestType && ['SINGLE', 'DOUBLE'].includes(guestType.toUpperCase())
+      ? guestType.toUpperCase()
       : 'SINGLE';
 
     // ─── CREATE GUEST ──────────────────────────────────────────────────

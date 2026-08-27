@@ -101,7 +101,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
                 <form action={`/api/check-in?guestId=${guest.id}`} method="POST">
                   <button
                     type="submit"
-                    className="bg-[#0D4F4F] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0A3D3D] transition"
+                    className="bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0A3939] transition"
                   >
                     🎯 Test Check‑In
                   </button>

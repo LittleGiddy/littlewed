@@ -37,9 +37,14 @@ export default function DeleteTenantButton({ tenantId, tenantName }: DeleteTenan
     <button
       onClick={handleDelete}
       disabled={isDeleting}
-      className="delete-link"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      <Trash2 size={14} /> {isDeleting ? 'Deleting...' : 'Delete'}
+      {isDeleting ? (
+        <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+      ) : (
+        <Trash2 size={13} />
+      )}
+      {isDeleting ? 'Deleting...' : 'Delete'}
     </button>
   );
 }

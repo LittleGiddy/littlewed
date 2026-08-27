@@ -3,7 +3,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Info } from 'lucide-react';
+import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Info, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -36,16 +36,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     if (role !== 'CLIENT' && role !== 'STAFF') { router.push('/login'); return; }
 
-    // ── Tenant check comes BEFORE the isActive check ──────────────────
-    // isActive:false has two different real-world meanings that must not
-    // be collapsed into one redirect target:
-    //   1. Brand-new Google user, no organization created yet → needs
-    //      /auth/google-callback to finish signup.
-    //   2. Organization exists, but is pending admin/subscription
-    //      approval → needs /client/pending-activation.
-    // Checking tenantId first disambiguates these. Without this, a
-    // Google user who never finished org creation lands on
-    // pending-activation with no way out.
     if (!user.tenantId) {
       router.push('/auth/google-callback?intent=login');
       return;
@@ -85,9 +75,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   if (status === 'loading') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F4F8' }}>
-        <div style={{ width: 40, height: 40, border: '4px solid #E2EAF0', borderTopColor: '#0D4F4F', borderRadius: '50%', animation: 'cl-spin 0.8s linear infinite' }} />
-        <style>{`@keyframes cl-spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
       </div>
     );
   }
@@ -97,6 +86,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const userName = (session.user as any)?.name || 'User';
   const userEmail = (session.user as any)?.email || '';
   const userInitial = userName.charAt(0).toUpperCase();
+  const userImage = (session.user as any)?.image || '';
 
   const navItems = role === 'CLIENT' ? [
     { path: '/client/dashboard', icon: Home, label: 'Dashboard' },
@@ -104,43 +94,61 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     { path: '/client/invitations', icon: Mail, label: 'Invitations' },
     { path: '/client/staff', icon: UserPlus, label: 'Team' },
     { path: '/client/settings', icon: Settings, label: 'Settings' },
+    { path: '/client/reports', icon: BarChart3, label: 'Reports' },
     { path: '/client/about', icon: Info, label: 'About' },
   ] : [
     { path: '/client/staff/dashboard', icon: Home, label: 'Check‑in' },
   ];
 
   const SidebarContent = () => (
-    <div className="cl-sidebar-inner">
-      <div className="cl-logo-wrap">
-        <img src="/Little Wed Logo_.svg" alt="Little Wed" className="cl-logo" />
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex justify-center py-4 pb-2 mb-4">
+        <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-14 w-auto object-contain" />
       </div>
 
-      <div className="cl-user-card">
-        <div className="cl-avatar">{userInitial}</div>
-        <div className="cl-user-info">
-          <p className="cl-user-name">{userName}</p>
-          <p className="cl-user-email">{userEmail}</p>
+      {/* User Card */}
+      <div className="flex items-center gap-3 bg-accent-soft/40 border border-accent/8 rounded-2xl p-3.5 mb-5">
+        <div className="w-[42px] h-[42px] rounded-full bg-gradient-to-br from-[#0D4B4B] to-pink-400 flex items-center justify-center text-white font-bold text-[15px] font-serif shadow-md shadow-[#0D4B4B]/20 shrink-0 overflow-hidden">
+          {userImage ? (
+            <img src={userImage} alt={userName} className="w-full h-full object-cover" />
+          ) : (
+            userInitial
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13.5px] font-bold text-gray-900 truncate m-0">{userName}</p>
+          <p className="text-[11.5px] text-gray-400 font-medium truncate m-0 mt-[1px]">{userEmail}</p>
         </div>
       </div>
 
-      <nav className="cl-nav">
+      {/* Navigation */}
+      <nav className="flex flex-col gap-[3px] flex-1 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
           return (
             <Link
               key={item.path}
               href={item.path}
-              className={`cl-nav-link${isActive ? ' active' : ''}`}
+              className={`flex items-center gap-3 px-3.5 py-[11px] rounded-[13px] text-[13.5px] font-semibold no-underline transition-all duration-150 ${
+                isActive
+                  ? 'bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] text-white shadow-md shadow-[#0D4B4B]/30'
+                  : 'text-gray-500 hover:bg-[#0D4B4B]/[0.06] hover:text-[#0A3939]'
+              }`}
             >
-              <item.icon size={18} className="cl-nav-icon" />
+              <item.icon size={18} className="shrink-0" />
               <span>{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="cl-sidebar-footer">
-        <button onClick={() => signOut({ redirect: true, callbackUrl: '/login' })} className="cl-signout-btn">
+      {/* Sign Out */}
+      <div className="mt-auto pt-3.5 border-t border-gray-100">
+        <button
+          onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+          className="w-full flex items-center gap-3 px-3.5 py-[11px] rounded-[13px] border-none bg-transparent text-[13.5px] font-semibold text-gray-400 font-sans cursor-pointer transition-all duration-150 hover:bg-red-50 hover:text-red-600"
+        >
           <LogOut size={18} />
           <span>Sign Out</span>
         </button>
@@ -149,19 +157,19 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   );
 
   const HamburgerIcon = () => (
-    <div className="cl-hamburger">
+    <div className="w-[18px] h-[14px] relative flex flex-col justify-between">
       <motion.span
-        className="cl-hamburger-line"
+        className="block w-full h-[2px] rounded-sm bg-gray-900 origin-center"
         animate={isMenuOpenState ? { rotate: 45, y: 6 } : { rotate: 0, y: 0 }}
         transition={{ duration: 0.25, ease: 'easeInOut' }}
       />
       <motion.span
-        className="cl-hamburger-line"
+        className="block w-full h-[2px] rounded-sm bg-gray-900"
         animate={isMenuOpenState ? { opacity: 0, x: -6 } : { opacity: 1, x: 0 }}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
       />
       <motion.span
-        className="cl-hamburger-line"
+        className="block w-full h-[2px] rounded-sm bg-gray-900 origin-center"
         animate={isMenuOpenState ? { rotate: -45, y: -6 } : { rotate: 0, y: 0 }}
         transition={{ duration: 0.25, ease: 'easeInOut' }}
       />
@@ -169,178 +177,19 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   );
 
   return (
-    <div className="cl-layout">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .cl-layout {
-          min-height: 100vh;
-          background: #F0F4F8;
-          font-family: 'DM Sans', 'Segoe UI', sans-serif;
-        }
-
-        .cl-desktop-sidebar {
-          display: none;
-        }
-        @media (min-width: 1024px) {
-          .cl-desktop-sidebar {
-            display: block;
-            position: fixed; left: 0; top: 0; bottom: 0;
-            width: 272px; z-index: 30;
-            background: white;
-            border-right: 1.5px solid #E2EAF0;
-            box-shadow: 2px 0 12px rgba(0,0,0,0.03);
-            overflow: hidden;
-            transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          .cl-desktop-sidebar.collapsed {
-            transform: translateX(-272px);
-          }
-        }
-
-        .cl-sidebar-inner {
-          display: flex; flex-direction: column; height: 100%;
-          padding: 24px 18px;
-          width: 272px;
-        }
-
-        .cl-logo-wrap {
-          display: flex; justify-content: center; padding: 8px 0 4px;
-          margin-bottom: 24px;
-        }
-        .cl-logo { height: 52px; width: auto; object-fit: contain; max-width: 100%; }
-
-        .cl-user-card {
-          display: flex; align-items: center; gap: 12px;
-          background: rgba(13,79,79,0.04); border: 1.5px solid rgba(13,79,79,0.08);
-          border-radius: 16px; padding: 14px; margin-bottom: 22px;
-        }
-        .cl-avatar {
-          width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
-          background: linear-gradient(135deg, #0D4F4F, #E8A598);
-          display: flex; align-items: center; justify-content: center;
-          color: white; font-weight: 800; font-size: 15px;
-          font-family: 'Playfair Display', serif;
-          box-shadow: 0 2px 6px rgba(13,79,79,0.2);
-        }
-        .cl-user-info { flex: 1; min-width: 0; }
-        .cl-user-name { font-size: 13.5px; font-weight: 700; color: #0D1B1B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
-        .cl-user-email { font-size: 11.5px; color: #9BAAB8; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0 0; }
-
-        .cl-nav { flex: 1; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
-        .cl-nav-link {
-          display: flex; align-items: center; gap: 12px;
-          padding: 11px 14px; border-radius: 13px;
-          font-size: 13.5px; font-weight: 600; color: #4A6072;
-          text-decoration: none; transition: background 0.15s, color 0.15s;
-        }
-        .cl-nav-link:hover { background: rgba(13,79,79,0.05); color: #0D4F4F; }
-        .cl-nav-link.active {
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white;
-          box-shadow: 0 3px 10px rgba(13,79,79,0.3);
-        }
-        .cl-nav-icon { flex-shrink: 0; }
-        .cl-nav-link.active .cl-nav-icon { color: white; }
-
-        .cl-sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1.5px solid #F0F4F8; }
-        .cl-signout-btn {
-          width: 100%; display: flex; align-items: center; gap: 12px;
-          padding: 11px 14px; border-radius: 13px; border: none; background: transparent;
-          font-size: 13.5px; font-weight: 600; color: #9BAAB8; font-family: inherit;
-          cursor: pointer; transition: background 0.15s, color 0.15s;
-        }
-        .cl-signout-btn:hover { background: #FEF2F2; color: #C0392B; }
-
-        .cl-mobile-sidebar {
-          position: fixed; left: 0; top: 0; bottom: 0;
-          width: min(280px, 84vw); z-index: 50;
-          background: white;
-          box-shadow: 8px 0 32px rgba(0,0,0,0.15);
-          overflow-y: auto;
-        }
-        .cl-overlay {
-          position: fixed; inset: 0; background: rgba(13,27,27,0.45);
-          backdrop-filter: blur(2px); z-index: 40;
-        }
-
-        .cl-main-wrap {
-          min-height: 100vh;
-        }
-        @media (min-width: 1024px) {
-          .cl-main-wrap {
-            margin-left: 272px;
-            transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          .cl-main-wrap.sidebar-collapsed {
-            margin-left: 0;
-          }
-        }
-
-        .cl-topbar {
-          position: sticky; top: 0; z-index: 20;
-          background: white; border-bottom: 1.5px solid #E2EAF0;
-          padding: 12px 18px;
-          display: flex; align-items: center; justify-content: space-between;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-        }
-        .cl-topbar-left { display: flex; align-items: center; gap: 14px; }
-
-        .cl-menu-btn {
-          width: 38px; height: 38px; border-radius: 11px;
-          border: 1.5px solid #E2EAF0; background: white;
-          display: flex; align-items: center; justify-content: center;
-          color: #0D1B1B; cursor: pointer; flex-shrink: 0;
-          transition: border-color 0.15s, background 0.15s;
-        }
-        .cl-menu-btn:hover { border-color: #0D4F4F; background: rgba(13,79,79,0.04); }
-
-        .cl-hamburger {
-          width: 18px;
-          height: 14px;
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-        .cl-hamburger-line {
-          display: block;
-          width: 100%;
-          height: 2px;
-          border-radius: 2px;
-          background: #0D1B1B;
-          transform-origin: center;
-        }
-
-        .cl-topbar-logo { height: 30px; width: auto; object-fit: contain; }
-        @media (min-width: 1024px) {
-          .cl-topbar-logo { display: none; }
-        }
-
-        .cl-topbar-right { display: flex; align-items: center; gap: 12px; }
-        .cl-topbar-username { font-size: 13px; color: #7A8FA6; font-weight: 600; display: none; }
-        @media (min-width: 640px) {
-          .cl-topbar-username { display: block; }
-        }
-        .cl-topbar-avatar {
-          width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-          background: linear-gradient(135deg, #0D4F4F, #E8A598);
-          display: flex; align-items: center; justify-content: center;
-          color: white; font-size: 12px; font-weight: 800;
-          font-family: 'Playfair Display', serif;
-        }
-
-        .cl-page-content { padding: 24px 18px 48px; }
-        @media (min-width: 1024px) {
-          .cl-page-content { padding: 32px 32px 56px; }
-        }
-      `}</style>
-
-      <aside className={`cl-desktop-sidebar${!desktopSidebarOpen ? ' collapsed' : ''}`}>
-        <SidebarContent />
+    <div className="min-h-screen bg-gray-50 font-sans">
+      {/* ── Desktop Sidebar ── */}
+      <aside
+        className={`hidden lg:block fixed inset-y-0 left-0 w-[272px] z-30 bg-white border-r border-gray-200 shadow-sm overflow-hidden transition-transform duration-300 ease-in-out ${
+          !desktopSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+        }`}
+      >
+        <div className="flex flex-col h-full p-6 px-[18px] w-[272px]">
+          <SidebarContent />
+        </div>
       </aside>
 
+      {/* ── Mobile Sidebar Overlay ── */}
       <AnimatePresence>
         {sidebarOpen && !isLargeScreen && (
           <>
@@ -350,42 +199,57 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               onClick={() => setSidebarOpen(false)}
-              className="cl-overlay"
+              className="fixed inset-0 bg-gray-900/45 backdrop-blur-[2px] z-40"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="cl-mobile-sidebar"
+              className="fixed inset-y-0 left-0 w-[min(280px,84vw)] z-50 bg-white shadow-2xl overflow-y-auto"
             >
-              <SidebarContent />
+              <div className="p-6">
+                <SidebarContent />
+              </div>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
-      <div className={`cl-main-wrap${isLargeScreen && !desktopSidebarOpen ? ' sidebar-collapsed' : ''}`}>
-        <div className="cl-topbar">
-          <div className="cl-topbar-left">
+      {/* ── Main Content ── */}
+      <div
+        className={`min-h-screen transition-[margin-left] duration-300 ease-in-out lg:ml-[272px] ${
+          isLargeScreen && !desktopSidebarOpen ? '!ml-0' : ''
+        }`}
+      >
+        {/* ── Top Bar ── */}
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-[0_1px_3px_rgba(0,0,0,0.03)] px-4 sm:px-[18px] py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3.5">
             <button
-              className="cl-menu-btn"
               onClick={toggleSidebar}
               aria-label={isMenuOpenState ? 'Close menu' : 'Open menu'}
               aria-expanded={isMenuOpenState}
+              className="w-[38px] h-[38px] rounded-[11px] border border-gray-200 bg-white flex items-center justify-center text-gray-900 cursor-pointer shrink-0 transition-all hover:border-[#0D4B4B] hover:bg-[#0D4B4B]/[0.04]"
             >
               <HamburgerIcon />
             </button>
-            <img src="/Little Wed Logo_.svg" alt="Little Wed" className="cl-topbar-logo" />
+            <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-[30px] w-auto object-contain lg:hidden" />
           </div>
 
-          <div className="cl-topbar-right">
+          <div className="flex items-center gap-3">
             <NotificationBell />
-            <span className="cl-topbar-username">{userName}</span>
-            <div className="cl-topbar-avatar">{userInitial}</div>
+            <span className="hidden sm:block text-[13px] text-gray-400 font-semibold">{userName}</span>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-pink-400 flex items-center justify-center text-white text-xs font-bold font-serif shrink-0 overflow-hidden">
+              {userImage ? (
+                <img src={userImage} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                userInitial
+              )}
+            </div>
           </div>
-        </div>
+        </header>
 
+        {/* ── Page Content ── */}
         <AnimatePresence mode="wait">
           <motion.main
             key={pathname}
@@ -393,7 +257,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="cl-page-content"
+            className="p-5 sm:p-6 lg:p-8 pb-12 lg:pb-14"
           >
             {children}
           </motion.main>

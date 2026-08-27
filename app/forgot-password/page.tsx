@@ -154,7 +154,7 @@ export default function ForgotPasswordPage() {
 
         .left {
           width: 420px; flex-shrink: 0;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
+          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 55%, #072B2B 100%);
           display: flex; flex-direction: column; justify-content: space-between;
           padding: 48px 40px; position: relative; overflow: hidden;
           animation: panelIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
@@ -194,7 +194,7 @@ export default function ForgotPasswordPage() {
           font-size: 36px; font-weight: 900; color: white;
           line-height: 1.15; margin-bottom: 14px; letter-spacing: -0.5px;
         }
-        .tagline span { color: #E8A598; }
+        .tagline span { color: #FF6B5C; }
         .tagline-sub { color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1.65; }
 
         .features-left {
@@ -210,7 +210,7 @@ export default function ForgotPasswordPage() {
         .feat-dot {
           width: 27px; height: 27px; border-radius: 8px; flex-shrink: 0;
           background: rgba(232,165,152,0.18); border: 1px solid rgba(232,165,152,0.28);
-          display: flex; align-items: center; justify-content: center; color: #E8A598;
+          display: flex; align-items: center; justify-content: center; color: #FF6B5C;
         }
 
         .right {
@@ -236,7 +236,7 @@ export default function ForgotPasswordPage() {
           flex-direction: column;
           align-items: center;
           padding: 40px 28px 32px;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
+          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 100%);
           position: relative; overflow: hidden; text-align: center;
         }
         .mobile-hero::before {
@@ -259,7 +259,7 @@ export default function ForgotPasswordPage() {
           line-height: 1.2; margin-bottom: 10px;
           animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
-        .mobile-tagline span { color: #E8A598; }
+        .mobile-tagline span { color: #FF6B5C; }
         .mobile-sub {
           position: relative; z-index: 2;
           color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
@@ -277,7 +277,7 @@ export default function ForgotPasswordPage() {
           border-radius: 20px; padding: 5px 12px;
           color: rgba(255,255,255,0.82); font-size: 11.5px; font-weight: 500;
         }
-        .pill svg { color: #E8A598; flex-shrink: 0; }
+        .pill svg { color: #FF6B5C; flex-shrink: 0; }
 
         .form-body { padding: 36px 36px 32px; }
         .form-title {
@@ -295,24 +295,24 @@ export default function ForgotPasswordPage() {
           padding: 0 4px; font-weight: 500;
           transition: top 0.2s cubic-bezier(0.4,0,0.2,1), font-size 0.2s cubic-bezier(0.4,0,0.2,1), color 0.2s cubic-bezier(0.4,0,0.2,1);
         }
-        .field-label.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
+        .field-label.up { top: 0; font-size: 10.5px; color: #0D4B4B; font-weight: 700; letter-spacing: 0.3px; }
         .field-input {
           width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
           font-size: 14px; font-family: inherit; outline: none; color: #0D1B1B;
           background: white; font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .field-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
 
         .btn-primary {
           width: 100%; padding: 15px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white; font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
         }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,75,75,0.4); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .btn-secondary {
@@ -321,7 +321,7 @@ export default function ForgotPasswordPage() {
           font-family: inherit; cursor: pointer; margin-top: 10px;
           transition: border-color 0.15s, background 0.15s, color 0.15s;
         }
-        .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; background: #F5FAF9; }
+        .btn-secondary:hover { border-color: #0D4B4B; color: #0D4B4B; background: #F5FAF9; }
 
         .spinner {
           width: 17px; height: 17px; border: 2px solid rgba(255,255,255,0.3);
@@ -355,11 +355,11 @@ export default function ForgotPasswordPage() {
         .info-box svg { flex-shrink: 0; margin-top: 1px; }
 
         .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 28px; }
-        .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
+        .footer-link a { color: #0D4B4B; font-weight: 700; text-decoration: none; }
 
         .google-note {
           background: #F0F4F8;
-          border-left: 4px solid #E8A598;
+          border-left: 4px solid #FF6B5C;
           padding: 12px 14px;
           border-radius: 8px;
           margin-bottom: 18px;
@@ -367,7 +367,7 @@ export default function ForgotPasswordPage() {
           color: #4A6072;
           line-height: 1.5;
         }
-        .google-note strong { color: #0D4F4F; }
+        .google-note strong { color: #0D4B4B; }
 
         @media (max-width: 768px) {
           .left { display: none; }
@@ -424,7 +424,7 @@ export default function ForgotPasswordPage() {
                         <AlertCircle size={16} />
                         <span>{error}</span>
                         {error.includes('Google account') && (
-                          <Link href="/login" className="text-sm font-bold text-[#0D4F4F] hover:underline ml-1">
+                          <Link href="/login" className="text-sm font-bold text-[#0D4B4B] hover:underline ml-1">
                             Sign in with Google →
                           </Link>
                         )}
@@ -545,7 +545,7 @@ export default function ForgotPasswordPage() {
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
                       <button
                         onClick={() => setShowPassword(!showPassword)}
-                        style={{ background: 'none', border: 'none', color: '#0D4F4F', fontSize: '12px', cursor: 'pointer' }}
+                        style={{ background: 'none', border: 'none', color: '#0D4B4B', fontSize: '12px', cursor: 'pointer' }}
                       >
                         {showPassword ? 'Hide' : 'Show'} passwords
                       </button>

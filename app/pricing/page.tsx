@@ -207,12 +207,12 @@ export default function PricingPage() {
           left: 0;
           width: 0;
           height: 2px;
-          background: #0D4F4F;
+          background: #0D4B4B;
           transition: width 0.3s;
         }
 
         .nav-link:hover {
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .nav-link:hover::after {
@@ -220,7 +220,7 @@ export default function PricingPage() {
         }
 
         .nav-link.active {
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .nav-link.active::after {
@@ -228,7 +228,7 @@ export default function PricingPage() {
         }
 
         .nav-link.cta {
-          background: #0D4F4F;
+          background: #0D4B4B;
           color: white;
           padding: 10px 24px;
           border-radius: 24px;
@@ -240,16 +240,16 @@ export default function PricingPage() {
         }
 
         .nav-link.cta:hover {
-          background: #0A3D3D;
+          background: #0A3939;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(13,79,79,0.3);
+          box-shadow: 0 4px 12px rgba(13,75,75,0.3);
         }
 
         .mobile-menu-btn {
           display: none;
           background: none;
           border: none;
-          color: #0D4F4F;
+          color: #0D4B4B;
           cursor: pointer;
           padding: 8px;
           border-radius: 8px;
@@ -257,7 +257,7 @@ export default function PricingPage() {
         }
 
         .mobile-menu-btn:hover {
-          background: rgba(13,79,79,0.08);
+          background: rgba(13,75,75,0.08);
         }
 
         .mobile-menu {
@@ -286,7 +286,7 @@ export default function PricingPage() {
         }
 
         .mobile-menu .nav-link:hover {
-          background: rgba(13,79,79,0.06);
+          background: rgba(13,75,75,0.06);
         }
 
         .mobile-menu .nav-link.cta {
@@ -298,7 +298,7 @@ export default function PricingPage() {
         .hero {
           text-align: center;
           padding: 60px 24px 40px;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
+          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 100%);
           color: white;
           position: relative;
           overflow: hidden;
@@ -370,7 +370,7 @@ export default function PricingPage() {
         }
 
         .hero-title span {
-          color: #E8A598;
+          color: #FF6B5C;
         }
 
         .hero-sub {
@@ -399,7 +399,7 @@ export default function PricingPage() {
         }
 
         .billing-toggle span.active {
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .toggle-switch {
@@ -414,7 +414,7 @@ export default function PricingPage() {
         }
 
         .toggle-switch.active {
-          background: #0D4F4F;
+          background: #0D4B4B;
         }
 
         .toggle-switch .toggle-dot {
@@ -435,7 +435,7 @@ export default function PricingPage() {
 
         .save-badge {
           background: #E8F5F2;
-          color: #0D4F4F;
+          color: #0D4B4B;
           font-size: 11px;
           font-weight: 700;
           padding: 2px 10px;
@@ -470,12 +470,12 @@ export default function PricingPage() {
         }
 
         .pricing-card.popular {
-          border-color: #0D4F4F;
-          box-shadow: 0 8px 32px rgba(13,79,79,0.12);
+          border-color: #0D4B4B;
+          box-shadow: 0 8px 32px rgba(13,75,75,0.12);
         }
 
         .pricing-card.popular:hover {
-          box-shadow: 0 12px 48px rgba(13,79,79,0.18);
+          box-shadow: 0 12px 48px rgba(13,75,75,0.18);
         }
 
         .popular-badge {
@@ -483,7 +483,7 @@ export default function PricingPage() {
           top: -12px;
           left: 50%;
           transform: translateX(-50%);
-          background: #0D4F4F;
+          background: #0D4B4B;
           color: white;
           font-size: 11px;
           font-weight: 700;
@@ -497,11 +497,11 @@ export default function PricingPage() {
           width: 44px;
           height: 44px;
           border-radius: 12px;
-          background: rgba(13,79,79,0.08);
+          background: rgba(13,75,75,0.08);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #0D4F4F;
+          color: #0D4B4B;
           margin-bottom: 16px;
         }
 
@@ -554,7 +554,7 @@ export default function PricingPage() {
         }
 
         .plan-features .check {
-          color: #0D4F4F;
+          color: #0D4B4B;
           flex-shrink: 0;
         }
 
@@ -579,36 +579,36 @@ export default function PricingPage() {
         }
 
         .plan-cta.primary {
-          background: #0D4F4F;
+          background: #0D4B4B;
           color: white;
         }
 
         .plan-cta.primary:hover {
-          background: #0A3D3D;
+          background: #0A3939;
           transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(13,79,79,0.3);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.3);
         }
 
         .plan-cta.outline {
           background: transparent;
-          color: #0D4F4F;
-          border: 2px solid #0D4F4F;
+          color: #0D4B4B;
+          border: 2px solid #0D4B4B;
         }
 
         .plan-cta.outline:hover {
-          background: rgba(13,79,79,0.06);
+          background: rgba(13,75,75,0.06);
         }
 
         .plan-cta.popular {
-          background: #0D4F4F;
+          background: #0D4B4B;
           color: white;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.3);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.3);
         }
 
         .plan-cta.popular:hover {
-          background: #0A3D3D;
+          background: #0A3939;
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(13,79,79,0.4);
+          box-shadow: 0 8px 24px rgba(13,75,75,0.4);
         }
 
         /* ── Features Section ── */
@@ -658,11 +658,11 @@ export default function PricingPage() {
           width: 56px;
           height: 56px;
           border-radius: 14px;
-          background: rgba(13,79,79,0.08);
+          background: rgba(13,75,75,0.08);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #0D4F4F;
+          color: #0D4B4B;
           margin: 0 auto 16px;
         }
 
@@ -718,7 +718,7 @@ export default function PricingPage() {
         }
 
         .faq-question:hover {
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .faq-answer {
@@ -736,7 +736,7 @@ export default function PricingPage() {
         }
 
         .faq-icon {
-          color: #0D4F4F;
+          color: #0D4B4B;
           flex-shrink: 0;
           transition: transform 0.3s;
         }
@@ -773,7 +773,7 @@ export default function PricingPage() {
         }
 
         .footer-brand strong {
-          color: #0D4F4F;
+          color: #0D4B4B;
           font-weight: 700;
         }
 
@@ -792,11 +792,11 @@ export default function PricingPage() {
         }
 
         .footer-link:hover {
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .footer-heart {
-          color: #E8A598;
+          color: #FF6B5C;
         }
 
         /* ── Responsive ── */
@@ -1031,7 +1031,7 @@ export default function PricingPage() {
         <section className="features-section">
           <div className="features-section-inner">
             <div className="section-header">
-              <h2>Everything you need to <span style={{ color: '#0D4F4F' }}>manage your event</span></h2>
+              <h2>Everything you need to <span style={{ color: '#0D4B4B' }}>manage your event</span></h2>
               <p>All plans include the core features you need to create an unforgettable experience.</p>
             </div>
 

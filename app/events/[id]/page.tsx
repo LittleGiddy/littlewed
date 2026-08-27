@@ -51,7 +51,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
         <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Event Not Found</h1>
           <p className="text-gray-500">This event doesn't exist or you don't have access to it.</p>
-          <Link href="/dashboard" className="inline-block mt-4 text-[#0D4F4F] font-semibold hover:underline">
+          <Link href="/dashboard" className="inline-block mt-4 text-[#0D4B4B] font-semibold hover:underline">
             Back to Dashboard
           </Link>
         </div>
@@ -73,7 +73,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     <div className="max-w-6xl mx-auto px-4 py-8">
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0D4F4F] transition mb-6"
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0D4B4B] transition mb-6"
       >
         <ArrowLeft size={16} /> Back to Dashboard
       </Link>
@@ -82,11 +82,11 @@ export default async function EventPage({ params }: { params: { id: string } }) 
         <h1 className="font-serif text-3xl font-black text-gray-900">{event.name}</h1>
         <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
           <span className="flex items-center gap-1.5">
-            <Calendar size={16} className="text-[#0D4F4F]" />
+            <Calendar size={16} className="text-[#0D4B4B]" />
             {format(new Date(event.date), 'PPP')}
           </span>
           <span className="flex items-center gap-1.5">
-            <MapPin size={16} className="text-[#0D4F4F]" />
+            <MapPin size={16} className="text-[#0D4B4B]" />
             {event.venue}
           </span>
         </div>
@@ -104,7 +104,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Checked In</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
-          <p className="text-xl md:text-2xl font-bold text-[#0D4F4F]">{guestsWithPhone}</p>
+          <p className="text-xl md:text-2xl font-bold text-[#0D4B4B]">{guestsWithPhone}</p>
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">With Phone</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
@@ -163,7 +163,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
                     </td>
                     <td className="px-3 md:px-4 py-3">
                       {guest.cardNumber ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2 py-1 rounded-lg">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2 py-1 rounded-lg">
                           <Hash size={12} />
                           {guest.cardNumber}
                         </span>

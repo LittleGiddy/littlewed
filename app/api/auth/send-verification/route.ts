@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       subject: 'Verify your email address',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-          <h2 style="color: #0D4F4F;">Welcome to LittleWed</h2>
+          <h2 style="color: #0D4B4B;">Welcome to LittleWed</h2>
           <p>Use this OTP to verify your email:</p>
           <div style="background: #F0F4F8; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
             <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px;">${otp}</span>

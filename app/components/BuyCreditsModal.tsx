@@ -132,7 +132,7 @@ export default function BuyCreditsModal({
         /* Top gradient bar */
         .bcm-bar {
           height: 4px;
-          background: linear-gradient(90deg, #0D4F4F, #E8A598);
+          background: linear-gradient(90deg, #0D4B4B, #FF6B5C);
           border-radius: 28px 28px 0 0;
         }
 
@@ -144,16 +144,16 @@ export default function BuyCreditsModal({
         .bcm-header-left {}
         .bcm-eyebrow {
           font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 5px;
+          color: #0D4B4B; text-transform: uppercase; margin-bottom: 5px;
           display: flex; align-items: center; gap: 6px;
         }
-        .bcm-eyebrow-dot { width: 4px; height: 4px; border-radius: 50%; background: #E8A598; }
+        .bcm-eyebrow-dot { width: 4px; height: 4px; border-radius: 50%; background: #FF6B5C; }
         .bcm-title {
           font-family: 'Playfair Display', serif;
           font-size: 22px; font-weight: 900; color: #0D1B1B;
           line-height: 1.15; letter-spacing: -0.3px; margin: 0;
         }
-        .bcm-title span { color: #E8A598; }
+        .bcm-title span { color: #FF6B5C; }
         .bcm-close {
           width: 34px; height: 34px; border-radius: 50%;
           border: 1.5px solid #E2EAF0; background: white;
@@ -167,13 +167,13 @@ export default function BuyCreditsModal({
         .bcm-balance {
           display: flex; align-items: center; gap: 10px;
           margin: 16px 26px 0;
-          background: rgba(13,79,79,0.05); border: 1.5px solid rgba(13,79,79,0.1);
+          background: rgba(13,75,75,0.05); border: 1.5px solid rgba(13,75,75,0.1);
           border-radius: 14px; padding: 12px 16px;
         }
         .bcm-balance-icon {
           width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
-          background: rgba(13,79,79,0.1);
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          background: rgba(13,75,75,0.1);
+          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
         }
         .bcm-balance-label { font-size: 12px; color: #7A8FA6; font-weight: 500; margin-bottom: 1px; }
         .bcm-balance-value { font-size: 15px; font-weight: 800; color: #0D1B1B; }
@@ -208,18 +208,18 @@ export default function BuyCreditsModal({
           transition: border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s;
         }
         .bcm-preset:hover {
-          border-color: rgba(13,79,79,0.35);
-          transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,79,79,0.1);
+          border-color: rgba(13,75,75,0.35);
+          transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,75,75,0.1);
         }
         .bcm-preset.selected {
-          border-color: #0D4F4F; background: rgba(13,79,79,0.04);
-          box-shadow: 0 0 0 4px rgba(13,79,79,0.08);
+          border-color: #0D4B4B; background: rgba(13,75,75,0.04);
+          box-shadow: 0 0 0 4px rgba(13,75,75,0.08);
         }
         .bcm-preset.popular {
-          border-color: #E8A598;
+          border-color: #FF6B5C;
         }
         .bcm-preset.popular.selected {
-          border-color: #0D4F4F;
+          border-color: #0D4B4B;
         }
 
         .bcm-preset-badge {
@@ -227,8 +227,8 @@ export default function BuyCreditsModal({
           font-size: 9.5px; font-weight: 800; letter-spacing: 0.5px;
           text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
         }
-        .bcm-preset-badge.popular  { background: #E8A598; color: white; }
-        .bcm-preset-badge.best     { background: #0D4F4F; color: white; }
+        .bcm-preset-badge.popular  { background: #FF6B5C; color: white; }
+        .bcm-preset-badge.best     { background: #0D4B4B; color: white; }
 
         .bcm-preset-credits {
           font-family: 'Playfair Display', serif;
@@ -237,8 +237,8 @@ export default function BuyCreditsModal({
         }
         .bcm-preset-clabel { font-size: 11px; font-weight: 600; color: #9BAAB8; margin-bottom: 8px; }
         .bcm-preset-price {
-          font-size: 13px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); border-radius: 8px; padding: 3px 8px;
+          font-size: 13px; font-weight: 700; color: #0D4B4B;
+          background: rgba(13,75,75,0.08); border-radius: 8px; padding: 3px 8px;
           display: inline-block;
         }
 
@@ -246,7 +246,7 @@ export default function BuyCreditsModal({
         .bcm-preset-check {
           position: absolute; top: 10px; right: 10px;
           width: 20px; height: 20px; border-radius: 50%;
-          background: #0D4F4F; display: flex; align-items: center; justify-content: center;
+          background: #0D4B4B; display: flex; align-items: center; justify-content: center;
           opacity: 0; transform: scale(0.6); transition: opacity 0.15s, transform 0.15s;
         }
         .bcm-preset.selected .bcm-preset-check { opacity: 1; transform: scale(1); }
@@ -264,8 +264,8 @@ export default function BuyCreditsModal({
           background: white; font-family: inherit;
           transition: border-color 0.15s, background 0.15s;
         }
-        .bcm-custom-toggle:hover { border-color: rgba(13,79,79,0.3); background: rgba(13,79,79,0.02); }
-        .bcm-custom-toggle.active { border-color: #0D4F4F; background: rgba(13,79,79,0.03); }
+        .bcm-custom-toggle:hover { border-color: rgba(13,75,75,0.3); background: rgba(13,75,75,0.02); }
+        .bcm-custom-toggle.active { border-color: #0D4B4B; background: rgba(13,75,75,0.03); }
         .bcm-custom-toggle-label { font-size: 13.5px; font-weight: 600; color: #4A6072; }
         .bcm-custom-toggle-icon { color: #9BAAB8; transition: transform 0.2s; }
         .bcm-custom-toggle.active .bcm-custom-toggle-icon { transform: rotate(90deg); }
@@ -274,9 +274,9 @@ export default function BuyCreditsModal({
         .bcm-custom-input-wrap {
           display: flex; align-items: center; gap: 10px;
           margin: 10px 26px 0; padding: 12px 14px;
-          border: 1.5px solid #0D4F4F; border-radius: 14px;
-          background: rgba(13,79,79,0.02);
-          box-shadow: 0 0 0 4px rgba(13,79,79,0.06);
+          border: 1.5px solid #0D4B4B; border-radius: 14px;
+          background: rgba(13,75,75,0.02);
+          box-shadow: 0 0 0 4px rgba(13,75,75,0.06);
           animation: bcmSlideIn 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
         @keyframes bcmSlideIn {
@@ -286,10 +286,10 @@ export default function BuyCreditsModal({
         .bcm-stepper-btn {
           width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
           border: 1.5px solid #E2EAF0; background: white; cursor: pointer;
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
           transition: border-color 0.15s, background 0.15s;
         }
-        .bcm-stepper-btn:hover { border-color: #0D4F4F; background: rgba(13,79,79,0.06); }
+        .bcm-stepper-btn:hover { border-color: #0D4B4B; background: rgba(13,75,75,0.06); }
         .bcm-custom-input {
           flex: 1; text-align: center; border: none; outline: none; background: transparent;
           font-size: 20px; font-weight: 800; color: #0D1B1B;
@@ -300,8 +300,8 @@ export default function BuyCreditsModal({
         /* Summary bar */
         .bcm-summary {
           margin: 18px 26px 0;
-          background: linear-gradient(135deg, rgba(13,79,79,0.06), rgba(13,79,79,0.03));
-          border: 1.5px solid rgba(13,79,79,0.14); border-radius: 16px;
+          background: linear-gradient(135deg, rgba(13,75,75,0.06), rgba(13,75,75,0.03));
+          border: 1.5px solid rgba(13,75,75,0.14); border-radius: 16px;
           padding: 16px 18px;
           display: flex; align-items: center; justify-content: space-between;
         }
@@ -309,7 +309,7 @@ export default function BuyCreditsModal({
         .bcm-summary-getting { font-size: 12px; color: #7A8FA6; font-weight: 500; margin-bottom: 2px; }
         .bcm-summary-credits {
           font-family: 'Playfair Display', serif;
-          font-size: 22px; font-weight: 900; color: #0D4F4F; line-height: 1;
+          font-size: 22px; font-weight: 900; color: #0D4B4B; line-height: 1;
         }
         .bcm-summary-credits span { font-size: 13px; font-weight: 600; color: #7A8FA6; margin-left: 4px; font-family: 'DM Sans', sans-serif; }
         .bcm-summary-right { text-align: right; }
@@ -333,14 +333,14 @@ export default function BuyCreditsModal({
           cursor: pointer; transition: border-color 0.15s, color 0.15s;
           white-space: nowrap;
         }
-        .bcm-cancel:hover { border-color: #0D4F4F; color: #0D4F4F; }
+        .bcm-cancel:hover { border-color: #0D4B4B; color: #0D4B4B; }
 
         .bcm-pay {
           flex: 1; padding: 13px; border-radius: 13px; border: none;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white; font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 14px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
           position: relative; overflow: hidden;
         }
@@ -350,7 +350,7 @@ export default function BuyCreditsModal({
           opacity: 0; transition: opacity 0.2s;
         }
         .bcm-pay:hover:not(:disabled)::after { opacity: 1; }
-        .bcm-pay:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.42); }
+        .bcm-pay:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.42); }
         .bcm-pay:active:not(:disabled) { transform: translateY(0); }
         .bcm-pay:disabled { opacity: 0.55; cursor: not-allowed; }
 

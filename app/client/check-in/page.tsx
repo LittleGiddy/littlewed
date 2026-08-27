@@ -405,7 +405,7 @@ export default function CheckInPage() {
           <p className="text-sm text-gray-500 mt-1">Please select an event first.</p>
           <button
             onClick={() => router.push('/client/dashboard')}
-            className="mt-4 px-6 py-2 bg-[#0D4F4F] text-white rounded-xl font-medium"
+            className="mt-4 px-6 py-2 bg-[#0D4B4B] text-white rounded-xl font-medium"
           >
             Go to Dashboard
           </button>
@@ -442,7 +442,7 @@ export default function CheckInPage() {
         {/* ─── Back Button ─── */}
         <Link
           href={`/client/events/${eventId}`}
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl px-3 py-1.5 transition hover:bg-[rgba(13,79,79,0.06)] mb-3 sm:mb-4"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)] mb-3 sm:mb-4"
         >
           <ArrowLeft size={14} /> Back
         </Link>
@@ -451,7 +451,7 @@ export default function CheckInPage() {
         {eventInfo && (
           <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 sm:mb-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm">
-              <Sparkles size={14} className="text-[#E8A598] flex-shrink-0" />
+              <Sparkles size={14} className="text-[#FF6B5C] flex-shrink-0" />
               <span className="font-semibold text-gray-800 truncate">{eventInfo.name}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-500 mt-0.5">
@@ -467,7 +467,7 @@ export default function CheckInPage() {
             onClick={() => setActiveTab('scan')}
             className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${
               activeTab === 'scan' 
-                ? 'bg-[#0D4F4F] text-white shadow-sm' 
+                ? 'bg-[#0D4B4B] text-white shadow-sm' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -477,7 +477,7 @@ export default function CheckInPage() {
             onClick={() => setActiveTab('data')}
             className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${
               activeTab === 'data' 
-                ? 'bg-[#0D4F4F] text-white shadow-sm' 
+                ? 'bg-[#0D4B4B] text-white shadow-sm' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -505,10 +505,10 @@ export default function CheckInPage() {
                 )}
                 <div className="absolute inset-0 pointer-events-none">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 sm:w-48 h-40 sm:h-48 border-2 border-white/50 rounded-lg">
-                    <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-[#E8A598] rounded-tl" />
-                    <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-[#E8A598] rounded-tr" />
-                    <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-[#E8A598] rounded-bl" />
-                    <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-[#E8A598] rounded-br" />
+                    <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-[#FF6B5C] rounded-tl" />
+                    <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-[#FF6B5C] rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-[#FF6B5C] rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-[#FF6B5C] rounded-br" />
                   </div>
                 </div>
               </div>
@@ -520,7 +520,7 @@ export default function CheckInPage() {
             {/* Manual Entry - Restructured for mobile */}
             <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Key size={16} className="text-[#0D4F4F] flex-shrink-0" />
+                <Key size={16} className="text-[#0D4B4B] flex-shrink-0" />
                 <span className="font-medium text-sm text-gray-700">Manual Entry</span>
               </div>
               <form onSubmit={handleManualCheckIn} className="space-y-3">
@@ -534,7 +534,7 @@ export default function CheckInPage() {
                     const val = e.target.value.replace(/\D/g, '').slice(0, 5);
                     setCardNumber(val);
                   }}
-                  className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                  className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                   placeholder="00000"
                   maxLength={5}
                   autoComplete="off"
@@ -542,7 +542,7 @@ export default function CheckInPage() {
                 <button
                   type="submit"
                   disabled={loading || cardNumber.length !== 5}
-                  className="w-full py-3 bg-[#0D4F4F] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                  className="w-full py-3 bg-[#0D4B4B] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
                   Check In
@@ -625,7 +625,7 @@ export default function CheckInPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name or card number..."
-                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent text-sm sm:text-base"
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
               />
             </div>
 
@@ -633,7 +633,7 @@ export default function CheckInPage() {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               {loadingGuests ? (
                 <div className="flex justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-[#0D4F4F]" />
+                  <Loader2 size={24} className="animate-spin text-[#0D4B4B]" />
                 </div>
               ) : filteredGuests.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -659,7 +659,7 @@ export default function CheckInPage() {
                         onClick={() => setSelectedGuest(guest)}
                       >
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                          <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                             {guest.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -711,7 +711,7 @@ export default function CheckInPage() {
             </div>
             <div className="p-4 sm:p-5 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
                   {selectedGuest.name.charAt(0).toUpperCase()}
                 </div>
                 <div>

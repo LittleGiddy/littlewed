@@ -103,6 +103,7 @@ export default function SendInvitationsPage() {
   const [expandedGuest, setExpandedGuest] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loadingGuests, setLoadingGuests] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [generatingCards, setGeneratingCards] = useState(false);
@@ -562,7 +563,7 @@ export default function SendInvitationsPage() {
                 <div className="p-3 border-t border-gray-100">
                   <button
                     onClick={() => toast.dismiss(t.id)}
-                    className="w-full bg-[#0D4F4F] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition"
+                    className="w-full bg-[#0D4B4B] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition"
                   >
                     Dismiss
                   </button>
@@ -660,6 +661,17 @@ export default function SendInvitationsPage() {
   const getFilteredGuests = useCallback(() => {
     let filtered = guests;
 
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(g =>
+        g.name.toLowerCase().includes(query) ||
+        (g.title && g.title.toLowerCase().includes(query)) ||
+        (g.phone && g.phone.includes(query)) ||
+        (g.cardNumber && g.cardNumber.includes(query)) ||
+        (g.passCode && g.passCode.toLowerCase().includes(query))
+      );
+    }
+
     if (filterChannel !== 'all') {
       filtered = filtered.filter(g => g.routingChannel === filterChannel);
     }
@@ -674,9 +686,19 @@ export default function SendInvitationsPage() {
     }
 
     return filtered;
-  }, [guests, filterChannel, filterStatus, results]);
+  }, [guests, filterChannel, filterStatus, results, searchQuery]);
 
   const filteredGuests = getFilteredGuests();
+
+  // ─── Filter counts for UI ─────────────────────────────────────────────
+  const filterCounts = {
+    all: guests.length,
+    whatsapp: guests.filter(g => g.routingChannel === 'whatsapp').length,
+    sms: guests.filter(g => g.routingChannel === 'sms').length,
+    sent: guests.filter(g => g.invitationSentAt).length,
+    pending: guests.filter(g => !g.invitationSentAt).length,
+    failed: results.filter(r => !r.success).length,
+  };
 
   // ─── Get guest status ──────────────────────────────────────────────────
   const getGuestStatus = (guest: Guest): 'sent' | 'pending' | 'failed' => {
@@ -701,7 +723,7 @@ export default function SendInvitationsPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
         <p className="text-sm text-gray-400">Loading invitations...</p>
       </div>
     );
@@ -715,7 +737,7 @@ export default function SendInvitationsPage() {
         <div className="flex items-center gap-2 min-w-0">
           <Link
             href={`/client/events/${eventId}`}
-            className="flex-shrink-0 p-2 text-gray-500 hover:text-[#0D4F4F] transition rounded-xl hover:bg-gray-100"
+            className="flex-shrink-0 p-2 text-gray-500 hover:text-[#0D4B4B] transition rounded-xl hover:bg-gray-100"
           >
             <ArrowLeft size={20} />
           </Link>
@@ -753,7 +775,7 @@ export default function SendInvitationsPage() {
           <button
             onClick={() => sendToChannel('whatsapp')}
             disabled={sending || whatsappCount === 0}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0D4F4F] text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0D4B4B] text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
           >
             <MessageCircle size={14} />
             <span className="hidden xs:inline">WhatsApp</span>
@@ -812,7 +834,7 @@ export default function SendInvitationsPage() {
           <button
             onClick={() => setActiveChannel('sms')}
             className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${activeChannel === 'sms'
-              ? 'bg-[#0D4F4F] text-white shadow-sm'
+              ? 'bg-[#0D4B4B] text-white shadow-sm'
               : 'text-gray-500 hover:bg-gray-50'
               }`}
           >
@@ -822,7 +844,7 @@ export default function SendInvitationsPage() {
           <button
             onClick={() => setActiveChannel('whatsapp')}
             className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 ${activeChannel === 'whatsapp'
-              ? 'bg-[#0D4F4F] text-white shadow-sm'
+              ? 'bg-[#0D4B4B] text-white shadow-sm'
               : 'text-gray-500 hover:bg-gray-50'
               }`}
           >
@@ -837,13 +859,13 @@ export default function SendInvitationsPage() {
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <FileText size={18} className="text-[#0D4F4F]" />
+              <FileText size={18} className="text-[#0D4B4B]" />
               <h2 className="font-semibold text-gray-800 text-base">SMS Template</h2>
               <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Editable</span>
             </div>
             <button
               onClick={() => setShowVariables(!showVariables)}
-              className="text-xs text-[#0D4F4F] hover:text-[#0A3D3D] font-medium flex items-center gap-1"
+              className="text-xs text-[#0D4B4B] hover:text-[#0A3939] font-medium flex items-center gap-1"
             >
               <HelpCircle size={14} />
               {showVariables ? 'Hide Variables' : 'Show Variables'}
@@ -862,7 +884,7 @@ export default function SendInvitationsPage() {
                   type="text"
                   value={smsVariables[key] || ''}
                   onChange={(e) => updateSmsVariable(key, e.target.value)}
-                  className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                  className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                   placeholder={`Enter ${label.toLowerCase()}`}
                 />
               </div>
@@ -898,7 +920,7 @@ export default function SendInvitationsPage() {
               id="sms-template-editor"
               value={smsTemplate}
               onChange={(e) => setSmsTemplate(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent min-h-[200px] resize-y"
+              className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent min-h-[200px] resize-y"
               placeholder="Write your SMS template here..."
             />
             <div className="absolute bottom-3 right-3 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded">
@@ -959,7 +981,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.hostFamily || ''}
                 onChange={(e) => updateWhatsappVariable('hostFamily', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="Host family name"
               />
             </div>
@@ -969,7 +991,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.person1 || ''}
                 onChange={(e) => updateWhatsappVariable('person1', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Agape"
               />
             </div>
@@ -979,7 +1001,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.person2 || ''}
                 onChange={(e) => updateWhatsappVariable('person2', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="e.g., Gladness"
               />
             </div>
@@ -989,7 +1011,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.eventDate || ''}
                 onChange={(e) => updateWhatsappVariable('eventDate', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 15 Septemba, 2026"
               />
             </div>
@@ -999,7 +1021,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.venue || ''}
                 onChange={(e) => updateWhatsappVariable('venue', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="e.g., The Embassy Hall"
               />
             </div>
@@ -1009,7 +1031,7 @@ export default function SendInvitationsPage() {
                 type="text"
                 value={whatsappVariables.time || ''}
                 onChange={(e) => updateWhatsappVariable('time', e.target.value)}
-                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-gray-50"
+                className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
                 placeholder="e.g., 5:00 PM"
               />
             </div>
@@ -1072,98 +1094,163 @@ Card No: {cardNumber} {guestType}`}
       </div>
 
       {/* ─── Filters ─── */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="flex gap-1">
-          <button
-            onClick={() => setFilterChannel('all')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterChannel === 'all'
-              ? 'bg-[#0D4F4F] text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilterChannel('whatsapp')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'whatsapp'
-              ? 'bg-[#0D4F4F] text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            <MessageCircle size={10} /> WA
-          </button>
-          <button
-            onClick={() => setFilterChannel('sms')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'sms'
-              ? 'bg-[#0D4F4F] text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            <Phone size={10} /> SMS
-          </button>
-        </div>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'all'
-              ? 'bg-gray-700 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilterStatus('sent')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'sent'
-              ? 'bg-green-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            <CheckCircle size={10} /> Sent
-          </button>
-          <button
-            onClick={() => setFilterStatus('pending')}
-            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'pending'
-              ? 'bg-amber-500 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-          >
-            <Clock size={10} /> Pending
-          </button>
-          {failedCount > 0 && (
+      <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={14} className="text-gray-400" />
+          <span className="text-xs font-medium text-gray-600">Filters</span>
+          {(filterChannel !== 'all' || filterStatus !== 'all' || searchQuery) && (
             <button
-              onClick={() => setFilterStatus('failed')}
-              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'failed'
-                ? 'bg-red-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+              onClick={() => {
+                setFilterChannel('all');
+                setFilterStatus('all');
+                setSearchQuery('');
+              }}
+              className="ml-auto text-[10px] sm:text-xs text-[#0D4B4B] hover:text-[#0A3939] font-medium flex items-center gap-1"
             >
-              <XCircle size={10} /> Failed
+              <XCircle size={12} />
+              Clear all
             </button>
           )}
         </div>
-        <button
-          onClick={() => {
-            setFilterChannel('all');
-            setFilterStatus('all');
-          }}
-          className="text-[10px] sm:text-xs text-gray-400 hover:text-gray-600 transition"
-        >
-          Clear
-        </button>
+
+        {/* Search */}
+        <div className="relative mb-3">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, phone, card number..."
+            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <XCircle size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Channel filters */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setFilterChannel('all')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterChannel === 'all'
+                ? 'bg-[#0D4B4B] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              All
+              <span className="ml-1 text-[9px] opacity-75">({filterCounts.all})</span>
+            </button>
+            <button
+              onClick={() => setFilterChannel('whatsapp')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'whatsapp'
+                ? 'bg-[#0D4B4B] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              <MessageCircle size={10} /> WA
+              <span className="text-[9px] opacity-75">({filterCounts.whatsapp})</span>
+            </button>
+            <button
+              onClick={() => setFilterChannel('sms')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterChannel === 'sms'
+                ? 'bg-[#0D4B4B] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              <Phone size={10} /> SMS
+              <span className="text-[9px] opacity-75">({filterCounts.sms})</span>
+            </button>
+          </div>
+
+          <div className="w-px h-5 bg-gray-200" />
+
+          {/* Status filters */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setFilterStatus('all')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterStatus === 'all'
+                ? 'bg-gray-700 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterStatus('sent')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterStatus === 'sent'
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              <CheckCircle size={10} /> Sent
+              <span className="text-[9px] opacity-75">({filterCounts.sent})</span>
+            </button>
+            <button
+              onClick={() => setFilterStatus('pending')}
+              className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterStatus === 'pending'
+                ? 'bg-amber-500 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+            >
+              <Clock size={10} /> Pending
+              <span className="text-[9px] opacity-75">({filterCounts.pending})</span>
+            </button>
+            {filterCounts.failed > 0 && (
+              <button
+                onClick={() => setFilterStatus('failed')}
+                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterStatus === 'failed'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+              >
+                <XCircle size={10} /> Failed
+                <span className="text-[9px] opacity-75">({filterCounts.failed})</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ─── Guest List ─── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-3 sm:px-5 py-2.5 sm:py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Users size={16} className="text-[#0D4F4F]" />
+            <Users size={16} className="text-[#0D4B4B]" />
             <span className="font-semibold text-gray-800 text-sm">
               {filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''}
             </span>
             {filterChannel !== 'all' && (
-              <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                {filterChannel === 'whatsapp' ? <MessageCircle size={8} /> : <Phone size={8} />}
                 {filterChannel}
+              </span>
+            )}
+            {filterStatus !== 'all' && (
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                filterStatus === 'sent' ? 'bg-green-100 text-green-700' :
+                filterStatus === 'pending' ? 'bg-amber-100 text-amber-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {filterStatus === 'sent' && <CheckCircle size={8} />}
+                {filterStatus === 'pending' && <Clock size={8} />}
+                {filterStatus === 'failed' && <XCircle size={8} />}
+                {filterStatus}
+              </span>
+            )}
+            {searchQuery && (
+              <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                "{searchQuery}"
               </span>
             )}
           </div>
@@ -1174,7 +1261,7 @@ Card No: {cardNumber} {guestType}`}
             <button
               onClick={broadcast}
               disabled={sending || filteredGuests.length === 0 || loadingGuests}
-              className="px-3 sm:px-4 py-1 sm:py-1.5 bg-[#0D4F4F] text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+              className="px-3 sm:px-4 py-1 sm:py-1.5 bg-[#0D4B4B] text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {sending ? <Loader2 size={12} className="animate-spin" /> : <Send size={14} />}
               {sending ? 'Sending...' : 'Send All'}
@@ -1185,13 +1272,25 @@ Card No: {cardNumber} {guestType}`}
         <div className="divide-y divide-gray-100 max-h-[500px] sm:max-h-[600px] overflow-y-auto">
           {loadingGuests ? (
             <div className="flex justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-[#0D4F4F]" />
+              <Loader2 size={24} className="animate-spin text-[#0D4B4B]" />
             </div>
           ) : filteredGuests.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Users size={40} className="mx-auto mb-3 text-gray-300" />
               <p className="font-medium text-sm">No guests match your filters</p>
-              <p className="text-xs text-gray-400">Try adjusting your filters</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {searchQuery ? `No results for "${searchQuery}"` : 'Try adjusting your filters'}
+              </p>
+              <button
+                onClick={() => {
+                  setFilterChannel('all');
+                  setFilterStatus('all');
+                  setSearchQuery('');
+                }}
+                className="mt-3 text-xs text-[#0D4B4B] hover:text-[#0A3939] font-medium"
+              >
+                Clear all filters
+              </button>
             </div>
           ) : (
             filteredGuests.map((guest) => {
@@ -1209,7 +1308,7 @@ Card No: {cardNumber} {guestType}`}
                 >
                   <div className="flex items-center gap-2 sm:gap-4">
                     {/* Avatar */}
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs sm:text-sm flex-shrink-0">
                       {guest.name.charAt(0).toUpperCase()}
                     </div>
 

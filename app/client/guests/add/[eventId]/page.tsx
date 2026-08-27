@@ -171,7 +171,7 @@ export default function AddGuestPage() {
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <Link
             href={`/client/events/${eventId}`}
-            className="flex-shrink-0 p-2 text-gray-500 hover:text-[#0D4F4F] hover:bg-[rgba(13,79,79,0.06)] rounded-xl transition"
+            className="flex-shrink-0 p-2 text-gray-500 hover:text-[#0D4B4B] hover:bg-[rgba(13,75,75,0.06)] rounded-xl transition"
           >
             <ArrowLeft size={20} />
           </Link>
@@ -200,7 +200,7 @@ export default function AddGuestPage() {
               <select
                 value={form.title}
                 onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-white"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
               >
                 {TITLES.map(title => (
                   <option key={title} value={title}>{title}</option>
@@ -218,7 +218,7 @@ export default function AddGuestPage() {
                 type="text"
                 value={form.name}
                 onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                 placeholder="e.g., John Doe"
                 required
               />
@@ -235,7 +235,7 @@ export default function AddGuestPage() {
                   type="tel"
                   value={form.phone}
                   onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                   placeholder="+255712345678"
                   required
                 />
@@ -243,7 +243,7 @@ export default function AddGuestPage() {
                   type="button"
                   onClick={checkWhatsApp}
                   disabled={checkingWhatsApp}
-                  className="px-3 sm:px-4 py-2.5 bg-[#0D4F4F] text-white rounded-xl font-medium hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
+                  className="px-3 sm:px-4 py-2.5 bg-[#0D4B4B] text-white rounded-xl font-medium hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
                 >
                   {checkingWhatsApp ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
                   {checkingWhatsApp ? 'Checking...' : 'Check WA'}
@@ -270,7 +270,7 @@ export default function AddGuestPage() {
               <select
                 value={form.guestType}
                 onChange={e => setForm(prev => ({ ...prev, guestType: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent bg-white"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
               >
                 {GUEST_TYPES.map(type => (
                   <option key={type} value={type}>
@@ -292,14 +292,14 @@ export default function AddGuestPage() {
                   type="text"
                   value={form.cardNumber}
                   onChange={e => setForm(prev => ({ ...prev, cardNumber: e.target.value }))}
-                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                   placeholder="e.g., 00001"
                 />
                 <button
                   type="button"
                   onClick={generateCardNumber}
                   disabled={isGeneratingCard}
-                  className="px-3 sm:px-4 py-2.5 bg-[#0D4F4F] text-white rounded-xl font-medium hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
+                  className="px-3 sm:px-4 py-2.5 bg-[#0D4B4B] text-white rounded-xl font-medium hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
                 >
                   {isGeneratingCard ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
                   {isGeneratingCard ? 'Generating...' : 'Auto'}
@@ -315,7 +315,7 @@ export default function AddGuestPage() {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                 placeholder="guest@example.com"
               />
             </div>
@@ -339,7 +339,7 @@ export default function AddGuestPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                className="w-full sm:flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <UserCheck size={18} />}
                 {loading ? 'Adding...' : 'Add Guest'}

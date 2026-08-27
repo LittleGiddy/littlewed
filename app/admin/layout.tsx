@@ -4,10 +4,10 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, Building2, Users, UserCog, CreditCard, 
-  Activity, LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Sparkles, Bell, Search, Settings, HelpCircle, ChevronDown
+import {
+  LayoutDashboard, Building2, Users, UserCog, Palette,
+  LogOut, Menu, X, ChevronLeft, ChevronRight,
+  Bell, Search, Zap, Coins, BarChart3
 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
@@ -43,15 +43,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [session, status, router]);
 
   useEffect(() => {
-    if (!isLargeScreen) {
-      setSidebarOpen(false);
-    }
+    if (!isLargeScreen) setSidebarOpen(false);
   }, [pathname, isLargeScreen]);
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
-        <div className="w-10 h-10 border-4 border-[#E2E8F0] border-t-[#0D4F4F] rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-8 h-8 border-2 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
       </div>
     );
   }
@@ -67,8 +65,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { path: '/admin/tenants', icon: Building2, label: 'Tenants' },
     { path: '/admin/users', icon: Users, label: 'Users' },
     { path: '/admin/staff', icon: UserCog, label: 'Staff' },
-    { path: '/admin/transactions', icon: CreditCard, label: 'Transactions' },
-    { path: '/admin/activity', icon: Activity, label: 'Activity Log' },
+    { path: '/admin/credit-requests', icon: Coins, label: 'Credit Requests' },
+    { path: '/admin/reports', icon: BarChart3, label: 'Reports' },
+    { path: '/admin/templates', icon: Palette, label: 'Templates' },
   ];
 
   const getPageTitle = () => {
@@ -79,16 +78,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const effectiveCollapsed = isCollapsed && !isHovered;
 
   const SidebarContent = ({ isMobile = false, onClose }: { isMobile?: boolean; onClose?: () => void }) => (
-    <div className={`flex flex-col h-full p-4 transition-all duration-300 ${effectiveCollapsed && !isMobile ? 'items-center px-3' : ''}`}>
-      {/* ─── Brand ─── */}
-      <div className={`flex items-center ${effectiveCollapsed && !isMobile ? 'justify-center' : 'gap-3'} w-full pb-5 mb-4 border-b border-[#EEF2F6] relative`}>
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center shadow-lg shadow-[#0D4F4F]/20 flex-shrink-0">
-          <Sparkles size={20} className="text-white" />
+    <div className={`flex flex-col h-full transition-all duration-300 ${effectiveCollapsed && !isMobile ? 'items-center' : ''}`}>
+      {/* Brand */}
+      <div className={`flex items-center w-full px-5 h-16 border-b border-gray-100 flex-shrink-0 ${effectiveCollapsed && !isMobile ? 'justify-center px-3' : 'gap-3'}`}>
+        <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] flex items-center justify-center flex-shrink-0">
+          <Zap size={16} className="text-white" />
         </div>
         {(!effectiveCollapsed || isMobile) && (
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className="font-bold text-[#0D1B1B] text-base tracking-tight">LittleWed</span>
-            <span className="text-[10px] font-medium text-[#94A3B8] uppercase tracking-wider">Admin Panel</span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-gray-900 text-sm tracking-tight">LittleWed</span>
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Admin</span>
           </div>
         )}
         {isMobile && (
@@ -98,34 +97,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </div>
 
-      {/* ─── Collapse Toggle ─── */}
+      {/* Collapse Toggle */}
       {!isMobile && (
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="hidden lg:flex absolute -right-3 top-[72px] w-6 h-6 rounded-full bg-white border border-[#EEF2F6] shadow-md items-center justify-center text-[#94A3B8] hover:text-[#0D4F4F] hover:border-[#0D4F4F] transition-all z-10"
+          className="hidden lg:flex absolute -right-3 top-20 w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm items-center justify-center text-gray-400 hover:text-[#0D4B4B] hover:border-[#0D4B4B]/30 transition-all z-10"
         >
           {isCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
       )}
 
-      {/* ─── User Profile ─── */}
-      <div className={`flex items-center ${effectiveCollapsed && !isMobile ? 'justify-center' : 'gap-3'} w-full p-3 rounded-xl bg-[#F8FAFC] border border-[#EEF2F6] mb-5 transition-all`}>
-        <div className="relative flex-shrink-0">
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            {userInitial}
+      {/* User Profile */}
+      {(!effectiveCollapsed || isMobile) && (
+        <div className="px-4 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50">
+            <div className="w-9 h-9 rounded-full bg-[#0D4B4B] flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+              {userInitial}
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900 truncate">{userName}</p>
+              <p className="text-xs text-gray-400 truncate">{userEmail}</p>
+            </div>
           </div>
-          <div className="absolute -inset-0.5 rounded-full border-2 border-[#0D4F4F]/20 animate-pulse" />
         </div>
-        {(!effectiveCollapsed || isMobile) && (
-          <div className="flex flex-col flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[#0D1B1B] truncate">{userName}</p>
-            <p className="text-[10px] text-[#94A3B8] truncate">{userEmail}</p>
-          </div>
-        )}
-      </div>
+      )}
 
-      {/* ─── Navigation ─── */}
-      <nav className="flex-1 w-full space-y-1 overflow-y-auto py-2">
+      {/* Navigation */}
+      <nav className="flex-1 w-full overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
           const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
           return (
@@ -133,56 +131,43 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               key={item.path}
               href={item.path}
               className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
-                ${isActive 
-                  ? 'bg-[#0D4F4F] text-white shadow-md shadow-[#0D4F4F]/20' 
-                  : 'text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0D4F4F]'
+                flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150
+                ${isActive
+                  ? 'bg-[#0D4B4B]/5 text-[#0D4B4B]'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                 }
                 ${effectiveCollapsed && !isMobile ? 'justify-center px-2' : ''}
               `}
             >
-              <span className={`flex-shrink-0 ${isActive ? 'text-white' : 'text-[#94A3B8]'} ${isActive && 'group-hover:text-white'}`}>
-                <item.icon size={18} />
-              </span>
-              {(!effectiveCollapsed || isMobile) && (
-                <>
-                  <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : ''}`}>
-                    {item.label}
-                  </span>
-                  {isActive && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/80 flex-shrink-0" />
-                  )}
-                </>
-              )}
+              <item.icon size={18} className={isActive ? 'text-[#0D4B4B]' : 'text-gray-400'} />
+              {(!effectiveCollapsed || isMobile) && <span>{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* ─── Footer ─── */}
-      <div className="w-full pt-4 mt-2 border-t border-[#EEF2F6]">
+      {/* Footer */}
+      <div className="w-full px-3 py-4 border-t border-gray-100">
         <button
           onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
           className={`
-            flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 w-full
-            text-[#94A3B8] hover:text-[#DC2626] hover:bg-[#FEF2F2]
+            flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 w-full
+            text-gray-400 hover:text-red-600 hover:bg-red-50
             ${effectiveCollapsed && !isMobile ? 'justify-center px-2' : ''}
           `}
         >
           <LogOut size={18} />
-          {(!effectiveCollapsed || isMobile) && (
-            <span className="text-sm font-medium">Sign Out</span>
-          )}
+          {(!effectiveCollapsed || isMobile) && <span>Sign Out</span>}
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans antialiased">
-      {/* ─── Desktop Sidebar ─── */}
-      <aside 
-        className={`hidden lg:block fixed top-0 left-0 bottom-0 bg-white border-r border-[#EEF2F6] shadow-sm transition-all duration-300 z-30 ${
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden lg:block fixed top-0 left-0 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-30 ${
           effectiveCollapsed ? 'w-[72px]' : 'w-[260px]'
         }`}
         onMouseEnter={() => setIsHovered(true)}
@@ -191,7 +176,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <SidebarContent />
       </aside>
 
-      {/* ─── Mobile Sidebar ─── */}
+      {/* Mobile Sidebar */}
       <AnimatePresence>
         {sidebarOpen && !isLargeScreen && (
           <>
@@ -199,16 +184,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.15 }}
               onClick={() => setSidebarOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+              className="fixed inset-0 bg-black/30 z-40"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed left-0 top-0 bottom-0 w-[300px] bg-white z-50 shadow-2xl overflow-y-auto"
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="fixed left-0 top-0 bottom-0 w-[280px] bg-white z-50 shadow-xl overflow-y-auto"
             >
               <SidebarContent isMobile onClose={() => setSidebarOpen(false)} />
             </motion.aside>
@@ -216,40 +201,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </AnimatePresence>
 
-      {/* ─── Main Content ─── */}
+      {/* Main Content */}
       <div className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${effectiveCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'}`}>
-        {/* ─── Top Bar ─── */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-[#EEF2F6] px-4 sm:px-6 py-3 flex items-center justify-between">
+        {/* Top Bar */}
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 sm:px-6 h-14 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors"
+              className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <Menu size={20} className="text-[#0D1B1B]" />
+              <Menu size={20} className="text-gray-600" />
             </button>
-            <h1 className="text-lg font-semibold text-[#0D1B1B]">{getPageTitle()}</h1>
+            <h1 className="text-base font-semibold text-gray-900">{getPageTitle()}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded-xl hover:bg-[#F1F5F9] transition-colors text-[#64748B] hover:text-[#0D4F4F]">
+          <div className="flex items-center gap-1">
+            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600">
               <Search size={18} />
             </button>
             <NotificationBell />
-            <div className="flex items-center gap-2 pl-2 border-l border-[#EEF2F6]">
-              <span className="text-sm font-medium text-[#64748B] hidden sm:block">{userName}</span>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#1A6B6B] flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                {userInitial}
-              </div>
+            <div className="w-8 h-8 rounded-full bg-[#0D4B4B] flex items-center justify-center text-white font-semibold text-xs ml-2">
+              {userInitial}
             </div>
           </div>
         </header>
 
-        {/* ─── Page Content ─── */}
+        {/* Page Content */}
         <motion.main
           key={pathname}
-          initial={{ opacity: 0, y: 8 }}
+          initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
-          className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto"
+          transition={{ duration: 0.2 }}
+          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto"
         >
           {children}
         </motion.main>

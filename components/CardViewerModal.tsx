@@ -68,21 +68,21 @@ export function CardViewerModal({ isOpen, onClose, cardUrl, guestName, cardNumbe
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={handleDownload}
-              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4F4F] hover:bg-gray-100 rounded-lg transition"
+              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4B4B] hover:bg-gray-100 rounded-lg transition"
               title="Download Card"
             >
               <Download size={18} />
             </button>
             <button
               onClick={handleShare}
-              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4F4F] hover:bg-gray-100 rounded-lg transition"
+              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4B4B] hover:bg-gray-100 rounded-lg transition"
               title="Share Card"
             >
               <Share2 size={18} />
             </button>
             <button
               onClick={() => setIsZoomed(!isZoomed)}
-              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4F4F] hover:bg-gray-100 rounded-lg transition"
+              className="p-1.5 sm:p-2 text-gray-500 hover:text-[#0D4B4B] hover:bg-gray-100 rounded-lg transition"
               title={isZoomed ? 'Zoom Out' : 'Zoom In'}
             >
               {isZoomed ? <Minimize size={18} /> : <Maximize size={18} />}
@@ -101,7 +101,7 @@ export function CardViewerModal({ isOpen, onClose, cardUrl, guestName, cardNumbe
           <div className="relative">
             {isLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 border-2 border-[#0D4F4F] border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-2 border-[#0D4B4B] border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             <img
@@ -117,7 +117,7 @@ export function CardViewerModal({ isOpen, onClose, cardUrl, guestName, cardNumbe
         {/* Footer */}
         <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-xs text-gray-400">
           <div className="flex items-center gap-2">
-            <QrCode size={12} className="text-[#0D4F4F]" />
+            <QrCode size={12} className="text-[#0D4B4B]" />
             <span>Scan QR code for check-in</span>
           </div>
           <div className="flex items-center gap-2">

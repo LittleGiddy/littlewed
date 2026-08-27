@@ -114,7 +114,7 @@ function GoogleCallbackInner() {
               borderRadius: '50%',
               margin: '0 auto 20px',
               border: '4px solid #E2EAF0',
-              borderTopColor: '#0D4F4F',
+              borderTopColor: '#0D4B4B',
               animation: 'spin 0.8s linear infinite',
             }}
           />
@@ -135,11 +135,11 @@ function GoogleCallbackInner() {
             width: 64,
             height: 64,
             borderRadius: 16,
-            background: 'rgba(13,79,79,0.08)',
+            background: 'rgba(13,75,75,0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#0D4F4F',
+            color: '#0D4B4B',
             margin: '0 auto 16px',
           }}
         >
@@ -163,7 +163,7 @@ function GoogleCallbackInner() {
         </p>
 
         <form onSubmit={handleCreateOrg} style={{ textAlign: 'left' }}>
-          <label style={{ fontSize: 12, fontWeight: 700, color: '#0D4F4F', display: 'block', marginBottom: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#0D4B4B', display: 'block', marginBottom: 6 }}>
             Organization Name
           </label>
           <input
@@ -187,7 +187,7 @@ function GoogleCallbackInner() {
           />
           {orgName && (
             <div style={{ fontSize: 11, color: '#9BAAB8', marginBottom: 14 }}>
-              Your URL: <strong style={{ color: '#0D4F4F' }}>{subdomainFromName(orgName)}.littlewed.co.tz</strong>
+              Your URL: <strong style={{ color: '#0D4B4B' }}>{subdomainFromName(orgName)}.littlewed.co.tz</strong>
             </div>
           )}
 
@@ -221,7 +221,7 @@ function GoogleCallbackInner() {
               padding: 14,
               border: 'none',
               borderRadius: 13,
-              background: 'linear-gradient(135deg, #0D4F4F, #0A3D3D)',
+              background: 'linear-gradient(135deg, #0D4B4B, #0A3939)',
               color: 'white',
               fontSize: 14,
               fontWeight: 700,

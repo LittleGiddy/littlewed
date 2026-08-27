@@ -63,29 +63,23 @@ const STEPS: { id: FlowStep; label: string; short: string; icon: React.ReactNode
 ];
 
 // ─── Countdown Timer ──────────────────────────────────────────────────
-const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate: string; onStatusChange?: (status: string) => void }) => {
+const EventCountdown = React.memo(({ targetDate }: { targetDate: string }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<'ACTIVE' | 'REMINDER' | 'LIVE'>('ACTIVE');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const target = useMemo(() => new Date(targetDate), [targetDate]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
 
-    const update = () => {
+    const compute = () => {
       const now = new Date();
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        if (status !== 'LIVE') {
-          setStatus('LIVE');
-          if (onStatusChange) onStatusChange('LIVE');
-        }
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+        setStatus('LIVE');
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
         return;
       }
 
@@ -95,19 +89,15 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
       setTimeLeft({ days, hours, minutes, seconds });
-      setStatus(prev => {
-        if (hours <= 24 && days === 0 && hours > 0) return 'REMINDER';
-        return prev === 'LIVE' ? 'LIVE' : 'ACTIVE';
-      });
+      if (days === 0 && hours <= 24 && hours > 0) setStatus('REMINDER');
+      else setStatus('ACTIVE');
     };
 
-    update();
-    intervalRef.current = setInterval(update, 1000);
+    compute();
+    intervalRef.current = setInterval(compute, 1000);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [target, onStatusChange]);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [target]);
 
   const formattedTime = `${String(timeLeft.days).padStart(2, '0')}d ${String(timeLeft.hours).padStart(2, '0')}h ${String(timeLeft.minutes).padStart(2, '0')}m ${String(timeLeft.seconds).padStart(2, '0')}s`;
 
@@ -130,7 +120,7 @@ const EventCountdown = React.memo(({ targetDate, onStatusChange }: { targetDate:
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2.5 py-1 rounded-full border border-[rgba(13,79,79,0.15)]">
+    <div className="flex items-center gap-1.5 text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2.5 py-1 rounded-full border border-[rgba(13,75,75,0.15)]">
       <CalendarClock size={13} />
       <span className="font-bold text-xs">{formattedTime}</span>
     </div>
@@ -175,7 +165,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [editGuestForm, setEditGuestForm] = useState({ name: '', phone: '' });
   const [savingGuest, setSavingGuest] = useState(false);
-  const hasReportedLive = useRef(false);
   const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
   const [selectedCardGuest, setSelectedCardGuest] = useState<Guest | null>(null);
   const [showCardModal, setShowCardModal] = useState(false);
@@ -237,7 +226,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
       setCurrentPage(1);
-      if (data.event.status !== 'LIVE') hasReportedLive.current = false;
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
       setFetchError(msg);
@@ -481,9 +469,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     e.preventDefault();
     setEditing(true);
     try {
+      // Build timezone-aware ISO string so server stores correct UTC time
+      const localDate = new Date(editForm.date);
+      const offsetMinutes = localDate.getTimezoneOffset();
+      const sign = offsetMinutes <= 0 ? '+' : '-';
+      const absOffset = Math.abs(offsetMinutes);
+      const offsetH = String(Math.floor(absOffset / 60)).padStart(2, '0');
+      const offsetM = String(absOffset % 60).padStart(2, '0');
+      const dateISO = `${editForm.date}:00${sign}${offsetH}:${offsetM}`;
+
       const res = await fetch(`/api/events/${eventId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editForm.name, venue: editForm.venue, address: editForm.address, date: editForm.date }),
+        body: JSON.stringify({ name: editForm.name, venue: editForm.venue, address: editForm.address, date: dateISO }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -492,14 +489,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } catch { toast.error('Network error'); }
     finally { setEditing(false); }
   };
-
-  // ─── Status Change Handler ──────────────────────────────────────────
-  const handleStatusChange = useCallback((newStatus: string) => {
-    if (newStatus === 'LIVE' && !hasReportedLive.current) {
-      hasReportedLive.current = true;
-      fetchData(eventId!);
-    }
-  }, [fetchData, eventId]);
 
   // ─── Memoized Values ────────────────────────────────────────────────
   const eventDate = useMemo(() => event ? new Date(event.date) : null, [event?.date]);
@@ -532,7 +521,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (isActive) {
       const hoursUntil = differenceInHours(new Date(event!.date), new Date());
       if (hoursUntil <= 24 && hoursUntil > 0) return { icon: <Timer size={13} className="animate-pulse" />, label: 'In 24 hours', className: 'bg-amber-50 text-amber-700 border-amber-200' };
-      return { icon: <CalendarClock size={13} />, label: formatDistanceToNow(new Date(event!.date), { addSuffix: true }), className: 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border-[rgba(13,79,79,0.15)]' };
+      return { icon: <CalendarClock size={13} />, label: formatDistanceToNow(new Date(event!.date), { addSuffix: true }), className: 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B] border-[rgba(13,75,75,0.15)]' };
     }
     if (isDraft) return { icon: <AlertCircle size={13} />, label: 'Draft', className: 'bg-gray-100 text-gray-500 border-gray-200' };
     return { icon: <AlertCircle size={13} />, label: event?.status || 'Unknown', className: 'bg-gray-100 text-gray-500 border-gray-200' };
@@ -577,12 +566,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             className={`${t.visible ? 'animate-enter' : 'animate-leave'
               } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
           >
-            <div className="p-4 bg-[#0D4F4F]">
+            <div className="p-4 bg-[#0D4B4B]">
               <h3 className="text-white font-semibold text-base">Generate Invitation Cards</h3>
             </div>
             <div className="p-4">
               <p className="text-gray-700 text-sm mb-1">
-                <span className="font-bold text-[#0D4F4F]">{pendingGuests.length}</span> guests need cards
+                <span className="font-bold text-[#0D4B4B]">{pendingGuests.length}</span> guests need cards
               </p>
               <p className="text-gray-500 text-xs mb-4">
                 {guests.filter((g) => g.invitationCard).length} guests already have cards
@@ -593,7 +582,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     toast.dismiss(t.id);
                     resolve(true);
                   }}
-                  className="flex-1 bg-[#0D4F4F] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition"
+                  className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition"
                 >
                   Generate {pendingGuests.length} Cards
                 </button>
@@ -689,7 +678,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               className={`${t.visible ? 'animate-enter' : 'animate-leave'
                 } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
             >
-              <div className="p-4 bg-[#0D4F4F]">
+              <div className="p-4 bg-[#0D4B4B]">
                 <h3 className="text-white font-semibold text-base flex items-center gap-2">
                   <Send size={18} />
                   Cards Ready!
@@ -705,7 +694,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       toast.dismiss(t.id);
                       goToStep('send');
                     }}
-                    className="flex-1 bg-[#0D4F4F] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-2"
+                    className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-2"
                   >
                     <Send size={16} />
                     Send Invitations
@@ -774,7 +763,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div
         key={guest.id}
-        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4F4F] shadow-md' : 'border-gray-100'
+        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4B4B] shadow-md' : 'border-gray-100'
           }`}
       >
         <div className="flex items-center p-3 gap-3">
@@ -782,9 +771,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             type="checkbox"
             checked={isSelected}
             onChange={() => toggleSelectGuest(guest.id)}
-            className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F] flex-shrink-0"
+            className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B] flex-shrink-0"
           />
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             {guest.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -801,7 +790,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </span>
               )}
               {hasThanks && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-[#FF6B5C] bg-[#FFF0ED] px-2 py-0.5 rounded-full">
                   <Heart size={12} /> Thanks
                 </span>
               )}
@@ -818,7 +807,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               <span
                 className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp
-                    ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]'
+                    ? 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]'
                     : 'bg-gray-100 text-gray-600'
                   }`}
               >
@@ -860,7 +849,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </button>
             <button
               onClick={() => openEditGuestModal(guest)}
-              className="p-1.5 text-gray-400 hover:text-[#0D4F4F] transition rounded"
+              className="p-1.5 text-gray-400 hover:text-[#0D4B4B] transition rounded"
               title="Edit guest"
             >
               <Edit2 size={15} />
@@ -945,7 +934,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           <div className="absolute top-2 right-2">
-            <span className="text-xs font-medium bg-[#0D4F4F] text-white px-2 py-0.5 rounded-full">
+            <span className="text-xs font-medium bg-[#0D4B4B] text-white px-2 py-0.5 rounded-full">
               #{guest.cardNumber || guest.id.slice(0, 6)}
             </span>
           </div>
@@ -961,7 +950,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center gap-1">
               <span
                 className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp'
-                    ? 'bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]'
+                    ? 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]'
                     : 'bg-gray-100 text-gray-600'
                   }`}
               >
@@ -983,7 +972,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
         <p className="text-sm text-gray-400">Loading event...</p>
       </div>
     );
@@ -1004,7 +993,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {fetchError && eventId && (
               <button
                 onClick={() => fetchData(eventId)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-sm font-bold rounded-xl hover:shadow-md transition"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white text-sm font-bold rounded-xl hover:shadow-md transition"
               >
                 <ArrowLeft size={14} /> Retry
               </button>
@@ -1042,7 +1031,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;
         }
         .modal-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 900; color: #0D1B1B; }
-        .modal-title span { color: #E8A598; }
+        .modal-title span { color: #FF6B5C; }
         .modal-body { padding: 20px 24px 24px; }
         .modal-close {
           width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
@@ -1056,21 +1045,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           font-size: 14px; outline: none; color: #0D1B1B; background: white; font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .field-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
         .btn-primary {
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D); color: white;
+          background: linear-gradient(135deg, #0D4B4B, #0A3939); color: white;
           padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
           border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,79,79,0.32); transition: transform 0.15s, box-shadow 0.15s;
+          box-shadow: 0 4px 14px rgba(13,75,75,0.32); transition: transform 0.15s, box-shadow 0.15s;
         }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
         .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
         .btn-secondary {
           padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
           border: 1.5px solid #E2EAF0; background: white; color: #4A6072;
           cursor: pointer; transition: border-color 0.15s, color 0.15s;
         }
-        .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; }
+        .btn-secondary:hover { border-color: #0D4B4B; color: #0D4B4B; }
         .card-modal-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
           display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
@@ -1093,21 +1082,21 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           font-weight: 700; font-size: 13px; transition: all 0.2s; border: 2px solid #E2EAF0;
           background: white; color: #9BAAB8;
         }
-        .step-pill.done .step-circle { background: #0D4F4F; border-color: #0D4F4F; color: white; }
+        .step-pill.done .step-circle { background: #0D4B4B; border-color: #0D4B4B; color: white; }
         .step-pill.active .step-circle {
-          background: #0D4F4F; border-color: #0D4F4F; color: white; box-shadow: 0 0 0 4px rgba(13,79,79,0.15);
+          background: #0D4B4B; border-color: #0D4B4B; color: white; box-shadow: 0 0 0 4px rgba(13,75,75,0.15);
         }
         .step-label { font-size: 11px; font-weight: 600; color: #9BAAB8; }
-        .step-pill.active .step-label, .step-pill.done .step-label { color: #0D4F4F; }
+        .step-pill.active .step-label, .step-pill.done .step-label { color: #0D4B4B; }
         .step-line { position: absolute; top: 17px; left: 50%; width: 100%; height: 2px; background: #E2EAF0; z-index: -1; }
-        .step-pill.done .step-line { background: #0D4F4F; }
+        .step-pill.done .step-line { background: #0D4B4B; }
         .step-pill:first-child .step-line { display: none; }
         .action-tile {
           display: flex; align-items: center; gap: 12px; background: white;
           border: 1.5px solid #E9EEF0; border-radius: 16px; padding: 16px;
           transition: all 0.15s; text-align: left; width: 100%;
         }
-        .action-tile:hover { border-color: #0D4F4F; box-shadow: 0 4px 14px rgba(13,79,79,0.1); transform: translateY(-1px); }
+        .action-tile:hover { border-color: #0D4B4B; box-shadow: 0 4px 14px rgba(13,75,75,0.1); transform: translateY(-1px); }
         .action-tile-icon {
           width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
@@ -1120,7 +1109,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center justify-between mb-4">
             <Link
               href="/client/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-white border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.06)]"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)]"
             >
               <ArrowLeft size={14} /> Back
             </Link>
@@ -1231,17 +1220,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
                   <span className="flex items-center gap-1">
-                    <Calendar size={12} className="text-[#0D4F4F]" />
+                    <Calendar size={12} className="text-[#0D4B4B]" />
                     {format(new Date(event.date), 'PPP')}
                   </span>
                   <span className="flex items-center gap-1">
-                    <MapPin size={12} className="text-[#0D4F4F]" />
+                    <MapPin size={12} className="text-[#0D4B4B]" />
                     {event.venue}
                   </span>
                 </div>
               </div>
               {!isEventDisabled && eventDate && (
-                <EventCountdown key={countdownKey} targetDate={event.date} onStatusChange={handleStatusChange} />
+                <EventCountdown key={countdownKey} targetDate={event.date} />
               )}
             </div>
 
@@ -1263,7 +1252,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Guests</p>
               </div>
               <div className="text-center">
-                <p className="text-base font-bold text-[#0D4F4F]">{guestsWithCards.length}</p>
+                <p className="text-base font-bold text-[#0D4B4B]">{guestsWithCards.length}</p>
                 <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Cards</p>
               </div>
               <div className="text-center">
@@ -1318,7 +1307,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                   <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#0D4F4F] rounded-full transition-all duration-300"
+                      className="h-full bg-[#0D4B4B] rounded-full transition-all duration-300"
                       style={{
                         width: `${((generationProgress.completed + generationProgress.failed) /
                             generationProgress.total) *
@@ -1340,7 +1329,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Link href={`/client/guests/import/${event.id}`} className="action-tile">
-                      <div className="action-tile-icon bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]">
+                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
                         <Upload size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1373,13 +1362,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                             setCurrentPage(1);
                           }}
                           placeholder="Search guests..."
-                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                         />
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={toggleSelectAll}
-                          className="p-2 text-gray-500 hover:text-[#0D4F4F] rounded-lg hover:bg-gray-50 transition"
+                          className="p-2 text-gray-500 hover:text-[#0D4B4B] rounded-lg hover:bg-gray-50 transition"
                           title="Select All"
                         >
                           {selectedGuests.size === guests.length && guests.length > 0 ? (
@@ -1400,7 +1389,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         )}
                         <button
                           onClick={openBackupModal}
-                          className="p-2 text-[#0D4F4F] hover:bg-[rgba(13,79,79,0.08)] rounded-lg transition"
+                          className="p-2 text-[#0D4B4B] hover:bg-[rgba(13,75,75,0.08)] rounded-lg transition"
                           title="View All Guests"
                         >
                           <Download size={16} />
@@ -1457,7 +1446,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {showBackToTop && (
                           <button
                             onClick={scrollToTop}
-                            className="fixed bottom-24 right-6 bg-[#0D4F4F] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3D3D] transition z-10"
+                            className="fixed bottom-24 right-6 bg-[#0D4B4B] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3939] transition z-10"
                           >
                             <ArrowUp size={20} />
                           </button>
@@ -1472,7 +1461,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {activeStep === 'design' && (
                 <div className="space-y-4">
                   <Link href={`/client/invitations/design/${event.id}`} className="action-tile">
-                    <div className="action-tile-icon bg-[rgba(13,79,79,0.08)] text-[#0D4F4F]">
+                    <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
                       <Palette size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1507,7 +1496,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={handleGenerateCards}
                         disabled={generatingCards || guests.length === 0}
-                        className="bg-[#0D4F4F] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
+                        className="bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-2"
                       >
                         {generatingCards ? (
                           <Loader2 size={16} className="animate-spin" />
@@ -1528,7 +1517,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={() => setCardView('grid')}
                         className={`p-2 rounded-lg transition ${cardView === 'grid'
-                            ? 'bg-[#0D4F4F] text-white'
+                            ? 'bg-[#0D4B4B] text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                           }`}
                         title="Grid View"
@@ -1538,7 +1527,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={() => setCardView('list')}
                         className={`p-2 rounded-lg transition ${cardView === 'list'
-                            ? 'bg-[#0D4F4F] text-white'
+                            ? 'bg-[#0D4B4B] text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                           }`}
                         title="List View"
@@ -1638,7 +1627,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Guests</p>
                       </div>
                       <div className="text-center bg-gray-50 rounded-xl py-3">
-                        <p className="text-lg font-bold text-[#0D4F4F]">{whatsappCount}</p>
+                        <p className="text-lg font-bold text-[#0D4B4B]">{whatsappCount}</p>
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">WhatsApp</p>
                       </div>
                       <div className="text-center bg-gray-50 rounded-xl py-3">
@@ -1657,7 +1646,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     )}
                     <Link
                       href={`/client/invitations/send/${event.id}`}
-                      className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
+                      className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Send size={16} /> {sentCount > 0 ? 'Continue sending' : 'Send invitations'}
                     </Link>
@@ -1795,7 +1784,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="modal-body">
               <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]">
+                <div className="w-10 h-10 rounded-lg bg-[rgba(13,75,75,0.1)] flex items-center justify-center text-[#0D4B4B]">
                   <Users size={18} />
                 </div>
                 <div>
@@ -1823,7 +1812,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <label className="field-label">Ujumbe wa kukumbusha</label>
               <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
+                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none text-sm"
                 rows={3}
                 value={kumbushaMessage}
                 onChange={(e) => setKumbushaMessage(e.target.value)}
@@ -1871,7 +1860,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="modal-body">
               <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[rgba(13,79,79,0.1)] flex items-center justify-center text-[#0D4F4F]">
+                <div className="w-10 h-10 rounded-lg bg-[rgba(13,75,75,0.1)] flex items-center justify-center text-[#0D4B4B]">
                   <Heart size={18} />
                 </div>
                 <div>
@@ -1901,7 +1890,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <label className="field-label">Ujumbe wa shukrani</label>
               <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
+                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none text-sm"
                 rows={3}
                 value={thanksMessage}
                 onChange={(e) => setThanksMessage(e.target.value)}
@@ -1990,6 +1979,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     value={editForm.date}
                     onChange={handleEditChange}
                     className="field-input"
+                    min={new Date().toISOString().slice(0, 16)}
                     required
                   />
                 </div>
@@ -2092,7 +2082,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="modal-body">
               {backupLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-[#0D4F4F]" />
+                  <Loader2 size={24} className="animate-spin text-[#0D4B4B]" />
                 </div>
               ) : (
                 <>
@@ -2106,7 +2096,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         setBackupPage(1);
                       }}
                       placeholder="Search all guests..."
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                     />
                   </div>
 
@@ -2119,7 +2109,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
                       {backupPaginated.map((g) => (
                         <div key={g.id} className="py-2.5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#0D4F4F]/10 flex items-center justify-center text-[#0D4F4F] font-bold text-sm flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#0D4B4B]/10 flex items-center justify-center text-[#0D4B4B] font-bold text-sm flex-shrink-0">
                             {g.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">

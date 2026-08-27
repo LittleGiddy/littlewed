@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, ArrowLeft, Coins, CreditCard } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Coins, Clock, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
-import BuyCreditsModal from '@/app/components/BuyCreditsModal';
+import RequestCreditsModal from '@/app/components/RequestCreditsModal';
 
 export default function NewEventPage() {
   const router = useRouter();
@@ -19,24 +19,27 @@ export default function NewEventPage() {
   const [error, setError] = useState('');
   const [focused, setFocused] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
-  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [hasPending, setHasPending] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const [requiredCredits, setRequiredCredits] = useState(0);
 
   const guestCount = parseInt(form.guestCount, 10) || 0;
-  const commissionPerGuest = 300;
+  const commissionPerGuest = 500;
   const totalCommission = guestCount * commissionPerGuest;
 
-  // Fetch tenant credits
-  useEffect(() => {
-    fetch('/api/tenant/billing', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.tenant?.credits !== undefined) {
-          setCredits(data.tenant.credits);
-        }
+  const fetchCredits = () => {
+    Promise.all([
+      fetch('/api/tenant/billing', { credentials: 'include' }).then((r) => r.json()),
+      fetch('/api/credits/pending', { credentials: 'include' }).then((r) => r.json()),
+    ])
+      .then(([billing, pending]) => {
+        setCredits(billing.tenant?.credits ?? 0);
+        setHasPending(!!pending.pending);
       })
       .catch(() => console.error('Failed to fetch credits'));
-  }, []);
+  };
+
+  useEffect(() => { fetchCredits(); }, []);
 
   const isLabelUp = (fieldName: string) => {
     if (focused === fieldName) return true;
@@ -44,22 +47,24 @@ export default function NewEventPage() {
     return value !== undefined && value !== null && value !== '';
   };
 
-  // Single submit handler – tries credits first, then falls back to payment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // ─── Convert local datetime to UTC ISO string ───────────────────────
     const localDate = new Date(form.date);
     if (isNaN(localDate.getTime())) {
       setError('Please select a valid date and time.');
       setLoading(false);
       return;
     }
-    const utcDateString = localDate.toISOString(); // e.g., "2026-07-29T15:00:00.000Z"
+    const offsetMinutes = localDate.getTimezoneOffset();
+    const sign = offsetMinutes <= 0 ? '+' : '-';
+    const absOffset = Math.abs(offsetMinutes);
+    const offsetH = String(Math.floor(absOffset / 60)).padStart(2, '0');
+    const offsetM = String(absOffset % 60).padStart(2, '0');
+    const utcDateString = `${form.date}:00${sign}${offsetH}:${offsetM}`;
 
-    // ─── Validate guest count ────────────────────────────────────────────
     const parsedGuestCount = parseInt(form.guestCount, 10);
     if (!parsedGuestCount || parsedGuestCount < 1) {
       setError('Please enter a valid number of guests (minimum 1).');
@@ -67,7 +72,6 @@ export default function NewEventPage() {
       return;
     }
 
-    // 1. Try creating with credits
     try {
       const res = await fetch('/api/events/create-with-credits', {
         method: 'POST',
@@ -75,7 +79,7 @@ export default function NewEventPage() {
         credentials: 'include',
         body: JSON.stringify({
           name: form.name,
-          date: utcDateString,          // ✅ Send UTC ISO string
+          date: utcDateString,
           venue: form.venue,
           address: form.address,
           guestCount: parsedGuestCount,
@@ -89,15 +93,13 @@ export default function NewEventPage() {
         return;
       }
 
-      // Insufficient credits – show modal
       if (res.status === 400 && data.error === 'Insufficient credits') {
         setRequiredCredits(data.required || parsedGuestCount);
-        setShowBuyModal(true);
+        setShowRequestModal(true);
         setLoading(false);
         return;
       }
 
-      // Other error from credit API
       setError(data.error || 'Failed to create event');
       setLoading(false);
     } catch {
@@ -117,7 +119,7 @@ export default function NewEventPage() {
           gap: 6px;
           font-size: 13px;
           font-weight: 700;
-          color: #0D4F4F;
+          color: #0D4B4B;
           text-decoration: none;
           margin-bottom: 24px;
           padding: 7px 14px;
@@ -135,7 +137,7 @@ export default function NewEventPage() {
           font-weight: 700;
           letter-spacing: 1.5px;
           text-transform: uppercase;
-          color: #0D4F4F;
+          color: #0D4B4B;
           margin-bottom: 6px;
         }
 
@@ -150,7 +152,7 @@ export default function NewEventPage() {
         }
 
         .page-title span {
-          color: #E8A598;
+          color: #FF6B5C;
         }
 
         .page-sub {
@@ -201,7 +203,7 @@ export default function NewEventPage() {
         .field-label.up {
           top: 0;
           font-size: 11px;
-          color: #0D4F4F;
+          color: #0D4B4B;
           font-weight: 700;
           letter-spacing: 0.2px;
         }
@@ -225,7 +227,7 @@ export default function NewEventPage() {
 
         .field-input:focus,
         .field-textarea:focus {
-          border-color: #0D4F4F;
+          border-color: #0D4B4B;
           box-shadow: 0 0 0 4px rgba(13, 79, 79, 0.08);
         }
 
@@ -293,7 +295,7 @@ export default function NewEventPage() {
           font-family: 'Playfair Display', serif;
           font-size: 28px;
           font-weight: 900;
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .total-hint {
@@ -341,7 +343,7 @@ export default function NewEventPage() {
 
         .credits-value {
           font-weight: 700;
-          color: #0D4F4F;
+          color: #0D4B4B;
         }
 
         .submit-btn {
@@ -353,13 +355,13 @@ export default function NewEventPage() {
           padding: 16px;
           border: none;
           border-radius: 14px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white;
           font-size: 15px;
           font-weight: 700;
           font-family: inherit;
           cursor: pointer;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
           position: relative;
           overflow: hidden;
@@ -380,7 +382,7 @@ export default function NewEventPage() {
 
         .submit-btn:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(13,79,79,0.4);
+          box-shadow: 0 8px 24px rgba(13,75,75,0.4);
         }
 
         .submit-btn:active:not(:disabled) {
@@ -423,7 +425,7 @@ export default function NewEventPage() {
           New <span>Event</span>
         </h1>
         <p className="page-sub">
-          Set up your event details. If you have enough credits, the event will be created instantly.
+          Set up your event details. Credits will be used to create the event.
         </p>
       </div>
 
@@ -436,11 +438,26 @@ export default function NewEventPage() {
             </div>
           )}
 
-          {/* Credit display */}
+          {/* Credit display + request button */}
           <div className="credits-display">
-            <span className="credits-label">Available Credits</span>
-            <span className="credits-value">{credits !== null ? credits : 'Loading...'}</span>
+            <div>
+              <span className="credits-label">Available Credits</span>
+              <span className="credits-value ml-2">{credits !== null ? credits : 'Loading...'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowRequestModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0D4B4B] text-white text-xs font-bold rounded-lg hover:bg-[#0A3939] transition-colors"
+            >
+              <Send size={12} /> Request
+            </button>
           </div>
+
+          {hasPending && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 text-xs font-semibold text-amber-700">
+              <Clock size={14} /> You have a pending credit request under review.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <div className="field-wrap">
@@ -450,7 +467,7 @@ export default function NewEventPage() {
                 required
                 className="field-input"
                 value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
                 onFocus={() => setFocused('name')}
                 onBlur={() => setFocused(null)}
               />
@@ -463,7 +480,8 @@ export default function NewEventPage() {
                 required
                 className="field-input"
                 value={form.date}
-                onChange={e => setForm({ ...form, date: e.target.value })}
+                min={new Date().toISOString().slice(0, 16)}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
                 onFocus={() => setFocused('date')}
                 onBlur={() => setFocused(null)}
               />
@@ -476,7 +494,7 @@ export default function NewEventPage() {
                 required
                 className="field-input"
                 value={form.venue}
-                onChange={e => setForm({ ...form, venue: e.target.value })}
+                onChange={(e) => setForm({ ...form, venue: e.target.value })}
                 onFocus={() => setFocused('venue')}
                 onBlur={() => setFocused(null)}
               />
@@ -488,7 +506,7 @@ export default function NewEventPage() {
                 required
                 className="field-textarea"
                 value={form.address}
-                onChange={e => setForm({ ...form, address: e.target.value })}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
                 onFocus={() => setFocused('address')}
                 onBlur={() => setFocused(null)}
               />
@@ -502,12 +520,12 @@ export default function NewEventPage() {
                 min="1"
                 className="field-input"
                 value={form.guestCount}
-                onChange={e => setForm({ ...form, guestCount: e.target.value })}
+                onChange={(e) => setForm({ ...form, guestCount: e.target.value })}
                 onFocus={() => setFocused('guestCount')}
                 onBlur={() => setFocused(null)}
                 placeholder="e.g., 100"
               />
-              <p className="field-hint">💡 You can add more guests later during event setup</p>
+              <p className="field-hint">You can add more guests later during event setup</p>
             </div>
 
             {form.guestCount && (
@@ -527,9 +545,9 @@ export default function NewEventPage() {
 
             {form.guestCount && (
               <div className="total-section">
-                <div className="total-label">TOTAL COMMISSION</div>
+                <div className="total-label">TOTAL COST</div>
                 <div className="total-value">{totalCommission.toLocaleString()} TZS</div>
-                <p className="total-hint">✓ Credits are used if available</p>
+                <p className="total-hint">Credits are deducted if available, otherwise request more below.</p>
               </div>
             )}
 
@@ -548,24 +566,15 @@ export default function NewEventPage() {
         </div>
       </div>
 
-      {/* Buy Credits Modal */}
-      <BuyCreditsModal
-        isOpen={showBuyModal}
+      {/* Request Credits Modal */}
+      <RequestCreditsModal
+        isOpen={showRequestModal}
         onClose={() => {
-          setShowBuyModal(false);
-          // Refresh credits after modal closes
-          fetch('/api/tenant/billing', { credentials: 'include' })
-            .then(res => res.json())
-            .then(data => {
-              if (data.tenant?.credits !== undefined) {
-                setCredits(data.tenant.credits);
-              }
-            })
-            .catch(() => {});
+          setShowRequestModal(false);
+          fetchCredits();
         }}
-        currentCredits={credits || 0}
-        requiredCredits={requiredCredits}
-        returnUrl={`/client/events/new?purchased=true`}
+        onRequestSent={() => fetchCredits()}
+        hasPending={hasPending}
       />
     </div>
   );

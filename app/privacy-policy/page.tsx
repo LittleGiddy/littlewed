@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
           font-family: 'Playfair Display', serif;
           font-size: 2.5rem;
           font-weight: 900;
-          color: #0D4F4F;
+          color: #0D4B4B;
           margin-bottom: 0.5rem;
         }
         .pp-container .last-updated {
@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
         .pp-container h2 {
           font-size: 1.3rem;
           font-weight: 700;
-          color: #0D4F4F;
+          color: #0D4B4B;
           margin-top: 2rem;
           margin-bottom: 0.75rem;
         }
@@ -53,7 +53,7 @@ export default function PrivacyPolicyPage() {
           background: #f0f9f9;
           padding: 0.2rem 0.5rem;
           border-radius: 4px;
-          color: #0D4F4F;
+          color: #0D4B4B;
           font-weight: 600;
         }
         .pp-container .contact-box {

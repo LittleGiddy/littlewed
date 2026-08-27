@@ -125,7 +125,7 @@ export default function BackupGuestsPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
         <p className="text-sm text-gray-400">Loading all guests…</p>
       </div>
     );
@@ -136,7 +136,7 @@ export default function BackupGuestsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)]">
+          <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)]">
             <ArrowLeft size={14} /> Dashboard
           </Link>
           <h1 className="font-serif text-3xl font-black text-gray-900 mt-3">Guest Database</h1>
@@ -146,7 +146,7 @@ export default function BackupGuestsPage() {
           <button
             onClick={exportCSV}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-[#0D4F4F] text-white px-4 py-2 rounded-xl font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white px-4 py-2 rounded-xl font-semibold hover:bg-[#0A3939] transition disabled:opacity-50"
           >
             <Download size={16} /> Export CSV
           </button>
@@ -167,7 +167,7 @@ export default function BackupGuestsPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
           placeholder="Search by name, phone, or event…"
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent text-sm"
+          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm"
         />
       </div>
 
@@ -206,7 +206,7 @@ export default function BackupGuestsPage() {
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     {guest.routingChannel === 'whatsapp' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2 py-0.5 rounded-full">
                         <MessageCircle size={10} /> WhatsApp
                       </span>
                     ) : (

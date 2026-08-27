@@ -256,7 +256,7 @@ export default function SendInvitationsPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4F4F] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
       </div>
     );
   }
@@ -269,7 +269,7 @@ export default function SendInvitationsPage() {
         <div className="flex items-center gap-3">
           <Link
             href={`/client/events/${eventId}`}
-            className="text-gray-500 hover:text-[#0D4F4F] transition p-2 hover:bg-gray-100 rounded-xl"
+            className="text-gray-500 hover:text-[#0D4B4B] transition p-2 hover:bg-gray-100 rounded-xl"
           >
             <ArrowLeft size={20} />
           </Link>
@@ -284,7 +284,7 @@ export default function SendInvitationsPage() {
           <button
             onClick={() => sendToChannel('whatsapp')}
             disabled={sending || whatsappCount === 0}
-            className="px-4 py-2 bg-[#0D4F4F] text-white rounded-xl font-semibold text-sm hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 bg-[#0D4B4B] text-white rounded-xl font-semibold text-sm hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-2"
           >
             <MessageCircle size={16} />
             WhatsApp ({whatsappCount})
@@ -303,7 +303,7 @@ export default function SendInvitationsPage() {
       {/* ─── SMS Message Editor ─── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 mb-6">
         <h2 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
-          <FileText size={18} className="text-[#0D4F4F]" />
+          <FileText size={18} className="text-[#0D4B4B]" />
           SMS Message Template
         </h2>
         <p className="text-xs text-gray-400 mb-3">
@@ -320,12 +320,12 @@ export default function SendInvitationsPage() {
           value={customMessage}
           onChange={(e) => setCustomMessage(e.target.value)}
           rows={3}
-          className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none text-sm"
+          className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none text-sm"
           placeholder="Write your SMS message here... Use placeholders to personalize for each guest."
         />
         <div className="flex justify-between items-center mt-2 text-xs text-gray-400">
           <span>{customMessage.length} characters</span>
-          <span className="text-[#0D4F4F] font-medium">
+          <span className="text-[#0D4B4B] font-medium">
             {customMessage.includes('{fullName}') ? '✅ Personalized' : '⚠️ No {fullName} placeholder'}
           </span>
         </div>
@@ -335,7 +335,7 @@ export default function SendInvitationsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center gap-2">
-            <Users size={16} className="text-[#0D4F4F]" />
+            <Users size={16} className="text-[#0D4B4B]" />
             <span className="text-sm font-medium text-gray-600">Total</span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{guests.length}</p>
@@ -370,7 +370,7 @@ export default function SendInvitationsPage() {
             onClick={() => setFilterChannel('all')}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
               filterChannel === 'all' 
-                ? 'bg-[#0D4F4F] text-white' 
+                ? 'bg-[#0D4B4B] text-white' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -380,7 +380,7 @@ export default function SendInvitationsPage() {
             onClick={() => setFilterChannel('whatsapp')}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition flex items-center gap-1 ${
               filterChannel === 'whatsapp' 
-                ? 'bg-[#0D4F4F] text-white' 
+                ? 'bg-[#0D4B4B] text-white' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -390,7 +390,7 @@ export default function SendInvitationsPage() {
             onClick={() => setFilterChannel('sms')}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition flex items-center gap-1 ${
               filterChannel === 'sms' 
-                ? 'bg-[#0D4F4F] text-white' 
+                ? 'bg-[#0D4B4B] text-white' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -456,7 +456,7 @@ export default function SendInvitationsPage() {
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Users size={18} className="text-[#0D4F4F]" />
+            <Users size={18} className="text-[#0D4B4B]" />
             <span className="font-semibold text-gray-800">
               {filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''}
             </span>
@@ -473,7 +473,7 @@ export default function SendInvitationsPage() {
             <button
               onClick={broadcast}
               disabled={sending || filteredGuests.length === 0}
-              className="px-4 py-1.5 bg-[#0D4F4F] text-white rounded-lg text-sm font-semibold hover:bg-[#0A3D3D] transition disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-1.5 bg-[#0D4B4B] text-white rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
             >
               {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
               {sending ? 'Sending...' : 'Send All'}
@@ -505,7 +505,7 @@ export default function SendInvitationsPage() {
                 >
                   <div className="flex items-center gap-4">
                     {/* Avatar */}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                       {guest.name.charAt(0).toUpperCase()}
                     </div>
 
@@ -533,7 +533,7 @@ export default function SendInvitationsPage() {
                               e.stopPropagation();
                               copyToClipboard(guest.smsCode!, guest.id);
                             }}
-                            className="flex items-center gap-1 hover:text-[#0D4F4F] transition"
+                            className="flex items-center gap-1 hover:text-[#0D4B4B] transition"
                           >
                             <Hash size={10} />
                             {guest.smsCode}

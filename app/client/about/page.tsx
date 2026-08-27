@@ -44,10 +44,10 @@ export default function AboutPage() {
       `}</style>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#0D4F4F] via-[#0A3D3D] to-[#082E2E] text-white">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#0D4B4B] via-[#0A3939] to-[#072B2B] text-white">
         <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-[#E8A598] rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 bg-[#E8A598] rounded-full blur-3xl" />
+          <div className="absolute top-20 left-10 w-72 h-72 bg-[#FF6B5C] rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-[#FF6B5C] rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-20 lg:py-28 text-center">
           <motion.div
@@ -56,7 +56,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
           >
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-6">
-              <Heart className="w-4 h-4 text-[#E8A598]" />
+              <Heart className="w-4 h-4 text-[#FF6B5C]" />
               <span className="text-sm font-medium">Built for Tanzanian weddings</span>
             </div>
             {/* Logo image instead of text */}
@@ -82,9 +82,9 @@ export default function AboutPage() {
           className="text-center mb-20"
         >
           <h2 className="font-serif text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Our <span className="text-[#0D4F4F]">Mission</span>
+            Our <span className="text-[#0D4B4B]">Mission</span>
           </h2>
-          <div className="w-20 h-1 bg-gradient-to-r from-[#0D4F4F] to-[#E8A598] mx-auto rounded-full mb-6" />
+          <div className="w-20 h-1 bg-gradient-to-r from-[#0D4B4B] to-[#FF6B5C] mx-auto rounded-full mb-6" />
           <p className="text-gray-600 max-w-3xl mx-auto text-lg leading-relaxed">
             We believe every couple deserves a stress‑free wedding planning experience. 
             LittleWed brings together guest management, invitations, and real‑time check‑ins 
@@ -95,9 +95,9 @@ export default function AboutPage() {
         {/* Features Grid */}
         <div className="mb-20">
           <h2 className="font-serif text-3xl md:text-4xl font-bold text-center text-gray-900 mb-4">
-            What <span className="text-[#0D4F4F]">You Get</span>
+            What <span className="text-[#0D4B4B]">You Get</span>
           </h2>
-          <div className="w-20 h-1 bg-gradient-to-r from-[#0D4F4F] to-[#E8A598] mx-auto rounded-full mb-12" />
+          <div className="w-20 h-1 bg-gradient-to-r from-[#0D4B4B] to-[#FF6B5C] mx-auto rounded-full mb-12" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, idx) => (
               <motion.div
@@ -107,7 +107,7 @@ export default function AboutPage() {
                 transition={{ duration: 0.4, delay: idx * 0.05 }}
                 className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
               >
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0D4F4F]/10 to-[#E8A598]/10 flex items-center justify-center text-[#0D4F4F] group-hover:scale-105 transition-transform mb-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0D4B4B]/10 to-[#FF6B5C]/10 flex items-center justify-center text-[#0D4B4B] group-hover:scale-105 transition-transform mb-4">
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 mb-2">{feature.title}</h3>
@@ -125,7 +125,7 @@ export default function AboutPage() {
           className="bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100"
         >
           <div className="grid md:grid-cols-2 gap-0">
-            <div className="bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] p-8 md:p-10 text-white">
+            <div className="bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] p-8 md:p-10 text-white">
               <h3 className="font-serif text-2xl font-bold mb-3">Need Help?</h3>
               <p className="text-white/80 mb-6 leading-relaxed">
                 Our support team is here to assist you with any questions about the platform, event setup, or technical issues.
@@ -133,7 +133,7 @@ export default function AboutPage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                    <Phone className="w-4 h-4 text-[#E8A598]" />
+                    <Phone className="w-4 h-4 text-[#FF6B5C]" />
                   </div>
                   <div>
                     <p className="text-xs text-white/60">Call / WhatsApp</p>
@@ -142,7 +142,7 @@ export default function AboutPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                    <Mail className="w-4 h-4 text-[#E8A598]" />
+                    <Mail className="w-4 h-4 text-[#FF6B5C]" />
                   </div>
                   <div>
                     <p className="text-xs text-white/60">Email</p>
@@ -158,7 +158,7 @@ export default function AboutPage() {
               </p>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-[#0D4F4F] flex-shrink-0 mt-0.5" />
+                  <Sparkles className="w-5 h-5 text-[#0D4B4B] flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-gray-600">
                     <span className="font-semibold text-gray-800">Response time:</span> Within 24 hours on business days.
                   </p>
@@ -168,7 +168,7 @@ export default function AboutPage() {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <Link
                   href="/contact"
-                  className="inline-flex items-center gap-2 text-[#0D4F4F] font-semibold hover:gap-3 transition-all"
+                  className="inline-flex items-center gap-2 text-[#0D4B4B] font-semibold hover:gap-3 transition-all"
                 >
                   Send us a message →
                 </Link>

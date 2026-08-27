@@ -91,8 +91,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Prepare update data
+    // Prepare update data — new Date() handles ISO strings with offsets correctly
     const newDate = new Date(date);
+    if (isNaN(newDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    }
+
     const updateData: any = {
       name,
       venue,
@@ -101,7 +105,8 @@ export async function PUT(
     };
 
     // If the date changed, reset reminder flags so they trigger again
-    if (existingEvent.date.getTime() !== newDate.getTime()) {
+    // Use Math.round to avoid floating-point precision issues with getTime()
+    if (Math.round(existingEvent.date.getTime()) !== Math.round(newDate.getTime())) {
       updateData.reminderSent = false;
       updateData.expiredNotified = false;
     }

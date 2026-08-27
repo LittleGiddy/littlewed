@@ -86,6 +86,9 @@ export default function NotificationBell() {
       case 'success': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'warning': return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case 'alert': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'CREDIT_GRANTED': return <CheckCircle className="w-4 h-4 text-[#0D4B4B]" />;
+      case 'CREDIT_REQUEST': return <Info className="w-4 h-4 text-amber-500" />;
+      case 'CREDIT_REJECTED': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return <Info className="w-4 h-4 text-blue-500" />;
     }
   };
@@ -122,7 +125,7 @@ export default function NotificationBell() {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-xs text-[#0D4F4F] hover:underline font-medium"
+                  className="text-xs text-[#0D4B4B] hover:underline font-medium"
                 >
                   Mark all read
                 </button>
@@ -161,7 +164,7 @@ export default function NotificationBell() {
 
             {notifications.length > 0 && (
               <div className="border-t border-gray-100 px-4 py-2 text-center">
-                <a href="/client/notifications" className="text-xs text-[#0D4F4F] hover:underline font-medium">
+                <a href="/client/notifications" className="text-xs text-[#0D4B4B] hover:underline font-medium">
                   View all notifications
                 </a>
               </div>

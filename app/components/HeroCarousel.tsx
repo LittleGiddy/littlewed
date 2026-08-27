@@ -84,7 +84,7 @@ export function HeroCarousel() {
               <p className="mt-2 text-white/80 text-sm md:text-base max-w-md">
                 {slide.description}
               </p>
-              <button className="mt-4 px-6 py-2.5 bg-white text-[#0D4F4F] font-bold rounded-xl text-sm hover:bg-gray-100 transition shadow-lg">
+              <button className="mt-4 px-6 py-2.5 bg-white text-[#0D4B4B] font-bold rounded-xl text-sm hover:bg-gray-100 transition shadow-lg">
                 {slide.cta} →
               </button>
             </div>

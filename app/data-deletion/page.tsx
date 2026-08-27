@@ -11,13 +11,13 @@ export default function DataDeletionPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
       <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
         <div className="text-center mb-8">
-          <h1 className="font-serif text-3xl font-black text-[#0D4F4F]">Data Deletion Request</h1>
+          <h1 className="font-serif text-3xl font-black text-[#0D4B4B]">Data Deletion Request</h1>
           <p className="text-gray-500 mt-2">LittleWed · Wedding Management Platform</p>
         </div>
 
         <div className="space-y-6 text-gray-700 leading-relaxed">
-          <div className="bg-[#F0F9F9] rounded-xl p-4 border border-[#0D4F4F]/20">
-            <p className="text-sm font-medium text-[#0D4F4F] flex items-center gap-2">
+          <div className="bg-[#F0F9F9] rounded-xl p-4 border border-[#0D4B4B]/20">
+            <p className="text-sm font-medium text-[#0D4B4B] flex items-center gap-2">
               <span className="text-xl">ℹ️</span>
               Important Information
             </p>
@@ -52,7 +52,7 @@ export default function DataDeletionPage() {
             <ol className="list-decimal pl-5 mt-2 text-sm space-y-2">
               <li>
                 <strong>Send an email</strong> to{' '}
-                <a href="mailto:privacy@littlewed.co.tz" className="text-[#0D4F4F] font-semibold hover:underline">
+                <a href="mailto:privacy@littlewed.co.tz" className="text-[#0D4B4B] font-semibold hover:underline">
                   privacy@littlewed.co.tz
                 </a>
               </li>
@@ -76,7 +76,7 @@ export default function DataDeletionPage() {
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
             <p className="text-sm text-gray-600">
               <strong>Contact:</strong>{' '}
-              <a href="mailto:privacy@littlewed.co.tz" className="text-[#0D4F4F] hover:underline">
+              <a href="mailto:privacy@littlewed.co.tz" className="text-[#0D4B4B] hover:underline">
                 privacy@littlewed.co.tz
               </a>
             </p>
@@ -91,7 +91,7 @@ export default function DataDeletionPage() {
           <div className="text-center pt-4 border-t border-gray-200">
             <Link 
               href="/" 
-              className="inline-flex items-center gap-2 text-[#0D4F4F] font-semibold hover:underline"
+              className="inline-flex items-center gap-2 text-[#0D4B4B] font-semibold hover:underline"
             >
               ← Back to LittleWed
             </Link>

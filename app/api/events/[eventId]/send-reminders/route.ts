@@ -26,7 +26,7 @@ export async function POST(
 
   const event = await prisma.event.findUnique({
     where: { id: eventId, tenantId },
-    include: { tenant: { select: { credits: true } } },
+    include: { tenant: { select: { credits: true, bypassPayment: true } } },
   });
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -51,14 +51,16 @@ export async function POST(
     totalCost += g.reminderCount === 0 ? 0 : 50;
   }
 
-  if (totalCost > 0 && (event.tenant.credits ?? 0) < totalCost) {
+  if (totalCost > 0 && !event.tenant.bypassPayment && (event.tenant.credits ?? 0) < totalCost) {
     return NextResponse.json({
-      error: `Insufficient credits. Need ${totalCost} TZS, you have ${event.tenant.credits} TZS.`,
+      error: `Insufficient credits. Need ${totalCost} credits, you have ${event.tenant.credits}. Request more credits from the admin.`,
+      creditsNeeded: totalCost,
+      creditsAvailable: event.tenant.credits,
     }, { status: 400 });
   }
 
-  // Deduct credits
-  if (totalCost > 0) {
+  // Deduct credits (skip if bypassPayment)
+  if (totalCost > 0 && !event.tenant.bypassPayment) {
     await prisma.tenant.update({
       where: { id: tenantId },
       data: { credits: { decrement: totalCost } },

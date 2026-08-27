@@ -2,12 +2,12 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
-import { 
-  Building2, Users, CreditCard, UserCheck, Activity, 
-  ArrowUp, ArrowDown, TrendingUp, Calendar, Clock,
-  ChevronRight, PlusCircle, ExternalLink, Zap
+import {
+  Building2, Users, CreditCard, UserCheck, UserCog,
+  TrendingUp, ArrowUpRight, ChevronRight, Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ActivityFeed } from './components/ActivityFeed';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,9 +16,9 @@ export default async function AdminDashboard() {
   if (!session || session.user?.role !== 'SUPER_ADMIN') redirect('/login');
 
   const [tenants, pendingUsers, totalStaff, totalCredits] = await Promise.all([
-    prisma.tenant.findMany({ 
-      include: { users: true }, 
-      orderBy: { createdAt: 'desc' } 
+    prisma.tenant.findMany({
+      include: { users: true },
+      orderBy: { createdAt: 'desc' }
     }),
     prisma.user.count({ where: { isActive: false, role: 'CLIENT' } }),
     prisma.user.count({ where: { role: 'STAFF' } }),
@@ -28,242 +28,213 @@ export default async function AdminDashboard() {
   const activeSubscriptions = tenants.filter(t => t.subscriptionStatus === 'active').length;
   const totalUsers = tenants.reduce((acc, t) => acc + t.users.length, 0);
   const totalCreditsSum = totalCredits._sum?.credits ?? 0;
+  const inactiveTenants = tenants.length - activeSubscriptions;
 
   const stats = [
-    { 
-      label: 'Total Tenants', 
-      value: tenants.length, 
-      icon: Building2, 
-      color: '#0D4F4F', 
-      bg: '#E8F4F4',
-      change: '+12%', 
-      trend: 'up' 
-    },
-    { 
-      label: 'Active Subscriptions', 
-      value: activeSubscriptions, 
-      icon: CreditCard, 
-      color: '#1A7A4A', 
-      bg: '#E6F7F1',
-      change: '+8%', 
-      trend: 'up' 
-    },
-    { 
-      label: 'Total Users', 
-      value: totalUsers, 
-      icon: Users, 
-      color: '#C07A20', 
-      bg: '#FFF4E8',
-      change: '+5%', 
-      trend: 'up' 
-    },
-    { 
-      label: 'Pending Approvals', 
-      value: pendingUsers, 
-      icon: UserCheck, 
-      color: '#DC2626', 
-      bg: '#FEE8E8',
-      change: pendingUsers > 0 ? `${pendingUsers} waiting` : 'All clear', 
-      trend: pendingUsers > 0 ? 'down' : 'up' 
-    },
-    { 
-      label: 'Staff Members', 
-      value: totalStaff, 
-      icon: Users, 
-      color: '#6366F1', 
-      bg: '#EEF2FF' 
-    },
-    { 
-      label: 'System Credits', 
-      value: totalCreditsSum, 
-      icon: CreditCard, 
-      color: '#0D4F4F', 
-      bg: '#E8F4F4' 
-    },
+    { label: 'Tenants', value: tenants.length, icon: Building2, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', trend: null },
+    { label: 'Active Subs', value: activeSubscriptions, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50', trend: inactiveTenants > 0 ? `${inactiveTenants} inactive` : 'All active' },
+    { label: 'Total Users', value: totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', trend: null },
+    { label: 'Pending', value: pendingUsers, icon: UserCheck, color: 'text-amber-600', bg: 'bg-amber-50', trend: pendingUsers > 0 ? 'Needs review' : 'All clear' },
+    { label: 'Staff', value: totalStaff, icon: UserCog, color: 'text-violet-600', bg: 'bg-violet-50', trend: null },
+    { label: 'Credits', value: totalCreditsSum.toLocaleString(), icon: CreditCard, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', trend: 'Total pool' },
   ];
 
   return (
     <div className="space-y-8">
-      {/* ─── Page Header ─── */}
+      {/* Header */}
       <div>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-[#0D1B1B]">Dashboard</h1>
-            <p className="text-sm text-[#64748B] mt-1">Overview of your entire platform</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-[#64748B] bg-white px-4 py-2 rounded-xl border border-[#EEF2F6] shadow-sm flex items-center gap-2">
-              <Clock size={14} className="text-[#94A3B8]" />
-              Last updated: {new Date().toLocaleDateString()}
-            </span>
-          </div>
+        <div className="flex items-center gap-2 mb-1">
+          <Sparkles size={18} className="text-[#0D4B4B]" />
+          <span className="text-xs font-bold tracking-wider text-[#0D4B4B] uppercase">Admin Panel</span>
         </div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Platform overview and quick management</p>
       </div>
 
-      {/* ─── Stats Grid ─── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {stats.map((stat) => (
-          <div 
-            key={stat.label} 
-            className="bg-white rounded-2xl border border-[#EEF2F6] p-5 shadow-sm hover:shadow-md transition-shadow duration-200"
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wider">
-                  {stat.label}
-                </p>
-                <p className="text-2xl font-bold text-[#0D1B1B] tracking-tight">
-                  {stat.value}
-                </p>
-                {stat.change && (
-                  <p className={`text-xs font-medium flex items-center gap-1 ${
-                    stat.trend === 'up' ? 'text-[#1A7A4A]' : 'text-[#DC2626]'
-                  }`}>
-                    {stat.trend === 'up' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-                    {stat.change}
-                  </p>
-                )}
+          <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md hover:border-gray-300 transition-all duration-200 group">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg ${stat.bg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                <stat.icon size={18} className={stat.color} />
               </div>
-              <div 
-                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: stat.bg, color: stat.color }}
-              >
-                <stat.icon size={20} />
+              <div className="min-w-0">
+                <p className="text-2xl font-bold text-gray-900 leading-none">{stat.value}</p>
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mt-1">{stat.label}</p>
+                {stat.trend && (
+                  <p className="text-[10px] text-gray-400 mt-0.5">{stat.trend}</p>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ─── Quick Actions ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Link 
-          href="/admin/tenants/new" 
-          className="group bg-gradient-to-r from-[#0D4F4F] to-[#1A6B6B] rounded-2xl p-5 shadow-md hover:shadow-lg transition-all duration-200 text-white hover:scale-[1.02]"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <Building2 size={24} className="mb-2 opacity-90" />
-              <p className="font-semibold text-sm">Create New Tenant</p>
-              <p className="text-xs opacity-75 mt-0.5">Add a new organisation</p>
-            </div>
-            <ChevronRight size={20} className="opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </div>
-        </Link>
-        <Link 
-          href="/admin/users" 
-          className="group bg-white border border-[#EEF2F6] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.01]"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <Users size={24} className="mb-2 text-[#0D4F4F]" />
-              <p className="font-semibold text-sm text-[#0D1B1B]">Manage Users</p>
-              <p className="text-xs text-[#64748B] mt-0.5">Activate or deactivate accounts</p>
-            </div>
-            <ChevronRight size={20} className="text-[#94A3B8]" />
-          </div>
-        </Link>
-        <Link 
-          href="/admin/staff" 
-          className="group bg-white border border-[#EEF2F6] rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.01]"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <UserCheck size={24} className="mb-2 text-[#6366F1]" />
-              <p className="font-semibold text-sm text-[#0D1B1B]">Staff Management</p>
-              <p className="text-xs text-[#64748B] mt-0.5">View all staff members</p>
-            </div>
-            <ChevronRight size={20} className="text-[#94A3B8]" />
-          </div>
-        </Link>
-      </div>
+      {/* Quick Actions + Activity Feed */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Quick Actions */}
+        <div className="lg:col-span-2 space-y-3">
+          <h2 className="text-sm font-semibold text-gray-900">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link
+              href="/admin/tenants"
+              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-[#0D4B4B]/30 transition-all duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#0D4B4B]/5 flex items-center justify-center group-hover:bg-[#0D4B4B]/10 transition-colors">
+                  <Building2 size={18} className="text-[#0D4B4B]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Manage Tenants</p>
+                  <p className="text-xs text-gray-400">{tenants.length} organisations</p>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-gray-300 group-hover:text-[#0D4B4B] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </Link>
 
-      {/* ─── Recent Tenants Table ─── */}
-      <div className="bg-white rounded-2xl border border-[#EEF2F6] shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#EEF2F6] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Building2 size={18} className="text-[#0D4F4F]" />
-            <h2 className="font-semibold text-[#0D1B1B]">Recent Organisations</h2>
-            <span className="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full">
-              {tenants.length}
-            </span>
+            <Link
+              href="/admin/users"
+              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-blue-300 transition-all duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                  <Users size={18} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Manage Users</p>
+                  <p className="text-xs text-gray-400">{pendingUsers} pending activation</p>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-gray-300 group-hover:text-blue-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </Link>
+
+            <Link
+              href="/admin/staff"
+              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-violet-300 transition-all duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors">
+                  <UserCog size={18} className="text-violet-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Staff Members</p>
+                  <p className="text-xs text-gray-400">{totalStaff} staff accounts</p>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-gray-300 group-hover:text-violet-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </Link>
+
+            <Link
+              href="/admin/templates"
+              className="group bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md hover:border-amber-300 transition-all duration-200 flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                  <CreditCard size={18} className="text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Templates</p>
+                  <p className="text-xs text-gray-400">Invitation templates</p>
+                </div>
+              </div>
+              <ArrowUpRight size={16} className="text-gray-300 group-hover:text-amber-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+            </Link>
           </div>
-          <Link 
-            href="/admin/tenants" 
-            className="text-sm font-medium text-[#0D4F4F] hover:underline flex items-center gap-1"
-          >
-            View All
-            <ChevronRight size={14} />
-          </Link>
         </div>
 
+        {/* Activity Feed */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
+          </div>
+          <div className="p-5">
+            <ActivityFeed />
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Tenants Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">Recent Tenants</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Latest organisations to join</p>
+          </div>
+          <Link
+            href="/admin/tenants"
+            className="text-xs font-semibold text-[#0D4B4B] hover:text-[#0D4B4B] flex items-center gap-1 transition-colors"
+          >
+            View all <ChevronRight size={14} />
+          </Link>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-[#F8FAFC] border-b border-[#EEF2F6]">
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Organisation
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Plan
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Users
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-[#64748B] uppercase tracking-wider">
-                  Action
-                </th>
+              <tr className="border-b border-gray-100">
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Organisation</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Plan</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Users</th>
+                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F1F5F9]">
+            <tbody className="divide-y divide-gray-50">
               {tenants.slice(0, 5).map((tenant) => (
-                <tr key={tenant.id} className="hover:bg-[#F8FAFC] transition-colors">
+                <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#E8F4F4] flex items-center justify-center text-[#0D4F4F]">
-                        <Building2 size={14} />
+                      <div className="w-9 h-9 rounded-lg bg-[#0D4B4B]/5 flex items-center justify-center text-[#0D4B4B]">
+                        <Building2 size={15} />
                       </div>
-                      <span className="font-medium text-sm text-[#0D1B1B]">{tenant.name}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{tenant.name}</p>
+                        <p className="text-[11px] text-gray-400 font-mono">{tenant.subdomain}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-3.5">
-                    <span className="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2.5 py-1 rounded-full">
+                    <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-lg">
                       {tenant.plan}
                     </span>
                   </td>
                   <td className="px-6 py-3.5">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      tenant.subscriptionStatus === 'active' 
-                        ? 'bg-[#E6F7F1] text-[#1A7A4A]' 
-                        : 'bg-[#FEE8E8] text-[#DC2626]'
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg ${
+                      tenant.subscriptionStatus === 'active'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-red-50 text-red-600'
                     }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${tenant.subscriptionStatus === 'active' ? 'bg-green-500' : 'bg-red-400'}`} />
                       {tenant.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td className="px-6 py-3.5 text-sm text-[#64748B]">
-                    {tenant.users.length}
-                  </td>
                   <td className="px-6 py-3.5">
-                    <Link 
-                      href={`/admin/tenants/${tenant.id}/manage`} 
-                      className="text-sm font-medium text-[#0D4F4F] hover:underline flex items-center gap-1"
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                      <Users size={13} className="text-gray-400" />
+                      {tenant.users.length}
+                    </div>
+                  </td>
+                  <td className="px-6 py-3.5 text-right">
+                    <Link
+                      href={`/admin/tenants/${tenant.id}`}
+                      className="text-xs font-semibold text-[#0D4B4B] hover:text-[#0D4B4B] transition-colors"
                     >
                       Manage
-                      <ExternalLink size={12} />
                     </Link>
                   </td>
                 </tr>
               ))}
               {tenants.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-[#94A3B8]">
-                    <div className="flex flex-col items-center gap-2">
-                      <Building2 size={32} className="text-[#CBD5E1]" />
-                      <p className="text-sm font-medium">No organisations created yet</p>
-                      <p className="text-xs">Create your first tenant to get started</p>
+                  <td colSpan={5} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                        <Building2 size={24} className="text-gray-300" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">No tenants yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Create your first organisation to get started</p>
+                      </div>
                     </div>
                   </td>
                 </tr>

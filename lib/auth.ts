@@ -148,6 +148,7 @@ export const authOptions: NextAuthOptions = {
             token.subscriptionStatus = dbUser.tenant?.subscriptionStatus ?? 'inactive';
             token.isActive = dbUser.isActive;
             token.phone = dbUser.phone ?? undefined;
+            token.image = dbUser.image ?? undefined;
           } else {
             token.id = (user as any).id;
           }
@@ -159,6 +160,7 @@ export const authOptions: NextAuthOptions = {
           token.subscriptionStatus = (user as any).subscriptionStatus;
           token.isActive = (user as any).isActive;
           token.phone = (user as any).phone;
+          token.image = (user as any).image;
         }
       } else if (trigger === 'update' && token.id) {
         const dbUser = await prisma.user.findUnique({
@@ -171,6 +173,7 @@ export const authOptions: NextAuthOptions = {
           token.tenant = dbUser.tenant as any;
           token.subscriptionStatus = dbUser.tenant?.subscriptionStatus ?? 'inactive';
           token.isActive = dbUser.isActive;
+          token.image = dbUser.image ?? undefined;
         }
       }
 
@@ -187,6 +190,9 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).subscriptionStatus = token.subscriptionStatus;
         (session.user as any).isActive = token.isActive;
         (session.user as any).phone = token.phone;
+        if (token.image) {
+          session.user.image = token.image as string;
+        }
       }
       return session;
     },

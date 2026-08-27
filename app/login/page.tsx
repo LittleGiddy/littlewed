@@ -314,7 +314,7 @@ export default function LoginPage() {
 
         .hero-nav-link.cta {
           background: rgba(255,255,255,0.95);
-          color: #0D4F4F;
+          color: #0D4B4B;
           padding: 8px 18px;
           border-radius: 20px;
           font-weight: 700;
@@ -322,7 +322,7 @@ export default function LoginPage() {
         }
 
         .hero-nav-link.cta:hover {
-          background: #E8A598;
+          background: #FF6B5C;
           color: white;
           transform: translateY(-2px);
           box-shadow: 0 6px 16px rgba(0,0,0,0.25);
@@ -366,7 +366,7 @@ export default function LoginPage() {
           margin-bottom: 16px;
         }
 
-        .hero-badge svg { color: #E8A598; }
+        .hero-badge svg { color: #FF6B5C; }
 
         .hero-title {
           font-family: 'Playfair Display', serif;
@@ -421,7 +421,7 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #E8A598;
+          color: #FF6B5C;
         }
 
         .hero-dots {
@@ -442,7 +442,7 @@ export default function LoginPage() {
         }
 
         .hero-dot:hover { background: rgba(255,255,255,0.5); }
-        .hero-dot.active { background: #E8A598; width: 34px; }
+        .hero-dot.active { background: #FF6B5C; width: 34px; }
 
         .right {
           flex: 1;
@@ -502,15 +502,15 @@ export default function LoginPage() {
           left: 0;
           width: 0;
           height: 2px;
-          background: #0D4F4F;
+          background: #0D4B4B;
           transition: width 0.3s;
         }
 
-        .nav-link:hover { color: #0D4F4F; }
+        .nav-link:hover { color: #0D4B4B; }
         .nav-link:hover::after { width: 100%; }
 
         .nav-link.cta {
-          background: #0D4F4F;
+          background: #0D4B4B;
           color: white;
           padding: 8px 20px;
           border-radius: 20px;
@@ -520,23 +520,23 @@ export default function LoginPage() {
         .nav-link.cta::after { display: none; }
 
         .nav-link.cta:hover {
-          background: #0A3D3D;
+          background: #0A3939;
           transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(13,79,79,0.3);
+          box-shadow: 0 4px 12px rgba(13,75,75,0.3);
         }
 
         .mobile-menu-btn {
           display: none;
           background: none;
           border: none;
-          color: #0D4F4F;
+          color: #0D4B4B;
           cursor: pointer;
           padding: 8px;
           border-radius: 8px;
           transition: background 0.2s;
         }
 
-        .mobile-menu-btn:hover { background: rgba(13,79,79,0.08); }
+        .mobile-menu-btn:hover { background: rgba(13,75,75,0.08); }
 
         .mobile-menu {
           display: none;
@@ -557,7 +557,7 @@ export default function LoginPage() {
 
         .mobile-menu.open { display: flex; }
         .mobile-menu .nav-link { padding: 10px 16px; border-radius: 8px; }
-        .mobile-menu .nav-link:hover { background: rgba(13,79,79,0.06); }
+        .mobile-menu .nav-link:hover { background: rgba(13,75,75,0.06); }
         .mobile-menu .nav-link.cta { margin: 4px 16px; }
 
         .card {
@@ -574,7 +574,7 @@ export default function LoginPage() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        .card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
+        .card-bar { height: 4px; background: linear-gradient(90deg, #0D4B4B, #FF6B5C); }
 
         .mobile-hero {
           display: none;
@@ -626,7 +626,7 @@ export default function LoginPage() {
           margin-bottom: 6px;
         }
 
-        .mobile-tagline span { color: #E8A598; }
+        .mobile-tagline span { color: #FF6B5C; }
 
         .mobile-sub {
           color: rgba(255,255,255,0.75);
@@ -656,7 +656,7 @@ export default function LoginPage() {
           font-weight: 500;
         }
 
-        .mobile-feat-pill svg { color: #E8A598; flex-shrink: 0; }
+        .mobile-feat-pill svg { color: #FF6B5C; flex-shrink: 0; }
 
         .mobile-hero-dots {
           display: flex;
@@ -674,7 +674,7 @@ export default function LoginPage() {
           font-size: 10.5px;
           font-weight: 700;
           letter-spacing: 1.5px;
-          color: #0D4F4F;
+          color: #0D4B4B;
           text-transform: uppercase;
           margin-bottom: 4px;
         }
@@ -711,7 +711,7 @@ export default function LoginPage() {
                       font-size 0.2s cubic-bezier(0.4,0,0.2,1),
                       color 0.2s cubic-bezier(0.4,0,0.2,1);
         }
-        .flabel.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
+        .flabel.up { top: 0; font-size: 10.5px; color: #0D4B4B; font-weight: 700; letter-spacing: 0.3px; }
 
         .finput {
           width: 100%;
@@ -726,7 +726,7 @@ export default function LoginPage() {
           font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .finput:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .finput:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
         .finput.err { border-color: #E05C5C; box-shadow: 0 0 0 4px rgba(224,92,92,0.08); }
         .finput:disabled { background: #F7F9FB; cursor: not-allowed; }
 
@@ -745,7 +745,7 @@ export default function LoginPage() {
           border-radius: 6px;
           transition: color 0.15s;
         }
-        .eye-btn:hover { color: #0D4F4F; }
+        .eye-btn:hover { color: #0D4B4B; }
 
         .forgot {
           display: block;
@@ -754,7 +754,7 @@ export default function LoginPage() {
           margin-bottom: 14px;
           font-size: 12px;
           font-weight: 600;
-          color: #0D4F4F;
+          color: #0D4B4B;
           text-decoration: none;
           transition: opacity 0.15s;
         }
@@ -786,7 +786,7 @@ export default function LoginPage() {
           padding: 14px;
           border: none;
           border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white;
           font-size: 14.5px;
           font-weight: 700;
@@ -796,7 +796,7 @@ export default function LoginPage() {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
           letter-spacing: 0.2px;
           position: relative;
@@ -811,7 +811,7 @@ export default function LoginPage() {
           transition: opacity 0.2s;
         }
         .btn:hover:not(:disabled)::after { opacity: 1; }
-        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
+        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,75,75,0.4); }
         .btn:active:not(:disabled) { transform: translateY(0); }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -855,7 +855,7 @@ export default function LoginPage() {
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
           margin-top: 8px;
         }
-        .btn-google:hover { border-color: #0D4F4F; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,79,79,0.08); }
+        .btn-google:hover { border-color: #0D4B4B; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,75,75,0.08); }
         .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .card-footer {
@@ -864,7 +864,7 @@ export default function LoginPage() {
           color: #7A8FA6;
           padding: 12px 28px 16px;
         }
-        .card-footer a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
+        .card-footer a { color: #0D4B4B; font-weight: 700; text-decoration: none; }
         .card-footer a:hover { text-decoration: underline; }
 
         .page-footer {
@@ -888,8 +888,8 @@ export default function LoginPage() {
           font-weight: 500;
         }
 
-        .footer-brand strong { color: #0D4F4F; font-weight: 700; }
-        .footer-heart { color: #E8A598; }
+        .footer-brand strong { color: #0D4B4B; font-weight: 700; }
+        .footer-heart { color: #FF6B5C; }
 
         .footer-links { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
@@ -900,7 +900,7 @@ export default function LoginPage() {
           font-weight: 500;
           transition: color 0.2s;
         }
-        .footer-link:hover { color: #0D4F4F; }
+        .footer-link:hover { color: #0D4B4B; }
         .footer-sep { color: #DCE4EA; font-weight: 300; }
 
         .float-element {

@@ -90,6 +90,7 @@ model Tenant {
   transactions       Transaction[]
   simpleEventMode    Boolean  @default(false)
   bypassPayment      Boolean  @default(false)
+  adminEmail         String?  // email for credit request notifications
   templateCardUrl    String?
   qrPlacementX       Float?
   qrPlacementY       Float?
@@ -102,6 +103,7 @@ model Tenant {
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]
+  creditRequests     CreditRequest[]
 }
 
 model Event {
@@ -243,6 +245,26 @@ model UsageRecord {
   channel   String   // "whatsapp" or "sms"
   cost      Int      // in same unit as credits
   createdAt DateTime @default(now())
+}
+
+model CreditRequest {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  requestedCredits Int
+  amountTZS       Int      // requestedCredits * 500
+  reason          String?
+  status          String   @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  reviewedBy      String?  // super admin user ID
+  reviewedAt      DateTime?
+  grantedCredits  Int?     // credits actually granted (may differ from requested)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
 }
 
 model Transaction {

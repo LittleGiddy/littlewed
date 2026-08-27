@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-const COST_PER_GUEST = 300;
+const COST_PER_GUEST = 500;
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);

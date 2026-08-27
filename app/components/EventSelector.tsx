@@ -45,7 +45,7 @@ export default function EventSelector({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#0D4F4F]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#0D4B4B]" />
       </div>
     );
   }
@@ -58,7 +58,7 @@ export default function EventSelector({
         <p className="text-gray-500">Create an event first before {actionLabel.toLowerCase()}.</p>
         <Link
           href="/client/events/new"
-          className="inline-block mt-4 bg-[#0D4F4F] text-white px-6 py-2 rounded-xl font-semibold hover:bg-[#0A3D3D] transition"
+          className="inline-block mt-4 bg-[#0D4B4B] text-white px-6 py-2 rounded-xl font-semibold hover:bg-[#0A3939] transition"
         >
           Create Event
         </Link>
@@ -70,7 +70,7 @@ export default function EventSelector({
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
       <Link
         href={backUrl}
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)] mb-6"
       >
         ← Back
       </Link>
@@ -87,11 +87,11 @@ export default function EventSelector({
             <Link
               key={event.id}
               href={`${actionBase}/${event.id}`}
-              className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-[#0D4F4F] hover:shadow-md transition group"
+              className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-[#0D4B4B] hover:shadow-md transition group"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#0D4F4F] text-white flex flex-col items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-[#0D4B4B] text-white flex flex-col items-center justify-center flex-shrink-0">
                     <span className="text-lg font-bold leading-none">{day}</span>
                     <span className="text-[10px] font-semibold uppercase opacity-80">{mon}</span>
                   </div>
@@ -100,7 +100,7 @@ export default function EventSelector({
                     <div className="text-sm text-gray-500">{event._count.guests} guests</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-[#0D4F4F] font-medium">
+                <div className="flex items-center gap-2 text-[#0D4B4B] font-medium">
                   {actionLabel}
                   <ChevronRight size={16} className="transition-transform group-hover:translate-x-1" />
                 </div>

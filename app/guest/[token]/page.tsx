@@ -18,7 +18,7 @@ export default async function GuestPage({ params }: { params: { token: string } 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-6">
-        <h1 className="font-serif text-2xl font-bold text-[#0D4F4F]">
+        <h1 className="font-serif text-2xl font-bold text-[#0D4B4B]">
           Welcome, {guest.title || 'Mr'} {guest.name}!
         </h1>
         <p className="text-gray-500 text-sm">Event Details</p>
@@ -58,7 +58,7 @@ export default async function GuestPage({ params }: { params: { token: string } 
 
         <Link
           href={`/guest/confirm/${guest.id}`}
-          className="block w-full mt-4 bg-[#0D4F4F] text-white text-center py-3 rounded-xl font-bold hover:bg-[#0A3D3D] transition"
+          className="block w-full mt-4 bg-[#0D4B4B] text-white text-center py-3 rounded-xl font-bold hover:bg-[#0A3939] transition"
         >
           Confirm Attendance ✅
         </Link>

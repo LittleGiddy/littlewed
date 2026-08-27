@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: { tenant: { select: { bypassPayment: true } } },
+      include: { tenant: { select: { bypassPayment: true, credits: true } } },
     });
 
     if (!event) {
@@ -106,13 +106,19 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check guest limit ──────────────────────────────────────────────
-    if (!event.tenant?.bypassPayment && event.guestCount) {
+    // ─── Check guest limit (tied to credits) ──────────────────────────
+    if (!event.tenant?.bypassPayment) {
       const currentGuests = await prisma.guest.count({ where: { eventId } });
-      if (currentGuests + validGuests.length > event.guestCount) {
-        const remaining = Math.max(0, event.guestCount - currentGuests);
+      const maxGuests = event.guestCount || 0;
+
+      if (maxGuests > 0 && currentGuests + validGuests.length > maxGuests) {
+        const remaining = Math.max(0, maxGuests - currentGuests);
         return NextResponse.json({
-          error: `Exceeds guest limit of ${event.guestCount}. You can add up to ${remaining} more guests.`,
+          error: `Exceeds guest limit of ${maxGuests}. You can add up to ${remaining} more guests. Request more credits from the admin to import additional guests.`,
+          limit: maxGuests,
+          current: currentGuests,
+          remaining,
+          credits: event.tenant.credits,
         }, { status: 400 });
       }
     }

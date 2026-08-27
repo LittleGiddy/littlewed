@@ -66,7 +66,7 @@ export default function SignupCompletePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA]">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-[#0D4F4F] animate-spin mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 text-[#0D4B4B] animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Completing sign up...</p>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function SignupCompletePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA]">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 text-[#0D4F4F] animate-spin mx-auto mb-4" />
+        <Loader2 className="w-12 h-12 text-[#0D4B4B] animate-spin mx-auto mb-4" />
         <p className="text-gray-600">Setting up your workspace...</p>
       </div>
     </div>

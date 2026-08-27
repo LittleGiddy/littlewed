@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
             <div style="text-align: center; padding: 20px 0;">
-              <h1 style="color: #0D4F4F; font-size: 24px; margin: 0;">LittleWed</h1>
+              <h1 style="color: #0D4B4B; font-size: 24px; margin: 0;">LittleWed</h1>
             </div>
             <div style="background: #F5F8FA; border-radius: 12px; padding: 30px; border: 1px solid #E8EEF2;">
               <h2 style="color: #0D1B1B; font-size: 20px; margin-top: 0;">${isGoogleUser ? 'Set Your Password' : 'Reset Your Password'}</h2>
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
                 </div>
               ` : ''}
               <div style="background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 1px solid #E2EAF0;">
-                <span style="font-size: 36px; font-weight: bold; letter-spacing: 6px; color: #0D4F4F;">${otp}</span>
+                <span style="font-size: 36px; font-weight: bold; letter-spacing: 6px; color: #0D4B4B;">${otp}</span>
               </div>
               <p style="color: #7A8FA6; font-size: 13px; margin-bottom: 0;">
                 This code will expire in <strong>10 minutes</strong>.

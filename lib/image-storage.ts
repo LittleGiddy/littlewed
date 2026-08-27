@@ -364,7 +364,7 @@ export async function generateCardForGuest(
   const qrSize = Math.round((event.qrSize || 150) * scaleFactor);
   const qrX = event.qrPlacementX ?? 85;
   const qrY = event.qrPlacementY ?? 85;
-  const qrColor = event.qrColor || '#0D4F4F';
+  const qrColor = event.qrColor || '#0D4B4B';
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
   

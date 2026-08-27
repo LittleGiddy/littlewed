@@ -82,7 +82,7 @@ export default function InvitationDesigner() {
   const [qrX, setQrX] = useState(85);
   const [qrY, setQrY] = useState(85);
   const [qrSize, setQrSize] = useState(150);
-  const [qrColor, setQrColor] = useState('#0D4F4F');
+  const [qrColor, setQrColor] = useState('#0D4B4B');
   const [qrRotation, setQrRotation] = useState(0);
   const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayerIndex, setSelectedLayerIndex] = useState<number | null>(null);
@@ -264,7 +264,7 @@ export default function InvitationDesigner() {
         setQrX(settings.qrPlacementX ?? 85);
         setQrY(settings.qrPlacementY ?? 85);
         setQrSize(settings.qrSize ?? 150);
-        setQrColor(settings.qrColor ?? '#0D4F4F');
+        setQrColor(settings.qrColor ?? '#0D4B4B');
         setQrRotation(settings.qrRotation ?? 0);
       } catch {
         toast.error('Failed to load data');
@@ -667,7 +667,7 @@ export default function InvitationDesigner() {
       position: 'absolute' as const,
       pointerEvents: 'auto' as const,
       touchAction: 'none' as const,
-      border: isSelected && !isLocked ? '2px solid #0D4F4F' : 'none',
+      border: isSelected && !isLocked ? '2px solid #0D4B4B' : 'none',
       borderRadius: '2px',
       opacity: isLocked ? 0.6 : 1,
     };
@@ -713,11 +713,11 @@ export default function InvitationDesigner() {
             lineHeight: 1.4,
             display: 'inline-block',
             ...(isSelected && !isLocked ? {
-              boxShadow: '0 0 0 2px #0D4F4F, 0 0 0 4px rgba(13,79,79,0.1)',
+              boxShadow: '0 0 0 2px #0D4B4B, 0 0 0 4px rgba(13,75,75,0.1)',
               borderRadius: '4px',
               padding: '4px 8px',
               margin: '-4px -8px',
-              backgroundColor: 'rgba(13,79,79,0.05)',
+              backgroundColor: 'rgba(13,75,75,0.05)',
               cursor: 'grab',
             } : {}),
           }}
@@ -729,12 +729,12 @@ export default function InvitationDesigner() {
           {isSelected && !isLocked && (
             <>
               <div
-                className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4F4F] rounded cursor-nw-resize"
+                className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4B4B] rounded cursor-nw-resize"
                 style={{ transform: 'translate(50%, 50%)' }}
                 onMouseDown={startResize(index)}
                 onTouchStart={startResize(index)}
               />
-              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-[8px] text-[#0D4F4F] bg-white/80 px-2 py-0.5 rounded whitespace-nowrap opacity-60 pointer-events-none flex items-center gap-1">
+              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-[8px] text-[#0D4B4B] bg-white/80 px-2 py-0.5 rounded whitespace-nowrap opacity-60 pointer-events-none flex items-center gap-1">
                 <MoveIcon size={10} /> Drag · ← ↑ ↓ →
               </div>
             </>
@@ -769,7 +769,7 @@ export default function InvitationDesigner() {
         >
           {isSelected && !isLocked && (
             <div
-              className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4F4F] rounded cursor-nw-resize"
+              className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4B4B] rounded cursor-nw-resize"
               style={{ transform: 'translate(50%, 50%)' }}
               onMouseDown={startResize(index)}
               onTouchStart={startResize(index)}
@@ -813,7 +813,7 @@ export default function InvitationDesigner() {
                 cx={`${x1}%`}
                 cy={`${y1}%`}
                 r="8"
-                fill="#0D4F4F"
+                fill="#0D4B4B"
                 className={isDraggable ? 'pointer-events-auto cursor-grab' : 'pointer-events-none'}
                 onMouseDown={isDraggable ? startDragLinePoint(index, 'start') : undefined}
                 onTouchStart={isDraggable ? startDragLinePoint(index, 'start') : undefined}
@@ -822,7 +822,7 @@ export default function InvitationDesigner() {
                 cx={`${x2}%`}
                 cy={`${y2}%`}
                 r="8"
-                fill="#0D4F4F"
+                fill="#0D4B4B"
                 className={isDraggable ? 'pointer-events-auto cursor-grab' : 'pointer-events-none'}
                 onMouseDown={isDraggable ? startDragLinePoint(index, 'end') : undefined}
                 onTouchStart={isDraggable ? startDragLinePoint(index, 'end') : undefined}
@@ -860,10 +860,10 @@ export default function InvitationDesigner() {
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <label className="text-[10px] font-medium text-gray-600 flex items-center gap-1.5">
-          {Icon && <Icon size={12} className="text-[#0D4F4F]" />}
+          {Icon && <Icon size={12} className="text-[#0D4B4B]" />}
           {label}
         </label>
-        <span className="text-[10px] font-semibold text-[#0D4F4F] bg-[#0D4F4F]/10 px-2 py-0.5 rounded">
+        <span className="text-[10px] font-semibold text-[#0D4B4B] bg-[#0D4B4B]/10 px-2 py-0.5 rounded">
           {value}{suffix}
         </span>
       </div>
@@ -875,9 +875,9 @@ export default function InvitationDesigner() {
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F] transition-all hover:h-2"
+          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4B4B] transition-all hover:h-2"
           style={{
-            background: `linear-gradient(to right, #0D4F4F 0%, #0D4F4F ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
+            background: `linear-gradient(to right, #0D4B4B 0%, #0D4B4B ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
           }}
         />
         {showInput && (
@@ -885,7 +885,7 @@ export default function InvitationDesigner() {
             type="number"
             value={value}
             onChange={(e) => onChange(Number(e.target.value))}
-            className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+            className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
             min={min}
             max={max}
           />
@@ -898,7 +898,7 @@ export default function InvitationDesigner() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4F4F]" />
+        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
         <p className="text-sm text-gray-400">Loading designer...</p>
       </div>
     );
@@ -919,7 +919,7 @@ export default function InvitationDesigner() {
           onClick={() => toggleSection(section)}
           className="w-full flex items-center justify-between p-2 text-left font-semibold text-gray-700 hover:bg-gray-50 transition text-sm"
         >
-          <span className="flex items-center gap-2">{icon && <span className="text-[#0D4F4F]">{icon}</span>}{title}</span>
+          <span className="flex items-center gap-2">{icon && <span className="text-[#0D4B4B]">{icon}</span>}{title}</span>
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
         </button>
         {!isCollapsed && <div className="p-2 pt-0">{children}</div>}
@@ -938,7 +938,7 @@ export default function InvitationDesigner() {
         <div className="flex gap-1 sm:gap-2 flex-wrap">
           <button
             onClick={() => setShowGrid(!showGrid)}
-            className={`p-1.5 sm:p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4F4F] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            className={`p-1.5 sm:p-2 rounded-lg transition ${showGrid ? 'bg-[#0D4B4B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             title="Toggle grid"
           >
             <Grid size={16} className="sm:text-lg" />
@@ -973,10 +973,10 @@ export default function InvitationDesigner() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 mb-4 sm:mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3 sm:mb-4">
           <h2 className="font-semibold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
-            <ImageIcon size={16} className="sm:text-lg text-[#0D4F4F]" /> Choose a Template
+            <ImageIcon size={16} className="sm:text-lg text-[#0D4B4B]" /> Choose a Template
           </h2>
           <div className="flex gap-2 flex-wrap">
-            <label className="cursor-pointer bg-[#0D4F4F] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3D3D] transition flex items-center gap-1.5 sm:gap-2">
+            <label className="cursor-pointer bg-[#0D4B4B] text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold hover:bg-[#0A3939] transition flex items-center gap-1.5 sm:gap-2">
               <Upload size={14} /> Upload
               <input 
                 type="file" 
@@ -986,7 +986,7 @@ export default function InvitationDesigner() {
                 ref={fileInputRef} 
               />
             </label>
-            {uploading && <Loader2 size={16} className="animate-spin text-[#0D4F4F]" />}
+            {uploading && <Loader2 size={16} className="animate-spin text-[#0D4B4B]" />}
             {templateUrl && (
               <button
                 onClick={() => { setTemplateUrl(null); setSelectedTemplateId(null); }}
@@ -1009,14 +1009,14 @@ export default function InvitationDesigner() {
               <div
                 key={t.id}
                 onClick={() => selectTemplate(t)}
-                className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${selectedTemplateId === t.id ? 'border-[#0D4F4F] shadow-md' : 'border-transparent'}`}
+                className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition hover:shadow-md ${selectedTemplateId === t.id ? 'border-[#0D4B4B] shadow-md' : 'border-transparent'}`}
               >
                 <img src={t.imageUrl} alt={t.name} className="w-full aspect-[3/4] object-cover" />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 sm:p-2">
                   <p className="text-white text-[10px] sm:text-xs font-medium truncate">{t.name}</p>
                 </div>
                 {selectedTemplateId === t.id && (
-                  <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-[#0D4F4F] rounded-full p-0.5 sm:p-1">
+                  <div className="absolute top-1.5 sm:top-2 right-1.5 sm:right-2 bg-[#0D4B4B] rounded-full p-0.5 sm:p-1">
                     <Check size={10} className="sm:text-xs text-white" />
                   </div>
                 )}
@@ -1041,7 +1041,7 @@ export default function InvitationDesigner() {
           >
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h2 className="font-semibold flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base">
-                <Maximize2 size={16} className="sm:text-lg text-[#0D4F4F]" /> Live Preview
+                <Maximize2 size={16} className="sm:text-lg text-[#0D4B4B]" /> Live Preview
               </h2>
               <span className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-2">
                 <GripVertical size={12} /> Drag
@@ -1100,7 +1100,7 @@ export default function InvitationDesigner() {
                         style={{
                           backgroundColor: 'rgba(255,255,255,0.85)',
                           backdropFilter: 'blur(2px)',
-                          border: `2px dashed ${qrColor === '#000000' ? '#0D4F4F' : qrColor}`,
+                          border: `2px dashed ${qrColor === '#000000' ? '#0D4B4B' : qrColor}`,
                           boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
                         }}
                       >
@@ -1112,7 +1112,7 @@ export default function InvitationDesigner() {
                         <div className="flex flex-col items-center justify-center gap-0.5 relative z-10">
                           <QrCode 
                             size={Math.min(Math.max(qrSize * 0.5, 28), 72)} 
-                            style={{ color: qrColor === '#000000' ? '#0D4F4F' : qrColor }}
+                            style={{ color: qrColor === '#000000' ? '#0D4B4B' : qrColor }}
                             className="drop-shadow-sm"
                           />
                           <span className="text-[8px] font-mono tracking-wider opacity-60" style={{ color: qrColor }}>
@@ -1152,30 +1152,30 @@ export default function InvitationDesigner() {
             {/* ─── Quick Add ─── */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles size={14} className="text-[#0D4F4F]" /> Quick Add
+                <Sparkles size={14} className="text-[#0D4B4B]" /> Quick Add
               </p>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={addGuestNameLayer}
-                  className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
+                  className="bg-[#0D4B4B] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-1"
                 >
                   <User size={12} /> Guest Name
                 </button>
                 <button
                   onClick={addGuestTitleLayer}
-                  className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
+                  className="bg-[#0D4B4B] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-1"
                 >
                   <UserCheck size={12} /> Title
                 </button>
                 <button
                   onClick={addGuestTypeLayer}
-                  className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
+                  className="bg-[#0D4B4B] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-1"
                 >
                   <Users size={12} /> Guest Type
                 </button>
                 <button
                   onClick={addCardNumberLayer}
-                  className="bg-[#0D4F4F] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3D3D] transition flex items-center justify-center gap-1"
+                  className="bg-[#0D4B4B] text-white px-2 py-1.5 rounded-lg text-[10px] font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-1"
                 >
                   <Hash size={12} /> Card No.
                 </button>
@@ -1212,16 +1212,16 @@ export default function InvitationDesigner() {
                   {layers.map((layer, idx) => (
                     <div
                       key={layer.id}
-                      className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,79,79,0.08)] border-l-4 border-[#0D4F4F]' : ''}`}
+                      className={`flex items-center justify-between p-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition ${idx === selectedLayerIndex ? 'bg-[rgba(13,75,75,0.08)] border-l-4 border-[#0D4B4B]' : ''}`}
                       onClick={() => setSelectedLayerIndex(idx)}
                     >
                       <span className="text-[10px] truncate flex items-center gap-1">
                         {layer.type === 'text' && <Type size={10} />}
                         {layer.type === 'rect' && <Square size={10} />}
                         {layer.type === 'line' && <Minus size={10} />}
-                        {layer.isGuestName && <User size={10} className="text-[#0D4F4F]" />}
-                        {layer.isGuestType && <UserCheck size={10} className="text-[#0D4F4F]" />}
-                        {layer.isCardNumber && <Hash size={10} className="text-[#0D4F4F]" />}
+                        {layer.isGuestName && <User size={10} className="text-[#0D4B4B]" />}
+                        {layer.isGuestType && <UserCheck size={10} className="text-[#0D4B4B]" />}
+                        {layer.isCardNumber && <Hash size={10} className="text-[#0D4B4B]" />}
                         <span className="truncate max-w-[40px]">
                           {layer.type === 'text' ? layer.text.substring(0, 10) : layer.type === 'rect' ? 'Rect' : 'Line'}
                         </span>
@@ -1257,7 +1257,7 @@ export default function InvitationDesigner() {
                     {/* ─── Position Controls ─── */}
                     <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
                       <p className="text-[9px] font-medium text-gray-500 mb-2 flex items-center gap-1">
-                        <Crosshair size={10} className="text-[#0D4F4F]" />
+                        <Crosshair size={10} className="text-[#0D4B4B]" />
                         Position
                       </p>
                       <div className="grid grid-cols-2 gap-2">
@@ -1271,7 +1271,7 @@ export default function InvitationDesigner() {
                               step="0.5"
                               value={Math.round(selectedLayer.x || 50)}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
-                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F]"
+                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4B4B]"
                             />
                             <input
                               type="number"
@@ -1280,7 +1280,7 @@ export default function InvitationDesigner() {
                               step="0.5"
                               value={Math.round(selectedLayer.x || 50)}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
-                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4F4F] focus:border-transparent"
+                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4B4B] focus:border-transparent"
                             />
                           </div>
                         </div>
@@ -1294,7 +1294,7 @@ export default function InvitationDesigner() {
                               step="0.5"
                               value={Math.round(selectedLayer.y || 50)}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
-                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4F4F]"
+                              className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4B4B]"
                             />
                             <input
                               type="number"
@@ -1303,7 +1303,7 @@ export default function InvitationDesigner() {
                               step="0.5"
                               value={Math.round(selectedLayer.y || 50)}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
-                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4F4F] focus:border-transparent"
+                              className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4B4B] focus:border-transparent"
                             />
                           </div>
                         </div>
@@ -1315,26 +1315,26 @@ export default function InvitationDesigner() {
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Text</label>
                           <textarea
-                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                             rows={2}
                             value={selectedLayer.text}
                             onChange={e => updateLayer(selectedLayerIndex!, { text: e.target.value })}
                           />
                           {selectedLayer.isGuestName && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with guest's name</p>
+                            <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with guest's name</p>
                           )}
                           {selectedLayer.isGuestType && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with "Single" or "Double"</p>
+                            <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with "Single" or "Double"</p>
                           )}
                           {selectedLayer.isCardNumber && (
-                            <p className="text-[8px] text-[#0D4F4F] mt-0.5">→ Replaced with card number</p>
+                            <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with card number</p>
                           )}
                         </div>
 
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Font</label>
                           <select
-                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                             value={selectedLayer.fontFamily}
                             onChange={e => updateLayer(selectedLayerIndex!, { fontFamily: e.target.value })}
                           >
@@ -1376,7 +1376,7 @@ export default function InvitationDesigner() {
                         {/* ─── Text Alignment ─── */}
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1 flex items-center gap-1.5">
-                            <AlignLeft size={12} className="text-[#0D4F4F]" />
+                            <AlignLeft size={12} className="text-[#0D4B4B]" />
                             Alignment
                           </label>
                           <div className="flex gap-1">
@@ -1384,7 +1384,7 @@ export default function InvitationDesigner() {
                               onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'left' })}
                               className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
                                 (selectedLayer.textAlign || 'left') === 'left'
-                                  ? 'bg-[#0D4F4F] text-white'
+                                  ? 'bg-[#0D4B4B] text-white'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -1394,7 +1394,7 @@ export default function InvitationDesigner() {
                               onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'center' })}
                               className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
                                 selectedLayer.textAlign === 'center'
-                                  ? 'bg-[#0D4F4F] text-white'
+                                  ? 'bg-[#0D4B4B] text-white'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -1404,7 +1404,7 @@ export default function InvitationDesigner() {
                               onClick={() => updateLayer(selectedLayerIndex!, { textAlign: 'right' })}
                               className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition flex items-center justify-center gap-1 ${
                                 selectedLayer.textAlign === 'right'
-                                  ? 'bg-[#0D4F4F] text-white'
+                                  ? 'bg-[#0D4B4B] text-white'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
@@ -1431,7 +1431,7 @@ export default function InvitationDesigner() {
                                 updateLayer(selectedLayerIndex!, { shadow: null });
                               }
                             }}
-                            className="accent-[#0D4F4F]"
+                            className="accent-[#0D4B4B]"
                           />
                           Shadow
                         </label>
@@ -1523,7 +1523,7 @@ export default function InvitationDesigner() {
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Dash</label>
                           <select
-                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                            className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                             value={selectedLayer.dashArray || 'solid'}
                             onChange={e => updateLayer(selectedLayerIndex!, { dashArray: e.target.value })}
                           >
@@ -1578,7 +1578,7 @@ export default function InvitationDesigner() {
                         max="100"
                         value={Math.round(qrX)}
                         onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                         placeholder="X"
                       />
                       <input
@@ -1587,7 +1587,7 @@ export default function InvitationDesigner() {
                         max="100"
                         value={Math.round(qrY)}
                         onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent"
+                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
                         placeholder="Y"
                       />
                     </div>
@@ -1632,7 +1632,7 @@ export default function InvitationDesigner() {
                         onClick={() => setQrSize(preset.size)}
                         className={`flex-1 py-1 rounded-lg text-[8px] font-semibold transition ${
                           qrSize === preset.size
-                            ? 'bg-[#0D4F4F] text-white'
+                            ? 'bg-[#0D4B4B] text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -1648,7 +1648,7 @@ export default function InvitationDesigner() {
             <button
               onClick={handleSave}
               disabled={saving || !templateUrl}
-              className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm"
+              className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg disabled:opacity-50 transition flex items-center justify-center gap-2 text-sm"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? 'Saving...' : 'Save Design'}
@@ -1676,7 +1676,7 @@ export default function InvitationDesigner() {
                     setShowSuccessModal(false);
                     router.push(`/client/events/${eventId}`);
                   }}
-                  className="w-full bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
+                  className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
                 >
                   <Sparkles size={18} />
                   Go Generate Cards

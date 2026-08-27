@@ -9,6 +9,9 @@ import { Toaster } from 'react-hot-toast';
 export const metadata = {
   title: 'Little Wed',
   description: 'Wedding Management System',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

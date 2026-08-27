@@ -331,7 +331,7 @@ export default function StaffDashboard() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-        <div style={{ width: 40, height: 40, border: '4px solid #E2EAF0', borderTopColor: '#0D4F4F', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ width: 40, height: 40, border: '4px solid #E2EAF0', borderTopColor: '#0D4B4B', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -361,16 +361,16 @@ export default function StaffDashboard() {
         }
         .sd-eyebrow {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
+          color: #0D4B4B; text-transform: uppercase; margin-bottom: 6px;
           display: flex; align-items: center; gap: 7px;
         }
-        .sd-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #E8A598; }
+        .sd-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #FF6B5C; }
         .sd-title {
           font-family: 'Playfair Display', serif;
           font-size: 30px; font-weight: 900; color: #0D1B1B;
           line-height: 1.1; letter-spacing: -0.4px; margin: 0 0 4px;
         }
-        .sd-title span { color: #E8A598; }
+        .sd-title span { color: #FF6B5C; }
         .sd-subtitle { font-size: 14px; color: #7A8FA6; margin: 0; }
 
         .sd-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
@@ -386,13 +386,13 @@ export default function StaffDashboard() {
         .sd-checkin-btn {
           display: inline-flex; align-items: center; gap: 7px;
           padding: 10px 18px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white; font-size: 14px; font-weight: 700; font-family: inherit;
           cursor: pointer; white-space: nowrap;
-          box-shadow: 0 4px 14px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 14px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s;
         }
-        .sd-checkin-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
+        .sd-checkin-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
         .sd-checkin-btn:active { transform: translateY(0); }
 
         .sd-card {
@@ -405,12 +405,12 @@ export default function StaffDashboard() {
           from { opacity: 0; transform: translateY(12px) scale(0.98); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .sd-card-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); }
+        .sd-card-bar { height: 4px; background: linear-gradient(90deg, #0D4B4B, #FF6B5C); }
         .sd-card-body { padding: 22px 24px; }
 
         .sd-select-label {
           font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 10px;
+          color: #0D4B4B; text-transform: uppercase; margin-bottom: 10px;
           display: flex; align-items: center; gap: 6px;
         }
         .sd-select {
@@ -422,11 +422,11 @@ export default function StaffDashboard() {
           background-repeat: no-repeat; background-position: right 14px center;
           padding-right: 36px;
         }
-        .sd-select:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .sd-select:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
 
         .sd-event-meta {
           display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-          padding: 14px 24px; background: rgba(13,79,79,0.03);
+          padding: 14px 24px; background: rgba(13,75,75,0.03);
           border-bottom: 1.5px solid #F0F4F8;
           font-size: 13px; color: #7A8FA6; font-weight: 500;
         }
@@ -445,7 +445,7 @@ export default function StaffDashboard() {
           background: white; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .sd-search:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .sd-search:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
 
         .sd-guest-card {
           background: white; border: 1.5px solid #E2EAF0; border-radius: 20px;
@@ -462,8 +462,8 @@ export default function StaffDashboard() {
           font-size: 16px; font-weight: 800; color: #0D1B1B;
         }
         .sd-table-badge {
-          font-size: 11px; font-weight: 700; color: #0D4F4F;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
+          font-size: 11px; font-weight: 700; color: #0D4B4B;
+          background: rgba(13,75,75,0.08); border: 1px solid rgba(13,75,75,0.12);
           padding: 3px 10px; border-radius: 20px;
         }
 
@@ -505,15 +505,15 @@ export default function StaffDashboard() {
           border: 1.5px solid #E2EAF0; background: white; cursor: pointer;
           color: #4A6072; transition: border-color 0.15s, color 0.15s, background 0.15s;
         }
-        .sd-page-btn:hover:not(:disabled) { border-color: #0D4F4F; color: #0D4F4F; background: rgba(13,79,79,0.04); }
+        .sd-page-btn:hover:not(:disabled) { border-color: #0D4B4B; color: #0D4B4B; background: rgba(13,75,75,0.04); }
         .sd-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .sd-page-label { font-size: 13px; font-weight: 600; color: #7A8FA6; padding: 0 4px; }
 
         .sd-empty { padding: 48px 24px; text-align: center; }
         .sd-empty-icon {
           width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 14px;
-          background: rgba(13,79,79,0.06); border: 1.5px solid rgba(13,79,79,0.1);
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          background: rgba(13,75,75,0.06); border: 1.5px solid rgba(13,75,75,0.1);
+          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
         }
         .sd-empty-title {
           font-family: 'Playfair Display', serif;
@@ -544,7 +544,7 @@ export default function StaffDashboard() {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        .sd-modal-bar { height: 4px; background: linear-gradient(90deg, #0D4F4F, #E8A598); border-radius: 24px 24px 0 0; }
+        .sd-modal-bar { height: 4px; background: linear-gradient(90deg, #0D4B4B, #FF6B5C); border-radius: 24px 24px 0 0; }
 
         .sd-modal-head {
           display: flex; align-items: center; justify-content: space-between;
@@ -554,7 +554,7 @@ export default function StaffDashboard() {
           font-family: 'Playfair Display', serif;
           font-size: 20px; font-weight: 900; color: #0D1B1B; letter-spacing: -0.3px;
         }
-        .sd-modal-title span { color: #E8A598; }
+        .sd-modal-title span { color: #FF6B5C; }
         .sd-modal-close {
           width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
           background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -577,7 +577,7 @@ export default function StaffDashboard() {
           color: #7A8FA6; background: transparent;
         }
         .sd-mode-btn.active {
-          background: white; color: #0D4F4F;
+          background: white; color: #0D4B4B;
           box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
 
@@ -593,7 +593,7 @@ export default function StaffDashboard() {
         }
         .sd-corner {
           position: absolute; width: 28px; height: 28px;
-          border-color: #E8A598; border-style: solid; border-width: 0;
+          border-color: #FF6B5C; border-style: solid; border-width: 0;
         }
         .sd-corner.tl { top: 16px; left: 16px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
         .sd-corner.tr { top: 16px; right: 16px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
@@ -610,17 +610,17 @@ export default function StaffDashboard() {
           transition: border-color 0.2s, box-shadow 0.2s;
           margin-bottom: 14px;
         }
-        .sd-code-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .sd-code-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
 
         .sd-submit-btn {
           width: 100%; padding: 14px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white; font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,79,79,0.32);
+          box-shadow: 0 4px 14px rgba(13,75,75,0.32);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
         }
-        .sd-submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,79,79,0.4); }
+        .sd-submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
         .sd-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .sd-qr-msg {

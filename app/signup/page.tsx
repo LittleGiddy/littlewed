@@ -138,7 +138,7 @@ export default function SignupPage() {
 
         .left {
           width: 420px; flex-shrink: 0;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 55%, #082E2E 100%);
+          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 55%, #072B2B 100%);
           display: flex; flex-direction: column; justify-content: space-between;
           padding: 52px 44px; position: relative; overflow: hidden;
           animation: panelIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
@@ -189,7 +189,7 @@ export default function SignupPage() {
           font-size: 36px; font-weight: 900; color: white;
           line-height: 1.15; margin-bottom: 14px; letter-spacing: -0.5px;
         }
-        .tagline span { color: #E8A598; }
+        .tagline span { color: #FF6B5C; }
         .tagline-sub { color: rgba(255,255,255,0.5); font-size: 14px; line-height: 1.65; }
 
         .features-left {
@@ -207,7 +207,7 @@ export default function SignupPage() {
         .feat-dot {
           width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
           background: rgba(232,165,152,0.18); border: 1px solid rgba(232,165,152,0.28);
-          display: flex; align-items: center; justify-content: center; color: #E8A598;
+          display: flex; align-items: center; justify-content: center; color: #FF6B5C;
         }
 
         .right {
@@ -234,7 +234,7 @@ export default function SignupPage() {
         .mobile-hero {
           display: none; flex-direction: column; align-items: center;
           padding: 40px 28px 32px;
-          background: linear-gradient(160deg, #0D4F4F 0%, #0A3D3D 100%);
+          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 100%);
           position: relative; overflow: hidden; text-align: center;
         }
         .mobile-hero::before {
@@ -264,7 +264,7 @@ export default function SignupPage() {
           line-height: 1.2; margin-bottom: 10px;
           animation: fadeDown 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) both;
         }
-        .mobile-tagline span { color: #E8A598; }
+        .mobile-tagline span { color: #FF6B5C; }
         .mobile-sub {
           position: relative; z-index: 2;
           color: rgba(255,255,255,0.55); font-size: 13px; line-height: 1.6;
@@ -282,12 +282,12 @@ export default function SignupPage() {
           border-radius: 20px; padding: 5px 12px;
           color: rgba(255,255,255,0.82); font-size: 11.5px; font-weight: 500;
         }
-        .pill svg { color: #E8A598; flex-shrink: 0; }
+        .pill svg { color: #FF6B5C; flex-shrink: 0; }
 
         .step-bar-wrap { background: #EEF2F6; height: 4px; }
         .step-bar-fill {
           height: 100%;
-          background: linear-gradient(90deg, #0D4F4F, #E8A598);
+          background: linear-gradient(90deg, #0D4B4B, #FF6B5C);
           border-radius: 0 2px 2px 0;
           transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
         }
@@ -295,7 +295,7 @@ export default function SignupPage() {
         .form-body { padding: 36px 36px 32px; }
         .step-label {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4F4F; text-transform: uppercase; margin-bottom: 6px;
+          color: #0D4B4B; text-transform: uppercase; margin-bottom: 6px;
         }
         .form-title {
           font-family: 'Playfair Display', serif; font-size: 24px;
@@ -310,7 +310,7 @@ export default function SignupPage() {
           padding: 0 4px; font-weight: 500;
           transition: top 0.2s cubic-bezier(0.4,0,0.2,1), font-size 0.2s cubic-bezier(0.4,0,0.2,1), color 0.2s cubic-bezier(0.4,0,0.2,1);
         }
-        .field-label.up { top: 0; font-size: 10.5px; color: #0D4F4F; font-weight: 700; letter-spacing: 0.3px; }
+        .field-label.up { top: 0; font-size: 10.5px; color: #0D4B4B; font-weight: 700; letter-spacing: 0.3px; }
 
         .field-input {
           width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
@@ -318,13 +318,13 @@ export default function SignupPage() {
           background: white; font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .field-input:focus { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .field-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
 
         .subdomain-wrap {
           display: flex; align-items: center; border: 1.5px solid #E2EAF0;
           border-radius: 13px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .subdomain-wrap:focus-within { border-color: #0D4F4F; box-shadow: 0 0 0 4px rgba(13,79,79,0.08); }
+        .subdomain-wrap:focus-within { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
         .subdomain-prefix {
           padding: 15px 11px 15px 15px; background: #F5F8FA; color: #9BAAB8;
           font-size: 12px; font-weight: 600; border-right: 1.5px solid #E2EAF0; white-space: nowrap;
@@ -335,14 +335,14 @@ export default function SignupPage() {
         }
 
         .hint { font-size: 11px; color: #9BAAB8; margin-top: 5px; padding-left: 4px; }
-        .hint strong { color: #0D4F4F; }
+        .hint strong { color: #0D4B4B; }
 
         .pw-eye {
           position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
           background: none; border: none; cursor: pointer; color: #9BAAB8;
           display: flex; align-items: center; padding: 4px; transition: color 0.15s;
         }
-        .pw-eye:hover { color: #0D4F4F; }
+        .pw-eye:hover { color: #0D4B4B; }
 
         .pw-strength { display: flex; gap: 4px; margin-top: 7px; }
         .pw-bar { flex: 1; height: 3px; border-radius: 2px; background: #E2EAF0; transition: background 0.3s; }
@@ -362,10 +362,10 @@ export default function SignupPage() {
 
         .btn-primary {
           width: 100%; padding: 15px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
+          background: linear-gradient(135deg, #0D4B4B, #0A3939);
           color: white; font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 16px rgba(13,79,79,0.35);
+          box-shadow: 0 4px 16px rgba(13,75,75,0.35);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
           letter-spacing: 0.2px; position: relative; overflow: hidden;
         }
@@ -375,7 +375,7 @@ export default function SignupPage() {
           opacity: 0; transition: opacity 0.2s;
         }
         .btn-primary:hover:not(:disabled)::after { opacity: 1; }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,79,79,0.4); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(13,75,75,0.4); }
         .btn-primary:active:not(:disabled) { transform: translateY(0); }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -386,7 +386,7 @@ export default function SignupPage() {
           transition: border-color 0.15s, background 0.15s, color 0.15s;
           margin-top: 10px;
         }
-        .btn-secondary:hover { border-color: #0D4F4F; color: #0D4F4F; background: #F5FAF9; }
+        .btn-secondary:hover { border-color: #0D4B4B; color: #0D4B4B; background: #F5FAF9; }
 
         .btn-google {
           width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
@@ -394,7 +394,7 @@ export default function SignupPage() {
           font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
         }
-        .btn-google:hover { border-color: #0D4F4F; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,79,79,0.08); }
+        .btn-google:hover { border-color: #0D4B4B; background: #F5FAF9; box-shadow: 0 2px 8px rgba(13,75,75,0.08); }
         .btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .method-divider {
@@ -405,11 +405,11 @@ export default function SignupPage() {
 
         .btn-email-choice {
           width: 100%; padding: 15px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          background: white; color: #0D4F4F; font-size: 14.5px; font-weight: 700;
+          background: white; color: #0D4B4B; font-size: 14.5px; font-weight: 700;
           font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
           transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.15s;
         }
-        .btn-email-choice:hover { border-color: #0D4F4F; background: #F5FAF9; transform: translateY(-1px); }
+        .btn-email-choice:hover { border-color: #0D4B4B; background: #F5FAF9; transform: translateY(-1px); }
 
         .spinner {
           width: 17px; height: 17px; border: 2px solid rgba(255,255,255,0.3);
@@ -422,10 +422,10 @@ export default function SignupPage() {
           padding: 18px 0 0; border-top: 1px solid #F0F4F8; margin-top: 22px;
         }
         .dot { width: 6px; height: 6px; border-radius: 50%; background: #E2EAF0; transition: all 0.3s; }
-        .dot.active { width: 20px; border-radius: 3px; background: #0D4F4F; }
+        .dot.active { width: 20px; border-radius: 3px; background: #0D4B4B; }
 
         .footer-link { text-align: center; font-size: 13px; color: #7A8FA6; padding: 16px 36px 18px; }
-        .footer-link a { color: #0D4F4F; font-weight: 700; text-decoration: none; }
+        .footer-link a { color: #0D4B4B; font-weight: 700; text-decoration: none; }
         .footer-link a:hover { text-decoration: underline; }
 
         .mobile-bottom {
@@ -436,8 +436,8 @@ export default function SignupPage() {
         .mobile-bottom-feat { display: flex; align-items: center; gap: 10px; color: #4A6072; font-size: 13px; font-weight: 500; }
         .mobile-bottom-dot {
           width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
-          background: rgba(13,79,79,0.08); border: 1px solid rgba(13,79,79,0.12);
-          display: flex; align-items: center; justify-content: center; color: #0D4F4F;
+          background: rgba(13,75,75,0.08); border: 1px solid rgba(13,75,75,0.12);
+          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
         }
 
         .page-footer {
@@ -524,7 +524,7 @@ export default function SignupPage() {
 
                     <button onClick={handleGoogleSignup} className="btn-google" type="button" disabled={loading}>
                       {loading ? (
-                        <><div className="spinner" style={{ borderTopColor: '#0D4F4F', borderColor: 'rgba(13,79,79,0.2)' }} /> Redirecting…</>
+                        <><div className="spinner" style={{ borderTopColor: '#0D4B4B', borderColor: 'rgba(13,75,75,0.2)' }} /> Redirecting…</>
                       ) : (
                         <>
                           <svg viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
@@ -649,7 +649,7 @@ export default function SignupPage() {
                         <div className="pw-strength">
                           {[1, 2, 3, 4].map(i => {
                             const strength = Math.min(4, Math.floor(form.password.length / 3));
-                            const colors = ['#E05C5C', '#F0A500', '#3AB795', '#0D4F4F'];
+                            const colors = ['#E05C5C', '#F0A500', '#3AB795', '#0D4B4B'];
                             return (
                               <div key={i} className="pw-bar"
                                 style={{ background: i <= strength ? colors[strength - 1] : undefined }}
@@ -695,7 +695,7 @@ export default function SignupPage() {
                       Didn't receive the code?{' '}
                       <button
                         onClick={sendVerification}
-                        style={{ background: 'none', border: 'none', color: '#0D4F4F', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ background: 'none', border: 'none', color: '#0D4B4B', fontWeight: 600, cursor: 'pointer' }}
                       >
                         Resend
                       </button>

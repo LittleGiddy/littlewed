@@ -51,7 +51,7 @@ export default function PendingActivationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA]">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#0D4F4F] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-[#0D4B4B] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading...</p>
         </div>
       </div>
@@ -62,15 +62,15 @@ export default function PendingActivationPage() {
     <div className="min-h-screen bg-[#F5F8FA] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Decorative top bar */}
-        <div className="h-1.5 bg-gradient-to-r from-[#0D4F4F] via-[#E8A598] to-[#0D4F4F] rounded-t-2xl" />
+        <div className="h-1.5 bg-gradient-to-r from-[#0D4B4B] via-[#FF6B5C] to-[#0D4B4B] rounded-t-2xl" />
 
         <div className="bg-white rounded-b-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-6 sm:p-8 text-center">
             {/* Icon with pulse animation */}
             <div className="relative w-24 h-24 mx-auto mb-6">
-              <div className="absolute inset-0 rounded-full border-2 border-[rgba(13,79,79,0.1)] animate-ping" />
+              <div className="absolute inset-0 rounded-full border-2 border-[rgba(13,75,75,0.1)] animate-ping" />
               <div className="absolute inset-[-6px] rounded-full border-2 border-[rgba(232,165,152,0.15)] animate-pulse" />
-              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-[#0D4F4F] to-[#0A3D3D] flex items-center justify-center shadow-lg">
+              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center shadow-lg">
                 <Clock className="w-10 h-10 text-white" />
               </div>
             </div>
@@ -82,7 +82,7 @@ export default function PendingActivationPage() {
             </div>
 
             <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900 mb-2">
-              Account <span className="text-[#E8A598]">Pending</span>
+              Account <span className="text-[#FF6B5C]">Pending</span>
             </h1>
 
             <p className="text-gray-500 text-sm mb-2">
@@ -93,7 +93,7 @@ export default function PendingActivationPage() {
             </p>
 
             {/* Email pill */}
-            <div className="inline-flex items-center gap-2 bg-[rgba(13,79,79,0.06)] border border-[rgba(13,79,79,0.12)] rounded-full px-4 py-2 text-sm font-semibold text-[#0D4F4F] mb-6">
+            <div className="inline-flex items-center gap-2 bg-[rgba(13,75,75,0.06)] border border-[rgba(13,75,75,0.12)] rounded-full px-4 py-2 text-sm font-semibold text-[#0D4B4B] mb-6">
               <Mail className="w-4 h-4" />
               {userEmail}
             </div>
@@ -113,7 +113,7 @@ export default function PendingActivationPage() {
 
             {/* Auto-refresh indicator */}
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-6">
-              <Sparkles size={12} className="text-[#0D4F4F]" />
+              <Sparkles size={12} className="text-[#0D4B4B]" />
               <span>This page automatically refreshes to check your status</span>
             </div>
 
@@ -138,7 +138,7 @@ export default function PendingActivationPage() {
 
             <p className="text-xs text-gray-400 mt-6">
               Think this is a mistake?{' '}
-              <a href="mailto:support@littlewed.com" className="text-[#0D4F4F] font-semibold hover:underline">
+              <a href="mailto:support@littlewed.com" className="text-[#0D4B4B] font-semibold hover:underline">
                 Contact support
               </a>
             </p>

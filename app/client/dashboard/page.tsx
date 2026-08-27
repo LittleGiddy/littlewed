@@ -34,7 +34,6 @@ export default async function ClientDashboard() {
     where: { tenantId },
     include: { _count: { select: { guests: true } } },
     orderBy: { date: 'asc' },
-    take: 5,
   });
 
   const transformedEvents = events.map((event) => ({
@@ -42,6 +41,7 @@ export default async function ClientDashboard() {
     name: event.name,
     date: event.date.toISOString(),
     venue: event.venue,
+    status: event.status,
     _count: { guests: event._count.guests },
   }));
 

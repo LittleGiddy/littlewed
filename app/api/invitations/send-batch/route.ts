@@ -45,6 +45,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No guests found' }, { status: 404 });
     }
 
+    // ─── Check credits before sending ─────────────────────────────────
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { credits: true, bypassPayment: true },
+    });
+
+    if (!tenant?.bypassPayment) {
+      const creditsNeeded = guests.length;
+      if ((tenant?.credits ?? 0) < creditsNeeded) {
+        return NextResponse.json({
+          error: `Insufficient credits to send ${creditsNeeded} invitations. You have ${tenant?.credits ?? 0} credits. Request more from the admin.`,
+          creditsNeeded,
+          creditsAvailable: tenant?.credits ?? 0,
+        }, { status: 400 });
+      }
+    }
+
+    // Deduct credits (1 credit per invitation, skip if bypassPayment)
+    if (!tenant?.bypassPayment) {
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { credits: { decrement: guests.length } },
+      });
+    }
+
     const results = [];
     let successCount = 0;
     let failCount = 0;

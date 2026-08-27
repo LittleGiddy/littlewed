@@ -142,7 +142,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#0D4F4F]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#0D4B4B]" />
       </div>
     );
   }
@@ -152,7 +152,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       <div className="text-center py-12">
         <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
         <p className="text-gray-500">Event not found.</p>
-        <Link href="/client/dashboard" className="text-[#0D4F4F] underline mt-2 inline-block">
+        <Link href="/client/dashboard" className="text-[#0D4B4B] underline mt-2 inline-block">
           Go back
         </Link>
       </div>
@@ -164,7 +164,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       <div className="flex items-center gap-3 mb-6">
         <Link
           href={`/client/events/${eventId}`}
-          className="text-gray-500 hover:text-[#0D4F4F] transition"
+          className="text-gray-500 hover:text-[#0D4B4B] transition"
         >
           <ArrowLeft size={20} />
         </Link>
@@ -179,7 +179,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleSelectAll}
-                className="text-sm text-gray-600 hover:text-[#0D4F4F] flex items-center gap-1"
+                className="text-sm text-gray-600 hover:text-[#0D4B4B] flex items-center gap-1"
               >
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
                 {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
@@ -220,7 +220,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               rows={5}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4F4F] focus:border-transparent resize-none"
+              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none"
               placeholder="e.g. Habari {name}, tunakumbusha kuhusu michango yako kwa {event}. Asante."
             />
           </div>
@@ -237,13 +237,13 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                     type="checkbox"
                     checked={selectedGuests.has(guest.id)}
                     onChange={() => toggleSelectGuest(guest.id)}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+                    className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-gray-800">{guest.name}</p>
                       {isWhatsApp ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.07)] px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.07)] px-2 py-0.5 rounded-full">
                           <MessageCircle size={10} /> WhatsApp
                         </span>
                       ) : (
@@ -256,7 +256,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                   </div>
                   <div className="text-xs text-gray-400">
                     {guest.reminderCount < 2 ? (
-                      <span className="text-[#0D4F4F] flex items-center gap-0.5">
+                      <span className="text-[#0D4B4B] flex items-center gap-0.5">
                         <Sparkles size={10} /> Free
                       </span>
                     ) : (
@@ -276,7 +276,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             <button
               onClick={sendReminders}
               disabled={sending || selectedCount === 0 || !message.trim() || (totalCost > 0 && credits !== null && credits < totalCost)}
-              className="flex-1 bg-gradient-to-r from-[#0D4F4F] to-[#0A3D3D] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send size={18} />}
               {sending ? 'Sending...' : `Send Reminder${selectedCount > 1 ? 's' : ''}`}

@@ -709,7 +709,7 @@ export default function ImportGuestsPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
       <Link
         href={`/client/events/${eventId}`}
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,79,79,0.14)] mb-6"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)] mb-6"
       >
         <ArrowLeft size={14} /> Back to Event
       </Link>
@@ -719,13 +719,13 @@ export default function ImportGuestsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={downloadSampleCSV}
-            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
+            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
           >
             <Download size={14} /> Sample CSV
           </button>
           <button
             onClick={downloadSamplePDF}
-            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4F4F] bg-[rgba(13,79,79,0.08)] border border-[rgba(13,79,79,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,79,79,0.14)] transition"
+            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
           >
             <FileText size={14} /> PDF Format
           </button>
@@ -744,14 +744,14 @@ export default function ImportGuestsPage() {
             <button
               onClick={importFromPhone}
               disabled={uploading}
-              className="w-full mb-4 py-3 bg-[rgba(13,79,79,0.08)] text-[#0D4F4F] border border-[rgba(13,79,79,0.2)] rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[rgba(13,79,79,0.14)] transition disabled:opacity-50"
+              className="w-full mb-4 py-3 bg-[rgba(13,75,75,0.08)] text-[#0D4B4B] border border-[rgba(13,75,75,0.2)] rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[rgba(13,75,75,0.14)] transition disabled:opacity-50"
             >
               <Phone size={18} /> Import from Phone Contacts
             </button>
           )}
 
           <div
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition ${dragActive ? 'border-[#0D4F4F] bg-[rgba(13,79,79,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
+            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition ${dragActive ? 'border-[#0D4B4B] bg-[rgba(13,75,75,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
               }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -773,7 +773,7 @@ export default function ImportGuestsPage() {
                 type="checkbox"
                 checked={detectWhatsApp}
                 onChange={(e) => setDetectWhatsApp(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-[#0D4F4F] focus:ring-[#0D4F4F]"
+                className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
               />
               <span className="text-sm font-medium text-gray-700">
                 Auto-detect WhatsApp numbers
@@ -788,7 +788,7 @@ export default function ImportGuestsPage() {
           {/* PDF Format Guide */}
           <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
             <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
-              <FileText size={16} className="text-[#0D4F4F]" />
+              <FileText size={16} className="text-[#0D4B4B]" />
               PDF Format Guide
             </h3>
             <p className="text-xs text-gray-600 mb-2">
@@ -851,7 +851,7 @@ export default function ImportGuestsPage() {
               {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
               <button
                 onClick={applyMapping}
-                className="mt-4 w-full sm:w-auto bg-[#0D4F4F] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#0A3D3D] transition"
+                className="mt-4 w-full sm:w-auto bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#0A3939] transition"
               >
                 Apply Mapping & Preview
               </button>
@@ -888,7 +888,7 @@ export default function ImportGuestsPage() {
                 <span className="text-sm font-medium text-[#C07A20]">{invalidCount} invalid</span>
                 <button
                   onClick={downloadInvalid}
-                  className="text-xs text-[#0D4F4F] underline hover:no-underline"
+                  className="text-xs text-[#0D4B4B] underline hover:no-underline"
                 >
                   Export invalid
                 </button>
@@ -945,7 +945,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
                                   placeholder="Title"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -955,7 +955,7 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
@@ -975,7 +975,7 @@ export default function ImportGuestsPage() {
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition"
+                                  className="text-gray-400 hover:text-[#0D4B4B] transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
@@ -991,7 +991,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
                                   placeholder="Name"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1001,7 +1001,7 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
@@ -1019,7 +1019,7 @@ export default function ImportGuestsPage() {
                                 <p className="font-medium text-gray-800 break-words">{guest.name}</p>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition flex-shrink-0"
+                                  className="text-gray-400 hover:text-[#0D4B4B] transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
@@ -1081,7 +1081,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
                                   placeholder="Title"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1091,7 +1091,7 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
@@ -1111,7 +1111,7 @@ export default function ImportGuestsPage() {
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition"
+                                  className="text-gray-400 hover:text-[#0D4B4B] transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
@@ -1126,7 +1126,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4F4F]"
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
                                   placeholder="Name"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1136,7 +1136,7 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4F4F] transition"
+                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
@@ -1154,7 +1154,7 @@ export default function ImportGuestsPage() {
                                 <span className="break-words">{guest.name}</span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4F4F] transition flex-shrink-0"
+                                  className="text-gray-400 hover:text-[#0D4B4B] transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
@@ -1202,7 +1202,7 @@ export default function ImportGuestsPage() {
               <div className="flex flex-col sm:flex-row sm:justify-between items-center px-4 py-2 border-t gap-2">
                 <button
                   onClick={() => setShowValidOnly(!showValidOnly)}
-                  className="text-sm text-[#0D4F4F] hover:underline"
+                  className="text-sm text-[#0D4B4B] hover:underline"
                 >
                   {showValidOnly ? 'Show all' : 'Show valid only'}
                 </button>
@@ -1223,7 +1223,7 @@ export default function ImportGuestsPage() {
             <button
               onClick={handleImport}
               disabled={uploading || validCount === 0 || !!limitWarning}
-              className="px-6 py-2 bg-[#0D4F4F] text-white rounded-lg hover:bg-[#0A3D3D] disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="px-6 py-2 bg-[#0D4B4B] text-white rounded-lg hover:bg-[#0A3939] disabled:opacity-50 transition flex items-center justify-center gap-2"
             >
               {uploading ? (
                 <>

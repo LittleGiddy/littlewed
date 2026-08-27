@@ -34,7 +34,7 @@ export default function EventsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex justify-between items-center mb-8">
           <div>
             <div className="h-3 w-20 bg-gray-200 rounded mb-2 animate-pulse" />
@@ -55,290 +55,52 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-
-        .page-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          margin-bottom: 32px;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-
-        .page-eyebrow {
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 1.5px;
-          text-transform: uppercase;
-          color: #0D4F4F;
-          margin-bottom: 6px;
-        }
-
-        .page-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 32px;
-          font-weight: 900;
-          color: #0D1B1B;
-          line-height: 1.1;
-          letter-spacing: -0.5px;
-        }
-
-        .page-title span { color: #E8A598; }
-
-        .page-sub {
-          color: #7A8FA6;
-          font-size: 14px;
-          margin-top: 6px;
-          font-weight: 400;
-        }
-
-        .create-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 12px 24px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white;
-          font-size: 14px;
-          font-weight: 700;
-          border-radius: 14px;
-          text-decoration: none;
-          box-shadow: 0 4px 12px rgba(13, 79, 79, 0.3);
-          transition: transform 0.15s, box-shadow 0.15s;
-          white-space: nowrap;
-        }
-        .create-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(13, 79, 79, 0.35);
-        }
-
-        .section-card {
-          background: white;
-          border-radius: 24px;
-          overflow: hidden;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.05);
-          animation: cardPop 0.5s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        @keyframes cardPop {
-          from { opacity: 0; transform: translateY(12px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .section-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 18px 24px;
-          border-bottom: 1.5px solid #F0F4F8;
-        }
-
-        .section-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 18px;
-          font-weight: 800;
-          color: #0D1B1B;
-          letter-spacing: -0.2px;
-        }
-
-        .section-badge {
-          font-size: 11px;
-          font-weight: 700;
-          color: #0D4F4F;
-          background: rgba(13, 79, 79, 0.08);
-          border: 1px solid rgba(13, 79, 79, 0.12);
-          padding: 4px 12px;
-          border-radius: 30px;
-        }
-
-        .event-row {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 16px 24px;
-          text-decoration: none;
-          border-bottom: 1px solid #F7F9FB;
-          transition: background 0.15s;
-          cursor: pointer;
-        }
-        .event-row:last-child { border-bottom: none; }
-        .event-row:hover { background: #F7FAFA; }
-
-        .event-date-box {
-          width: 48px;
-          height: 48px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          color: white;
-        }
-
-        .event-date-day {
-          font-size: 18px;
-          font-weight: 800;
-          line-height: 1;
-          font-family: 'Playfair Display', serif;
-        }
-
-        .event-date-mon {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-          opacity: 0.85;
-          margin-top: 2px;
-        }
-
-        .event-info { flex: 1; min-width: 0; }
-
-        .event-name {
-          font-size: 15px;
-          font-weight: 700;
-          color: #0D1B1B;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .event-meta {
-          font-size: 12px;
-          color: #9BAAB8;
-          margin-top: 4px;
-          font-weight: 500;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-        }
-
-        .meta-item {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .active-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          padding: 2px 8px;
-          border-radius: 30px;
-          font-size: 10px;
-          font-weight: 700;
-          background: #EDFAF4;
-          color: #1A7A4A;
-        }
-
-        .event-arrow {
-          color: #C8D4DE;
-          flex-shrink: 0;
-          transition: color 0.15s, transform 0.15s;
-        }
-        .event-row:hover .event-arrow {
-          color: #0D4F4F;
-          transform: translateX(3px);
-        }
-
-        .empty-state {
-          padding: 64px 24px;
-          text-align: center;
-        }
-
-        .empty-icon {
-          width: 72px;
-          height: 72px;
-          border-radius: 24px;
-          background: rgba(13, 79, 79, 0.07);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 20px;
-          font-size: 32px;
-        }
-
-        .empty-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px;
-          font-weight: 800;
-          color: #0D1B1B;
-          margin-bottom: 8px;
-        }
-
-        .empty-sub {
-          font-size: 14px;
-          color: #9BAAB8;
-          line-height: 1.6;
-        }
-
-        .empty-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 24px;
-          padding: 12px 24px;
-          background: linear-gradient(135deg, #0D4F4F, #0A3D3D);
-          color: white;
-          font-size: 14px;
-          font-weight: 700;
-          text-decoration: none;
-          border-radius: 14px;
-          box-shadow: 0 4px 12px rgba(13, 79, 79, 0.3);
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .empty-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(13, 79, 79, 0.35);
-        }
-
-        @media (max-width: 640px) {
-          .page-title { font-size: 28px; }
-          .create-btn span { display: none; }
-          .create-btn { padding: 12px 16px; }
-          .section-header { padding: 14px 20px; }
-          .event-row { padding: 14px 20px; }
-          .event-date-box { width: 42px; height: 42px; }
-          .event-date-day { font-size: 16px; }
-          .event-name { font-size: 14px; }
-          .meta-item { font-size: 11px; }
-        }
-      `}</style>
-
-      <div className="page-header">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+      {/* ─── Page Header ─── */}
+      <div className="flex items-start justify-between mb-8 gap-4 flex-wrap">
         <div>
-          <div className="page-eyebrow">Manage</div>
-          <div className="page-title">
-            Your <span>Events</span>
-          </div>
-          <p className="page-sub">View and manage all your events in one place.</p>
+          <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Manage</p>
+          <h1 className="font-serif text-3xl sm:text-[32px] font-black text-gray-900 leading-tight tracking-tight">
+            Your <span className="text-[#FF6B5C]">Events</span>
+          </h1>
+          <p className="text-sm text-gray-400 mt-1.5">View and manage all your events in one place.</p>
         </div>
-        <Link href="/client/events/new" className="create-btn">
+        <Link
+          href="/client/events/new"
+          className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] text-white text-sm font-bold rounded-[14px] shadow-md shadow-[#0D4B4B]/25 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#0D4B4B]/30 whitespace-nowrap"
+        >
           <Plus size={16} />
-          <span>New Event</span>
+          <span className="hidden sm:inline">New Event</span>
         </Link>
       </div>
 
-      <div className="section-card">
-        <div className="section-header">
-          <div className="section-title">All Events</div>
-          <div className="section-badge">{events.length} event{events.length !== 1 ? 's' : ''}</div>
+      {/* ─── Events Card ─── */}
+      <div className="bg-white rounded-3xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.05)] animate-[cardIn_0.5s_cubic-bezier(0.16,1,0.3,1)_both]">
+        <style>{`
+          @keyframes cardIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+          }
+        `}</style>
+
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-gray-100">
+          <h2 className="font-serif text-lg font-extrabold text-gray-800">All Events</h2>
+          <span className="text-[11px] font-bold text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 px-3 py-1 rounded-full">
+            {events.length} event{events.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {events.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">🎊</div>
-            <div className="empty-title">No events yet</div>
-            <p className="empty-sub">Create your first event and start managing guests and invitations.</p>
-            <Link href="/client/events/new" className="empty-btn">
+          <div className="py-16 px-6 text-center">
+            <div className="w-[72px] h-[72px] rounded-[24px] bg-[#0D4B4B]/5 flex items-center justify-center mx-auto mb-5">
+              <span className="text-4xl">🎊</span>
+            </div>
+            <h3 className="font-serif text-xl font-extrabold text-gray-900 mb-2">No events yet</h3>
+            <p className="text-sm text-gray-400">Create your first event and start managing guests and invitations.</p>
+            <Link
+              href="/client/events/new"
+              className="inline-flex items-center gap-2 mt-6 px-6 py-3 bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] text-white text-sm font-bold rounded-[14px] shadow-md shadow-[#0D4B4B]/25 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            >
               <Plus size={15} /> Create your first event
             </Link>
           </div>
@@ -353,30 +115,40 @@ export default function EventsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="event-row"
+                className="flex items-center gap-4 px-5 sm:px-6 py-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50/60 transition-colors cursor-pointer"
                 onClick={() => window.location.href = `/client/events/${event.id}`}
               >
-                <div className="event-date-box">
-                  <div className="event-date-day">{day}</div>
-                  <div className="event-date-mon">{mon}</div>
+                {/* Date Box */}
+                <div className="w-12 h-12 sm:w-[48px] sm:h-[48px] rounded-[14px] bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex flex-col items-center justify-center shrink-0 text-white">
+                  <span className="font-serif text-lg sm:text-[18px] font-bold leading-none">{day}</span>
+                  <span className="text-[9px] font-bold uppercase opacity-80 mt-0.5">{mon}</span>
                 </div>
-                <div className="event-info">
-                  <div className="event-name">
-                    {event.name}
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-[15px] font-bold text-gray-900 truncate">{event.name}</span>
                     {event.commission_paid && (
-                      <span className="active-badge">
+                      <span className="inline-flex items-center gap-1 px-2 py-[2px] rounded-full text-[10px] font-bold bg-green-50 text-green-700">
                         <CheckCircle size={10} /> Active
                       </span>
                     )}
                   </div>
-                  <div className="event-meta">
-                    <span className="meta-item"><Calendar size={12} /> {d.toLocaleDateString()}</span>
-                    <span className="meta-item"><MapPin size={12} /> {event.venue}</span>
-                    <span className="meta-item"><Users size={12} /> {event._count.guests} guests</span>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                      <Calendar size={12} /> {d.toLocaleDateString()}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                      <MapPin size={12} /> {event.venue}
+                    </span>
+                    <span className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                      <Users size={12} /> {event._count.guests} guests
+                    </span>
                   </div>
                 </div>
+
                 <DeleteEventButton eventId={event.id} />
-                <ArrowRight size={16} className="event-arrow" />
+                <ArrowRight size={16} className="text-gray-300 shrink-0 transition-colors group-hover:text-[#0D4B4B]" />
               </motion.div>
             );
           })
