@@ -164,7 +164,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex overflow-x-clip">
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:block fixed top-0 left-0 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-30 ${
@@ -202,7 +202,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${effectiveCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'}`}>
+      <div className={`flex-1 min-h-screen min-w-0 flex flex-col transition-all duration-300 ${effectiveCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[260px]'}`}>
         {/* Top Bar */}
         <header className="sticky top-0 z-20 bg-white border-b border-gray-200 px-4 sm:px-6 h-14 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -231,7 +231,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto"
+          className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0 overflow-x-clip"
         >
           {children}
         </motion.main>

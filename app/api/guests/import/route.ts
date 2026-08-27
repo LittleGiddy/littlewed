@@ -106,23 +106,6 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ─── Check guest limit (tied to credits) ──────────────────────────
-    if (!event.tenant?.bypassPayment) {
-      const currentGuests = await prisma.guest.count({ where: { eventId } });
-      const maxGuests = event.guestCount || 0;
-
-      if (maxGuests > 0 && currentGuests + validGuests.length > maxGuests) {
-        const remaining = Math.max(0, maxGuests - currentGuests);
-        return NextResponse.json({
-          error: `Exceeds guest limit of ${maxGuests}. You can add up to ${remaining} more guests. Request more credits from the admin to import additional guests.`,
-          limit: maxGuests,
-          current: currentGuests,
-          remaining,
-          credits: event.tenant.credits,
-        }, { status: 400 });
-      }
-    }
-
     // ─── Duplicate detection using phone ──────────────────────────────
     const phoneNumbers = validGuests.map((g: any) => g.phone);
     const existingGuests = await prisma.guest.findMany({
@@ -151,6 +134,21 @@ export async function POST(req: NextRequest) {
         invalidCount,
         message: `All valid guests are duplicates. No new guests added. (${invalidCount} invalid numbers skipped)`,
       });
+    }
+
+    // ─── Credit check (1 credit per guest; credits are now the only limit) ─
+    if (!event.tenant?.bypassPayment) {
+      const tenantCredits = event.tenant.credits ?? 0;
+      if (tenantCredits < uniqueGuests.length) {
+        const remaining = tenantCredits;
+        return NextResponse.json({
+          error: `You don't have enough credits to import ${uniqueGuests.length} guests. You have ${remaining} credit${remaining === 1 ? '' : 's'} remaining. Request more credits from the admin to continue importing.`,
+          needsCredits: true,
+          credits: remaining,
+          needed: uniqueGuests.length,
+          alreadyProcessed: 0,
+        }, { status: 400 });
+      }
     }
 
     // ─── Detect WhatsApp for each guest (if enabled) ──────────────────
@@ -216,6 +214,22 @@ export async function POST(req: NextRequest) {
       data: guestsToInsert,
       skipDuplicates: true,
     });
+
+    // ─── Deduct 1 credit per guest successfully imported (skip if bypass) ─
+    if (!event.tenant?.bypassPayment && result.count > 0) {
+      await prisma.tenant.update({
+        where: { id: event.tenantId },
+        data: { credits: { decrement: result.count } },
+      });
+      await prisma.usageRecord.createMany({
+        data: Array.from({ length: result.count }, () => ({
+          tenantId: event.tenantId,
+          eventId,
+          channel: 'guest_add',
+          cost: 1,
+        })),
+      });
+    }
 
     // ─── Return response ──────────────────────────────────────────────
     const responseData: any = {

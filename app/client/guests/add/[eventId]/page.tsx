@@ -138,9 +138,48 @@ export default function AddGuestPage() {
         router.push(`/client/events/${eventId}`);
       } else {
         setError(data.error || 'Failed to add guest');
-        toast.error(data.error || 'Failed to add guest', {
-          icon: <AlertCircle size={18} className="text-red-500" />,
-        });
+        if (data.needsCredits) {
+          toast.custom(
+            (t) => (
+              <div
+                className={`${t.visible ? 'animate-enter' : 'animate-leave'
+                  } max-w-md w-full bg-white shadow-lg rounded-2xl pointer-events-auto overflow-hidden border border-amber-200`}
+              >
+                <div className="p-4 bg-amber-50 border-b border-amber-200">
+                  <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
+                    <Sparkles size={18} />
+                    No credits left
+                  </h3>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-gray-600 mb-4">
+                    {data.error || 'You have no credits remaining. Request more from the admin to keep adding guests.'}
+                  </p>
+                  <div className="flex gap-3">
+                    <Link
+                      href="/client/billing"
+                      onClick={() => toast.dismiss(t.id)}
+                      className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-center text-sm font-semibold hover:bg-[#0A3939] transition"
+                    >
+                      Request Credits
+                    </Link>
+                    <button
+                      onClick={() => toast.dismiss(t.id)}
+                      className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ),
+            { duration: 8000 }
+          );
+        } else {
+          toast.error(data.error || 'Failed to add guest', {
+            icon: <AlertCircle size={18} className="text-red-500" />,
+          });
+        }
       }
     } catch {
       setError('Network error');

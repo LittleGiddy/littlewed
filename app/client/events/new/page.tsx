@@ -425,7 +425,7 @@ export default function NewEventPage() {
           New <span>Event</span>
         </h1>
         <p className="page-sub">
-          Set up your event details. Credits will be used to create the event.
+          Set up your event details. Credits are used 1-per-guest when you add or import guests.
         </p>
       </div>
 
@@ -547,7 +547,7 @@ export default function NewEventPage() {
               <div className="total-section">
                 <div className="total-label">TOTAL COST</div>
                 <div className="total-value">{totalCommission.toLocaleString()} TZS</div>
-                <p className="total-hint">Credits are deducted if available, otherwise request more below.</p>
+                <p className="total-hint">Estimated cost for your planned guests. Credits are used 1-per-guest as you add or import them.</p>
               </div>
             )}
 

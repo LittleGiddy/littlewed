@@ -88,18 +88,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // ─── Guest limit check (tied to credits) ─────────────────────────
+    // ─── Credit check (1 credit per guest; credits are now the only limit) ─
     if (!event.tenant?.bypassPayment) {
-      const currentCount = await prisma.guest.count({ where: { eventId } });
-      const maxGuests = event.guestCount || 0;
-
-      if (maxGuests > 0 && currentCount >= maxGuests) {
+      const tenantCredits = event.tenant.credits ?? 0;
+      if (tenantCredits < 1) {
         return NextResponse.json(
           {
-            error: `Guest limit reached (${maxGuests}). You've used all your credits for this event. Request more credits from the admin to add additional guests.`,
-            limit: maxGuests,
-            current: currentCount,
-            credits: event.tenant.credits,
+            error: `You've run out of credits. Each guest costs 1 credit, and you have ${tenantCredits} credits. Request more credits from the admin to add additional guests.`,
+            needsCredits: true,
+            credits: tenantCredits,
           },
           { status: 400 }
         );
@@ -133,6 +130,22 @@ export async function POST(req: NextRequest) {
         qrToken: randomBytes(16).toString('hex'),
       },
     });
+
+    // ─── Deduct 1 credit for adding this guest (skip if bypassPayment) ──
+    if (!event.tenant?.bypassPayment) {
+      await prisma.tenant.update({
+        where: { id: event.tenantId },
+        data: { credits: { decrement: 1 } },
+      });
+      await prisma.usageRecord.create({
+        data: {
+          tenantId: event.tenantId,
+          eventId,
+          channel: 'guest_add',
+          cost: 1,
+        },
+      });
+    }
 
     const cardImageUrl = `https://littlewed.co.tz/api/og/card?code=${passCode}`;
     const inviteLink = `https://littlewed.co.tz/invite/${passCode}`;

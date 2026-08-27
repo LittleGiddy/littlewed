@@ -1250,6 +1250,16 @@ Card No: {cardNumber} {guestType}`}
         </div>
       </div>
 
+      {/* ─── Friendly helper note ─── */}
+      <div className="bg-[#EDFAF4] border border-[#A8D5C4] rounded-2xl px-3 sm:px-4 py-2.5 flex items-start gap-2.5">
+        <Info size={16} className="text-[#1A7A4A] flex-shrink-0 mt-0.5" />
+        <p className="text-xs sm:text-sm text-[#14532d] leading-relaxed">
+          <span className="font-semibold">How sending works:</span> Sending is free — credits are only used when you
+          <span className="font-medium"> add or import</span> a guest (1 credit per guest). <span className="font-semibold">Send All</span> only sends to guests who
+          haven't received their invitation yet, so you can send safely without duplicating.
+        </p>
+      </div>
+
       {/* ─── Guest List ─── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-3 sm:px-5 py-2.5 sm:py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">

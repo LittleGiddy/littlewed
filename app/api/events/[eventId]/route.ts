@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { refundCreditsForUnsentDeleted } from '@/lib/credits';
 
 // ─── GET ────────────────────────────────────────────────────────────────
 export async function GET(
@@ -25,12 +26,19 @@ export async function GET(
             id: true,
             name: true,
             phone: true,
+            email: true,
+            title: true,
+            guestType: true,
+            cardNumber: true,
+            passCode: true,
             routingChannel: true,
             checkedIn: true,
             attending: true,
             invitationSentAt: true,
+            invitationCard: true,
             thanksSentAt: true,
             reminderCount: true,
+            createdAt: true,
           },
           orderBy: { name: 'asc' },
         },
@@ -143,8 +151,17 @@ export async function DELETE(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
+  // Refund credits for guests that were never sent an invitation
+  const unsentCount = await prisma.guest.count({
+    where: { eventId, invitationSentAt: null },
+  });
+
   await prisma.guest.deleteMany({ where: { eventId } });
   await prisma.event.delete({ where: { id: eventId } });
+
+  if (unsentCount > 0) {
+    await refundCreditsForUnsentDeleted(tenantId, eventId, unsentCount);
+  }
 
   return NextResponse.json({ success: true });
 }

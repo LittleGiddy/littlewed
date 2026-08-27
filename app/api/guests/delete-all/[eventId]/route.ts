@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth'; // ✅ import authOptions
 import { prisma } from '@/lib/prisma';
+import { refundCreditsForUnsentDeleted } from '@/lib/credits';
 
 export async function DELETE(
   req: NextRequest,
@@ -36,14 +37,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // Count guests that were never sent an invitation (eligible for refund)
+    const unsentCount = await prisma.guest.count({
+      where: { eventId, invitationSentAt: null },
+    });
+
     // Delete all guests for this event
     await prisma.guest.deleteMany({
       where: { eventId },
     });
 
+    // Refund credits for the unsent guests that were removed
+    if (unsentCount > 0) {
+      await refundCreditsForUnsentDeleted(tenantId, eventId, unsentCount);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'All guests deleted',
+      refunded: unsentCount,
     });
   } catch (error: any) {
     console.error('DELETE /api/guests/delete-all/[eventId] error:', error);

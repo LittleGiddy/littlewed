@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone } from '@/lib/phone';
+import { refundCreditsForUnsentDeleted } from '@/lib/credits';
 
 // ─── DELETE ─────────────────────────────────────────────────────────────
 export async function DELETE(
@@ -18,12 +19,19 @@ export async function DELETE(
 
   const guest = await prisma.guest.findFirst({
     where: { id, event: { tenantId } },
+    select: { id: true, eventId: true, invitationSentAt: true },
   });
   if (!guest) {
     return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
   }
 
   await prisma.guest.delete({ where: { id } });
+
+  // Refund 1 credit if the guest was never sent an invitation
+  if (!guest.invitationSentAt) {
+    await refundCreditsForUnsentDeleted(tenantId, guest.eventId, 1);
+  }
+
   return NextResponse.json({ success: true });
 }
 

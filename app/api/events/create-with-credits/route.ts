@@ -28,50 +28,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
   }
 
-  // Bypass mode (admin override)
-  if (tenant.bypassPayment === true) {
-    const event = await prisma.event.create({
-      data: {
-        name,
-        date: new Date(date),
-        venue,
-        address,
-        guestCount,
-        total_budget: 0,
-        commission_paid: true,
-        tenantId,
-      },
-    });
-    return NextResponse.json({ eventId: event.id, bypassed: true });
-  }
-
-  const requiredCredits = guestCount;
-  if (tenant.credits >= requiredCredits) {
-    const event = await prisma.$transaction(async (tx) => {
-      await tx.tenant.update({
-        where: { id: tenantId },
-        data: { credits: { decrement: requiredCredits } },
-      });
-      return tx.event.create({
-        data: {
-          name,
-          date: new Date(date),
-          venue,
-          address,
-          guestCount,
-          total_budget: requiredCredits * COST_PER_GUEST,
-          commission_paid: true,
-          tenantId,
-        },
-      });
-    });
-    return NextResponse.json({ eventId: event.id, creditsUsed: requiredCredits });
-  }
-
-  // Insufficient credits
-  return NextResponse.json({
-    error: 'Insufficient credits',
-    available: tenant.credits,
-    required: requiredCredits,
-  }, { status: 400 });
+  // Since credits are now deducted 1-per-guest when guests are added or
+  // imported, creating the event does NOT charge credits upfront.
+  const event = await prisma.event.create({
+    data: {
+      name,
+      date: new Date(date),
+      venue,
+      address,
+      guestCount,
+      total_budget: tenant.bypassPayment ? 0 : guestCount * COST_PER_GUEST,
+      commission_paid: true,
+      tenantId,
+    },
+  });
+  return NextResponse.json({ eventId: event.id, creditsUsed: 0, bypassed: !!tenant.bypassPayment });
 }

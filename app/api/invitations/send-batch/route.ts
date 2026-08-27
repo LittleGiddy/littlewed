@@ -46,23 +46,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No guests found' }, { status: 404 });
     }
 
-    // ─── Check credits before sending ─────────────────────────────────
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { credits: true, bypassPayment: true },
-    });
-
-    if (!tenant?.bypassPayment) {
-      const creditsNeeded = guests.length;
-      if ((tenant?.credits ?? 0) < creditsNeeded) {
-        return NextResponse.json({
-          error: `Insufficient credits to send ${creditsNeeded} invitations. You have ${tenant?.credits ?? 0} credits. Request more from the admin.`,
-          creditsNeeded,
-          creditsAvailable: tenant?.credits ?? 0,
-        }, { status: 400 });
-      }
-    }
-
     const results = [];
     let successCount = 0;
     let failCount = 0;
@@ -208,24 +191,6 @@ export async function POST(req: NextRequest) {
           // ─── Handle result ─────────────────────────────────────────────
           if (result.success) {
             successCount++;
-
-            // ─── Deduct 1 credit per invitation sent (skip if bypassPayment) ─
-            if (!tenant?.bypassPayment) {
-              await prisma.tenant.update({
-                where: { id: tenantId },
-                data: { credits: { decrement: 1 } },
-              });
-            }
-
-            // ─── Log credit usage ─────────────────────────────────────────
-            await prisma.usageRecord.create({
-              data: {
-                tenantId,
-                eventId,
-                channel: guest.routingChannel === 'whatsapp' ? 'whatsapp' : 'sms',
-                cost: 1,
-              },
-            });
 
             await prisma.guest.update({
               where: { id: guest.id },

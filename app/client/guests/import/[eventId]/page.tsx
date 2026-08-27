@@ -40,7 +40,7 @@ export default function ImportGuestsPage() {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState('');
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
-  const [eventDetails, setEventDetails] = useState<{ guestCount: number; totalGuests: number } | null>(null);
+  const [eventDetails, setEventDetails] = useState<{ guestCount: number; totalGuests: number; credits: number } | null>(null);
   const [step, setStep] = useState<'upload' | 'map' | 'preview'>('upload');
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [showValidOnly, setShowValidOnly] = useState(false);
@@ -455,12 +455,10 @@ export default function ImportGuestsPage() {
 
   const checkLimit = (newCount: number) => {
     if (!eventDetails) return;
-    const { guestCount, totalGuests } = eventDetails;
-    const currentTotal = totalGuests || 0;
-    const newTotal = currentTotal + newCount;
-    if (guestCount > 0 && newTotal > guestCount) {
+    const { credits } = eventDetails;
+    if (credits >= 0 && newCount > credits) {
       setLimitWarning(
-        `This would exceed the paid guest limit (${guestCount}). You can add up to ${Math.max(0, guestCount - currentTotal)} more.`
+        `You have ${credits} credit${credits === 1 ? '' : 's'} left, but trying to import ${newCount} guest${newCount === 1 ? '' : 's'}. Credits are used 1 per guest — request more from the admin to import all of these.`
       );
     } else {
       setLimitWarning(null);
@@ -654,6 +652,44 @@ export default function ImportGuestsPage() {
       }
       toast.success(successMsg);
       router.push(`/client/events/${eventId}`);
+    } else if (data.needsCredits) {
+      setLimitWarning(null);
+      toast.custom(
+        (t) => (
+          <div
+            className={`${t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-white shadow-lg rounded-2xl pointer-events-auto overflow-hidden border border-amber-200`}
+          >
+            <div className="p-4 bg-amber-50 border-b border-amber-200">
+              <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
+                <AlertCircle size={18} />
+                Not enough credits
+              </h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 mb-4">
+                {data.error || 'You do not have enough credits to import these guests. Request more from the admin to continue.'}
+              </p>
+              <div className="flex gap-3">
+                <Link
+                  href="/client/billing"
+                  onClick={() => toast.dismiss(t.id)}
+                  className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-center text-sm font-semibold hover:bg-[#0A3939] transition"
+                >
+                  Request Credits
+                </Link>
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        ),
+        { duration: 10000 }
+      );
     } else {
       toast.error(data.error || 'Import failed');
       if (data.error?.includes('limit') || data.error?.includes('exceeds')) {
@@ -895,17 +931,25 @@ export default function ImportGuestsPage() {
               </div>
             )}
             <div className="text-sm text-gray-500 flex items-center">
-              Remaining slots: {eventDetails ? Math.max(0, eventDetails.guestCount - eventDetails.totalGuests) : '—'}
-            </div>
-          </div>
+          {eventDetails ? (
+            eventDetails.credits < 0
+              ? 'Unlimited (payment bypassed)'
+              : `${eventDetails.credits} credit${eventDetails.credits === 1 ? '' : 's'} left`
+          ) : '—'}
+        </div>
+      </div>
 
-          {eventDetails && (
-            <div className="text-sm text-gray-600 mb-4 flex flex-wrap gap-2">
-              <span><span className="font-semibold">Guest limit:</span> {eventDetails.guestCount}</span>
-              <span>•</span>
-              <span><span className="font-semibold">Current guests:</span> {eventDetails.totalGuests}</span>
-            </div>
+      {eventDetails && (
+        <div className="text-sm text-gray-600 mb-4 flex flex-wrap gap-2">
+          {eventDetails.credits < 0 ? (
+            <span><span className="font-semibold">Limit:</span> Unlimited</span>
+          ) : (
+            <span><span className="font-semibold">Credits remaining:</span> {eventDetails.credits} (1 credit = 1 guest)</span>
           )}
+          <span>•</span>
+          <span><span className="font-semibold">Current guests:</span> {eventDetails.totalGuests}</span>
+        </div>
+      )}
 
           {limitWarning && (
             <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg mb-4 flex items-center gap-2">
