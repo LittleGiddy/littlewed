@@ -64,7 +64,11 @@ export async function POST(req: NextRequest) {
     }
 
     const guests = await prisma.guest.findMany({
-      where: { id: { in: guestIds }, eventId, invitationCard: null },
+      where: {
+        id: { in: guestIds },
+        eventId,
+        OR: [{ invitationCard: null }, { passCode: null }],
+      },
     });
 
     if (guests.length === 0) {

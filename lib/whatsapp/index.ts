@@ -141,10 +141,13 @@ export async function sendWeddingInvitation(
     cardType: string;
     imageUrl?: string;
     inviteLink?: string;
+    templateName?: string; // e.g. 'Mwalikotemp' | 'Mwalikosecond'
+    contact?: string;     // {var10} for Mwalikosecond
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
-  console.log('[WhatsApp] Template: swahili_invitation');
+  const templateName = data.templateName || 'Mwalikotemp';
+  console.log('[WhatsApp] Template:', templateName);
 
   // ─── Header with image ────────────────────────────────────────────────
   const header = {
@@ -170,22 +173,27 @@ export async function sendWeddingInvitation(
   // ─── Send template with proper variable mapping ──────────────────────
   // IMPORTANT: Match the exact case from your template:
   // var1, var2, var3, var4, var5, var6, var7, Var8 (capital V), var9
+  const personalisation: Record<string, string> = {
+    "var1": data.guestName,      // ✅ Habari {var1}
+    "var2": data.hostFamily,     // ✅ Familia ya {var2}
+    "var3": data.person1,        // ✅ {var3}
+    "var4": data.person2,        // ✅ {var4}
+    "var5": data.date,           // ✅ {var5}
+    "var6": data.venue,          // ✅ {var6}
+    "var7": data.time,           // ✅ {var7}
+    "Var8": data.cardNumber,     // ✅ {Var8} - CAPITAL V!
+    "var9": data.cardType,       // ✅ {var9}
+  };
+
+  // Mwalikosecond adds {var10} for further contact info.
+  if (data.contact) {
+    personalisation["var10"] = data.contact;
+  }
+
   return sendWhatsAppTemplate({
     to: phone,
-    template: 'Mwalikotemp', // ⚠️ Replace with your exact template name
-    personalisation: [
-      {
-        "var1": data.guestName,      // ✅ Habari {var1}
-        "var2": data.hostFamily,     // ✅ Familia ya {var2}
-        "var3": data.person1,        // ✅ {var3}
-        "var4": data.person2,        // ✅ {var4}
-        "var5": data.date,           // ✅ {var5}
-        "var6": data.venue,          // ✅ {var6}
-        "var7": data.time,           // ✅ {var7}
-        "Var8": data.cardNumber,     // ✅ {Var8} - CAPITAL V!
-        "var9": data.cardType,       // ✅ {var9}
-      }
-    ],
+    template: templateName,
+    personalisation: [personalisation],
     header,
     button,
   });
@@ -201,4 +209,36 @@ export function toLinkSuffix(value: string): string {
   } catch {
     return value;
   }
+}
+
+/**
+ * Sends a "Thank You" message over WhatsApp using an approved template that
+ * embeds ONE card image (no text variables). The same card is sent to every
+ * checked-in WhatsApp guest.
+ *
+ * The approved template name is provided at runtime; it defaults to an env
+ * var (THANKS_WHATSAPP_TEMPLATE) so it can be updated once approved.
+ */
+export async function sendWhatsAppThanksCard({
+  to,
+  cardUrl,
+  templateName,
+}: {
+  to: string;
+  cardUrl: string;
+  templateName: string;
+}): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING THANKS CARD ======');
+  console.log('[WhatsApp] Template:', templateName);
+  return sendWhatsAppTemplate({
+    to,
+    template: templateName,
+    header: {
+      image: { file: cardUrl, name: 'Thank You' },
+    },
+  });
+}
+
+export function getThanksWhatsAppTemplate(): string {
+  return process.env.THANKS_WHATSAPP_TEMPLATE || 'mwalikothanks';
 }

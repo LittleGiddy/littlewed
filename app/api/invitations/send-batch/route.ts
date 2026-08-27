@@ -26,7 +26,9 @@ export async function POST(req: NextRequest) {
       smsVariables, 
       whatsappVariables, 
       message, 
-      retry 
+      retry,
+      whatsappTemplate,
+      whatsappContact,
     } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
@@ -126,6 +128,8 @@ export async function POST(req: NextRequest) {
               cardType: actualCardType,
               imageUrl: cardImageUrl,
               inviteLink: inviteLink,
+              templateName: whatsappTemplate,
+              contact: whatsappContact,
             });
 
           } else {
@@ -167,10 +171,11 @@ export async function POST(req: NextRequest) {
               person1: vars.person1 || guest.event?.person1 || '',
               person2: vars.person2 || guest.event?.person2 || '',
               time: vars.time || guest.event?.time || '',
+              contact: whatsappContact || '',
             };
 
             const smsMessage = smsTemplateText.replace(
-              /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|passCode|event|date|eventDate|venue|address|hostFamily|person1|person2|time)\}/g,
+              /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|passCode|event|date|eventDate|venue|address|hostFamily|person1|person2|time|contact)\}/g,
               (match: string, key: string) => varsMap[key] ?? match
             );
 

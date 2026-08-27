@@ -46,6 +46,7 @@ export async function GET(
           select: {
             testMode: true,
             thanksCardUrl: true,
+            bypassPayment: true,
           },
         },
       },
@@ -93,16 +94,29 @@ export async function PUT(
     // Check if event exists and belongs to the user's tenant
     const existingEvent = await prisma.event.findFirst({
       where: { id: eventId, tenantId },
+      include: {
+        guests: { where: { checkedIn: true }, select: { id: true } },
+      },
     });
 
     if (!existingEvent) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Prepare update data — new Date() handles ISO strings with offsets correctly
+    // ─── Lock the date/time if any guest has already checked in ────────
     const newDate = new Date(date);
     if (isNaN(newDate.getTime())) {
       return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    }
+    const dateChanged = Math.round(existingEvent.date.getTime()) !== Math.round(newDate.getTime());
+    if (dateChanged && (existingEvent.guests?.length ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          error:
+            'The event date/time can no longer be changed because one or more guests have already checked in, to avoid confusion during check-in.',
+        },
+        { status: 409 }
+      );
     }
 
     const updateData: any = {

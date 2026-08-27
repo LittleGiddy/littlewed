@@ -199,12 +199,22 @@ export default function DashboardContent({
   const eventColors = ['bg-[#0D4B4B]', 'bg-green-600', 'bg-amber-600'];
 
   const now = new Date();
+  const liveEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000); // next 24h window
+
+  // "Live" = event happening at the current time, i.e. whose date falls
+  // within the next 24 hours. Uses the event date so it reflects the real
+  // event window rather than the (rarely written) status flag.
+  const isLiveNow = (event: { date: string }) => {
+    const d = event.date ? new Date(event.date).getTime() : NaN;
+    return !Number.isNaN(d) && d >= now.getTime() && d <= liveEnd.getTime();
+  };
+
   const filteredEvents = events.filter((event) => {
     switch (activeCategory) {
       case 'upcoming':
         return event.status === 'ACTIVE' || event.status === 'DRAFT';
       case 'live':
-        return event.status === 'LIVE';
+        return isLiveNow(event);
       case 'completed':
         return event.status === 'EXPIRED' || event.status === 'ARCHIVED';
       default:
@@ -215,7 +225,7 @@ export default function DashboardContent({
   const categoryCounts = {
     all: events.length,
     upcoming: events.filter((e) => e.status === 'ACTIVE' || e.status === 'DRAFT').length,
-    live: events.filter((e) => e.status === 'LIVE').length,
+    live: events.filter((e) => isLiveNow(e)).length,
     completed: events.filter((e) => e.status === 'EXPIRED' || e.status === 'ARCHIVED').length,
   };
 

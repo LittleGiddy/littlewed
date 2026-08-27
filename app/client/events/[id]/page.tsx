@@ -11,11 +11,12 @@ import {
   Search, Download, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
   Check, Coins, Sparkles, Hash, Loader2, MoreVertical,
-  Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle,
+  Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import ThanksCardModal from '@/components/ThanksCardModal';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 interface Guest {
@@ -44,7 +45,7 @@ interface EventData {
   address: string;
   commission_paid: boolean;
   thankYouCardUrl: string | null;
-  tenant: { testMode: boolean };
+  tenant: { testMode: boolean; bypassPayment?: boolean };
   status: string;
   pausedAt: string | null;
   expiresAt: string | null;
@@ -154,8 +155,6 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [backupSearch, setBackupSearch] = useState('');
   const [backupPage, setBackupPage] = useState(1);
   const [showThanksModal, setShowThanksModal] = useState(false);
-  const [thanksMessage, setThanksMessage] = useState('');
-  const [sendingThanks, setSendingThanks] = useState(false);
   const [showKumbushaModal, setShowKumbushaModal] = useState(false);
   const [kumbushaMessage, setKumbushaMessage] = useState('');
   const [sendingKumbusha, setSendingKumbusha] = useState(false);
@@ -387,44 +386,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return filteredBackup.slice(start, start + pageSize);
   }, [filteredBackup, backupPage, pageSize]);
 
-  // ─── Kumbusha / Thanks ──────────────────────────────────────────────
-  const whatsappCheckedInGuests = guests.filter(g => g.checkedIn && g.routingChannel === 'whatsapp');
-  const checkedInCount = whatsappCheckedInGuests.length;
+  // ─── Thanks Card ─────────────────────────────────────────────────────
+  // The Thanks Card modal handles both WhatsApp (single uploaded card, no
+  // variables) and SMS (individualized message) for checked-in guests only.
+  const checkedInCount = guests.filter(g => g.checkedIn).length;
 
   const openThanksModal = () => {
-    if (checkedInCount === 0) { toast.error('No WhatsApp-checked-in guests to thank.'); return; }
-    setThanksMessage(`Thank you for attending ${event?.name}! We hope you enjoyed the event.`);
+    if (checkedInCount === 0) { toast.error('No checked-in guests to thank yet.'); return; }
     setShowThanksModal(true);
     setShowManageMenu(false);
-  };
-
-  const sendThanks = async () => {
-    if (!thanksMessage.trim()) { toast.error('Please enter a thank-you message.'); return; }
-    const totalCost = checkedInCount * 300;
-    if (credits !== null && credits < totalCost) { toast.error(`Insufficient credits. Need ${totalCost} TZS, you have ${credits} TZS.`); return; }
-    const ok = await confirmToast({
-      title: `Send thank-you to ${checkedInCount} WhatsApp guest${checkedInCount > 1 ? 's' : ''}?`,
-      message: `This will cost ${totalCost} TZS.`,
-      confirmText: 'Send',
-    });
-    if (!ok) return;
-    setSendingThanks(true);
-    let successCount = 0; const errors: string[] = [];
-    for (const guest of whatsappCheckedInGuests) {
-      try {
-        const res = await fetch('/api/invitations/send-whatsapp', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestId: guest.id, eventId, message: thanksMessage, type: 'thanks' }), credentials: 'include',
-        });
-        const data = await res.json();
-        if (res.ok) successCount++; else errors.push(`${guest.name}: ${data.error || 'Unknown error'}`);
-      } catch { errors.push(`${guest.name}: Network error`); }
-      await new Promise(r => setTimeout(r, 300));
-    }
-    if (errors.length === 0) toast.success(`Thank-you sent to ${successCount} of ${checkedInCount} guests.`);
-    else toast.error(`Sent ${successCount}/${checkedInCount}. Errors: ${errors.join(', ')}`);
-    setSendingThanks(false); setShowThanksModal(false);
-    fetchCredits(); fetchData(eventId!);
   };
 
   const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
@@ -486,6 +456,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Do not allow a date/time change once any guest has checked in.
+    const originalDate = event?.date ? new Date(event.date).getTime() : null;
+    const editedDate = editForm.date ? new Date(editForm.date).getTime() : null;
+    if (checkedInAll > 0 && originalDate !== null && editedDate !== null && originalDate !== editedDate) {
+      toast.error('The event date/time cannot be changed because guests have already checked in.');
+      return;
+    }
     setEditing(true);
     try {
       // Build timezone-aware ISO string so server stores correct UTC time
@@ -1866,84 +1843,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         </div>
       )}
 
-      {/* ─── Thanks Modal ─── */}
-      {showThanksModal && (
-        <div
-          className="modal-overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowThanksModal(false);
-          }}
-        >
-          <div className="modal-content">
-            <div className="modal-header">
-              <div className="modal-title">
-                Tuma <span>Shukrani</span>
-              </div>
-              <button className="modal-close" onClick={() => setShowThanksModal(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[rgba(13,75,75,0.1)] flex items-center justify-center text-[#0D4B4B]">
-                  <Heart size={18} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Wageni wa kupokea</p>
-                  <p className="font-bold text-gray-800">{checkedInCount} WhatsApp guests</p>
-                </div>
-              </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-amber-600">
-                  <Coins size={20} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">Gharama: {checkedInCount * 300} TZS</p>
-                  {credits !== null && <p className="text-xs text-gray-400">Mikopo iliyobaki: {credits} TZS</p>}
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 mb-4 text-center border border-gray-200">
-                {event.thankYouCardUrl ? (
-                  <img
-                    src={event.thankYouCardUrl}
-                    alt="Thanks Card"
-                    className="max-h-32 mx-auto rounded-lg object-contain"
-                  />
-                ) : (
-                  <p className="text-sm text-gray-400">Hakuna kadi ya shukrani</p>
-                )}
-              </div>
-              <label className="field-label">Ujumbe wa shukrani</label>
-              <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none text-sm"
-                rows={3}
-                value={thanksMessage}
-                onChange={(e) => setThanksMessage(e.target.value)}
-                placeholder="Andika ujumbe wa shukrani..."
-              />
-              <div className="text-right text-xs text-gray-400 mt-1">{thanksMessage.length} herufi</div>
-              <div className="flex gap-3 mt-4">
-                <button className="flex-1 btn-secondary" onClick={() => setShowThanksModal(false)}>
-                  Ghairi
-                </button>
-                <button
-                  className="flex-1 btn-primary"
-                  onClick={sendThanks}
-                  disabled={
-                    sendingThanks ||
-                    !thanksMessage.trim() ||
-                    (credits !== null && credits < checkedInCount * 300) ||
-                    !event.thankYouCardUrl
-                  }
-                >
-                  {sendingThanks ? <Loader2 size={18} className="animate-spin" /> : <Heart size={18} />}
-                  {sendingThanks ? 'Inatuma...' : 'Tuma Shukrani'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─── Thanks Card Modal ─── */}
+      <ThanksCardModal
+        open={showThanksModal}
+        eventId={eventId!}
+        event={event}
+        guests={guests}
+        isBypassed={!!event?.tenant?.bypassPayment}
+        credits={credits}
+        onClose={() => setShowThanksModal(false)}
+        onSent={() => { fetchCredits(); fetchData(eventId!); }}
+      />
 
       {/* ─── Edit Event Modal ─── */}
       {showEditModal && (
@@ -2005,8 +1915,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     onChange={handleEditChange}
                     className="field-input"
                     min={new Date().toISOString().slice(0, 16)}
+                    disabled={checkedInAll > 0}
                     required
                   />
+                  {checkedInAll > 0 && (
+                    <p className="mt-1.5 text-[11px] leading-snug text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                      <Lock size={12} />
+                      Date/time is locked because {checkedInAll} guest{checkedInAll > 1 ? 's have' : ' has'} already checked in.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex gap-3 mt-6">

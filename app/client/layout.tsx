@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Info, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
+import IdleSessionTimeout from '@/components/IdleSessionTimeout';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -178,6 +179,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
+      {/* Auto sign-out after 30 min of inactivity (kept off live check-in stations) */}
+      {!pathname.startsWith('/client/check-in') && <IdleSessionTimeout />}
+
       {/* ── Desktop Sidebar ── */}
       <aside
         className={`hidden lg:block fixed inset-y-0 left-0 w-[272px] z-30 bg-white border-r border-gray-200 shadow-sm overflow-hidden transition-transform duration-300 ease-in-out ${

@@ -89,6 +89,41 @@ const SMS_FIELD_LABELS: Record<string, string> = {
   time: 'Event Time',
 };
 
+// ─── Approved Invitation Templates ─────────────────────────────────────
+// Each template maps to a WhatsApp (pre-approved) template name plus the
+// corresponding SMS body. `hasContact` adds the var10 / {contact} variable.
+const INVITE_TEMPLATES: Record<
+  string,
+  { label: string; whatsappName: string; hasContact: boolean; smsBody: string }
+> = {
+  mwaliko: {
+    label: 'Mwaliko',
+    whatsappName: 'Mwalikotemp',
+    hasContact: false,
+    smsBody: `Habari {guestName},
+
+Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}.
+
+Reception: {venue}, saa {time}
+
+Card No: {cardNumber} {guestType}
+
+Tafadhali onyesha kadi hii wakati wa kuingia.
+Karibu sana!`,
+  },
+  mwalikosecond: {
+    label: 'Mwalikosecond',
+    whatsappName: 'Mwalikosecond',
+    hasContact: true,
+    smsBody: `Habari {guestName}
+Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}
+Reception itafanyika {venue} kuanzia saa {time}
+Card No: {cardNumber} {guestType}
+kwa mawasiliano zaidi: {contact}
+Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante`,
+  },
+};
+
 export default function SendInvitationsPage() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -132,6 +167,10 @@ export default function SendInvitationsPage() {
   const [smsTemplate, setSmsTemplate] = useState(DEFAULT_SMS_TEMPLATE);
   const [showVariables, setShowVariables] = useState(false);
   const [isSmsSaving, setIsSmsSaving] = useState(false);
+
+  // ─── Template picker + contact info (var10) ─────────────────────────
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('mwaliko');
+  const [contactInfo, setContactInfo] = useState('');
 
   // ─── WhatsApp Variables ──────────────────────────────────────────────
   const [whatsappVariables, setWhatsappVariables] = useState<Record<string, string>>({});
@@ -311,6 +350,15 @@ export default function SendInvitationsPage() {
     setWhatsappVariables(prev => ({ ...prev, [key]: value }));
   };
 
+  // ─── Choose an approved template ──────────────────────────────────────
+  const applyTemplate = (id: string) => {
+    const t = INVITE_TEMPLATES[id];
+    if (!t) return;
+    setSelectedTemplate(id);
+    setSmsTemplate(t.smsBody);
+    toast.success(`${t.label} template selected`);
+  };
+
   // ─── Build SMS Message from Template ──────────────────────────────────
   const buildSmsMessage = (template: string, guest: Guest): string => {
     const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
@@ -333,10 +381,11 @@ export default function SendInvitationsPage() {
       eventDate: smsVariables.eventDate,
       venue: smsVariables.venue,
       time: smsVariables.time,
+      contact: contactInfo,
     };
 
     return template.replace(
-      /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|hostFamily|person1|person2|eventDate|venue|time)\}/g,
+      /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|hostFamily|person1|person2|eventDate|venue|time|contact)\}/g,
       (match: string, key: string) => varsMap[key] ?? match
     );
   };
@@ -437,7 +486,8 @@ export default function SendInvitationsPage() {
 
   // ─── Generate Cards ────────────────────────────────────────────────────
   const handleGenerateCards = async () => {
-    const pendingGuests = guests.filter(g => !g.passCode);
+    // Regenerate guests that are missing a pass code OR a card image.
+    const pendingGuests = guests.filter(g => !g.passCode || !g.invitationCard);
     if (pendingGuests.length === 0) {
       toast.success('All guests already have cards');
       return;
@@ -526,6 +576,8 @@ export default function SendInvitationsPage() {
           smsTemplate,
           smsVariables,
           whatsappVariables,
+          whatsappTemplate: INVITE_TEMPLATES[selectedTemplate]?.whatsappName,
+          whatsappContact: contactInfo,
         }),
         credentials: 'include',
       });
@@ -650,6 +702,8 @@ export default function SendInvitationsPage() {
           smsTemplate,
           smsVariables,
           whatsappVariables,
+          whatsappTemplate: INVITE_TEMPLATES[selectedTemplate]?.whatsappName,
+          whatsappContact: contactInfo,
           retry: true,
         }),
         credentials: 'include',
@@ -885,6 +939,61 @@ export default function SendInvitationsPage() {
         </div>
       </div>
 
+      {/* ─── Template Picker ─── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <FileText size={18} className="text-[#0D4B4B]" />
+          <h2 className="font-semibold text-gray-800 text-base">Choose Invitation Template</h2>
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          Select an approved template. This sets both the WhatsApp template name and the SMS message.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Object.entries(INVITE_TEMPLATES).map(([id, t]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => applyTemplate(id)}
+              className={`text-left rounded-xl border p-4 transition-all ${
+                selectedTemplate === id
+                  ? 'border-[#0D4B4B] bg-[#0D4B4B]/5 ring-1 ring-[#0D4B4B]'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-sm text-gray-900">
+                  <Check size={14} className={`inline mr-1 ${selectedTemplate === id ? 'text-[#0D4B4B]' : 'text-gray-300'}`} />
+                  {t.label}
+                </p>
+                <code className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">
+                  {t.whatsappName}
+                </code>
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">
+                WhatsApp template: <b>{t.whatsappName}</b>
+                {t.hasContact ? ' · includes a contact variable' : ''}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        {INVITE_TEMPLATES[selectedTemplate]?.hasContact && (
+          <div className="mt-4">
+            <label className="block text-[10px] font-medium text-gray-700 mb-1">
+              Contact Info (variable: {'{contact}'} / var10)
+              <span className="text-gray-400 text-[8px] ml-1">e.g. +255 712 345 678</span>
+            </label>
+            <input
+              type="text"
+              value={contactInfo}
+              onChange={(e) => setContactInfo(e.target.value)}
+              placeholder="Enter contact for var10..."
+              className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+            />
+          </div>
+        )}
+      </div>
+
       {/* ─── SMS Editor ─── */}
       {activeChannel === 'sms' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
@@ -999,6 +1108,9 @@ export default function SendInvitationsPage() {
             <MessageCircle size={18} className="text-green-600" />
             <h2 className="font-semibold text-gray-800 text-base">WhatsApp Template</h2>
             <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
+            <code className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+              {INVITE_TEMPLATES[selectedTemplate]?.whatsappName || 'Mwalikotemp'}
+            </code>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
