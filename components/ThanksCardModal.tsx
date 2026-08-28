@@ -122,6 +122,10 @@ export default function ThanksCardModal({
       toast.error('Please select an image file.');
       return;
     }
+    if (file.size > 1 * 1024 * 1024) {
+      toast.error('Image is too large. Maximum size is 1MB.');
+      return;
+    }
     setCardFile(file);
     setCardPreview(URL.createObjectURL(file));
   };

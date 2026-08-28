@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
+import { sendPushToTenantRole } from '@/lib/push';
 
 export async function POST(
   req: NextRequest,
@@ -30,6 +31,13 @@ export async function POST(
   });
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  }
+
+  // ─── Once-per-event lock (non-bypassed tenants only) ───────────────
+  if (!event.tenant.bypassPayment && event.manualReminderSent) {
+    return NextResponse.json({
+      error: 'Reminder messages can only be sent once per event. This event has already used its reminder. Bypassed (test/free) tenants are unlimited.',
+    }, { status: 403 });
   }
 
   const guests = await prisma.guest.findMany({
@@ -102,6 +110,21 @@ export async function POST(
 
   const successCount = results.filter(r => r.success).length;
   const errors = results.filter(r => !r.success).map(r => ({ guestId: r.guestId, error: r.error }));
+
+  if (successCount > 0) {
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { manualReminderSent: true },
+    });
+
+    sendPushToTenantRole(tenantId, 'CLIENT', {
+      title: 'Reminders sent',
+      body: `Reminder messages sent to ${successCount} guest${successCount > 1 ? 's' : ''} for ${event.name}.`,
+      url: '/client/dashboard',
+      type: 'success',
+      sound: true,
+    }).catch(() => {});
+  }
 
   return NextResponse.json({
     success: true,

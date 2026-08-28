@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { sendPushToTenantRole } from '@/lib/push';
 
 // ─── Helper Functions ────────────────────────────────────────────────
 
@@ -53,11 +54,26 @@ function getCheckInStartTime(
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const tenantId = (session.user as any).tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(req.url);
     const eventId = searchParams.get('eventId');
 
     if (!eventId) {
       return NextResponse.json({ error: 'Event ID required' }, { status: 400 });
+    }
+
+    // Verify the event belongs to the caller's tenant.
+    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
     const guests = await prisma.guest.findMany({
@@ -149,8 +165,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── TIME VALIDATION: Check if event has started ──────────────────
-    const event = await prisma.event.findUnique({
-      where: { id: guest.eventId },
+    const event = await prisma.event.findFirst({
+      where: { id: guest.eventId, tenantId: (session.user as any).tenantId },
       select: {
         id: true,
         name: true,
@@ -160,7 +176,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Event not found for this account.' },
+        { status: 404 }
+      );
     }
 
     const checkInAvailableAt = getCheckInStartTime(
@@ -211,6 +230,18 @@ export async function POST(req: NextRequest) {
         checkedInAt: new Date(),
       },
     });
+
+    // ─── Notify the tenant owner(s) of the check-in (fire & forget) ──
+    const fullName = updated.title ? `${updated.title} ${updated.name}` : updated.name;
+    sendPushToTenantRole((session.user as any).tenantId, 'CLIENT', {
+      title: `${fullName} checked in`,
+      body: isFullyCheckedIn
+        ? `${fullName} has fully checked in to ${event.name} (${newCount}/${maxCheckIns}).`
+        : `${fullName} checked in to ${event.name} (${newCount}/${maxCheckIns}).`,
+      url: '/client/dashboard',
+      type: 'success',
+      sound: true,
+    }).catch(() => {});
 
     // ─── If called with guestId, redirect to success page ─────────────
     if (guestIdFromQuery) {

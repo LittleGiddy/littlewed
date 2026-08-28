@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.byteLength > 1 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image is too large. Maximum size is 1MB.' }, { status: 400 });
+    }
     const key = `guests/${tenantId}/${guestId}.png`;
     const url = await uploadToBlob(key, buffer, 'image/png');
 

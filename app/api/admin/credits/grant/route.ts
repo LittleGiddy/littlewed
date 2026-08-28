@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendCreditGrantedEmail } from '@/lib/email';
+import { sendPushToUser } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -80,6 +81,15 @@ export async function POST(req: NextRequest) {
       ).catch((err) => console.error('Failed to send credit granted email:', err));
     }
 
+    // Push notification to requester
+    sendPushToUser(request.userId, {
+      title: 'Credits Granted',
+      body: `Your request for ${credits} credits has been approved and added to your account.`,
+      url: '/client/settings',
+      type: 'success',
+      sound: true,
+    }).catch(() => {});
+
     return NextResponse.json({ success: true, credits });
   }
 
@@ -103,6 +113,15 @@ export async function POST(req: NextRequest) {
         isRead: false,
       },
     });
+
+    // Push notification to requester
+    sendPushToUser(request.userId, {
+      title: 'Credit Request Declined',
+      body: 'Your credit request has been declined by the admin.',
+      url: '/client/settings',
+      type: 'error',
+      sound: true,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true });
   }

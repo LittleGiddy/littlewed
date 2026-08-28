@@ -28,6 +28,7 @@ model User {
   sessions      Session[]
 
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
 }
 
 // ─── NextAuth Models ──────────────────────────────────────────────────────
@@ -123,6 +124,7 @@ model Event {
   expiresAt     DateTime? // when the event will be permanently archived
   resumedAt     DateTime? // when the event was last resumed (for tracking)
   reminderSent  Boolean  @default(false) // track if 24h reminder was sent
+  manualReminderSent Boolean @default(false) // track if the manual reminder-message feature was used (once per event for non-bypassed tenants)
   expiredNotified Boolean @default(false) // track if expiration email was sent
   checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
   qrRotation       Float?   @default(0)
@@ -315,6 +317,19 @@ model Notification {
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
+}
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String   @unique
+  keysP256dh String
+  keysAuth   String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Template {

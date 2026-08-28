@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import {
   Building2, Users, CreditCard, UserCheck, UserCog,
-  TrendingUp, ArrowUpRight, ChevronRight, Sparkles, Activity,
+  TrendingUp, ArrowUpRight, ChevronRight, Sparkles, Activity, Bell,
 } from 'lucide-react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ export default async function AdminDashboard() {
   const session = await getServerSession(authOptions);
   if (!session || session.user?.role !== 'SUPER_ADMIN') redirect('/login');
 
-  const [tenants, pendingUsers, totalStaff, totalCredits, messageFailure24h] = await Promise.all([
+  const [tenants, pendingUsers, totalStaff, totalCredits, messageFailure24h, pendingCreditRequests, pushSubscribers, todayCheckIns] = await Promise.all([
     prisma.tenant.findMany({
       include: { users: true },
       orderBy: { createdAt: 'desc' }
@@ -30,12 +30,16 @@ export default async function AdminDashboard() {
         createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
       },
     }),
+    prisma.creditRequest.count({ where: { status: 'PENDING' } }),
+    prisma.pushSubscription.count(),
+    prisma.guest.count({ where: { checkedInAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } } }),
   ]);
 
   const activeSubscriptions = tenants.filter(t => t.subscriptionStatus === 'active').length;
   const totalUsers = tenants.reduce((acc, t) => acc + t.users.length, 0);
   const totalCreditsSum = totalCredits._sum?.credits ?? 0;
   const inactiveTenants = tenants.length - activeSubscriptions;
+  const lowCreditTenants = tenants.filter(t => (t.credits ?? 0) <= 0).length;
 
   const stats = [
     { label: 'Tenants', value: tenants.length, icon: Building2, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', trend: null },
@@ -44,6 +48,8 @@ export default async function AdminDashboard() {
     { label: 'Pending', value: pendingUsers, icon: UserCheck, color: 'text-amber-600', bg: 'bg-amber-50', trend: pendingUsers > 0 ? 'Needs review' : 'All clear' },
     { label: 'Staff', value: totalStaff, icon: UserCog, color: 'text-violet-600', bg: 'bg-violet-50', trend: null },
     { label: 'Credits', value: totalCreditsSum.toLocaleString(), icon: CreditCard, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', trend: 'Total pool' },
+    { label: 'Push Subscribers', value: pushSubscribers, icon: Bell, color: 'text-sky-600', bg: 'bg-sky-50', trend: 'Web push devices' },
+    { label: 'Check-ins Today', value: todayCheckIns, icon: UserCheck, color: 'text-teal-600', bg: 'bg-teal-50', trend: 'Across all events' },
   ];
 
   return (
@@ -191,6 +197,44 @@ export default async function AdminDashboard() {
           <div className="p-5">
             <ActivityFeed />
           </div>
+        </div>
+      </div>
+
+      {/* Needs Attention */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-500" />
+            <h2 className="text-sm font-semibold text-gray-900">Needs Attention</h2>
+          </div>
+          <p className="text-xs text-gray-400 mt-0.5">Actionable items across the platform</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 p-5">
+          <Link href="/admin/credit-requests" className={`rounded-xl border p-4 transition-all hover:shadow-sm ${pendingCreditRequests > 0 ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50' : 'border-gray-100 bg-gray-50/60'}`}>
+            <p className="text-2xl font-bold text-gray-900">{pendingCreditRequests}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">Pending credit requests</p>
+            {pendingCreditRequests > 0 && <p className="text-[11px] text-amber-600 mt-1">Review now</p>}
+          </Link>
+          <Link href="/admin/tenants" className={`rounded-xl border p-4 transition-all hover:shadow-sm ${lowCreditTenants > 0 ? 'border-red-200 bg-red-50/60 hover:bg-red-50' : 'border-gray-100 bg-gray-50/60'}`}>
+            <p className="text-2xl font-bold text-gray-900">{lowCreditTenants}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">Tenants with 0 credits</p>
+            {lowCreditTenants > 0 && <p className="text-[11px] text-red-600 mt-1">May be blocked</p>}
+          </Link>
+          <Link href="/admin/users" className={`rounded-xl border p-4 transition-all hover:shadow-sm ${pendingUsers > 0 ? 'border-blue-200 bg-blue-50/60 hover:bg-blue-50' : 'border-gray-100 bg-gray-50/60'}`}>
+            <p className="text-2xl font-bold text-gray-900">{pendingUsers}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">Unactivated users</p>
+            {pendingUsers > 0 && <p className="text-[11px] text-blue-600 mt-1">Awaiting approval</p>}
+          </Link>
+          <Link href="/admin/tenants" className={`rounded-xl border p-4 transition-all hover:shadow-sm ${inactiveTenants > 0 ? 'border-orange-200 bg-orange-50/60 hover:bg-orange-50' : 'border-gray-100 bg-gray-50/60'}`}>
+            <p className="text-2xl font-bold text-gray-900">{inactiveTenants}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">Inactive tenants</p>
+            {inactiveTenants > 0 && <p className="text-[11px] text-orange-600 mt-1">Subscription lapsed</p>}
+          </Link>
+          <Link href="/admin/logs" className={`rounded-xl border p-4 transition-all hover:shadow-sm ${messageFailure24h > 0 ? 'border-red-200 bg-red-50/60 hover:bg-red-50' : 'border-gray-100 bg-gray-50/60'}`}>
+            <p className="text-2xl font-bold text-gray-900">{messageFailure24h}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-0.5">Msg failures (24h)</p>
+            {messageFailure24h > 0 && <p className="text-[11px] text-red-600 mt-1">Check delivery</p>}
+          </Link>
         </div>
       </div>
 

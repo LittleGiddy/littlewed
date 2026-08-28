@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
@@ -9,6 +11,25 @@ export async function GET(
   console.log('API called for eventId:', eventId);
 
   try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const role = (session.user as any).role;
+    if (role !== 'CLIENT' && role !== 'STAFF' && role !== 'SUPER_ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    const tenantId = (session.user as any).tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
+    }
+
+    // Verify the event belongs to the caller's tenant.
+    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
     const guests = await prisma.guest.findMany({
       where: { eventId },
       select: {

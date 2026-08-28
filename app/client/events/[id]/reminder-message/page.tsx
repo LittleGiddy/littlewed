@@ -23,6 +23,7 @@ interface Guest {
 interface Event {
   id: string;
   name: string;
+  manualReminderSent?: boolean;
 }
 
 export default function ReminderMessagePage({ params }: { params: Promise<{ eventId: string }> }) {
@@ -35,6 +36,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState<number | null>(null);
+  const [bypassPayment, setBypassPayment] = useState(false);
 
   useEffect(() => {
     params.then(({ eventId }) => {
@@ -51,6 +53,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       const data = await res.json();
       setEvent(data.event);
       setGuests(data.guests || []);
+      setBypassPayment(!!data.bypassPayment);
     } catch {
       toast.error('Could not load event data');
     } finally {
@@ -84,12 +87,18 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   };
 
   const selectedCount = selectedGuests.size;
+  // Once-per-event lock: non-bypassed tenants can use the manual reminder once.
+  const alreadyUsed = !bypassPayment && !!event?.manualReminderSent;
   // Cost: first 2 reminders free, then 50 TZS each
   const totalCost = guests
     .filter(g => selectedGuests.has(g.id))
     .reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
 
   const sendReminders = async () => {
+    if (alreadyUsed) {
+      toast.error('Reminder messages have already been sent for this event.');
+      return;
+    }
     if (selectedCount === 0) {
       toast.error('Please select at least one guest.');
       return;
@@ -175,13 +184,38 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
         </h1>
       </div>
 
+      {alreadyUsed ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-800">Reminder already sent</p>
+            <p className="text-sm text-amber-700 mt-0.5">
+              Reminder messages can only be sent once per event. This event has already used its
+              reminder. If you need to reach guests again, please contact support.
+            </p>
+          </div>
+        </div>
+      ) : bypassPayment ? (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-green-800">Unlimited reminders</p>
+            <p className="text-sm text-green-700 mt-0.5">
+              Your account is set to bypass usage limits, so you can send reminders as many times as
+              you need.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleSelectAll}
-                className="text-sm text-gray-600 hover:text-[#0D4B4B] flex items-center gap-1"
+                disabled={alreadyUsed}
+                className="text-sm text-gray-600 hover:text-[#0D4B4B] flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
                 {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
@@ -239,7 +273,8 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                     type="checkbox"
                     checked={selectedGuests.has(guest.id)}
                     onChange={() => toggleSelectGuest(guest.id)}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
+                    disabled={alreadyUsed}
+                    className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B] disabled:opacity-40"
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -277,7 +312,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           <div className="mt-6 flex gap-3">
             <button
               onClick={sendReminders}
-              disabled={sending || selectedCount === 0 || !message.trim() || (totalCost > 0 && credits !== null && credits < totalCost)}
+              disabled={sending || alreadyUsed || selectedCount === 0 || !message.trim() || (totalCost > 0 && credits !== null && credits < totalCost)}
               className="flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send size={18} />}

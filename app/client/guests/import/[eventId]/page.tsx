@@ -718,7 +718,7 @@ export default function ImportGuestsPage() {
   const downloadInvalid = () => {
     const invalid = parsedGuests.filter(g => !g.isValid);
     if (invalid.length === 0) {
-      toast('No invalid guests to export');
+      toast('No invalid guests to export', { icon: <FileSpreadsheet size={16} className="text-gray-400" /> });
       return;
     }
     const header = 'Name,Original Phone,Reason';

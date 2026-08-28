@@ -285,9 +285,9 @@ export default function InvitationDesigner() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    const MAX_FILE_SIZE = 3 * 1024 * 1024;
+    const MAX_FILE_SIZE = 1 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
-      toast.error('File size exceeds 3MB limit. Please compress your image and try again.');
+      toast.error('File size exceeds 1MB limit. Please compress your image and try again.');
       e.target.value = '';
       return;
     }
@@ -997,7 +997,7 @@ export default function InvitationDesigner() {
             )}
           </div>
         </div>
-        <p className="text-xs text-gray-400 mb-2 sm:mb-3">Max file size: 3MB</p>
+        <p className="text-xs text-gray-400 mb-2 sm:mb-3">Max file size: 1MB</p>
         {templates.length === 0 ? (
           <div className="text-center py-6 sm:py-8 text-gray-400">
             <ImageIcon size={28} className="sm:text-4xl mx-auto mb-2 opacity-50" />

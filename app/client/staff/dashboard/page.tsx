@@ -2,15 +2,27 @@
 import { useRef, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Search, CheckCircle, XCircle, Users, Camera, Key, QrCode, Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import Link from 'next/link';
+import {
+  Search, CheckCircle, XCircle, Users, Camera, Key, Calendar,
+  ChevronRight, Scan, Loader2, User, UserCheck, CheckCheck, Trash2, ArrowLeft,
+  Info, PartyPopper
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 
 interface Guest {
   id: string;
   name: string;
-  phone: string;
+  title: string | null;
+  cardNumber: string | null;
+  guestType: string | null;
+  checkInCount: number;
   checkedIn: boolean;
+  checkedInAt: string | null;
+  phone: string | null;
+  routingChannel: string;
+  createdAt: string;
 }
 
 interface Event {
@@ -19,42 +31,59 @@ interface Event {
   date: string;
 }
 
-// ─── Sound effects using Web Audio API ────────────────────────────────
 const playSound = (type: 'success' | 'fail') => {
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
 
-  if (type === 'success') {
-    oscillator.frequency.value = 880;
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.4);
-
-    setTimeout(() => {
-      const osc2 = audioCtx.createOscillator();
-      const gain2 = audioCtx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(audioCtx.destination);
-      osc2.frequency.value = 1108;
-      osc2.type = 'sine';
-      gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-      osc2.start(audioCtx.currentTime);
-      osc2.stop(audioCtx.currentTime + 0.3);
-    }, 150);
-  } else {
-    oscillator.frequency.value = 440;
-    oscillator.type = 'sawtooth';
-    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.5);
+    if (type === 'success') {
+      oscillator.frequency.value = 880;
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.4);
+      setTimeout(() => {
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.frequency.value = 1108;
+        osc2.type = 'sine';
+        gain2.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc2.start(audioCtx.currentTime);
+        osc2.stop(audioCtx.currentTime + 0.3);
+      }, 150);
+    } else {
+      oscillator.frequency.value = 440;
+      oscillator.type = 'sawtooth';
+      gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    }
+  } catch {
+    // Silent fail if audio context not supported
   }
+};
+
+const getFullName = (guest: Guest) => guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
+const getGuestTypeLabel = (type: string | null) => {
+  if (!type) return 'SINGLE';
+  return type.toUpperCase();
+};
+
+const getCheckInStatus = (guest: Guest) => {
+  const max = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+  const count = guest.checkInCount || 0;
+  if (count >= max) return { label: 'Fully Checked In', color: 'text-green-600 bg-green-50', icon: CheckCheck };
+  if (count > 0) return { label: `Partial (${count}/${max})`, color: 'text-amber-600 bg-amber-50', icon: UserCheck };
+  return { label: 'Not Scanned', color: 'text-gray-400 bg-gray-50', icon: User };
 };
 
 export default function StaffDashboard() {
@@ -63,96 +92,61 @@ export default function StaffDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [guests, setGuests] = useState<Guest[]>([]);
-  const [filteredGuests, setFilteredGuests] = useState<Guest[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [showCheckinModal, setShowCheckinModal] = useState(false);
-  const [checkinMode, setCheckinMode] = useState<'qr' | 'manual'>('qr');
-  const [manualCode, setManualCode] = useState('');
-  const [scanning, setScanning] = useState(false);
+  const [loadingGuests, setLoadingGuests] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'scan' | 'data'>('scan');
+  const [cardNumber, setCardNumber] = useState('');
+  const [loadingCheckin, setLoadingCheckin] = useState(false);
+  const [message, setMessage] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [scannedGuest, setScannedGuest] = useState<Guest | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [forceCheckinGuest, setForceCheckinGuest] = useState<Guest | null>(null);
+
+  const [blockedMessage, setBlockedMessage] = useState('');
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [qrMessage, setQrMessage] = useState('');
-  const [qrMessageType, setQrMessageType] = useState<'success' | 'error' | 'info'>('info');
-  const [blockedMessage, setBlockedMessage] = useState('');
-  const [availableAt, setAvailableAt] = useState('');
-  const [countdown, setCountdown] = useState('');
-  const [guestName, setGuestName] = useState('');
-  const [guestType, setGuestType] = useState('');
-  const [checkedIn, setCheckedIn] = useState(false);
-  const [loadingCheckin, setLoadingCheckin] = useState(false);
-  const itemsPerPage = 10;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
 
-  // ─── Auth Check ──────────────────────────────────────────────────────
+  // ─── Auth + load events ────────────────────────────────────────────
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
     if (session?.user?.role !== 'STAFF') router.push('/login');
     if (session) {
       fetch('/api/events', { credentials: 'include' })
         .then(res => res.json())
-        .then(data => { if (Array.isArray(data)) setEvents(data); else setEvents([]); })
+        .then(data => { if (Array.isArray(data)) setEvents(data); })
         .catch(() => toast.error('Failed to load events'))
         .finally(() => setLoading(false));
     }
   }, [session, status, router]);
 
-  // ─── Load Guests ─────────────────────────────────────────────────────
+  // ─── Load guests for selected event ────────────────────────────────
   const loadGuests = async (eventId: string) => {
     setSelectedEventId(eventId);
-    setCurrentPage(1);
     setSearchTerm('');
-    const res = await fetch(`/api/events/${eventId}/guests?_=${Date.now()}`, { credentials: 'include' });
-    const data = await res.json();
-    setGuests(data);
-    setFilteredGuests(data);
+    setLoadingGuests(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/guests?_=${Date.now()}`, { credentials: 'include' });
+      const data = await res.json();
+      if (Array.isArray(data)) setGuests(data);
+      else setGuests([]);
+    } catch {
+      setGuests([]);
+    } finally {
+      setLoadingGuests(false);
+    }
   };
 
-  // ─── Filter Guests ──────────────────────────────────────────────────
+  // ─── QR Scanner ────────────────────────────────────────────────────
   useEffect(() => {
-    const filtered = guests.filter(g =>
-      g.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      g.phone.includes(searchTerm)
-    );
-    setFilteredGuests(filtered);
-    setCurrentPage(1);
-  }, [searchTerm, guests]);
-
-  // ─── Countdown Timer ────────────────────────────────────────────────
-  useEffect(() => {
-    if (!availableAt) {
-      setCountdown('');
-      return;
-    }
-
-    const timer = setInterval(() => {
-      const target = new Date(availableAt);
-      const now = new Date();
-      const diff = target.getTime() - now.getTime();
-
-      if (diff <= 0) {
-        setCountdown('🟢 Available now! Refresh to check in.');
-        clearInterval(timer);
-        return;
-      }
-
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setCountdown(
-        `${hours.toString().padStart(2, '0')}:${minutes
-          .toString()
-          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-      );
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [availableAt]);
-
-  // ─── QR Scanner ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!showCheckinModal || checkinMode !== 'qr') return;
+    if (activeTab !== 'scan' || !selectedEventId) return;
     let stream: MediaStream | null = null;
 
     const startCamera = async () => {
@@ -166,18 +160,15 @@ export default function StaffDashboard() {
         }
       } catch {
         toast.error('Camera access denied or not available');
-        setCheckinMode('manual');
       }
     };
     startCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      if (stream) stream.getTracks().forEach(track => track.stop());
       setScanning(false);
     };
-  }, [showCheckinModal, checkinMode]);
+  }, [activeTab, selectedEventId]);
 
   const scanFrame = () => {
     if (!videoRef.current || !canvasRef.current || !scanning) return;
@@ -206,713 +197,524 @@ export default function StaffDashboard() {
   };
 
   useEffect(() => {
-    if (scanning) {
-      requestAnimationFrame(scanFrame);
-    }
+    if (scanning) requestAnimationFrame(scanFrame);
   }, [scanning]);
 
-  // ─── Core Check-in Function ─────────────────────────────────────────
-  const processCheckin = async (token: string) => {
+  // ─── Core check-in (uses cardNumber field, matches client/check-in) ──
+  const processCheckin = async (value: string) => {
     setLoadingCheckin(true);
-    setQrMessage('');
-    setQrMessageType('info');
+    setMessage('');
+    setShowSuccess(false);
+    setScannedGuest(null);
     setBlockedMessage('');
-    setAvailableAt('');
-    setCheckedIn(false);
-    setGuestName('');
-    setGuestType('');
+    setScannedGuest(null);
 
     try {
+      const cleanValue = value.trim().padStart(5, '0');
       const res = await fetch('/api/check-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ cardNumber: cleanValue }),
         credentials: 'include',
       });
       const data = await res.json();
 
-      // ─── Event hasn't started yet ──────────────────────────────────────
       if (res.status === 403 && data.availableAt) {
-        setBlockedMessage(data.error);
-        setAvailableAt(data.availableAt);
         playSound('fail');
-        setQrMessageType('info');
-        setQrMessage(`⏰ ${data.error}`);
+        setBlockedMessage(data.error);
+        setShowSuccess(false);
         return;
       }
 
       if (res.ok) {
+        const guest = data.guest;
+        const isFully = guest.fullyCheckedIn;
+        const max = guest.maxCheckIns || 1;
+        const count = guest.checkInCount || 1;
+        const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+
         playSound('success');
-        setCheckedIn(true);
-        setGuestName(data.guest.name);
-        setGuestType(data.guest.guestType || '—');
-        setQrMessageType('success');
-        setQrMessage(`${data.guest.name} checked in`);
+        setScannedGuest(guest);
+        setShowSuccess(true);
+        setMessage(data.message || 'Checked in successfully');
+
+        if (isFully && max > 1) toast.success(`${fullName} fully checked in (${count}/${max})`);
+        else if (max > 1) toast.success(`${fullName} checked in (${count}/${max})`);
+        else toast.success(`Welcome ${fullName}`);
+
+        await loadGuests(selectedEventId);
+
         setTimeout(() => {
-          loadGuests(selectedEventId);
-          setShowCheckinModal(false);
-          setQrMessage('');
-          setCheckedIn(false);
-          setGuestName('');
-          setGuestType('');
-        }, 1500);
+          setShowSuccess(false);
+          setScannedGuest(null);
+          setMessage('');
+          setCardNumber('');
+          if (activeTab === 'scan') {
+            setScanning(true);
+            requestAnimationFrame(scanFrame);
+          }
+        }, 4000);
       } else {
         playSound('fail');
-        setQrMessageType('error');
-        setQrMessage(data.error);
+        setMessage(data.error || 'Check-in failed');
+        toast.error(data.error || 'Check-in failed');
+        setShowSuccess(false);
       }
     } catch {
       playSound('fail');
-      setQrMessageType('error');
-      setQrMessage('Network error');
+      setMessage('Network error');
+      setShowSuccess(false);
     } finally {
       setLoadingCheckin(false);
     }
   };
 
-  // ─── Manual Check-in ─────────────────────────────────────────────────
-  const handleManualCheckin = async (e: React.FormEvent) => {
+  const handleManualCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualCode) return;
+    if (!cardNumber || cardNumber.length !== 5) {
+      toast.error('Please enter a valid 5-digit card number');
+      return;
+    }
+    await processCheckin(cardNumber);
+    setCardNumber('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
 
-    setLoadingCheckin(true);
-    setQrMessage('');
-    setQrMessageType('info');
-    setBlockedMessage('');
-    setAvailableAt('');
-    setCheckedIn(false);
-    setGuestName('');
-    setGuestType('');
-
+  // ─── Force check-in ─────────────────────────────────────────────────
+  const handleForceCheckin = async (guest: Guest) => {
     try {
-      const res = await fetch('/api/check-in', {
-        method: 'POST',
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ smsCode: manualCode }),
+        body: JSON.stringify({ checkedIn: true }),
         credentials: 'include',
       });
-      const data = await res.json();
-
-      // ─── Event hasn't started yet ──────────────────────────────────────
-      if (res.status === 403 && data.availableAt) {
-        setBlockedMessage(data.error);
-        setAvailableAt(data.availableAt);
-        playSound('fail');
-        setQrMessageType('info');
-        setQrMessage(data.error);
-        setManualCode('');
-        return;
-      }
-
       if (res.ok) {
-        playSound('success');
-        setCheckedIn(true);
-        setGuestName(data.guest.name);
-        setGuestType(data.guest.guestType || '—');
-        setQrMessageType('success');
-        setQrMessage(`${data.guest.name} checked in`);
-        setManualCode('');
-        setTimeout(() => {
-          loadGuests(selectedEventId);
-          setShowCheckinModal(false);
-          setQrMessage('');
-          setCheckedIn(false);
-          setGuestName('');
-          setGuestType('');
-        }, 1500);
+        toast.success(`${getFullName(guest)} force checked in`);
+        await loadGuests(selectedEventId);
+        setForceCheckinGuest(null);
       } else {
-        playSound('fail');
-        setQrMessageType('error');
-        setQrMessage(data.error);
+        const data = await res.json();
+        toast.error(data.error || 'Failed to force check in');
       }
     } catch {
-      playSound('fail');
-      setQrMessageType('error');
-      setQrMessage('Network error');
-    } finally {
-      setLoadingCheckin(false);
+      toast.error('Network error');
     }
   };
 
-  const totalPages = Math.ceil(filteredGuests.length / itemsPerPage);
-  const paginatedGuests = filteredGuests.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const checkedInCount = filteredGuests.filter(g => g.checkedIn).length;
+  // ─── Delete guest ──────────────────────────────────────────────────
+  const handleDeleteGuest = async (guest: Guest) => {
+    try {
+      const res = await fetch(`/api/guests/${guest.id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) {
+        toast.success(`${getFullName(guest)} deleted`);
+        await loadGuests(selectedEventId);
+        setSelectedGuest(null);
+        setShowDeleteConfirm(false);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to delete guest');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
+  // ─── Derived data ──────────────────────────────────────────────────
+  const filteredGuests = guests.filter(g => {
+    const name = getFullName(g).toLowerCase();
+    const card = g.cardNumber || '';
+    return name.includes(searchTerm.toLowerCase()) || card.includes(searchTerm);
+  });
+
+  const totalGuests = guests.length;
+  const fullyCheckedIn = guests.filter(g => {
+    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    return (g.checkInCount || 0) >= max;
+  }).length;
+  const partiallyCheckedIn = guests.filter(g => {
+    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    return (g.checkInCount || 0) > 0 && (g.checkInCount || 0) < max;
+  }).length;
+  const notCheckedIn = totalGuests - fullyCheckedIn - partiallyCheckedIn;
+
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-        <div style={{ width: 40, height: 40, border: '4px solid #E2EAF0', borderTopColor: '#0D4B4B', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-[#0D4B4B]" />
       </div>
     );
   }
-
   if (!session || session.user?.role !== 'STAFF') return null;
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .sd-wrap {
-          font-family: 'DM Sans', 'Segoe UI', sans-serif;
-          max-width: 860px; margin: 0 auto; padding: 40px 24px 64px;
-          animation: sdFadeIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes sdFadeIn {
-          from { opacity: 0; transform: translateY(14px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .sd-header {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          gap: 16px; margin-bottom: 32px; flex-wrap: wrap;
-        }
-        .sd-eyebrow {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4B4B; text-transform: uppercase; margin-bottom: 6px;
-          display: flex; align-items: center; gap: 7px;
-        }
-        .sd-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #FF6B5C; }
-        .sd-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 30px; font-weight: 900; color: #0D1B1B;
-          line-height: 1.1; letter-spacing: -0.4px; margin: 0 0 4px;
-        }
-        .sd-title span { color: #FF6B5C; }
-        .sd-subtitle { font-size: 14px; color: #7A8FA6; margin: 0; }
-
-        .sd-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
-
-        .sd-stat-pill {
-          display: flex; align-items: center; gap: 8px;
-          background: white; border: 1.5px solid #E2EAF0; border-radius: 40px;
-          padding: 8px 16px; font-size: 13px; font-weight: 600; color: #4A6072;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-        }
-        .sd-stat-pill strong { color: #1A7A4A; font-weight: 800; }
-
-        .sd-checkin-btn {
-          display: inline-flex; align-items: center; gap: 7px;
-          padding: 10px 18px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4B4B, #0A3939);
-          color: white; font-size: 14px; font-weight: 700; font-family: inherit;
-          cursor: pointer; white-space: nowrap;
-          box-shadow: 0 4px 14px rgba(13,75,75,0.35);
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .sd-checkin-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
-        .sd-checkin-btn:active { transform: translateY(0); }
-
-        .sd-card {
-          background: white; border: 1.5px solid #E2EAF0; border-radius: 20px;
-          overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05);
-          margin-bottom: 20px;
-          animation: sdCardIn 0.5s 0.1s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes sdCardIn {
-          from { opacity: 0; transform: translateY(12px) scale(0.98); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .sd-card-bar { height: 4px; background: linear-gradient(90deg, #0D4B4B, #FF6B5C); }
-        .sd-card-body { padding: 22px 24px; }
-
-        .sd-select-label {
-          font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
-          color: #0D4B4B; text-transform: uppercase; margin-bottom: 10px;
-          display: flex; align-items: center; gap: 6px;
-        }
-        .sd-select {
-          width: 100%; padding: 13px 16px; border: 1.5px solid #E2EAF0; border-radius: 13px;
-          font-size: 14px; font-family: inherit; color: #0D1B1B; font-weight: 500;
-          background: white; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s; appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239BAAB8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-          background-repeat: no-repeat; background-position: right 14px center;
-          padding-right: 36px;
-        }
-        .sd-select:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
-
-        .sd-event-meta {
-          display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-          padding: 14px 24px; background: rgba(13,75,75,0.03);
-          border-bottom: 1.5px solid #F0F4F8;
-          font-size: 13px; color: #7A8FA6; font-weight: 500;
-        }
-        .sd-event-meta-item { display: flex; align-items: center; gap: 6px; }
-        .sd-event-meta-name {
-          font-family: 'Playfair Display', serif;
-          font-size: 15px; font-weight: 800; color: #0D1B1B; letter-spacing: -0.2px;
-        }
-
-        .sd-search-wrap { position: relative; margin-bottom: 16px; }
-        .sd-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #9BAAB8; pointer-events: none; }
-        .sd-search {
-          width: 100%; padding: 13px 14px 13px 42px;
-          border: 1.5px solid #E2EAF0; border-radius: 13px;
-          font-size: 14px; font-family: inherit; color: #0D1B1B; font-weight: 500;
-          background: white; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .sd-search:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
-
-        .sd-guest-card {
-          background: white; border: 1.5px solid #E2EAF0; border-radius: 20px;
-          overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05);
-          animation: sdCardIn 0.5s 0.2s cubic-bezier(0.16,1,0.3,1) both;
-        }
-
-        .sd-table-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 16px 24px; border-bottom: 1.5px solid #F0F4F8;
-        }
-        .sd-table-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 16px; font-weight: 800; color: #0D1B1B;
-        }
-        .sd-table-badge {
-          font-size: 11px; font-weight: 700; color: #0D4B4B;
-          background: rgba(13,75,75,0.08); border: 1px solid rgba(13,75,75,0.12);
-          padding: 3px 10px; border-radius: 20px;
-        }
-
-        .sd-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .sd-table thead { background: #F7F9FB; }
-        .sd-table th {
-          padding: 11px 20px; text-align: left;
-          font-size: 11px; font-weight: 700; letter-spacing: 1px;
-          color: #9BAAB8; text-transform: uppercase; border-bottom: 1.5px solid #F0F4F8;
-        }
-        .sd-table td { padding: 14px 20px; border-bottom: 1px solid #F7F9FB; vertical-align: middle; }
-        .sd-table tr:last-child td { border-bottom: none; }
-        .sd-table tbody tr { transition: background 0.12s; }
-        .sd-table tbody tr:hover { background: #F7FAFA; }
-
-        .sd-guest-name { font-weight: 700; color: #0D1B1B; }
-        .sd-guest-phone { color: #9BAAB8; font-size: 12.5px; margin-top: 2px; }
-
-        .sd-status-checked {
-          display: inline-flex; align-items: center; gap: 5px;
-          font-size: 12px; font-weight: 700; color: #1A7A4A;
-          background: rgba(26,122,74,0.08); border: 1px solid rgba(26,122,74,0.18);
-          padding: 4px 10px; border-radius: 20px;
-        }
-        .sd-status-pending {
-          display: inline-flex; align-items: center; gap: 5px;
-          font-size: 12px; font-weight: 700; color: #9BAAB8;
-          background: #F7F9FB; border: 1px solid #E2EAF0;
-          padding: 4px 10px; border-radius: 20px;
-        }
-
-        .sd-pagination {
-          display: flex; align-items: center; justify-content: center; gap: 8px;
-          padding: 16px 24px; border-top: 1.5px solid #F0F4F8;
-        }
-        .sd-page-btn {
-          display: flex; align-items: center; justify-content: center;
-          width: 34px; height: 34px; border-radius: 10px;
-          border: 1.5px solid #E2EAF0; background: white; cursor: pointer;
-          color: #4A6072; transition: border-color 0.15s, color 0.15s, background 0.15s;
-        }
-        .sd-page-btn:hover:not(:disabled) { border-color: #0D4B4B; color: #0D4B4B; background: rgba(13,75,75,0.04); }
-        .sd-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .sd-page-label { font-size: 13px; font-weight: 600; color: #7A8FA6; padding: 0 4px; }
-
-        .sd-empty { padding: 48px 24px; text-align: center; }
-        .sd-empty-icon {
-          width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 14px;
-          background: rgba(13,75,75,0.06); border: 1.5px solid rgba(13,75,75,0.1);
-          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
-        }
-        .sd-empty-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 17px; font-weight: 800; color: #0D1B1B; margin-bottom: 5px;
-        }
-        .sd-empty-sub { font-size: 13.5px; color: #9BAAB8; }
-
-        /* ── Modal ── */
-        .sd-modal-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 50; padding: 20px;
-          animation: sdOverlayIn 0.2s ease both;
-        }
-        @keyframes sdOverlayIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-
-        .sd-modal {
-          background: white; border-radius: 24px; width: 100%; max-width: 500px;
-          max-height: 90vh; overflow-y: auto;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 32px 64px rgba(0,0,0,0.12);
-          animation: sdModalIn 0.35s cubic-bezier(0.16,1,0.3,1) both;
-        }
-        @keyframes sdModalIn {
-          from { opacity: 0; transform: translateY(24px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .sd-modal-bar { height: 4px; background: linear-gradient(90deg, #0D4B4B, #FF6B5C); border-radius: 24px 24px 0 0; }
-
-        .sd-modal-head {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 24px 16px; border-bottom: 1.5px solid #F0F4F8;
-        }
-        .sd-modal-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 20px; font-weight: 900; color: #0D1B1B; letter-spacing: -0.3px;
-        }
-        .sd-modal-title span { color: #FF6B5C; }
-        .sd-modal-close {
-          width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
-          background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
-          color: #9BAAB8; font-size: 18px; line-height: 1;
-          transition: border-color 0.15s, color 0.15s;
-        }
-        .sd-modal-close:hover { border-color: #C0392B; color: #C0392B; }
-
-        .sd-modal-body { padding: 20px 24px 24px; }
-
-        .sd-mode-toggle {
-          display: flex; gap: 8px; margin-bottom: 20px;
-          background: #F7F9FB; border-radius: 14px; padding: 5px;
-        }
-        .sd-mode-btn {
-          flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-          padding: 10px; border-radius: 10px; border: none; cursor: pointer;
-          font-size: 13.5px; font-weight: 700; font-family: inherit;
-          transition: background 0.2s, color 0.2s, box-shadow 0.2s;
-          color: #7A8FA6; background: transparent;
-        }
-        .sd-mode-btn.active {
-          background: white; color: #0D4B4B;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .sd-qr-wrap {
-          border-radius: 16px; overflow: hidden; background: #0D1B1B;
-          aspect-ratio: 4/3; position: relative;
-        }
-        .sd-qr-wrap video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-
-        .sd-qr-corners {
-          position: absolute; inset: 0; pointer-events: none;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .sd-corner {
-          position: absolute; width: 28px; height: 28px;
-          border-color: #FF6B5C; border-style: solid; border-width: 0;
-        }
-        .sd-corner.tl { top: 16px; left: 16px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
-        .sd-corner.tr { top: 16px; right: 16px; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
-        .sd-corner.bl { bottom: 16px; left: 16px; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
-        .sd-corner.br { bottom: 16px; right: 16px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
-
-        .sd-qr-hint { text-align: center; font-size: 12.5px; color: #9BAAB8; margin-top: 10px; font-weight: 500; }
-
-        .sd-code-input {
-          width: 100%; padding: 16px; text-align: center;
-          font-size: 26px; letter-spacing: 6px; font-family: 'Courier New', monospace;
-          font-weight: 700; color: #0D1B1B;
-          border: 1.5px solid #E2EAF0; border-radius: 13px; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          margin-bottom: 14px;
-        }
-        .sd-code-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
-
-        .sd-submit-btn {
-          width: 100%; padding: 14px; border: none; border-radius: 13px;
-          background: linear-gradient(135deg, #0D4B4B, #0A3939);
-          color: white; font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,75,75,0.32);
-          transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
-        }
-        .sd-submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
-        .sd-submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .sd-qr-msg {
-          margin-top: 14px; padding: 12px 16px; border-radius: 12px;
-          font-size: 13.5px; font-weight: 600; text-align: center;
-        }
-        .sd-qr-msg.success { background: rgba(26,122,74,0.08); border: 1px solid rgba(26,122,74,0.2); color: #1A7A4A; }
-        .sd-qr-msg.error   { background: #FEF2F2; border: 1px solid #FECACA; color: #C0392B; }
-        .sd-qr-msg.warning { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
-
-        /* ─── Checked-in Guest Details ────────────────────────────────── */
-        .sd-checked-in-details {
-          margin-top: 14px; padding: 14px 16px; border-radius: 12px;
-          background: #F0FDF4; border: 1.5px solid #86EFAC;
-          display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-        }
-        .sd-checked-in-details .sd-check-icon { color: #1A7A4A; }
-        .sd-checked-in-details .sd-guest-info {
-          font-weight: 600; color: #0D1B1B; flex: 1;
-        }
-        .sd-checked-in-details .sd-guest-type {
-          font-size: 12px; font-weight: 700; color: #1A7A4A;
-          background: rgba(26,122,74,0.12); padding: 2px 10px; border-radius: 12px;
-        }
-
-        @media (max-width: 560px) {
-          .sd-wrap { padding: 24px 16px 48px; }
-          .sd-title { font-size: 26px; }
-          .sd-table th, .sd-table td { padding: 11px 14px; }
-          .sd-guest-phone { display: none; }
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+      <style jsx global>{`
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeInUp { animation: fadeInUp 0.4s ease-out forwards; }
+        input, select, textarea { font-size: 16px !important; }
+        @media (max-width: 640px) {
+          .qr-scanner-container { max-height: 50vh; }
         }
       `}</style>
 
-      <div className="sd-wrap">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)] mb-3 sm:mb-4">
+          <ArrowLeft size={14} /> Back
+        </Link>
 
-        {/* ── Header ── */}
-        <div className="sd-header">
+        {/* ─── Header ─── */}
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div>
-            <div className="sd-eyebrow"><div className="sd-eyebrow-dot" />Staff Portal</div>
-            <h1 className="sd-title">Staff <span>Dashboard</span></h1>
-            <p className="sd-subtitle">Manage guest arrivals for your event.</p>
+            <div className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#0D4B4B] mb-0.5">Staff Portal</div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900">Staff <span className="text-[#FF6B5C]">Check-in</span></h1>
           </div>
-          <div className="sd-header-right">
-            {selectedEventId && (
-              <div className="sd-stat-pill">
-                <Users size={15} />
-                <strong>{checkedInCount}</strong> / {filteredGuests.length} checked in
-              </div>
-            )}
-            <button className="sd-checkin-btn" onClick={() => setShowCheckinModal(true)}>
-              <Camera size={15} /> Check‑in Guest
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-full px-3 py-1.5">
+              <Users size={13} /> {fullyCheckedIn}/{totalGuests} in
+            </span>
           </div>
         </div>
 
-        {/* ── Event selector card ── */}
-        <div className="sd-card">
-          <div className="sd-card-bar" />
-          <div className="sd-card-body">
-            <div className="sd-select-label">
-              <Calendar size={13} /> Select Event
-            </div>
-            <select
-              className="sd-select"
-              value={selectedEventId}
-              onChange={e => loadGuests(e.target.value)}
-            >
-              <option value="">— Choose an event —</option>
-              {events.map(e => (
-                <option key={e.id} value={e.id}>
-                  {e.name} · {new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* ─── Event selector ─── */}
+        <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 shadow-sm">
+          <label className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase text-[#0D4B4B] mb-1.5">
+            <Calendar size={13} /> Select Event
+          </label>
+          <select
+            value={selectedEventId}
+            onChange={e => loadGuests(e.target.value)}
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent outline-none bg-white"
+          >
+            <option value="">— Choose an event —</option>
+            {events.map(e => (
+              <option key={e.id} value={e.id}>
+                {e.name} · {new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* ── Guest list ── */}
+        {/* ─── No event selected ─── */}
+        {!selectedEventId && (
+          <div className="text-center py-12 text-gray-500">
+            <PartyPopper size={36} className="mx-auto mb-2 text-gray-300" />
+            <p className="font-medium">Select an event to start checking in guests</p>
+          </div>
+        )}
+
         {selectedEventId && (
           <>
-            <div className="sd-search-wrap">
-              <Search size={16} className="sd-search-icon" />
-              <input
-                type="text"
-                className="sd-search"
-                placeholder="Search by name or phone…"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="sd-guest-card">
-              {/* Event meta */}
-              {selectedEvent && (
-                <div className="sd-event-meta">
-                  <span className="sd-event-meta-name">{selectedEvent.name}</span>
-                  <span className="sd-event-meta-item">
-                    <Calendar size={13} />
-                    {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
+            {/* ─── Event info + tabs ─── */}
+            {selectedEvent && (
+              <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 shadow-sm">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar size={14} className="text-[#FF6B5C] flex-shrink-0" />
+                  <span className="font-semibold text-gray-800 truncate">{selectedEvent.name}</span>
                 </div>
-              )}
-
-              <div className="sd-table-header">
-                <div className="sd-table-title">Guest List</div>
-                <div className="sd-table-badge">{filteredGuests.length} guest{filteredGuests.length !== 1 ? 's' : ''}</div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  {new Date(selectedEvent.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
               </div>
+            )}
 
-              {paginatedGuests.length === 0 ? (
-                <div className="sd-empty">
-                  <div className="sd-empty-icon"><Users size={22} /></div>
-                  <div className="sd-empty-title">{searchTerm ? 'No results found' : 'No guests yet'}</div>
-                  <p className="sd-empty-sub">{searchTerm ? 'Try a different name or phone number.' : 'Guests will appear here once added to this event.'}</p>
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="sd-table">
-                    <thead>
-                      <tr>
-                        <th>Guest</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {paginatedGuests.map(guest => (
-                        <tr key={guest.id}>
-                          <td>
-                            <div className="sd-guest-name">{guest.name}</div>
-                            {guest.phone && <div className="sd-guest-phone">{guest.phone}</div>}
-                          </td>
-                          <td>
-                            {guest.checkedIn ? (
-                              <span className="sd-status-checked">
-                                <CheckCircle size={13} /> Checked in
-                              </span>
-                            ) : (
-                              <span className="sd-status-pending">
-                                <XCircle size={13} /> Pending
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {totalPages > 1 && (
-                <div className="sd-pagination">
-                  <button className="sd-page-btn" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="sd-page-label">Page {currentPage} of {totalPages}</span>
-                  <button className="sd-page-btn" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              )}
+            <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-3 shadow-sm">
+              <button
+                onClick={() => setActiveTab('scan')}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'scan' ? 'bg-[#0D4B4B] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                <Scan size={16} /> Scan
+              </button>
+              <button
+                onClick={() => setActiveTab('data')}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'data' ? 'bg-[#0D4B4B] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                <Users size={16} /> Data
+              </button>
             </div>
+
+            {/* ─── Scan tab ─── */}
+            {activeTab === 'scan' && (
+              <>
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
+                  <div className="relative rounded-xl overflow-hidden bg-black aspect-square qr-scanner-container">
+                    <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
+                    <canvas ref={canvasRef} className="hidden" />
+                    {!scanning && !loadingCheckin && (
+                      <div className="absolute inset-0 flex items-center justify-center text-white bg-black/40">
+                        <Camera size={32} className="animate-pulse" />
+                      </div>
+                    )}
+                    {loadingCheckin && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                        <Loader2 size={32} className="animate-spin text-white" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 pointer-events-none">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 sm:w-48 h-40 sm:h-48 border-2 border-white/50 rounded-lg">
+                        <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-[#FF6B5C] rounded-tl" />
+                        <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-[#FF6B5C] rounded-tr" />
+                        <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-[#FF6B5C] rounded-bl" />
+                        <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-[#FF6B5C] rounded-br" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-center text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">
+                    Position QR code in the frame
+                  </p>
+                </div>
+
+                {/* Manual entry */}
+                <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Key size={16} className="text-[#0D4B4B] flex-shrink-0" />
+                    <span className="font-medium text-sm text-gray-700">Manual Entry</span>
+                  </div>
+                  <form onSubmit={handleManualCheckIn} className="space-y-3">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                      className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+                      placeholder="00000"
+                      maxLength={5}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loadingCheckin || cardNumber.length !== 5}
+                      className="w-full py-3 bg-[#0D4B4B] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                    >
+                      {loadingCheckin ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                      Check In
+                    </button>
+                  </form>
+                </div>
+
+                {/* Blocked (event not started) */}
+                {blockedMessage && (
+                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-center text-sm">
+                    <div className="flex items-center justify-center gap-1.5 font-medium">
+                      <Info size={15} /> Check-in not available yet
+                    </div>
+                    <p className="text-xs mt-1 opacity-90">{blockedMessage}</p>
+                  </div>
+                )}
+
+                {/* Message / success */}
+                {message && !blockedMessage && (
+                  <div className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl text-center font-medium transition-all text-sm ${showSuccess ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+                    {message}
+                  </div>
+                )}
+
+                {scannedGuest && showSuccess && (
+                  <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-green-200 p-3 sm:p-4 animate-fadeInUp">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle size={16} className="text-green-600 sm:text-2xl" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-800 text-sm sm:text-base truncate">{getFullName(scannedGuest)}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                          <span className="font-mono">#{scannedGuest.cardNumber}</span>
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {getGuestTypeLabel(scannedGuest.guestType)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right text-xs flex-shrink-0">
+                        <span className="text-green-600 font-medium">
+                          {scannedGuest.checkInCount || 1}/{scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ─── Data tab ─── */}
+            {activeTab === 'data' && (
+              <>
+                <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
+                    <p className="text-base sm:text-lg font-bold text-gray-800">{totalGuests}</p>
+                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
+                    <p className="text-base sm:text-lg font-bold text-green-600">{fullyCheckedIn}</p>
+                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Fully In</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
+                    <p className="text-base sm:text-lg font-bold text-amber-500">{partiallyCheckedIn}</p>
+                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Partial</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
+                    <p className="text-base sm:text-lg font-bold text-gray-400">{notCheckedIn}</p>
+                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Not In</p>
+                  </div>
+                </div>
+
+                <div className="relative mb-3 sm:mb-4">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name or card number..."
+                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
+                  />
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  {loadingGuests ? (
+                    <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-[#0D4B4B]" /></div>
+                  ) : filteredGuests.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users size={32} className="mx-auto mb-2 text-gray-300" />
+                      <p className="font-medium">No guests found</p>
+                      <p className="text-sm text-gray-400">Try adjusting your search</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100 max-h-[400px] sm:max-h-[500px] overflow-y-auto">
+                      {filteredGuests.map(guest => {
+                        const status = getCheckInStatus(guest);
+                        const StatusIcon = status.icon;
+                        const max = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+                        const count = guest.checkInCount || 0;
+                        const isFully = count >= max;
+                        return (
+                          <div key={guest.id} onClick={() => setSelectedGuest(guest)} className={`px-3 py-2.5 hover:bg-gray-50 transition cursor-pointer ${isFully ? 'bg-green-50/30' : ''}`}>
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                                {guest.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{getFullName(guest)}</p>
+                                <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs">
+                                  <span className="font-mono text-gray-400 text-[10px] sm:text-xs">#{guest.cardNumber}</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${guest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                    {getGuestTypeLabel(guest.guestType)}
+                                  </span>
+                                  {guest.routingChannel === 'whatsapp' && (
+                                    <span className="text-[9px] sm:text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">WA</span>
+                                  )}
+                                  <StatusIcon size={11} className={status.color.split(' ')[0]} />
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-gray-300 flex-shrink-0" />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
 
-      {/* ─── Check-in Modal ── */}
-      {showCheckinModal && (
-        <div className="sd-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowCheckinModal(false); }}>
-          <div className="sd-modal">
-            <div className="sd-modal-bar" />
-            <div className="sd-modal-head">
-              <div className="sd-modal-title">Guest <span>Check‑in</span></div>
-              <button className="sd-modal-close" onClick={() => setShowCheckinModal(false)}>×</button>
+      {/* ─── Guest Detail Modal ─── */}
+      {selectedGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedGuest(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden mx-2" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-800 text-sm sm:text-base">Guest Details</h3>
+              <button onClick={() => setSelectedGuest(null)} className="text-gray-400 hover:text-gray-600 p-1"><XCircle size={20} /></button>
             </div>
-            <div className="sd-modal-body">
-
-              {/* Mode toggle */}
-              <div className="sd-mode-toggle">
-                <button className={`sd-mode-btn ${checkinMode === 'qr' ? 'active' : ''}`} onClick={() => setCheckinMode('qr')}>
-                  <QrCode size={15} /> QR Scanner
-                </button>
-                <button className={`sd-mode-btn ${checkinMode === 'manual' ? 'active' : ''}`} onClick={() => setCheckinMode('manual')}>
-                  <Key size={15} /> Manual Code
-                </button>
+            <div className="p-4 sm:p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
+                  {selectedGuest.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-gray-800 text-sm sm:text-base">{getFullName(selectedGuest)}</p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+                    <span className="font-mono">#{selectedGuest.cardNumber}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {getGuestTypeLabel(selectedGuest.guestType)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              {checkinMode === 'qr' ? (
-                <>
-                  <div className="sd-qr-wrap">
-                    <video ref={videoRef} playsInline />
-                    <canvas ref={canvasRef} style={{ display: 'none' }} />
-                    <div className="sd-qr-corners">
-                      <div className="sd-corner tl" />
-                      <div className="sd-corner tr" />
-                      <div className="sd-corner bl" />
-                      <div className="sd-corner br" />
-                    </div>
-                    {loadingCheckin && (
-                      <div style={{
-                        position: 'absolute', inset: 0, display: 'flex',
-                        alignItems: 'center', justifyContent: 'center',
-                        background: 'rgba(0,0,0,0.5)'
-                      }}>
-                        <div style={{ color: 'white', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: 20, height: 20, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                          Checking in…
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="sd-qr-hint">Position the guest's QR code within the frame</p>
-                </>
-              ) : (
-                <form onSubmit={handleManualCheckin}>
-                  <input
-                    type="text"
-                    className="sd-code-input"
-                    value={manualCode}
-                    onChange={e => setManualCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
-                    placeholder="Enter SMS code"
-                    maxLength={10}
-                    required
-                    disabled={loadingCheckin}
-                  />
-                  <button type="submit" className="sd-submit-btn" disabled={manualCode.length < 6 || loadingCheckin}>
-                    {loadingCheckin ? (
-                      <>
-                        <div style={{ width: 18, height: 18, border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                        Checking…
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle size={16} /> Check In
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-
-              {/* ─── Blocked Message - Event hasn't started ──────────────── */}
-              {blockedMessage && availableAt && (
-                <div className="sd-qr-msg warning" style={{ marginTop: '14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                    <Clock size={18} />
-                    <span>Check-in not available yet</span>
-                  </div>
-                  <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.9 }}>
-                    {blockedMessage}
-                  </div>
-                  {countdown && (
-                    <div style={{ fontSize: '20px', fontWeight: 700, marginTop: '8px' }}>
-                      {countdown}
-                    </div>
-                  )}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-400">Check-in Status</p>
+                  <p className="font-medium text-sm">{selectedGuest.checkInCount || 0}/{selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}</p>
                 </div>
-              )}
-
-              {/* ─── Success / Error Message ────────────────────────────── */}
-              {qrMessage && !blockedMessage && (
-                <div className={`sd-qr-msg ${qrMessageType === 'success' ? 'success' : 'error'}`}>
-                  {qrMessage}
+                <div className="bg-gray-50 rounded-lg p-2">
+                  <p className="text-[10px] text-gray-400">Channel</p>
+                  <p className="font-medium text-sm capitalize">{selectedGuest.routingChannel || 'SMS'}</p>
                 </div>
-              )}
+                {selectedGuest.phone && (
+                  <div className="bg-gray-50 rounded-lg p-2 col-span-2">
+                    <p className="text-[10px] text-gray-400">Phone</p>
+                    <p className="font-medium text-sm">{selectedGuest.phone}</p>
+                  </div>
+                )}
+              </div>
 
-              {/* ─── Checked-in Guest Details ───────────────────────────── */}
-              {checkedIn && guestName && (
-                <div className="sd-checked-in-details">
-                  <CheckCircle size={20} className="sd-check-icon" />
-                  <span className="sd-guest-info">{guestName}</span>
-                  {guestType && guestType !== '—' && (
-                    <span className="sd-guest-type">
-                      {guestType === 'single' ? 'Single' : guestType === 'double' ? 'Double' : guestType}
-                    </span>
-                  )}
-                  <span style={{ fontSize: '12px', color: '#1A7A4A', fontWeight: 600 }}>✓ Checked in</span>
-                </div>
-              )}
-
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => { setForceCheckinGuest(selectedGuest); setSelectedGuest(null); }} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5">
+                  <UserCheck size={14} /> Force
+                </button>
+                <button onClick={() => { setShowDeleteConfirm(true); setSelectedGuest(null); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5">
+                  <Trash2 size={14} /> Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </>
+
+      {/* ─── Force Confirm ─── */}
+      {forceCheckinGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-amber-600" /></div>
+              <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
+                <br /><span className="text-xs text-gray-400">This will mark them as checked in regardless of card type.</span>
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => setForceCheckinGuest(null)} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
+                <button onClick={() => handleForceCheckin(forceCheckinGuest)} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">Confirm</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Delete Confirm ─── */}
+      {showDeleteConfirm && selectedGuest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><Trash2 size={24} className="text-red-600" /></div>
+              <h3 className="font-bold text-gray-800 text-sm sm:text-base">Delete Guest?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Are you sure you want to delete <span className="font-semibold">{getFullName(selectedGuest)}</span>?
+                <br /><span className="text-xs text-red-500">This action cannot be undone.</span>
+              </p>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => { setShowDeleteConfirm(false); setSelectedGuest(null); }} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
+                <button onClick={() => handleDeleteGuest(selectedGuest)} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

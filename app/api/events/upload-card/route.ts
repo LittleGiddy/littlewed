@@ -21,9 +21,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 });
     }
 
-    // Validate file size (3MB max)
-    if (file.size > 3 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size exceeds 3MB limit' }, { status: 400 });
+    // Validate file size (1MB max)
+    if (file.size > 1 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image is too large. Maximum size is 1MB.' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

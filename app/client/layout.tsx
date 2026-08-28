@@ -212,7 +212,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
               className="fixed inset-y-0 left-0 w-[min(280px,84vw)] z-50 bg-white shadow-2xl overflow-y-auto"
             >
-              <div className="p-6">
+              <div className="flex flex-col h-full p-6">
                 <SidebarContent />
               </div>
             </motion.aside>
@@ -241,7 +241,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="flex items-center gap-3">
-            <NotificationBell />
+            {role !== 'STAFF' && <NotificationBell />}
             <span className="hidden sm:block text-[13px] text-gray-400 font-semibold">{userName}</span>
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-pink-400 flex items-center justify-center text-white text-xs font-bold font-serif shrink-0 overflow-hidden">
               {userImage ? (

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index';
 import { sendWhatsAppThanksCard, getThanksWhatsAppTemplate } from '@/lib/whatsapp/index';
+import { sendPushToTenantRole } from '@/lib/push';
 
 const THANKS_COST_PER_MESSAGE = 300; // in TZS/credit units
 
@@ -213,6 +214,15 @@ export async function POST(
     }
 
     const failed = results.filter((r) => !r.success);
+
+    // ─── Notify the tenant owner(s) of the thanks activity ─────────────
+    sendPushToTenantRole(tenantId, 'CLIENT', {
+      title: 'Thanks cards sent',
+      body: `Thanks messages sent to ${successCount} checked-in guest${successCount > 1 ? 's' : ''} for ${event.name}.`,
+      url: '/client/dashboard',
+      type: 'success',
+      sound: true,
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

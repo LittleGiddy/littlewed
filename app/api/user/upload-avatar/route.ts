@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid file type. Use JPEG, PNG, WebP, or GIF.' }, { status: 400 });
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File too large. Max 2MB.' }, { status: 400 });
+    if (file.size > 1 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File too large. Max 1MB.' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

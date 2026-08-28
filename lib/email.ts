@@ -160,8 +160,7 @@ export async function sendCreditGrantedEmail(
   });
 }
 
-export async function sendCreditRequestToAdmin(
-  adminEmail: string,
+export async function sendCreditRequestToAdmin(  adminEmail: string,
   userName: string,
   tenantName: string,
   credits: number,
@@ -218,4 +217,27 @@ export async function sendCreditRequestToAdmin(
       </div>
     `,
   });
+}
+
+// ─── Broadcast Email (Super Admin) ───────────────────────────────────────
+
+export async function sendBroadcastEmail(
+  toAddresses: string[],
+  subject: string,
+  htmlBody: string
+) {
+  const from = 'LittleWed Admin <admin@littlewed.co.tz>';
+  const results: Record<string, boolean> = {};
+
+  for (const to of toAddresses) {
+    try {
+      await resend.emails.send({ from, to, subject, html: htmlBody });
+      results[to] = true;
+    } catch (err) {
+      console.error('Broadcast email failed for', to, err);
+      results[to] = false;
+    }
+  }
+
+  return results;
 }

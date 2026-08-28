@@ -62,6 +62,7 @@ export async function GET(
     return NextResponse.json({
       event: { ...eventData, thankYouCardUrl },
       guests,
+      bypassPayment: tenant.bypassPayment || false,
     });
   } catch (error) {
     console.error('Error fetching event:', error);

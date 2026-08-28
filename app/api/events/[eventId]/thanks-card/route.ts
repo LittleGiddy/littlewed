@@ -61,6 +61,10 @@ export async function POST(
       return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
     }
 
+    if (file.size > 1 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image is too large. Maximum size is 1MB.' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // ─── Prefer Cloudinary; fall back to local disk (local/dev only) ───

@@ -1,1091 +1,266 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Check, X, Sparkles, Zap, Users, Building, Calendar, MessageCircle, QrCode, Mail, Globe, Shield, Crown, ArrowRight, Menu, X as XClose, ChevronDown } from 'lucide-react';
+import {
+  Menu, X, Heart, Sparkles, Mail, Bell, CheckCircle2, ShieldCheck,
+  MessageCircle, Phone, Users, LayoutDashboard, ArrowRight, HeartHandshake
+} from 'lucide-react';
+
+const formatTZS = (n: number) => n.toLocaleString('en-TZ');
 
 export default function PricingPage() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const Logo = () => (
-    <img
-      src="/Little Wed Logo.svg"
-      alt="Little Wed"
-      style={{
-        display: 'block',
-        width: '130px',
-        height: 'auto',
-      }}
-    />
-  );
-
-  const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/about', label: 'About' },
-    { href: '/pricing', label: 'Pricing' },
-    { href: '/contact', label: 'Contact' },
-  ];
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth > 768) setMobileMenuOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const plans = [
     {
-      name: 'Starter',
-      icon: <Sparkles size={20} />,
-      price: 29,
-      description: 'Perfect for small events and gatherings',
+      slug: 'wedding',
+      badge: 'Most Popular',
+      title: 'Wedding Owners',
+      tagline: 'For couples and families planning their own wedding.',
+      price: 1500,
+      unit: 'per guest',
       features: [
-        { included: true, text: 'Up to 50 guests' },
-        { included: true, text: 'WhatsApp & SMS invitations' },
-        { included: true, text: 'QR code check-in' },
-        { included: true, text: 'Basic guest management' },
-        { included: true, text: 'Email support' },
-        { included: false, text: 'Custom invitation cards' },
-        { included: false, text: 'Real-time dashboard' },
-        { included: false, text: 'Priority support' },
-        { included: false, text: 'Advanced analytics' },
-        { included: false, text: 'Multiple events' },
+        'Unlimited invitation cards (WhatsApp, SMS, print)',
+        'QR code check-in with live guest list',
+        'Guest management & RSVP tracking',
+        'Reminder messages to your guests',
+        'Thanks cards after the event',
+        'Free support throughout',
       ],
-      cta: 'Get Started',
-      popular: false,
+      cta: 'Plan My Wedding',
     },
     {
-      name: 'Professional',
-      icon: <Zap size={20} />,
-      price: 59,
-      description: 'Ideal for growing events and businesses',
+      slug: 'planner',
+      badge: null,
+      title: 'Event Planners',
+      tagline: 'For professionals who plan weddings at scale.',
+      price: 500,
+      unit: 'per invite',
       features: [
-        { included: true, text: 'Up to 200 guests' },
-        { included: true, text: 'WhatsApp & SMS invitations' },
-        { included: true, text: 'QR code check-in' },
-        { included: true, text: 'Advanced guest management' },
-        { included: true, text: 'Custom invitation cards' },
-        { included: true, text: 'Real-time dashboard' },
-        { included: true, text: 'Email & chat support' },
-        { included: false, text: 'Priority support' },
-        { included: false, text: 'Advanced analytics' },
-        { included: false, text: 'Multiple events' },
+        'Everything in Wedding Owners',
+        'Manage multiple events & clients',
+        'Staff accounts for on-the-day teams',
+        'Bulk invitations & guest imports',
+        'Client dashboards & reports',
+        'Priority support',
       ],
-      cta: 'Get Started',
-      popular: true,
-    },
-    {
-      name: 'Enterprise',
-      icon: <Crown size={20} />,
-      price: 99,
-      description: 'For large events and organizations',
-      features: [
-        { included: true, text: 'Unlimited guests' },
-        { included: true, text: 'WhatsApp & SMS invitations' },
-        { included: true, text: 'QR code check-in' },
-        { included: true, text: 'Advanced guest management' },
-        { included: true, text: 'Custom invitation cards' },
-        { included: true, text: 'Real-time dashboard' },
-        { included: true, text: 'Priority support' },
-        { included: true, text: 'Advanced analytics' },
-        { included: true, text: 'Multiple events' },
-        { included: true, text: 'Dedicated account manager' },
-      ],
-      cta: 'Contact Sales',
-      popular: false,
+      cta: 'Start With Events',
     },
   ];
 
-  const features = [
+  const services = [
     {
-      icon: <MessageCircle size={18} />,
-      title: 'WhatsApp & SMS',
-      description: 'Send invitations via WhatsApp and SMS with automated reminders',
+      icon: <MessageCircle size={20} />,
+      title: 'Smart Invitations',
+      desc: 'Send beautiful invitations over WhatsApp and SMS with live delivery tracking, so you know every guest was reached.',
     },
     {
-      icon: <QrCode size={18} />,
-      title: 'QR Code Check-in',
-      description: 'Instant check-in with QR codes for a seamless guest experience',
+      icon: <LayoutDashboard size={20} />,
+      title: 'Live Guest Dashboard',
+      desc: 'Track RSVPs, manage your guest list, and add guests in seconds from one clean dashboard.',
     },
     {
-      icon: <Users size={18} />,
-      title: 'Guest Management',
-      description: 'Easily manage guest lists, RSVPs, and seating arrangements',
+      icon: <Users size={20} />,
+      title: 'QR Check-in',
+      desc: 'Scan QR codes at the door with a phone or staff device. The guest list updates in real time.',
     },
     {
-      icon: <Building size={18} />,
-      title: 'Custom Cards',
-      description: 'Design professional invitation cards with your branding',
+      icon: <Bell size={20} />,
+      title: 'Reminders & Thanks',
+      desc: 'Send polite reminder messages before the event and heartfelt thank-you cards after — to the guests who attended.',
     },
     {
-      icon: <Globe size={18} />,
-      title: 'Real-time Dashboard',
-      description: 'Track attendance and engagement in real-time',
+      icon: <Mail size={20} />,
+      title: 'Email Notifications',
+      desc: 'Get important updates and alerts delivered straight to your inbox and notifications in the app.',
     },
     {
-      icon: <Shield size={18} />,
+      icon: <ShieldCheck size={20} />,
       title: 'Secure & Reliable',
-      description: 'Enterprise-grade security and 99.9% uptime guarantee',
+      desc: 'Your guest information is kept private and protected. Built for peace of mind on your big day.',
     },
   ];
-
-  const faqs = [
-    {
-      question: 'What payment methods do you accept?',
-      answer: 'We accept all major credit cards (Visa, Mastercard, American Express) and PayPal. For Enterprise plans, we also offer invoice payments.',
-    },
-    {
-      question: 'Can I upgrade or downgrade my plan later?',
-      answer: 'Yes, you can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.',
-    },
-    {
-      question: 'Is there a free trial?',
-      answer: 'Yes, we offer a 14-day free trial on all plans. No credit card required to start.',
-    },
-    {
-      question: 'What happens if I exceed my guest limit?',
-      answer: 'We\'ll notify you when you\'re approaching your limit. You can upgrade your plan at any time to accommodate more guests.',
-    },
-    {
-      question: 'Do you offer custom pricing for non-profits?',
-      answer: 'Yes, we offer special pricing for non-profit organizations. Please contact our sales team for more information.',
-    },
-    {
-      question: 'Can I cancel my subscription anytime?',
-      answer: 'Yes, you can cancel your subscription at any time. No long-term contracts or hidden fees.',
-    },
-  ];
-
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Segoe UI', sans-serif", background: '#F5F8FA' }}>
+    <div className="pricing-page" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .pricing-page {
-          min-height: 100vh;
-        }
-
-        /* ── Navigation ── */
-        .nav {
-          background: white;
-          border-bottom: 1px solid #E8EEF2;
-          padding: 16px 32px;
-          position: sticky;
-          top: 0;
-          z-index: 100;
-        }
-
-        .nav-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .nav-left {
-          display: flex;
-          align-items: center;
-        }
-
-        .nav-desktop {
-          display: flex;
-          gap: 32px;
-          align-items: center;
-        }
-
-        .nav-link {
-          color: #4A6072;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          transition: color 0.2s;
-          position: relative;
-        }
-
-        .nav-link::after {
-          content: '';
-          position: absolute;
-          bottom: -4px;
-          left: 0;
-          width: 0;
-          height: 2px;
-          background: #0D4B4B;
-          transition: width 0.3s;
-        }
-
-        .nav-link:hover {
-          color: #0D4B4B;
-        }
-
-        .nav-link:hover::after {
-          width: 100%;
-        }
-
-        .nav-link.active {
-          color: #0D4B4B;
-        }
-
-        .nav-link.active::after {
-          width: 100%;
-        }
-
-        .nav-link.cta {
-          background: #0D4B4B;
-          color: white;
-          padding: 10px 24px;
-          border-radius: 24px;
-          font-weight: 600;
-        }
-
-        .nav-link.cta::after {
-          display: none;
-        }
-
-        .nav-link.cta:hover {
-          background: #0A3939;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(13,75,75,0.3);
-        }
-
-        .mobile-menu-btn {
-          display: none;
-          background: none;
-          border: none;
-          color: #0D4B4B;
-          cursor: pointer;
-          padding: 8px;
-          border-radius: 8px;
-          transition: background 0.2s;
-        }
-
-        .mobile-menu-btn:hover {
-          background: rgba(13,75,75,0.08);
-        }
-
-        .mobile-menu {
-          display: none;
-          flex-direction: column;
-          gap: 4px;
-          padding: 16px 0;
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-          margin-top: 8px;
-          position: absolute;
-          top: 100%;
-          left: 16px;
-          right: 16px;
-          z-index: 50;
-        }
-
-        .mobile-menu.open {
-          display: flex;
-        }
-
-        .mobile-menu .nav-link {
-          padding: 12px 16px;
-          border-radius: 8px;
-        }
-
-        .mobile-menu .nav-link:hover {
-          background: rgba(13,75,75,0.06);
-        }
-
-        .mobile-menu .nav-link.cta {
-          margin: 4px 16px;
-          text-align: center;
-        }
-
-        /* ── Hero ── */
-        .hero {
-          text-align: center;
-          padding: 60px 24px 40px;
-          background: linear-gradient(160deg, #0D4B4B 0%, #0A3939 100%);
-          color: white;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .hero::before {
-          content: '';
-          position: absolute;
-          top: -50%;
-          right: -20%;
-          width: 600px;
-          height: 600px;
-          border-radius: 50%;
-          background: rgba(232,165,152,0.05);
-          animation: floatA 15s ease-in-out infinite;
-        }
-
-        .hero::after {
-          content: '';
-          position: absolute;
-          bottom: -40%;
-          left: -10%;
-          width: 400px;
-          height: 400px;
-          border-radius: 50%;
-          background: rgba(232,165,152,0.03);
-          animation: floatB 12s ease-in-out infinite;
-        }
-
-        @keyframes floatA {
-          0%,100% { transform: translate(0,0) scale(1); }
-          50% { transform: translate(30px,-30px) scale(1.05); }
-        }
-
-        @keyframes floatB {
-          0%,100% { transform: translate(0,0) scale(1); }
-          50% { transform: translate(-20px,20px) scale(1.08); }
-        }
-
-        .hero-content {
-          position: relative;
-          z-index: 1;
-          max-width: 700px;
-          margin: 0 auto;
-        }
-
-        .hero-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(255,255,255,0.1);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255,255,255,0.15);
-          padding: 6px 16px 6px 12px;
-          border-radius: 50px;
-          color: rgba(255,255,255,0.85);
-          font-size: 12px;
-          font-weight: 600;
-          letter-spacing: 0.5px;
-          margin-bottom: 20px;
-        }
-
-        .hero-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 48px;
-          font-weight: 900;
-          line-height: 1.1;
-          margin-bottom: 16px;
-        }
-
-        .hero-title span {
-          color: #FF6B5C;
-        }
-
-        .hero-sub {
-          color: rgba(255,255,255,0.6);
-          font-size: 18px;
-          line-height: 1.6;
-          max-width: 500px;
-          margin: 0 auto;
-        }
-
-        /* ── Billing Toggle ── */
-        .billing-toggle {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          padding: 20px 0;
-          background: white;
-          border-bottom: 1px solid #E8EEF2;
-        }
-
-        .billing-toggle span {
-          font-size: 14px;
-          font-weight: 500;
-          color: #4A6072;
-        }
-
-        .billing-toggle span.active {
-          color: #0D4B4B;
-        }
-
-        .toggle-switch {
-          width: 56px;
-          height: 30px;
-          background: #E2EAF0;
-          border-radius: 15px;
-          cursor: pointer;
-          position: relative;
-          transition: background 0.3s;
-          flex-shrink: 0;
-        }
-
-        .toggle-switch.active {
-          background: #0D4B4B;
-        }
-
-        .toggle-switch .toggle-dot {
-          width: 24px;
-          height: 24px;
-          background: white;
-          border-radius: 50%;
-          position: absolute;
-          top: 3px;
-          left: 3px;
-          transition: transform 0.3s;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-        }
-
-        .toggle-switch.active .toggle-dot {
-          transform: translateX(26px);
-        }
-
-        .save-badge {
-          background: #E8F5F2;
-          color: #0D4B4B;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 2px 10px;
-          border-radius: 12px;
-          letter-spacing: 0.3px;
-        }
-
-        /* ── Pricing Grid ── */
-        .pricing-grid {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 40px 24px 60px;
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-        }
-
-        .pricing-card {
-          background: white;
-          border-radius: 20px;
-          padding: 32px 28px;
-          border: 1px solid #E8EEF2;
-          transition: all 0.3s;
-          position: relative;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .pricing-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 40px rgba(0,0,0,0.08);
-        }
-
-        .pricing-card.popular {
-          border-color: #0D4B4B;
-          box-shadow: 0 8px 32px rgba(13,75,75,0.12);
-        }
-
-        .pricing-card.popular:hover {
-          box-shadow: 0 12px 48px rgba(13,75,75,0.18);
-        }
-
-        .popular-badge {
-          position: absolute;
-          top: -12px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: #0D4B4B;
-          color: white;
-          font-size: 11px;
-          font-weight: 700;
-          padding: 4px 16px;
-          border-radius: 20px;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #F5F8FA; }
+        .pricing-page { min-height: 100dvh; background: #F5F8FA; color: #243B53; }
+        a { text-decoration: none; color: inherit; }
+        .nav { position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 2px 14px rgba(13,79,79,0.06); }
+        .nav-inner { max-width: 1080px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+        .nav-left { display: flex; align-items: center; gap: 10px; }
+        .logo-mark { width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, #0D4B4B, #0A3939); display: flex; align-items: center; justify-content: center; color: white; }
+        .logo-text { font-weight: 800; font-size: 18px; color: #0D4B4B; letter-spacing: -0.2px; }
+        .nav-links { display: flex; align-items: center; gap: 24px; }
+        .nav-links a { font-weight: 600; font-size: 14px; color: #3A5670; }
+        .nav-links a:hover { color: #0D4B4B; }
+        .btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; border-radius: 12px; padding: 11px 20px; cursor: pointer; border: none; transition: all 0.2s; }
+        .btn-primary { background: #0D4B4B; color: #fff; }
+        .btn-primary:hover { background: #0A3939; }
+        .btn-ghost { background: transparent; color: #0D4B4B; }
+        .mobile-btn { display: none; }
+        .mobile-menu-out { display: none; }
+
+        .hero { text-align: center; padding: 72px 20px 40px; max-width: 760px; margin: 0 auto; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid rgba(13,75,75,0.12); color: #0D4B4B; font-weight: 700; font-size: 13px; padding: 7px 16px; border-radius: 999px; }
+        .hero h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 900; line-height: 1.1; color: #102A2A; margin: 20px 0 14px; }
+        .hero h1 span { color: #FF6B5C; }
+        .hero p { font-size: 17px; color: #5A7186; line-height: 1.6; max-width: 560px; margin: 0 auto; }
+
+        .plans { max-width: 900px; margin: 24px auto 0; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+        .plan { background: #fff; border: 1px solid #E6EDF2; border-radius: 22px; padding: 30px 28px; position: relative; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(13,79,79,0.06); }
+        .plan.featured { border: 2px solid #FF6B5C; box-shadow: 0 18px 42px rgba(255,107,92,0.16); }
+        .plan-badge { position: absolute; top: -13px; left: 26px; background: #FF6B5C; color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 5px 14px; border-radius: 999px; }
+        .plan-cat { font-size: 12px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #0D4B4B; }
+        .plan-title { font-size: 24px; font-weight: 900; color: #102A2A; margin: 6px 0; }
+        .plan-tagline { font-size: 14px; color: #5A7186; line-height: 1.5; margin-bottom: 18px; }
+        .plan-price { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+        .plan-price .amount { font-size: 44px; font-weight: 900; color: #102A2A; }
+        .plan-price .small { font-size: 14px; color: #8AA0B5; }
+        .plan-price .currency { position: relative; top: -16px; font-size: 16px; font-weight: 700; color: #0D4B4B; }
+        .plan-features { list-style: none; margin: 20px 0 24px; flex: 1; }
+        .plan-features li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: #3A5670; padding: 6px 0; }
+        .plan-features li svg { color: #0D4B4B; flex-shrink: 0; margin-top: 1px; }
+        .plan .btn { justify-content: center; width: 100%; }
+
+        .services { max-width: 1080px; margin: 80px auto 0; padding: 0 20px; }
+        .services-head { text-align: center; margin-bottom: 36px; }
+        .services-head h2 { font-size: clamp(26px, 4vw, 36px); font-weight: 900; color: #102A2A; }
+        .services-head p { color: #5A7186; max-width: 540px; margin: 12px auto 0; }
+        .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+        .service { background: #fff; border: 1px solid #E6EDF2; border-radius: 18px; padding: 24px; }
+        .service-icon { width: 44px; height: 44px; border-radius: 13px; background: rgba(13,75,75,0.08); color: #0D4B4B; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+        .service h3 { font-size: 16px; font-weight: 800; color: #102A2A; margin-bottom: 6px; }
+        .service p { font-size: 14px; color: #5A7186; line-height: 1.6; }
+
+        .cta-strip { max-width: 900px; margin: 80px auto 40px; padding: 40px; background: linear-gradient(135deg, #0D4B4B, #0A3939); border-radius: 26px; text-align: center; color: #fff; box-shadow: 0 20px 50px rgba(13,79,79,0.25); }
+        .cta-strip h2 { font-size: clamp(24px, 4vw, 34px); font-weight: 900; }
+        .cta-strip p { opacity: 0.85; margin: 10px auto 22px; max-width: 460px; }
+        .cta-strip .btn-primary { background: #FF6B5C; }
+        .cta-strip .btn-primary:hover { background: #f25547; }
+
+        .footer { text-align: center; padding: 24px 20px 36px; color: #8AA0B5; font-size: 13px; }
+
+        @media (max-width: 900px) {
+          .services-grid { grid-template-columns: repeat(2, 1fr); }
         }
-
-        .plan-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 12px;
-          background: rgba(13,75,75,0.08);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #0D4B4B;
-          margin-bottom: 16px;
-        }
-
-        .plan-name {
-          font-size: 20px;
-          font-weight: 700;
-          color: #0D1B1B;
-          margin-bottom: 4px;
-        }
-
-        .plan-description {
-          font-size: 14px;
-          color: #7A8FA6;
-          margin-bottom: 20px;
-        }
-
-        .plan-price {
-          font-size: 42px;
-          font-weight: 800;
-          color: #0D1B1B;
-          margin-bottom: 4px;
-        }
-
-        .plan-price span {
-          font-size: 16px;
-          font-weight: 500;
-          color: #7A8FA6;
-        }
-
-        .plan-billing {
-          font-size: 13px;
-          color: #7A8FA6;
-          margin-bottom: 24px;
-        }
-
-        .plan-features {
-          flex: 1;
-          list-style: none;
-          padding: 0;
-          margin: 0 0 24px;
-        }
-
-        .plan-features li {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 6px 0;
-          font-size: 14px;
-          color: #4A6072;
-        }
-
-        .plan-features .check {
-          color: #0D4B4B;
-          flex-shrink: 0;
-        }
-
-        .plan-features .x {
-          color: #C8D4DE;
-          flex-shrink: 0;
-        }
-
-        .plan-cta {
-          padding: 14px;
-          border: none;
-          border-radius: 12px;
-          font-size: 15px;
-          font-weight: 700;
-          font-family: inherit;
-          cursor: pointer;
-          transition: all 0.3s;
-          width: 100%;
-          text-align: center;
-          text-decoration: none;
-          display: block;
-        }
-
-        .plan-cta.primary {
-          background: #0D4B4B;
-          color: white;
-        }
-
-        .plan-cta.primary:hover {
-          background: #0A3939;
-          transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(13,75,75,0.3);
-        }
-
-        .plan-cta.outline {
-          background: transparent;
-          color: #0D4B4B;
-          border: 2px solid #0D4B4B;
-        }
-
-        .plan-cta.outline:hover {
-          background: rgba(13,75,75,0.06);
-        }
-
-        .plan-cta.popular {
-          background: #0D4B4B;
-          color: white;
-          box-shadow: 0 4px 16px rgba(13,75,75,0.3);
-        }
-
-        .plan-cta.popular:hover {
-          background: #0A3939;
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(13,75,75,0.4);
-        }
-
-        /* ── Features Section ── */
-        .features-section {
-          background: white;
-          padding: 60px 24px;
-          border-top: 1px solid #E8EEF2;
-        }
-
-        .features-section-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .section-header {
-          text-align: center;
-          max-width: 600px;
-          margin: 0 auto 48px;
-        }
-
-        .section-header h2 {
-          font-family: 'Playfair Display', serif;
-          font-size: 36px;
-          font-weight: 800;
-          color: #0D1B1B;
-          margin-bottom: 12px;
-        }
-
-        .section-header p {
-          color: #7A8FA6;
-          font-size: 16px;
-          line-height: 1.6;
-        }
-
-        .features-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 32px;
-        }
-
-        .feature-card {
-          text-align: center;
-          padding: 24px;
-        }
-
-        .feature-icon {
-          width: 56px;
-          height: 56px;
-          border-radius: 14px;
-          background: rgba(13,75,75,0.08);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #0D4B4B;
-          margin: 0 auto 16px;
-        }
-
-        .feature-card h3 {
-          font-size: 16px;
-          font-weight: 700;
-          color: #0D1B1B;
-          margin-bottom: 8px;
-        }
-
-        .feature-card p {
-          font-size: 14px;
-          color: #7A8FA6;
-          line-height: 1.6;
-        }
-
-        /* ── FAQ Section ── */
-        .faq-section {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 60px 24px;
-        }
-
-        .faq-section h2 {
-          font-family: 'Playfair Display', serif;
-          font-size: 36px;
-          font-weight: 800;
-          color: #0D1B1B;
-          text-align: center;
-          margin-bottom: 40px;
-        }
-
-        .faq-item {
-          border-bottom: 1px solid #E8EEF2;
-          padding: 16px 0;
-        }
-
-        .faq-question {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          cursor: pointer;
-          padding: 8px 0;
-          font-size: 16px;
-          font-weight: 600;
-          color: #0D1B1B;
-          background: none;
-          border: none;
-          width: 100%;
-          text-align: left;
-          font-family: inherit;
-          transition: color 0.2s;
-        }
-
-        .faq-question:hover {
-          color: #0D4B4B;
-        }
-
-        .faq-answer {
-          max-height: 0;
-          overflow: hidden;
-          transition: max-height 0.3s ease, padding 0.3s ease;
-          color: #7A8FA6;
-          font-size: 14px;
-          line-height: 1.6;
-        }
-
-        .faq-answer.open {
-          max-height: 200px;
-          padding: 12px 0 4px;
-        }
-
-        .faq-icon {
-          color: #0D4B4B;
-          flex-shrink: 0;
-          transition: transform 0.3s;
-        }
-
-        .faq-icon.open {
-          transform: rotate(180deg);
-        }
-
-        /* ── Footer ── */
-        .footer {
-          background: white;
-          border-top: 1px solid #E8EEF2;
-          padding: 32px 24px;
-          text-align: center;
-        }
-
-        .footer-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: space-between;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .footer-brand {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          color: #7A8FA6;
-          font-size: 13px;
-          font-weight: 500;
-        }
-
-        .footer-brand strong {
-          color: #0D4B4B;
-          font-weight: 700;
-        }
-
-        .footer-links {
-          display: flex;
-          gap: 20px;
-          flex-wrap: wrap;
-        }
-
-        .footer-link {
-          color: #9BAAB8;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 500;
-          transition: color 0.2s;
-        }
-
-        .footer-link:hover {
-          color: #0D4B4B;
-        }
-
-        .footer-heart {
-          color: #FF6B5C;
-        }
-
-        /* ── Responsive ── */
         @media (max-width: 768px) {
-          .nav {
-            padding: 12px 16px;
-          }
-
-          .nav-desktop {
-            display: none;
-          }
-
-          .mobile-menu-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .hero-title {
-            font-size: 32px;
-          }
-
-          .hero-sub {
-            font-size: 16px;
-          }
-
-          .pricing-grid {
-            grid-template-columns: 1fr;
-            padding: 24px 16px 40px;
-            gap: 20px;
-          }
-
-          .pricing-card {
-            padding: 24px 20px;
-          }
-
-          .plan-price {
-            font-size: 36px;
-          }
-
-          .features-grid {
-            grid-template-columns: 1fr;
-            gap: 20px;
-          }
-
-          .features-section {
-            padding: 40px 16px;
-          }
-
-          .section-header h2 {
-            font-size: 28px;
-          }
-
-          .faq-section {
-            padding: 40px 16px;
-          }
-
-          .faq-section h2 {
-            font-size: 28px;
-          }
-
-          .footer-inner {
-            flex-direction: column;
-            text-align: center;
-          }
-
-          .footer-links {
-            justify-content: center;
-          }
+          .nav-links { display: none; }
+          .mobile-btn { display: flex; }
+          .mobile-menu-out { display: block; background: #fff; border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,0.12); padding: 8px 0; margin: 0 14px; }
+          .mobile-menu-out.hidden { display: none; }
+          .mobile-menu-out a { display: block; padding: 12px 18px; font-weight: 700; font-size: 15px; color: #243B53; border-radius: 10px; }
+          .mobile-menu-out a:hover { background: rgba(13,75,75,0.06); }
+          .mobile-menu-out .btn { margin: 6px 12px 12px; justify-content: center; width: calc(100% - 24px); }
+          .plans { grid-template-columns: 1fr; }
+          .hero { padding: 48px 20px 24px; }
         }
-
-        @media (min-width: 769px) {
-          .mobile-menu-btn {
-            display: none;
-          }
-
-          .mobile-menu {
-            display: none !important;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .hero-title {
-            font-size: 28px;
-          }
-
-          .hero {
-            padding: 40px 16px 32px;
-          }
-
-          .plan-price {
-            font-size: 32px;
-          }
-
-          .pricing-card {
-            padding: 20px 16px;
-          }
+        @media (max-width: 560px) {
+          .services-grid { grid-template-columns: 1fr; }
         }
       `}</style>
 
-      <div className="pricing-page">
-        {/* ── Navigation ── */}
-        <nav className="nav">
-          <div className="nav-inner">
-            <div className="nav-left">
-              <Logo />
-            </div>
-
-            <div className="nav-desktop">
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.href} 
-                  href={link.href} 
-                  className={`nav-link ${link.label === 'Pricing' ? 'active' : ''}`}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <Link href="/login" className="nav-link">
-                Sign In
-              </Link>
-              <Link href="/signup" className="nav-link cta">
-                Get Started
-              </Link>
-            </div>
-
-            <button 
-              className="mobile-menu-btn"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <XClose size={24} /> : <Menu size={24} />}
-            </button>
-
-            <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
-              {navLinks.map((link) => (
-                <Link 
-                  key={link.href} 
-                  href={link.href} 
-                  className={`nav-link ${link.label === 'Pricing' ? 'active' : ''}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <Link href="/login" className="nav-link" onClick={() => setMobileMenuOpen(false)}>
-                Sign In
-              </Link>
-              <Link href="/signup" className="nav-link cta" onClick={() => setMobileMenuOpen(false)}>
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </nav>
-
-        {/* ── Hero ── */}
-        <section className="hero">
-          <div className="hero-content">
-            <div className="hero-badge">
-              <Sparkles size={14} />
-              Simple, Transparent Pricing
-            </div>
-            <h1 className="hero-title">
-              Choose the plan that <span>fits your event</span>
-            </h1>
-            <p className="hero-sub">
-              Start with a 14-day free trial. No credit card required. 
-              Cancel anytime.
-            </p>
-          </div>
-        </section>
-
-        {/* ── Billing Toggle ── */}
-        <div className="billing-toggle">
-          <span className={billingCycle === 'monthly' ? 'active' : ''}>Monthly</span>
-          <div 
-            className={`toggle-switch ${billingCycle === 'annual' ? 'active' : ''}`}
-            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
+      {/* ── Navbar ── */}
+      <header className="nav">
+        <div className="nav-inner">
+          <Link href="/" className="nav-left">
+            <span className="logo-mark"><Heart size={18} fill="currentColor" /></span>
+            <span className="logo-text">LittleWed</span>
+          </Link>
+          <nav className="nav-links">
+            <Link href="/login">Login</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/signup" className="btn btn-primary">Get Started</Link>
+          </nav>
+          <button
+            className="btn btn-ghost mobile-btn"
+            onClick={() => setMobileMenuOpen(o => !o)}
+            aria-label="Toggle menu"
           >
-            <div className="toggle-dot" />
-          </div>
-          <span className={billingCycle === 'annual' ? 'active' : ''}>Annual</span>
-          <span className="save-badge">Save 20%</span>
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
+        {mobileMenuOpen && (
+          <nav className={`mobile-menu-out ${mobileMenuOpen ? '' : 'hidden'}`}>
+            <a href="/login">Login</a>
+            <a href="/signup" className="btn btn-primary">Get Started</a>
+          </nav>
+        )}
+      </header>
 
-        {/* ── Pricing Cards ── */}
-        <div className="pricing-grid">
-          {plans.map((plan, index) => {
-            const isPopular = plan.popular;
-            const price = billingCycle === 'annual' ? Math.round(plan.price * 0.8) : plan.price;
-            
-            return (
-              <div key={index} className={`pricing-card ${isPopular ? 'popular' : ''}`}>
-                {isPopular && <div className="popular-badge">Most Popular</div>}
-                
-                <div className="plan-icon">{plan.icon}</div>
-                <h3 className="plan-name">{plan.name}</h3>
-                <p className="plan-description">{plan.description}</p>
-                
-                <div className="plan-price">
-                  ${price}<span>/mo</span>
-                </div>
-                <div className="plan-billing">
-                  {billingCycle === 'annual' ? 'Billed annually' : 'Billed monthly'}
-                </div>
+      {/* ── Hero ── */}
+      <section className="hero">
+        <span className="hero-badge"><HeartHandshake size={15} /> Simple, fair pricing</span>
+        <h1>Beautiful weddings & events, <span>without surprise fees</span></h1>
+        <p>
+          Pay per guest or per invite. No subscription traps — just the tools you need to
+          invite, manage, and check in your guests.
+        </p>
+      </section>
 
-                <ul className="plan-features">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx}>
-                      {feature.included ? (
-                        <Check size={16} className="check" />
-                      ) : (
-                        <X size={16} className="x" />
-                      )}
-                      {feature.text}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link 
-                  href={plan.name === 'Enterprise' ? '/contact' : '/signup'} 
-                  className={`plan-cta ${isPopular ? 'popular' : plan.name === 'Starter' ? 'outline' : 'primary'}`}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Features Section ── */}
-        <section className="features-section">
-          <div className="features-section-inner">
-            <div className="section-header">
-              <h2>Everything you need to <span style={{ color: '#0D4B4B' }}>manage your event</span></h2>
-              <p>All plans include the core features you need to create an unforgettable experience.</p>
+      {/* ── Plans ── */}
+      <section className="plans">
+        {plans.map(plan => (
+          <div key={plan.slug} className={`plan ${plan.slug === 'wedding' ? 'featured' : ''}`}>
+            {plan.badge && <span className="plan-badge">{plan.badge}</span>}
+            <div className="plan-cat">{plan.slug === 'wedding' ? 'Wedding Owners' : 'Event Planners'}</div>
+            <h2 className="plan-title">{plan.title}</h2>
+            <p className="plan-tagline">{plan.tagline}</p>
+            <div className="plan-price">
+              <span className="currency">TZS</span>
+              <span className="amount">{formatTZS(plan.price)}</span>
+              <span className="small">/ {plan.unit}</span>
             </div>
-
-            <div className="features-grid">
-              {features.map((feature, index) => (
-                <div key={index} className="feature-card">
-                  <div className="feature-icon">{feature.icon}</div>
-                  <h3>{feature.title}</h3>
-                  <p>{feature.description}</p>
-                </div>
+            <ul className="plan-features">
+              {plan.features.map(f => (
+                <li key={f}><CheckCircle2 size={18} /> {f}</li>
               ))}
-            </div>
+            </ul>
+            <Link href="/signup" className="btn btn-primary" style={{ background: plan.slug === 'wedding' ? '#0D4B4B' : undefined, color: plan.slug === 'wedding' ? '#fff' : undefined }}>
+              {plan.cta} <ArrowRight size={16} />
+            </Link>
           </div>
-        </section>
+        ))}
+      </section>
 
-        {/* ── FAQ Section ── */}
-        <section className="faq-section">
-          <h2>Frequently Asked Questions</h2>
-          {faqs.map((faq, index) => (
-            <div key={index} className="faq-item">
-              <button 
-                className="faq-question"
-                onClick={() => setOpenFaq(openFaq === index ? null : index)}
-              >
-                {faq.question}
-                <ChevronDown size={20} className={`faq-icon ${openFaq === index ? 'open' : ''}`} />
-              </button>
-              <div className={`faq-answer ${openFaq === index ? 'open' : ''}`}>
-                {faq.answer}
-              </div>
+      {/* ── Services ── */}
+      <section className="services">
+        <div className="services-head">
+          <h2>Everything you need, in one place</h2>
+          <p>From the invitation to the thank-you card, LittleWed handles the guest experience end to end.</p>
+        </div>
+        <div className="services-grid">
+          {services.map(s => (
+            <div key={s.title} className="service">
+              <div className="service-icon">{s.icon}</div>
+              <h3>{s.title}</h3>
+              <p>{s.desc}</p>
             </div>
           ))}
-        </section>
+        </div>
+      </section>
 
-        {/* ── Footer ── */}
-        <footer className="footer">
-          <div className="footer-inner">
-            <div className="footer-brand">
-              <span>© 2026</span>
-              <strong>LittleWed</strong>
-              <span className="footer-heart">♥</span>
-              <span>by <strong>MAHIRI GLOBAL LTD</strong></span>
-            </div>
+      {/* ── CTA ── */}
+      <section className="cta-strip">
+        <h2>Ready to get started?</h2>
+        <p>Create your account in minutes and invite your first guest today.</p>
+        <Link href="/signup" className="btn btn-primary"><Sparkles size={16} /> Get Started Free</Link>
+      </section>
 
-            <div className="footer-links">
-              <Link href="/about" className="footer-link">About</Link>
-              <Link href="/pricing" className="footer-link">Pricing</Link>
-              <Link href="/privacy-policy" className="footer-link">Privacy Policy</Link>
-              <Link href="/data-deletion" className="footer-link">Data Deletion</Link>
-              <Link href="/contact" className="footer-link">Contact</Link>
-            </div>
-          </div>
-        </footer>
-      </div>
+      <footer className="footer">
+        © {new Date().getFullYear()} LittleWed · Wedding Management Platform · <Phone size={12} style={{ verticalAlign: 'middle' }} /> +255 702 529 514
+      </footer>
     </div>
   );
 }

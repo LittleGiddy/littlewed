@@ -19,6 +19,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 });
   }
 
+  if (file.size > 1 * 1024 * 1024) {
+    return NextResponse.json({ error: 'Image is too large. Maximum size is 1MB.' }, { status: 400 });
+  }
+
   // Ensure the upload directory exists
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'thanks', eventId);
   if (!fs.existsSync(uploadDir)) {

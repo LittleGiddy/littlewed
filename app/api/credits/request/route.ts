@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendCreditRequestSubmittedEmail, sendCreditRequestToAdmin } from '@/lib/email';
+import { sendPushToRole } from '@/lib/push';
 
 const CREDIT_COST_TZS = 500;
 
@@ -94,6 +95,14 @@ export async function POST(req: NextRequest) {
         isRead: false,
       })),
     });
+
+    sendPushToRole('SUPER_ADMIN', {
+      title: 'New Credit Request',
+      body: `${user?.name || 'Unknown'} from ${tenant?.name || 'Unknown'} requested ${credits} credits (${(credits * CREDIT_COST_TZS).toLocaleString()} TZS).`,
+      url: '/admin/credit-requests',
+      type: 'info',
+      sound: true,
+    }).catch(() => {});
   }
 
   return NextResponse.json({

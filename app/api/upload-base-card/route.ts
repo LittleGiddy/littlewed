@@ -12,6 +12,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing image or eventId' }, { status: 400 });
     }
 
+    if (file.size > 1 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Image is too large. Maximum size is 1MB.' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', eventId);
     await mkdir(uploadDir, { recursive: true });
