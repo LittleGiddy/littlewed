@@ -7,9 +7,11 @@ import { normalizePhone } from '@/lib/phone';
 
 // ─── Helper: Check WhatsApp using NexSMS ──────────────────────────────
 async function checkWhatsAppNumber(phone: string): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  // Since NexSMS doesn't have a direct WhatsApp check endpoint,
-  // we assume WhatsApp is available and let the send API handle errors.
-  return { hasWhatsApp: true };
+  // WhatsApp presence cannot be detected reliably ahead of time, so we report
+  // no WhatsApp by default to avoid auto-routing guests to WhatsApp.
+  // The delivery webhook handles failures and the client can manually switch
+  // a guest to WhatsApp.
+  return { hasWhatsApp: false };
 }
 
 export async function POST(req: NextRequest) {

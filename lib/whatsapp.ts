@@ -177,7 +177,7 @@ export async function sendInvitationTemplate(
   }
 
   const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
-  const cardNumber = guest.cardNumber || '108';
+  const cardNumber = guest.cardNumber || '';
 
   const eventDate = typeof event.date === 'string' ? new Date(event.date) : event.date;
   const formattedDate = eventDate.toLocaleDateString('sw-TZ', {
@@ -192,21 +192,22 @@ export async function sendInvitationTemplate(
   });
 
   // Match template placeholders: {1} through {9}
+  // Variable values come from the user's event/guest data — no hardcoded fallbacks.
   const params = [
     fullName,                                    // {1}
-    event.hostFamily || 'Mr & Mrs Allan Swai',   // {2}
-    event.person1 || 'Agape',                    // {3}
-    event.person2 || 'Gladness',                 // {4}
+    event.hostFamily || '',                      // {2}
+    event.person1 || '',                         // {3}
+    event.person2 || '',                         // {4}
     formattedDate,                               // {5}
-    event.venue || 'The Embassy Hall',           // {6}
+    event.venue || '',                           // {6}
     formattedTime,                               // {7}
     cardNumber,                                  // {8}
-    guest.title || 'SINGLE',                     // {9}
+    guest.title || '',                           // {9}
   ];
 
   // Generate a dynamic invite link
   const inviteLink = customParams?.buttonUrl || `https://littlewed.co.tz/invite/${guest.phone}`;
-  const imageUrl = customParams?.imageUrl || event.imageUrl || 'https://littlewed.co.tz/images/invite-default.jpg';
+  const imageUrl = customParams?.imageUrl || event.imageUrl || '';
 
   return await sendWhatsAppMessage({
     to: guest.phone,

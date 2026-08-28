@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { sendNewSignupToAdmin } from '@/lib/email';
+import { sendPushToRole } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
   const { business_name, subdomain, email, phone, password, name } = await req.json();
@@ -48,6 +50,25 @@ export async function POST(req: NextRequest) {
       emailVerified: new Date(),
     },
   });
+
+  // Notify super admin of the new signup awaiting approval
+  sendNewSignupToAdmin({
+    name,
+    email,
+    phone: phone || null,
+    tenantName: business_name,
+    subdomain: cleanSubdomain,
+    method: 'email',
+  }).catch((err) => console.error('Failed to send new signup email:', err));
+
+  // Push to super admins' mobile devices
+  sendPushToRole('SUPER_ADMIN', {
+    title: 'New user signup',
+    body: `${name} (${email}) from ${business_name} is awaiting approval.`,
+    url: '/admin/users',
+    type: 'alert',
+    sound: true,
+  }).catch(() => {});
 
   return NextResponse.json({ success: true, tenantId: tenant.id });
 } 

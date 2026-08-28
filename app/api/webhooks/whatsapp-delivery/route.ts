@@ -78,7 +78,9 @@ export async function POST(req: NextRequest) {
 
       case 'FAILED':
         console.error(`[Webhook] ❌ Message ${messageId} failed!`);
-        // You could send an alert or retry here
+        // Mark the guest as NOT received so the UI can show which numbers
+        // didn't get the message, and fall back their routing to SMS.
+        await markGuestDeliveryFailed(messageId, body.error || 'Delivery failed');
         break;
 
       case 'PENDING':
@@ -92,6 +94,7 @@ export async function POST(req: NextRequest) {
         if (body.error) {
           console.error('[Webhook] Rejection reason:', body.error);
         }
+        await markGuestDeliveryFailed(messageId, body.error || 'Rejected by provider');
         break;
 
       case 'SENT':
@@ -147,6 +150,39 @@ async function updateGuestOnDelivery(messageId: string) {
     }
   } catch (error) {
     console.error('[Webhook] ❌ Error updating guest:', error);
+  }
+}
+
+// ─── Helper: Mark a guest as NOT having received the message ───────────
+// Used when the delivery webhook reports FAILED/REJECTED. The guest is
+// flagged as not-on-WhatsApp and routed to SMS so they appear on the SMS
+// side and can be retried by SMS.
+async function markGuestDeliveryFailed(messageId: string, error?: string) {
+  try {
+    const messageLog = await prisma.messageLog.findUnique({
+      where: { messageId: messageId },
+      select: { guestId: true, type: true },
+    });
+
+    if (!messageLog || !messageLog.guestId) {
+      console.log(`[Webhook] ℹ️ No guest found for failed message ${messageId}`);
+      return;
+    }
+
+    if (messageLog.type === 'WHATSAPP') {
+      await prisma.guest.update({
+        where: { id: messageLog.guestId },
+        data: {
+          onWhatsApp: false,
+          routingChannel: 'sms',
+        },
+      });
+      console.log(
+        `[Webhook] 🚫 Guest ${messageLog.guestId} did not receive the message (${error}). Moved to SMS.`
+      );
+    }
+  } catch (e) {
+    console.error('[Webhook] ❌ Error marking guest delivery failed:', e);
   }
 }
 

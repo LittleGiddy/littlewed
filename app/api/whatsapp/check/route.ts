@@ -22,12 +22,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 });
     }
 
-    // Since NexSMS doesn't have a direct check endpoint,
-    // we assume WhatsApp is available and let the send API handle errors
+    // WhatsApp presence cannot be detected reliably ahead of time, so we
+    // report no WhatsApp by default to avoid auto-routing guests to WhatsApp.
+    // The delivery webhook handles failures and the client can manually
+    // switch a guest to WhatsApp.
     return NextResponse.json({
       number: normalized,
-      hasWhatsApp: true,
-      waId: normalized.replace(/\D/g, ''),
+      hasWhatsApp: false,
+      waId: null,
     });
   } catch (error: any) {
     console.error('WhatsApp check error:', error);

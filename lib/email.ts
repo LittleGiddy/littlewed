@@ -5,6 +5,101 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_ADDRESS = 'LittleWed <credits@littlewed.co.tz>';
 const APP_URL = 'https://littlewed.co.tz';
 
+// ─── Super admin notifications ────────────────────────────────────────────
+// All admin alerts (new signups, approvals, credit requests) go to this inbox.
+export const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'gideonfelixy@gmail.com';
+
+async function sendAdminAlert(
+  subject: string,
+  title: string,
+  rows: { label: string; value: string }[],
+  actionLabel: string,
+  actionUrl: string
+) {
+  await resend.emails.send({
+    from: 'LittleWed Admin <admin@littlewed.co.tz>',
+    to: SUPER_ADMIN_EMAIL,
+    subject,
+    html: `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: #0D4B4B; padding: 32px; text-align: center; border-radius: 16px 16px 0 0;">
+          <h1 style="color: white; font-size: 24px; margin: 0;">LittleWed Admin</h1>
+        </div>
+        <div style="background: #f8fafb; padding: 32px; border: 1px solid #e8ecef; border-top: none;">
+          <h2 style="color: #1a2b3c; font-size: 20px; margin: 0 0 12px;">${title}</h2>
+          <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e8ecef;">
+            <table style="width: 100%; border-collapse: collapse;">
+              ${rows
+                .map(
+                  (r) => `
+                  <tr>
+                    <td style="padding: 6px 0; color: #718096; font-size: 14px;">${r.label}</td>
+                    <td style="padding: 6px 0; color: #1a2b3c; font-size: 14px; font-weight: 700; text-align: right;">${r.value}</td>
+                  </tr>`
+                )
+                .join('')}
+            </table>
+          </div>
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="${actionUrl}" style="display: inline-block; background: #FF6B5C; color: white; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px;">${actionLabel}</a>
+          </div>
+        </div>
+        <div style="padding: 16px 32px; text-align: center;">
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Admin Notifications</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+// Notify super admin that a brand-new user just signed up and needs approval.
+export async function sendNewSignupToAdmin(params: {
+  name: string;
+  email: string;
+  phone?: string | null;
+  tenantName?: string;
+  subdomain?: string;
+  method: 'email' | 'google';
+}) {
+  const rows: { label: string; value: string }[] = [
+    { label: 'Name', value: params.name || '—' },
+    { label: 'Email', value: params.email },
+    { label: 'Method', value: params.method },
+  ];
+  if (params.phone) rows.push({ label: 'Phone', value: params.phone });
+  if (params.tenantName) rows.push({ label: 'Organization', value: params.tenantName });
+  if (params.subdomain) rows.push({ label: 'Subdomain', value: `${params.subdomain}.littlewed.co.tz` });
+
+  await sendAdminAlert(
+    `New user signed up — ${params.name || params.email}`,
+    'New User Signup',
+    rows,
+    'View Pending Users',
+    `${APP_URL}/admin/users`
+  );
+}
+
+// Notify super admin that an existing pending account is requesting approval/activation.
+export async function sendApprovalRequestToAdmin(params: {
+  name: string;
+  email: string;
+  tenantName?: string;
+}) {
+  const rows: { label: string; value: string }[] = [
+    { label: 'Name', value: params.name || '—' },
+    { label: 'Email', value: params.email },
+  ];
+  if (params.tenantName) rows.push({ label: 'Organization', value: params.tenantName });
+
+  await sendAdminAlert(
+    `Approval request — ${params.name || params.email}`,
+    'Account Awaiting Approval',
+    rows,
+    'Review & Approve',
+    `${APP_URL}/admin/users`
+  );
+}
+
 export async function sendEventReminderEmail(to: string, eventName: string, eventDate: Date) {
   const formattedDate = eventDate.toLocaleDateString('en-US', {
     weekday: 'long',

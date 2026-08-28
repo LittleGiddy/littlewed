@@ -105,8 +105,10 @@ export async function POST(req: NextRequest) {
     if (ourStatus === 'FAILED') {
       console.error(`[Webhook] ❌ Message ${messageId} failed!`);
       console.error(`[Webhook] Error: ${updateData.error || 'Unknown error'}`);
-      
-      // You could send a notification to the admin here
+
+      // Mark guest as not received + fall back to SMS so the client can see
+      // which numbers didn't get the message and retry by SMS.
+      await markGuestDeliveryFailed(messageLog.guestId);
     }
 
     return NextResponse.json({ 
@@ -123,5 +125,19 @@ export async function POST(req: NextRequest) {
       success: false, 
       error: error.message,
     }, { status: 200 });
+  }
+}
+
+// ─── Helper: Mark guest as not received ──────────────────────────────────
+async function markGuestDeliveryFailed(guestId?: string | null) {
+  if (!guestId) return;
+  try {
+    await prisma.guest.update({
+      where: { id: guestId },
+      data: { onWhatsApp: false, routingChannel: 'sms' },
+    });
+    console.log(`[Webhook] 🚫 Guest ${guestId} did not receive the message. Moved to SMS.`);
+  } catch (e) {
+    console.error('[Webhook] ❌ Error marking guest delivery failed:', e);
   }
 }

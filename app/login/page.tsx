@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
   const [isInactiveUser, setIsInactiveUser] = useState(false);
+  const [userNotFound, setUserNotFound] = useState(false);
 
   // Hero carousel content
   const heroSlides = [
@@ -67,7 +68,8 @@ export default function LoginPage() {
 
 
     if (errorParam === 'UserNotFound') {
-      setError('No account found with this email. Please sign up first.');
+      setError('No account associated, Create one?');
+      setUserNotFound(true);
       setIsInactiveUser(false);
       setLoading(false);
       return;
@@ -139,6 +141,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     setIsInactiveUser(false);
+    setUserNotFound(false);
     try {
       const result = await signIn('credentials', { email, password, redirect: false });
 
@@ -163,6 +166,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     setIsInactiveUser(false);
+    setUserNotFound(false);
     try {
       await signIn('google', {
         callbackUrl: '/login?from=google',
@@ -1177,6 +1181,14 @@ export default function LoginPage() {
                   <div className="err-box" role="alert" aria-live="assertive">
                     <AlertCircle size={16} className="flex-shrink-0" />
                     <span>{error}</span>
+                  </div>
+                )}
+
+                {userNotFound && (
+                  <div style={{ marginBottom: 14 }}>
+                    <a href="/signup" className="btn" style={{ textDecoration: 'none' }}>
+                      Sign Up <ArrowRight size={16} />
+                    </a>
                   </div>
                 )}
 

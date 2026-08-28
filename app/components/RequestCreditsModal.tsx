@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Coins, Minus, Plus, Send, Clock } from 'lucide-react';
+import { X, Coins, Minus, Plus, Send, Clock, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const CREDIT_COST_TZS = 500;
@@ -18,6 +18,7 @@ interface RequestCreditsModalProps {
   onClose: () => void;
   onRequestSent?: () => void;
   hasPending?: boolean;
+  requiredCredits?: number;
 }
 
 export default function RequestCreditsModal({
@@ -25,12 +26,30 @@ export default function RequestCreditsModal({
   onClose,
   onRequestSent,
   hasPending = false,
+  requiredCredits = 0,
 }: RequestCreditsModalProps) {
   const [selectedCredits, setSelectedCredits] = useState(25);
   const [customMode, setCustomMode] = useState(false);
   const [customCredits, setCustomCredits] = useState('');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Pre-select an amount that covers the shortfall, if one is provided.
+  // Uses the render-time derived-state pattern (no effect) to adjust state
+  // when requiredCredits changes.
+  const [prevRequired, setPrevRequired] = useState<number>(requiredCredits);
+  if (requiredCredits !== prevRequired && requiredCredits > 0) {
+    setPrevRequired(requiredCredits);
+    const preset = PRESETS.find((p) => p.credits >= requiredCredits);
+    if (preset) {
+      setSelectedCredits(preset.credits);
+      setCustomMode(false);
+    } else {
+      setSelectedCredits(25);
+      setCustomMode(true);
+      setCustomCredits(String(requiredCredits));
+    }
+  }
 
   const activeCredits = customMode
     ? Math.max(1, parseInt(customCredits || '0', 10) || 0)
@@ -94,6 +113,18 @@ export default function RequestCreditsModal({
               <div>
                 <p className="text-sm font-bold text-amber-800">Request pending</p>
                 <p className="text-xs text-amber-600 mt-0.5">You already have a credit request being reviewed by the admin.</p>
+              </div>
+            </div>
+          )}
+
+          {requiredCredits > 0 && (
+            <div className="flex items-start gap-2.5 bg-[#0D4B4B]/[0.06] border border-[#0D4B4B]/15 rounded-2xl p-4 mb-5">
+              <AlertCircle size={18} className="text-[#C07A20] shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-[#0A3939]">You need {requiredCredits} more credit{requiredCredits !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-[#0D4B4B]/80 mt-0.5">
+                  The amount below is pre-selected to cover your shortfall. Request it to continue importing.
+                </p>
               </div>
             </div>
           )}

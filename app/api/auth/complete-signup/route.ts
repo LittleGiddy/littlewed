@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { sendNewSignupToAdmin } from '@/lib/email';
+import { sendPushToRole } from '@/lib/push';
 
 export async function POST(req: NextRequest) {
   try {
@@ -88,6 +90,25 @@ export async function POST(req: NextRequest) {
     });
 
     console.log('[CompleteSignup] User updated:', user.id);
+
+    // Notify super admin of the new signup awaiting approval
+    sendNewSignupToAdmin({
+      name: user.name || '',
+      email: user.email,
+      phone: undefined,
+      tenantName: tenant.name,
+      subdomain: tenant.subdomain,
+      method: 'google',
+    }).catch((err) => console.error('Failed to send new signup email:', err));
+
+    // Push to super admins' mobile devices
+    sendPushToRole('SUPER_ADMIN', {
+      title: 'New user signup',
+      body: `${user.name || ''} (${user.email}) from ${tenant.name} is awaiting approval.`,
+      url: '/admin/users',
+      type: 'alert',
+      sound: true,
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

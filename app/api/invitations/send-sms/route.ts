@@ -44,13 +44,14 @@ export async function POST(req: NextRequest) {
       : '';
 
     // ─── Build SMS message (no link) ────────────────────────────────────
+    // Values come from the user's event/guest data — no hardcoded fallbacks.
     let smsMessage = `Habari ${guestFullName},
 
-Familia ya ${guest.event?.hostFamily || 'Mr & Mrs Allan Swai'} inakualika katika harusi ya ${guest.event?.person1 || 'Agape'} na ${guest.event?.person2 || 'Gladness'} tarehe ${formattedDate}.
+Familia ya ${guest.event?.hostFamily || ''} inakualika katika harusi ya ${guest.event?.person1 || ''} na ${guest.event?.person2 || ''} tarehe ${formattedDate}.
 
-Venue: ${guest.event?.venue || 'The Embassy Hall'}, saa ${guest.event?.time || '5:00 PM'}.
+Venue: ${guest.event?.venue || ''}, saa ${guest.event?.time || ''}.
 
-Card No: ${guest.cardNumber || '108'} • ${guest.guestType || 'SINGLE'}
+Card No: ${guest.cardNumber || ''} • ${guest.guestType || ''}
 
 Tafadhali onyesha kadi hii wakati wa kuingia.
 Karibu na ufurahie sherehe!

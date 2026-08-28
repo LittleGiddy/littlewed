@@ -45,8 +45,11 @@ async function generateUniqueCardNumber(eventId: string): Promise<string> {
 }
 
 // ─── Helper: Check WhatsApp with rate limiting ──────────────────────────
+// WhatsApp presence cannot be reliably detected ahead of time, so guests are
+// defaulted to SMS. Keep this return value false to avoid auto-routing guests
+// to WhatsApp; users can manually switch a guest (or all) to WhatsApp.
 async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
-  return { hasWhatsApp: true };
+  return { hasWhatsApp: false };
 }
 
 // ─── Helper: Validate guest type ──────────────────────────────────────────
@@ -63,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { guests, eventId, detectWhatsApp = true } = await req.json();
+    const { guests, eventId, detectWhatsApp = false } = await req.json();
 
     if (!guests || !Array.isArray(guests) || guests.length === 0 || !eventId) {
       return NextResponse.json({ error: 'Missing guests or eventId' }, { status: 400 });

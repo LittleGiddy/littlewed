@@ -10,7 +10,7 @@ import {
   Square, ArrowUp, Heart, X, Image as ImageIcon, Bell,
   Search, Download, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
-  Check, Coins, Sparkles, Hash, Loader2, MoreVertical,
+  Check, Coins, Sparkles, Hash, Loader2, MoreVertical, Compass,
   Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
 } from 'lucide-react';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
@@ -542,6 +542,28 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const goNextStep = () => { if (stepIndex < STEPS.length - 1) goToStep(STEPS[stepIndex + 1].id); };
+
+  // Friendly guidance shown under each step describing what comes next
+  const nextUp = (() => {
+    if (activeStep === 'guests') {
+      return stepComplete.guests
+        ? 'Great — your guest list is ready. Next, design a single invitation template that will be used for every guest.'
+        : 'Start by adding your guests — you can import a spreadsheet or add them one by one. You need at least one guest to continue.';
+    }
+    if (activeStep === 'design') {
+      return stepComplete.generate
+        ? 'Card design looks complete. Next, review your generated cards and then send them to your guests.'
+        : 'Now personalise one card design. When you save it, you\'ll move on to generating a card for each guest.';
+    }
+    if (activeStep === 'generate') {
+      return stepComplete.generate
+        ? 'All cards are generated. Next, send your invitations by WhatsApp or SMS.'
+        : 'Generate a personalised card for each guest. Missing cards are shown below — click Generate when ready.';
+    }
+    return stepComplete.send
+      ? 'All invitations sent! Your guests can now receive their personal cards. You\'re all set.'
+      : 'Ready to share the love — send your invitations now. You can pick WhatsApp, SMS, or both.';
+  })();
 
   // ─── Generate Cards Handler (Smart - Only for guests without cards) ──
   const handleGenerateCards = async () => {
@@ -1085,6 +1107,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         }
         .step-label { font-size: 11px; font-weight: 600; color: #9BAAB8; }
         .step-pill.active .step-label, .step-pill.done .step-label { color: #0D4B4B; }
+        .step-count { font-size: 9.5px; font-weight: 700; color: #B0BEC8; }
+        .step-pill.done .step-count { color: #0D4B4B; }
+        .step-pill.active .step-count { color: #FF6B5C; }
         .step-line { position: absolute; top: 17px; left: 50%; width: 100%; height: 2px; background: #E2EAF0; z-index: -1; }
         .step-pill.done .step-line { background: #0D4B4B; }
         .step-pill:first-child .step-line { display: none; }
@@ -1278,25 +1303,74 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           ) : (
             <>
-              {/* ─── Step Rail ─── */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3 py-3 mb-4">
-                <div className="flex items-start">
-                  {STEPS.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`step-pill ${activeStep === s.id ? 'active' : ''} ${stepComplete[s.id] ? 'done' : ''
-                        }`}
-                      onClick={() => goToStep(s.id)}
-                    >
-                      <div className="step-line" />
-                      <div className="step-circle">
-                        {stepComplete[s.id] && activeStep !== s.id ? <Check size={16} /> : s.icon}
-                      </div>
-                      <span className="step-label">{s.label}</span>
+                  {/* ─── Step Rail ─── */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3 py-3 mb-4">
+                    <div className="flex items-start">
+                      {STEPS.map((s) => (
+                        <div
+                          key={s.id}
+                          className={`step-pill ${activeStep === s.id ? 'active' : ''} ${stepComplete[s.id] ? 'done' : ''
+                            }`}
+                          onClick={() => goToStep(s.id)}
+                        >
+                          <div className="step-line" />
+                          <div className="step-circle">
+                            {stepComplete[s.id] && activeStep !== s.id ? <Check size={16} /> : s.icon}
+                          </div>
+                          <span className="step-label">{s.label}</span>
+                          <span className="step-count">
+                            {s.id === 'guests' && `${guests.length || 0}`}
+                            {s.id === 'generate' && `${guestsWithCards.length}/${guests.length}`}
+                            {s.id === 'send' && `${sentCount}/${guests.length}`}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+
+                  {/* ─── Journey Overview ─── */}
+                  <div className="bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] rounded-2xl shadow-sm border border-[#0D4B4B]/10 overflow-hidden mb-4">
+                    <div className="px-5 py-4 text-white">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Compass size={16} className="text-[#FFD9D2]" />
+                        <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#FFD9D2]/90">Your invitation journey</p>
+                      </div>
+                      <p className="text-sm text-white/85 leading-relaxed">
+                        Set up your wedding invitations in <strong>{STEPS.length} simple steps</strong> — add your
+                        guests, design one card, generate a personalised card for each guest, then send them.
+                        Here&apos;s where you are now:
+                      </p>
+                      <div className="mt-3 flex flex-col gap-2">
+                        {STEPS.map((s, i) => {
+                          const state = activeStep === s.id
+                            ? { dot: 'bg-[#FF6B5C]', text: 'text-white', label: '', badge: 'Current' }
+                            : stepComplete[s.id]
+                              ? { dot: 'bg-green-400', text: 'text-white/70', label: <Check size={13} className="text-green-300" />, badge: 'Done' }
+                              : { dot: 'bg-white/25', text: 'text-white/55', label: <span className="text-white/40">{i + 1}</span>, badge: '' };
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => goToStep(s.id)}
+                              className="flex items-center gap-3 text-left w-full rounded-lg px-2.5 py-1.5 transition hover:bg-white/10"
+                            >
+                              <span className={`w-2 h-2 rounded-full ${state.dot} flex-shrink-0`} />
+                              <span className={`text-xs font-semibold ${state.text}`}>
+                                Step {i + 1} · {s.label} {state.label}
+                              </span>
+                              {state.badge && (
+                                <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  state.badge === 'Current' ? 'bg-white/20 text-white' : 'bg-green-400/20 text-green-200'
+                                }`}>
+                                  {state.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
 
               {/* ─── Generation Progress ─── */}
               {generationProgress && (
@@ -1672,6 +1746,17 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
+              {/* ─── Next Up Guidance ─── */}
+              <div className="bg-[#0D4B4B]/[0.05] border border-[#0D4B4B]/15 rounded-2xl px-4 py-3.5 mb-3 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <ArrowRight size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold tracking-[1.2px] uppercase text-[#0D4B4B] mb-0.5">Next up</p>
+                  <p className="text-[13px] font-medium text-gray-700 leading-relaxed">{nextUp}</p>
+                </div>
+              </div>
+
               {/* ─── Bottom Sticky Step Navigation ─── */}
               <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 sm:px-6 py-3 z-30">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
@@ -1687,7 +1772,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </span>
                   {stepIndex < STEPS.length - 1 ? (
                     <button onClick={goNextStep} className="btn-primary flex-shrink-0">
-                      Continue <ArrowRight size={16} />
+                      Continue to {STEPS[stepIndex + 1].label} <ArrowRight size={16} />
                     </button>
                   ) : (
                     <button

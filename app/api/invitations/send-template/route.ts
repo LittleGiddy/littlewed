@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!cardImageUrl) {
-      cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
+      cardImageUrl = '';
     }
     const formattedDate = guest.event?.date
       ? new Date(guest.event.date).toLocaleDateString('sw-TZ', {
@@ -80,17 +80,19 @@ export async function POST(req: NextRequest) {
     console.log('[SendTemplate] Invite Link:', inviteLink);
 
     // ─── Send WhatsApp invitation ──────────────────────────────────────
+    // Variable values come from the user's event/guest data — no hardcoded
+    // fallbacks. Empty fields send empty values to the template.
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
-      hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
-      person1: guest.event?.person1 || 'Agape',
-      person2: guest.event?.person2 || 'Gladness',
+      hostFamily: guest.event?.hostFamily || '',
+      person1: guest.event?.person1 || '',
+      person2: guest.event?.person2 || '',
       date: formattedDate,
-      venue: guest.event?.venue || 'The Embassy Hall',
-      time: guest.event?.time || '5:00 PM',
-      cardNumber: guest.cardNumber || '108',
-      cardType: guest.guestType || 'SINGLE',
-      imageUrl: cardImageUrl,
+      venue: guest.event?.venue || '',
+      time: guest.event?.time || '',
+      cardNumber: guest.cardNumber || '',
+      cardType: guest.guestType || '',
+      imageUrl: cardImageUrl || undefined,
       inviteLink: inviteLink,
     });
 

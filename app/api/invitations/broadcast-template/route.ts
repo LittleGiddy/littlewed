@@ -60,7 +60,11 @@ export async function POST(req: NextRequest) {
             name: event.name,
             date: event.date,
             venue: event.venue,
-            time: undefined,
+            time: event.time || undefined,
+            hostFamily: event.hostFamily || undefined,
+            person1: event.person1 || undefined,
+            person2: event.person2 || undefined,
+            imageUrl: event.imageUrl || undefined,
           }
         );
 

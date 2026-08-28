@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (!cardImageUrl) {
-            cardImageUrl = 'https://www.gstatic.com/webp/gallery/1.png';
+            cardImageUrl = '';
           }
 
           // ─── Build invite link for the button ──────────────────────────
@@ -112,25 +112,97 @@ export async function POST(req: NextRequest) {
 
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
-            const actualCardNumber = guest.cardNumber || vars.cardNumber || '108';
-            const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
+            const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
+            const actualCardType = guest.guestType || vars.cardType || '';
 
             // ─── Send WhatsApp ────────────────────────────────────────────
+            // Variable values come from the user's inputs (whatsappVariables),
+            // then the event data — no hardcoded fallbacks.
             result = await sendWeddingInvitation(guest.phone!, {
               guestName: actualGuestName,
-              hostFamily: vars.hostFamily || guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
-              person1: vars.person1 || guest.event?.person1 || 'Agape',
-              person2: vars.person2 || guest.event?.person2 || 'Gladness',
+              hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+              person1: vars.person1 || guest.event?.person1 || '',
+              person2: vars.person2 || guest.event?.person2 || '',
               date: vars.date || formattedDate,
-              venue: vars.venue || guest.event?.venue || 'The Embassy Hall',
-              time: vars.time || guest.event?.time || '5:00 PM',
+              venue: vars.venue || guest.event?.venue || '',
+              time: vars.time || guest.event?.time || '',
               cardNumber: actualCardNumber,
               cardType: actualCardType,
-              imageUrl: cardImageUrl,
+              imageUrl: cardImageUrl || undefined,
               inviteLink: inviteLink,
               templateName: whatsappTemplate,
               contact: whatsappContact,
             });
+
+            // ─── WhatsApp failed → fall back to SMS ──────────────────────
+            // Since WhatsApp presence can't be detected ahead of time, if the
+            // WhatsApp send fails, automatically retry with SMS and flip the
+            // guest's routing so they now appear on the SMS side.
+            if (!result.success) {
+              console.log(`[Batch] WhatsApp failed for ${guest.name}, falling back to SMS`);
+
+              const fallbackVars = smsVariables || {};
+              const cardNumber = guest.cardNumber || fallbackVars.cardNumber || '';
+              const guestType =
+                guest.guestType === 'DOUBLE' ? 'Double' : guest.guestType === 'SINGLE' ? 'Single' : '';
+
+              const smsTemplateText =
+                smsTemplate ||
+                message ||
+                `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
+
+              const fallbackMap: Record<string, string> = {
+                guestName: actualGuestName,
+                guestTitle: guest.title || '',
+                title: guest.title || '',
+                name: guest.name || '',
+                fullName: actualGuestName,
+                cardNumber,
+                cardNo: cardNumber,
+                guestType,
+                cardType: guestType,
+                passCode: guest.passCode || 'N/A',
+                event: guest.event?.name || '',
+                date: formattedDate,
+                eventDate: formattedDate,
+                venue: fallbackVars.venue || guest.event?.venue || '',
+                address: guest.event?.address || '',
+                hostFamily: fallbackVars.hostFamily || guest.event?.hostFamily || '',
+                person1: fallbackVars.person1 || guest.event?.person1 || '',
+                person2: fallbackVars.person2 || guest.event?.person2 || '',
+                time: fallbackVars.time || guest.event?.time || '',
+                contact: whatsappContact || '',
+              };
+
+              const fallbackMessage = smsTemplateText.replace(
+                /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|passCode|event|date|eventDate|venue|address|hostFamily|person1|person2|time|contact)\}/g,
+                (m: string, key: string) => fallbackMap[key] ?? m
+              );
+
+              const smsFallback = await sendSMS({ to: guest.phone!, message: fallbackMessage });
+
+              if (smsFallback.success) {
+                // Flip the guest's routing to SMS so they show on the SMS side
+                await prisma.guest.update({
+                  where: { id: guest.id },
+                  data: { routingChannel: 'sms', onWhatsApp: false, invitationSentAt: new Date() },
+                }).catch(() => {});
+
+                result = {
+                  success: true,
+                  error: undefined,
+                  data: { ...(smsFallback.data || {}), fellBackFromWhatsapp: true },
+                  messageId: smsFallback.messageId,
+                };
+              } else {
+                result = {
+                  success: false,
+                  error: result.error || (smsFallback.error || 'WhatsApp failed and SMS fallback failed'),
+                  data: { whatsappData: result.data, smsFallbackData: smsFallback.data },
+                  messageId: result.messageId,
+                };
+              }
+            }
 
           } else {
             // ─── SMS ──────────────────────────────────────────────────────
@@ -140,8 +212,8 @@ export async function POST(req: NextRequest) {
             const vars = smsVariables || {};
 
             const actualGuestName = guestFullName;
-            const actualCardNumber = guest.cardNumber || vars.cardNumber || '108';
-            const actualCardType = guest.guestType || vars.cardType || 'SINGLE';
+            const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
+            const actualCardType = guest.guestType || vars.cardType || '';
 
             // ─── Base template: prefer the SMS template edited by the user ──
             const smsTemplateText =

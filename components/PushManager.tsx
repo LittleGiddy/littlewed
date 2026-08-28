@@ -126,8 +126,7 @@ export default function PushManager() {
     if (
       isLoggedIn &&
       supportsPush &&
-      userChoice != null &&
-      userChoice !== 'granted' &&
+      permission !== 'granted' &&
       userChoice !== 'denied'
     ) {
       const t = setTimeout(() => setShowPrompt(true), 1500);

@@ -11,6 +11,7 @@ import {
   GripVertical, Crosshair, Dot
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ModernColorPicker from '@/app/components/ModernColorPicker';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
@@ -634,28 +635,45 @@ export default function InvitationDesigner() {
   };
 
   const moveResize = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!resizing) return;
+    if (!resizing || !canvasRef.current) return;
     e.preventDefault();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const deltaY = clientY - resizeStart.y;
+    const isTouch = 'touches' in e;
+    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    const rect = canvasRef.current.getBoundingClientRect();
     const idx = resizing.index;
     const layer = layers[idx];
+    if (!layer) return;
+
+    const scale = canvasScale || rect.width / DESIGNER_WIDTH;
+    const dxPct = rect.width > 0 ? ((clientX - resizeStart.x) / rect.width) * 100 : 0;
+    const dyPct = rect.height > 0 ? ((clientY - resizeStart.y) / rect.height) * 100 : 0;
+    const dyDesignPx = scale > 0 ? (clientY - resizeStart.y) / scale : 0;
+
     if (layer.type === 'text') {
-      const newSize = Math.max(8, resizeStart.initialFontSize + deltaY * 0.5);
+      const newSize = Math.max(8, Math.min(180, resizeStart.initialFontSize + dyDesignPx));
       updateLayer(idx, { fontSize: Math.round(newSize) });
     } else if (layer.type === 'rect') {
-      const deltaX = clientX - resizeStart.x;
-      const newWidth = Math.max(5, resizeStart.initialWidth + deltaX * 0.2);
-      const newHeight = Math.max(5, resizeStart.initialHeight + deltaY * 0.2);
+      const newWidth = Math.min(100, Math.max(5, resizeStart.initialWidth + dxPct));
+      const newHeight = Math.min(100, Math.max(5, resizeStart.initialHeight + dyPct));
       updateLayer(idx, {
-        width: Math.round(Math.min(100, newWidth)),
-        height: Math.round(Math.min(100, newHeight)),
+        width: Math.round(newWidth),
+        height: Math.round(newHeight),
       });
     }
   };
 
   const endResize = () => setResizing(null);
+
+  const moveCanvas = (e: React.MouseEvent | React.TouchEvent) => {
+    if (resizing) moveResize(e);
+    else moveDrag(e);
+  };
+
+  const endCanvas = (e?: React.MouseEvent | React.TouchEvent) => {
+    endDrag(e);
+    endResize();
+  };
 
   // ─── Render layer ─────────────────────────────────────────────────────
   const renderLayer = (layer: any, index: number) => {
@@ -729,13 +747,15 @@ export default function InvitationDesigner() {
           {isSelected && !isLocked && (
             <>
               <div
-                className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4B4B] rounded cursor-nw-resize"
+                className="absolute bottom-0 right-0 w-5 h-5 bg-[#0D4B4B] rounded cursor-nw-resize touch-none"
                 style={{ transform: 'translate(50%, 50%)' }}
                 onMouseDown={startResize(index)}
                 onTouchStart={startResize(index)}
-              />
+              >
+                <span className="absolute inset-1 border-r-2 border-b-2 border-white/80 rounded-sm" />
+              </div>
               <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-[8px] text-[#0D4B4B] bg-white/80 px-2 py-0.5 rounded whitespace-nowrap opacity-60 pointer-events-none flex items-center gap-1">
-                <MoveIcon size={10} /> Drag · ← ↑ ↓ →
+                <MoveIcon size={10} /> Drag · grab corner to resize
               </div>
             </>
           )}
@@ -769,11 +789,13 @@ export default function InvitationDesigner() {
         >
           {isSelected && !isLocked && (
             <div
-              className="absolute bottom-0 right-0 w-4 h-4 bg-[#0D4B4B] rounded cursor-nw-resize"
+              className="absolute bottom-0 right-0 w-5 h-5 bg-[#0D4B4B] rounded cursor-nw-resize touch-none"
               style={{ transform: 'translate(50%, 50%)' }}
               onMouseDown={startResize(index)}
               onTouchStart={startResize(index)}
-            />
+            >
+              <span className="absolute inset-1 border-r-2 border-b-2 border-white/80 rounded-sm" />
+            </div>
           )}
         </div>
       );
@@ -1057,12 +1079,12 @@ export default function InvitationDesigner() {
                 height: containerSize.height || 500,
                 maxWidth: '100%',
               }}
-              onMouseUp={endDrag}
-              onMouseLeave={endDrag}
-              onTouchEnd={endDrag}
-              onTouchCancel={endDrag}
-              onMouseMove={moveDrag}
-              onTouchMove={moveDrag}
+              onMouseUp={endCanvas}
+              onMouseLeave={endCanvas}
+              onTouchEnd={endCanvas}
+              onTouchCancel={endCanvas}
+              onMouseMove={moveCanvas}
+              onTouchMove={moveCanvas}
             >
               <div
                 ref={canvasRef}
@@ -1253,7 +1275,7 @@ export default function InvitationDesigner() {
 
               <Section title="Properties" section="properties" icon={<Settings size={14} />}>
                 {selectedLayer ? (
-                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                  <div className="space-y-3 max-h-72 overflow-y-auto overscroll-contain">
                     {/* ─── Position Controls ─── */}
                     <div className="bg-gray-50 rounded-lg p-2 border border-gray-200">
                       <p className="text-[9px] font-medium text-gray-500 mb-2 flex items-center gap-1">
@@ -1269,7 +1291,7 @@ export default function InvitationDesigner() {
                               min="0"
                               max="100"
                               step="0.5"
-                              value={Math.round(selectedLayer.x || 50)}
+                              value={selectedLayer.x ?? 50}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
                               className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4B4B]"
                             />
@@ -1278,7 +1300,7 @@ export default function InvitationDesigner() {
                               min="0"
                               max="100"
                               step="0.5"
-                              value={Math.round(selectedLayer.x || 50)}
+                              value={selectedLayer.x ?? 50}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { x: Number(e.target.value) })}
                               className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4B4B] focus:border-transparent"
                             />
@@ -1292,7 +1314,7 @@ export default function InvitationDesigner() {
                               min="0"
                               max="100"
                               step="0.5"
-                              value={Math.round(selectedLayer.y || 50)}
+                              value={selectedLayer.y ?? 50}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
                               className="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#0D4B4B]"
                             />
@@ -1301,7 +1323,7 @@ export default function InvitationDesigner() {
                               min="0"
                               max="100"
                               step="0.5"
-                              value={Math.round(selectedLayer.y || 50)}
+                              value={selectedLayer.y ?? 50}
                               onChange={(e) => updateLayer(selectedLayerIndex!, { y: Number(e.target.value) })}
                               className="w-14 p-0.5 border border-gray-200 rounded text-[10px] text-center focus:ring-1 focus:ring-[#0D4B4B] focus:border-transparent"
                             />
@@ -1365,11 +1387,9 @@ export default function InvitationDesigner() {
 
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Color</label>
-                          <input
-                            type="color"
+                          <ModernColorPicker
                             value={selectedLayer.color}
-                            onChange={e => updateLayer(selectedLayerIndex!, { color: e.target.value })}
-                            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                            onChange={(c) => updateLayer(selectedLayerIndex!, { color: c })}
                           />
                         </div>
 
@@ -1442,20 +1462,17 @@ export default function InvitationDesigner() {
                       <>
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Fill</label>
-                          <input
-                            type="color"
+                          <ModernColorPicker
                             value={selectedLayer.fill || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { fill: e.target.value })}
-                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                            onChange={(c) => updateLayer(selectedLayerIndex!, { fill: c })}
+                            withAlpha
                           />
                         </div>
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Border</label>
-                          <input
-                            type="color"
+                          <ModernColorPicker
                             value={selectedLayer.borderColor || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { borderColor: e.target.value })}
-                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                            onChange={(c) => updateLayer(selectedLayerIndex!, { borderColor: c })}
                           />
                         </div>
                         <RangeSlider
@@ -1504,11 +1521,9 @@ export default function InvitationDesigner() {
                       <>
                         <div>
                           <label className="block text-[10px] font-medium text-gray-600 mb-1">Stroke</label>
-                          <input
-                            type="color"
+                          <ModernColorPicker
                             value={selectedLayer.strokeColor || '#ffffff'}
-                            onChange={e => updateLayer(selectedLayerIndex!, { strokeColor: e.target.value })}
-                            className="w-full h-8 rounded-lg cursor-pointer border border-gray-200 p-0.5"
+                            onChange={(c) => updateLayer(selectedLayerIndex!, { strokeColor: c })}
                           />
                         </div>
                         <RangeSlider
@@ -1547,11 +1562,9 @@ export default function InvitationDesigner() {
                 <div className="space-y-2">
                   <div>
                     <label className="block text-[10px] font-medium text-gray-700">Color</label>
-                    <input
-                      type="color"
+                    <ModernColorPicker
                       value={overlayColor}
-                      onChange={e => setOverlayColor(e.target.value)}
-                      className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                      onChange={setOverlayColor}
                     />
                   </div>
                   <RangeSlider
@@ -1613,11 +1626,9 @@ export default function InvitationDesigner() {
                   />
                   <div>
                     <label className="block text-[10px] font-medium text-gray-700">Color</label>
-                    <input
-                      type="color"
+                    <ModernColorPicker
                       value={qrColor}
-                      onChange={e => setQrColor(e.target.value)}
-                      className="w-full h-7 rounded-lg cursor-pointer border border-gray-200"
+                      onChange={setQrColor}
                     />
                   </div>
                   <div className="flex gap-1 mt-1">

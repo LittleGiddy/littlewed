@@ -150,6 +150,10 @@ export default function SendInvitationsPage() {
   const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
   const [cardGenErrors, setCardGenErrors] = useState<{ name: string; error: string }[]>([]);
   const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
+  const [deliveryFailures, setDeliveryFailures] = useState<
+    { guestId: string; name: string; phone: string | null; status: string; error?: string | null }[]
+  >([]);
+  const [showDeliveryFailures, setShowDeliveryFailures] = useState(false);
 
   // ─── Selection for "send to selected guests" ─────────────────────────
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
@@ -306,6 +310,17 @@ export default function SendInvitationsPage() {
       }
 
       setGuests(guestsData || []);
+
+      // ─── Load delivery failures (numbers that didn't receive) ────────
+      try {
+        const failuresRes = await fetch(`/api/events/${eventId}/delivery-failures`, { credentials: 'include' });
+        if (failuresRes.ok) {
+          const failuresData = await failuresRes.json();
+          setDeliveryFailures(failuresData.failures || []);
+        }
+      } catch (err) {
+        console.error('Failed to load delivery failures:', err);
+      }
     } catch (error) {
       console.error('Load error:', error);
       toast.error('Failed to load data');
@@ -1371,6 +1386,43 @@ Card No: {cardNumber} {guestType}`}
           haven't received their invitation yet, so you can send safely without duplicating.
         </p>
       </div>
+
+      {/* ─── Numbers that didn't receive the message ─── */}
+      {deliveryFailures.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl shadow-sm mb-4 overflow-hidden">
+          <button
+            onClick={() => setShowDeliveryFailures(!showDeliveryFailures)}
+            className="w-full px-3 sm:px-4 py-2.5 flex items-center justify-between gap-2 text-left"
+          >
+            <span className="flex items-center gap-2 text-xs sm:text-sm font-bold text-red-700">
+              <AlertTriangle size={16} className="flex-shrink-0" />
+              Numbers that didn&apos;t receive the message ({deliveryFailures.length})
+            </span>
+            <span className="flex items-center gap-1 text-red-400">
+              {showDeliveryFailures ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </span>
+          </button>
+          {showDeliveryFailures && (
+            <div className="px-3 sm:px-4 pb-3 max-h-64 overflow-y-auto divide-y divide-red-100 border-t border-red-100">
+              {deliveryFailures.map((f) => (
+                <div key={f.guestId + f.name} className="py-2 flex items-center justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-red-800 truncate">{f.name}</p>
+                    <p className="text-xs text-red-600 truncate">{f.phone || 'No phone'}</p>
+                  </div>
+                  <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex-shrink-0">
+                    {f.status === 'REJECTED' ? 'Rejected' : 'Failed'} — retry by SMS
+                  </span>
+                </div>
+              ))}
+              <p className="text-[11px] text-red-400 pt-2">
+                These numbers were moved to SMS automatically. Switch back to the SMS tab and use
+                &quot;Send All&quot; to retry them.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Guest List ─── */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

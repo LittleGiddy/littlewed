@@ -54,20 +54,22 @@ export async function POST(req: NextRequest) {
     // ─── Build dynamic card URL using pass code ─────────────────────────
     const cardImageUrl = guest.passCode 
       ? `https://littlewed.co.tz/api/og/card?code=${guest.passCode}`
-      : guest.invitationCard || guest.event?.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png';
+      : (guest.invitationCard || guest.event?.imageUrl || '');
 
     // ─── Send WhatsApp invitation (no link button) ──────────────────────
+    // Variable values come from the user's event/guest data — no hardcoded
+    // fallbacks. Empty fields send empty values to the template.
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
-      hostFamily: guest.event?.hostFamily || 'Mr & Mrs Allan Swai',
-      person1: guest.event?.person1 || 'Agape',
-      person2: guest.event?.person2 || 'Gladness',
+      hostFamily: guest.event?.hostFamily || '',
+      person1: guest.event?.person1 || '',
+      person2: guest.event?.person2 || '',
       date: formattedDate,
-      venue: guest.event?.venue || 'The Embassy Hall',
-      time: guest.event?.time || '5:00 PM',
-      cardNumber: guest.cardNumber || '108',
-      cardType: guest.guestType || 'SINGLE',
-      imageUrl: cardImageUrl,  // ✅ Card image rendered in WhatsApp
+      venue: guest.event?.venue || '',
+      time: guest.event?.time || '',
+      cardNumber: guest.cardNumber || '',
+      cardType: guest.guestType || '',
+      imageUrl: cardImageUrl || undefined,  // ✅ Card image rendered in WhatsApp (omitted if none)
       // No inviteLink - removed!
     });
 

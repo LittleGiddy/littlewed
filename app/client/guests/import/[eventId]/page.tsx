@@ -4,12 +4,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Upload, FileSpreadsheet, X, AlertCircle, Loader2, Download,
-  AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle, FileText
+  AlertTriangle, CheckCircle, Phone, ArrowLeft, Pencil, Save, XCircle, FileText, Plus
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Papa from 'papaparse';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import RequestCreditsModal from '@/app/components/RequestCreditsModal';
 
 interface ParsedGuest {
   name: string;
@@ -41,6 +42,8 @@ export default function ImportGuestsPage() {
   const [error, setError] = useState('');
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
   const [eventDetails, setEventDetails] = useState<{ guestCount: number; totalGuests: number; credits: number } | null>(null);
+  const [creditDeficit, setCreditDeficit] = useState(0);
+  const [showCreditRequest, setShowCreditRequest] = useState(false);
   const [step, setStep] = useState<'upload' | 'map' | 'preview'>('upload');
   const [skipInvalid, setSkipInvalid] = useState(true);
   const [showValidOnly, setShowValidOnly] = useState(false);
@@ -457,12 +460,27 @@ export default function ImportGuestsPage() {
     if (!eventDetails) return;
     const { credits } = eventDetails;
     if (credits >= 0 && newCount > credits) {
+      const deficit = newCount - credits;
+      setCreditDeficit(deficit);
       setLimitWarning(
-        `You have ${credits} credit${credits === 1 ? '' : 's'} left, but trying to import ${newCount} guest${newCount === 1 ? '' : 's'}. Credits are used 1 per guest — request more from the admin to import all of these.`
+        `You're importing ${newCount} guest${newCount === 1 ? '' : 's'} but only have ${credits} credit${credits === 1 ? '' : 's'} left. Credits are used 1 per guest — request ${deficit} more credits from the admin to import all of these.`
       );
     } else {
+      setCreditDeficit(0);
       setLimitWarning(null);
     }
+  };
+
+  // ─── Refresh credits after a request is sent so the user can retry ──
+  const refreshCredits = () => {
+    fetch(`/api/events/${eventId}/guests/count`, { credentials: 'include' })
+      .then(res => res.json())
+      .then((data) => {
+        setEventDetails(data);
+        const stillValid = parsedGuests.filter(g => g.isValid).length;
+        checkLimit(stillValid);
+      })
+      .catch(() => toast.error('Could not refresh credits'));
   };
 
   const downloadSampleCSV = () => {
@@ -653,43 +671,10 @@ export default function ImportGuestsPage() {
       toast.success(successMsg);
       router.push(`/client/events/${eventId}`);
     } else if (data.needsCredits) {
-      setLimitWarning(null);
-      toast.custom(
-        (t) => (
-          <div
-            className={`${t.visible ? 'animate-enter' : 'animate-leave'
-              } max-w-md w-full bg-white shadow-lg rounded-2xl pointer-events-auto overflow-hidden border border-amber-200`}
-          >
-            <div className="p-4 bg-amber-50 border-b border-amber-200">
-              <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
-                <AlertCircle size={18} />
-                Not enough credits
-              </h3>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-600 mb-4">
-                {data.error || 'You do not have enough credits to import these guests. Request more from the admin to continue.'}
-              </p>
-              <div className="flex gap-3">
-                <Link
-                  href="/client/billing"
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-center text-sm font-semibold hover:bg-[#0A3939] transition"
-                >
-                  Request Credits
-                </Link>
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        ),
-        { duration: 10000 }
-      );
+      // Friendly inline flow: open the request-credits modal directly,
+      // pre-filled with the shortfall, instead of navigating the user away.
+      setCreditDeficit(Math.max(1, (data.needed ?? 0) - (data.credits ?? 0) || creditDeficit || 1));
+      setShowCreditRequest(true);
     } else {
       toast.error(data.error || 'Import failed');
       if (data.error?.includes('limit') || data.error?.includes('exceeds')) {
@@ -952,8 +937,25 @@ export default function ImportGuestsPage() {
       )}
 
           {limitWarning && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2 rounded-lg mb-4 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> {limitWarning}
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-xl mb-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0 text-sm">{limitWarning}</div>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setShowCreditRequest(true)}
+                  className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition"
+                >
+                  <Plus size={15} /> Request {creditDeficit > 0 ? `${creditDeficit} ` : ''}Credits
+                </button>
+                <a
+                  href="/client/billing"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#0D4B4B] bg-white border border-[#0D4B4B]/20 hover:bg-[rgba(13,75,75,0.06)] transition"
+                >
+                  Billing
+                </a>
+              </div>
             </div>
           )}
 
@@ -1281,6 +1283,13 @@ export default function ImportGuestsPage() {
           </div>
         </motion.div>
       )}
+
+      <RequestCreditsModal
+        isOpen={showCreditRequest}
+        onClose={() => setShowCreditRequest(false)}
+        onRequestSent={refreshCredits}
+        requiredCredits={creditDeficit}
+      />
     </div>
   );
 }

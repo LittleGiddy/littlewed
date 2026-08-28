@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendCreditRequestSubmittedEmail, sendCreditRequestToAdmin } from '@/lib/email';
+import { sendCreditRequestSubmittedEmail, sendCreditRequestToAdmin, SUPER_ADMIN_EMAIL } from '@/lib/email';
 import { sendPushToRole } from '@/lib/push';
 
 const CREDIT_COST_TZS = 500;
@@ -79,6 +79,16 @@ export async function POST(req: NextRequest) {
       reason || null
     ).catch((err) => console.error('Failed to send admin notification email:', err));
   }
+
+  // Always notify the super admin inbox (gideonfelixy@gmail.com) of the credit request
+  sendCreditRequestToAdmin(
+    SUPER_ADMIN_EMAIL,
+    user?.name || 'Unknown',
+    tenant?.name || 'Unknown',
+    credits,
+    credits * CREDIT_COST_TZS,
+    reason || null
+  ).catch((err) => console.error('Failed to send super admin credit email:', err));
 
   // Notify all super admins
   const superAdmins = await prisma.user.findMany({

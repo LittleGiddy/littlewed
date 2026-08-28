@@ -150,12 +150,15 @@ export async function sendWeddingInvitation(
   console.log('[WhatsApp] Template:', templateName);
 
   // ─── Header with image ────────────────────────────────────────────────
-  const header = {
-    image: {
-      file: data.imageUrl || 'https://www.gstatic.com/webp/gallery/1.png',
-      name: 'Wedding Invitation',
-    }
-  };
+  // Only attach a header when a real card image exists — never a placeholder.
+  const header = data.imageUrl
+    ? {
+        image: {
+          file: data.imageUrl,
+          name: 'Wedding Invitation',
+        }
+      }
+    : undefined;
 
   // ─── Button with dynamic URL ──────────────────────────────────────────
   let button = undefined;
