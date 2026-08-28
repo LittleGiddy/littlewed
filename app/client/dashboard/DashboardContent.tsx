@@ -44,7 +44,7 @@ const carouselImages = [
   },
   {
     id: 3,
-    src: 'https://images.unsplash.com/photo-1532712932145-1d5fbe6cda9b?w=900&h=500&fit=crop',
+    src: '/dashimg.jpg',
     title: 'Beautiful Invitation Cards',
     subtitle: 'Design custom cards and send via WhatsApp or SMS.',
   },
