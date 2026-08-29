@@ -19,6 +19,7 @@ interface Tenant {
   createdAt: string;
   bypassPayment: boolean;
   testMode: boolean;
+  creditsEnabled: boolean;
 }
 
 export default function AdminTenantsPage() {
@@ -204,6 +205,9 @@ export default function AdminTenantsPage() {
                             )}
                             {tenant.testMode && (
                               <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md">Test</span>
+                            )}
+                            {tenant.creditsEnabled === false && (
+                              <span className="text-[10px] font-bold bg-red-50 text-red-600 px-1.5 py-0.5 rounded-md">Credits Disabled</span>
                             )}
                           </div>
                         </div>

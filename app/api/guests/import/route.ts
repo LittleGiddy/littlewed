@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: { tenant: { select: { bypassPayment: true, credits: true } } },
+      include: { tenant: { select: { bypassPayment: true, credits: true, creditsEnabled: true } } },
     });
 
     if (!event) {
@@ -140,13 +140,17 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Credit check (1 credit per guest; credits are now the only limit) ─
-    if (!event.tenant?.bypassPayment) {
-      const tenantCredits = event.tenant.credits ?? 0;
+    const creditsDisabled = event.tenant?.creditsEnabled === false;
+    if (!event.tenant?.bypassPayment || creditsDisabled) {
+      const tenantCredits = creditsDisabled ? 0 : (event.tenant.credits ?? 0);
       if (tenantCredits < uniqueGuests.length) {
         const remaining = tenantCredits;
         return NextResponse.json({
-          error: `You don't have enough credits to import ${uniqueGuests.length} guests. You have ${remaining} credit${remaining === 1 ? '' : 's'} remaining. Request more credits from the admin to continue importing.`,
-          needsCredits: true,
+          error: creditsDisabled
+            ? "Your account's credits have been disabled by the admin. Please contact support to re-enable them."
+            : `You don't have enough credits to import ${uniqueGuests.length} guests. You have ${remaining} credit${remaining === 1 ? '' : 's'} remaining. Request more credits from the admin to continue importing.`,
+          needsCredits: !creditsDisabled,
+          creditsDisabled,
           credits: remaining,
           needed: uniqueGuests.length,
           alreadyProcessed: 0,
@@ -219,7 +223,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ─── Deduct 1 credit per guest successfully imported (skip if bypass) ─
-    if (!event.tenant?.bypassPayment && result.count > 0) {
+    if (!event.tenant?.bypassPayment && event.tenant?.creditsEnabled !== false && result.count > 0) {
       await prisma.tenant.update({
         where: { id: event.tenantId },
         data: { credits: { decrement: result.count } },

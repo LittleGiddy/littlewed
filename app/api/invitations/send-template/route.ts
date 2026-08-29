@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
+import { logSystemEvent } from '@/lib/systemLog';
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -53,6 +54,15 @@ export async function POST(req: NextRequest) {
         cardImageUrl = await generateAndStoreCardForGuest(guest.id);
       } catch (error) {
         console.error('Failed to generate card image on send:', error);
+        await logSystemEvent({
+          tenantId,
+          eventId,
+          guestId: guest.id,
+          type: 'card_generation',
+          level: 'ERROR',
+          message: `Card generation failed for ${guest.name}`,
+          details: { error: error instanceof Error ? error.message : String(error) },
+        });
       }
     }
 
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
     console.log('[SendTemplate] Invite Link:', inviteLink);
 
     // ─── Send WhatsApp invitation ──────────────────────────────────────
-    // Variable values come from the user's event/guest data — no hardcoded
+    // Variable values come from the user's event/guest data - no hardcoded
     // fallbacks. Empty fields send empty values to the template.
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
@@ -126,6 +136,15 @@ export async function POST(req: NextRequest) {
       });
     } else {
       console.error('[SendTemplate] Failed to send to', guest.phone, result.error);
+      await logSystemEvent({
+        tenantId,
+        eventId,
+        guestId: guest.id,
+        type: 'send',
+        level: 'ERROR',
+        message: `Send failed for ${guest.name} via whatsapp`,
+        details: { channel: 'whatsapp', error: result.error || undefined },
+      });
 
       if (result.messageId) {
         await prisma.messageLog.create({

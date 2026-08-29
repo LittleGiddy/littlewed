@@ -27,7 +27,7 @@ export async function POST(
     const event = await prisma.event.findUnique({
       where: { id: eventId, tenantId },
       include: {
-        tenant: { select: { credits: true, bypassPayment: true } },
+        tenant: { select: { credits: true, bypassPayment: true, creditsEnabled: true } },
         guests: {
           where: { checkedIn: true },
           select: {
@@ -49,6 +49,7 @@ export async function POST(
     }
 
     const isBypassed = event.tenant.bypassPayment;
+    const creditsDisabled = event.tenant.creditsEnabled === false;
     const templateName = getThanksWhatsAppTemplate();
 
     // ─── Determine which guests will actually be sent to ────────────────
@@ -87,14 +88,18 @@ export async function POST(
       });
     }
 
-    // ─── Credit check + deduction (skip for bypass) ────────────────────
+    // ─── Credit check + deduction (skip for bypass, blocked when disabled) ─
     const totalCost = targets.length * THANKS_COST_PER_MESSAGE;
-    if (!isBypassed) {
-      if ((event.tenant.credits ?? 0) < totalCost) {
+    if (!isBypassed || creditsDisabled) {
+      const available = creditsDisabled ? 0 : (event.tenant.credits ?? 0);
+      if (available < totalCost) {
         return NextResponse.json({
-          error: `Insufficient credits. Need ${totalCost} credits, you have ${event.tenant.credits}.`,
+          error: creditsDisabled
+            ? "Your account's credits have been disabled by the admin. Please contact support to re-enable them."
+            : `Insufficient credits. Need ${totalCost} credits, you have ${event.tenant.credits}.`,
           creditsNeeded: totalCost,
-          creditsAvailable: event.tenant.credits,
+          creditsAvailable: available,
+          creditsDisabled,
         }, { status: 400 });
       }
       await prisma.tenant.update({

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       : '';
 
     // ─── Build SMS message (no link) ────────────────────────────────────
-    // Values come from the user's event/guest data — no hardcoded fallbacks.
+    // Values come from the user's event/guest data - no hardcoded fallbacks.
     let smsMessage = `Habari ${guestFullName},
 
 Familia ya ${guest.event?.hostFamily || ''} inakualika katika harusi ya ${guest.event?.person1 || ''} na ${guest.event?.person2 || ''} tarehe ${formattedDate}.

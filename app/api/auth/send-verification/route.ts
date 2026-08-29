@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
   // Block only if email exists WITH a password (credentials account).
   // A Google-only account (password: '') should not block a new password signup
-  // — but in practice we shouldn't allow that either. Block all existing emails.
+  // - but in practice we shouldn't allow that either. Block all existing emails.
   const existingUser = await prisma.user.findUnique({
     where: { email },
     select: { id: true, password: true },
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     } else {
-      // Google-only account — block duplicate signup via email too
+      // Google-only account - block duplicate signup via email too
       return NextResponse.json(
         { error: 'This email is linked to a Google account. Please sign in with Google.' },
         { status: 409 }

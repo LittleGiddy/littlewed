@@ -188,7 +188,7 @@ export default function BillingPage() {
                       <td className="px-3.5 py-3 text-xs text-gray-400">
                         {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </td>
-                      <td className="px-3.5 py-3 font-bold text-gray-800">{u.event?.name || '—'}</td>
+                      <td className="px-3.5 py-3 font-bold text-gray-800">{u.event?.name || '-'}</td>
                       <td className="px-3.5 py-3">
                         <span className={`inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-[3px] rounded-full ${
                           u.channel === 'whatsapp'

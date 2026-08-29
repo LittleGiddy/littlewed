@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Users, Plus, Coins, Upload, Palette, Send,
   ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, Sparkles, MapPin, Download, Trash2, ArrowUpRight, Clock,
+  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -34,7 +34,7 @@ const carouselImages = [
     id: 1,
     src: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=900&h=500&fit=crop',
     title: 'Plan the Perfect Wedding',
-    subtitle: 'Guest lists, invitations, and check-ins — all in one place.',
+    subtitle: 'Guest lists, invitations, and check-ins, all in one place.',
   },
   {
     id: 2,
@@ -389,7 +389,7 @@ export default function DashboardContent({
           {featuredEvents.length === 0 ? (
             <div className="bg-white rounded-3xl p-10 text-center shadow-[0_2px_10px_rgba(20,30,45,0.06)]">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-[#0D4B4B]/5">
-                <Sparkles className="w-8 h-8 text-[#0D4B4B]" />
+                <Calendar className="w-8 h-8 text-[#0D4B4B]" />
               </div>
               <h3 className="font-serif text-lg font-bold text-gray-900">
                 {activeCategory === 'all' ? 'No events yet' : `No ${activeCategory} events`}

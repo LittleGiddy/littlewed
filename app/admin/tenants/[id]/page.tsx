@@ -23,6 +23,7 @@ interface TenantDetails {
   status: string;
   subscriptionStatus: string;
   credits: number;
+  creditsEnabled: boolean;
   maxGuests: number;
   simpleEventMode: boolean;
   bypassPayment: boolean;
@@ -73,6 +74,7 @@ export default function TenantDetailPage() {
         simpleEventMode: data.simpleEventMode,
         bypassPayment: data.bypassPayment,
         testMode: data.testMode,
+        creditsEnabled: data.creditsEnabled,
         subscriptionStatus: data.subscriptionStatus,
         adminEmail: data.adminEmail || '',
       });
@@ -136,6 +138,29 @@ export default function TenantDetailPage() {
       });
       if (res.ok) { toast.success(`Tenant ${newStatus}`); fetchTenant(); }
       else { const data = await res.json().catch(() => null); toast.error(data?.error || 'Failed to update status'); }
+    } catch { toast.error('Network error'); }
+  };
+
+  const toggleCredits = async () => {
+    const enable = tenant?.creditsEnabled === false;
+    const ok = await confirmToast({
+      title: enable ? `Enable credits for "${tenant?.name}"?` : `Disable credits for "${tenant?.name}"?`,
+      message: enable
+        ? 'The tenant will regain access to credit-funded features (adding/importing guests, reminders, thanks cards).'
+        : 'They will no longer have credits: adding/importing guests, reminders and thanks cards will be blocked. This overrides Bypass Payment.',
+      confirmText: enable ? 'Enable' : 'Disable',
+      danger: !enable,
+    });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/settings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creditsEnabled: enable }),
+        credentials: 'include',
+      });
+      if (res.ok) { toast.success(enable ? 'Credits enabled' : 'Credits disabled'); fetchTenant(); }
+      else { const data = await res.json().catch(() => null); toast.error(data?.error || 'Failed to update credits'); }
     } catch { toast.error('Network error'); }
   };
 
@@ -206,6 +231,14 @@ export default function TenantDetailPage() {
               {tenant.subscriptionStatus === 'active' ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
               {tenant.subscriptionStatus === 'active' ? 'Active' : 'Inactive'}
             </button>
+            <button onClick={toggleCredits} className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all border ${
+              tenant.creditsEnabled
+                ? 'text-red-600 bg-red-50 border-red-200 hover:bg-red-100'
+                : 'bg-[#0D4B4B] text-white border-[#0D4B4B] hover:bg-[#0A3939]'
+            }`}>
+              {tenant.creditsEnabled ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              {tenant.creditsEnabled ? 'Disable Credits' : 'Enable Credits'}
+            </button>
             <button onClick={deleteTenant} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
               <Trash2 size={14} /> Delete
             </button>
@@ -243,6 +276,15 @@ export default function TenantDetailPage() {
         {/* ─── OVERVIEW ─────────────────────────────────────────── */}
         {tab === 'overview' && (
           <div className="space-y-6">
+            {!tenant.creditsEnabled && (
+              <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <AlertTriangle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700">Credits disabled</p>
+                  <p className="text-xs text-red-600 mt-0.5">This tenant has no credits and cannot use credit-funded features (adding/importing guests, reminders, thanks cards). This overrides Bypass Payment.</p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'Users', value: s.totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -250,7 +292,7 @@ export default function TenantDetailPage() {
                 { label: 'Guests', value: s.totalGuests, icon: Users, color: 'text-violet-600', bg: 'bg-violet-50' },
                 { label: 'Staff', value: s.staffCount, icon: UserCog, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Active Events', value: s.activeEvents, icon: Activity, color: 'text-green-600', bg: 'bg-green-50' },
-                { label: 'Credits', value: tenant.credits, icon: CreditCard, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
+                { label: 'Credits', value: tenant.creditsEnabled ? tenant.credits : 0, icon: CreditCard, color: tenant.creditsEnabled ? 'text-[#0D4B4B]' : 'text-red-600', bg: tenant.creditsEnabled ? 'bg-[#0D4B4B]/5' : 'bg-red-50' },
                 { label: 'Revenue', value: `${(s.totalRevenue / 1000).toFixed(0)}k`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
                 { label: 'Pending Events', value: tenant.events.filter((e: any) => e.status === 'PENDING').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
               ].map(stat => (
@@ -531,7 +573,7 @@ export default function TenantDetailPage() {
                               {g.deliveredMessages}/{g.totalMessages} delivered
                             </div>
                           </td>
-                          <td className="px-5 py-3 text-xs font-mono text-gray-500">{g.cardNumber || '—'}</td>
+                          <td className="px-5 py-3 text-xs font-mono text-gray-500">{g.cardNumber || '-'}</td>
                         </tr>
                       ))
                     )}
@@ -600,21 +642,28 @@ export default function TenantDetailPage() {
 
                 <div className="border-t border-gray-100 pt-5">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Feature Toggles</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
                       { key: 'simpleEventMode', label: 'Simple Event Mode', desc: 'Simplified event creation' },
                       { key: 'bypassPayment', label: 'Bypass Payment', desc: 'Skip payment requirements' },
                       { key: 'testMode', label: 'Test Mode', desc: 'Run in test/sandbox mode' },
+                      { key: 'creditsEnabled', label: 'Credits Enabled', desc: 'Uncheck to disable credits - blocks adding/importing guests, reminders & thanks cards', critical: true },
                     ].map(f => (
                       <button key={f.key} onClick={() => setSettingsForm({ ...settingsForm, [f.key]: !settingsForm[f.key] })}
                         className={`p-4 rounded-xl border-2 text-left transition-all ${
-                          settingsForm[f.key] ? 'border-[#0D4B4B] bg-[#0D4B4B]/5' : 'border-gray-200 hover:border-gray-300'
+                          (f as any).critical
+                            ? settingsForm[f.key]
+                              ? 'border-[#0D4B4B] bg-[#0D4B4B]/5'
+                              : 'border-red-300 bg-red-50'
+                            : settingsForm[f.key] ? 'border-[#0D4B4B] bg-[#0D4B4B]/5' : 'border-gray-200 hover:border-gray-300'
                         }`}>
                         <div className="flex items-center gap-2 mb-1">
-                          {settingsForm[f.key] ? <ToggleRight size={18} className="text-[#0D4B4B]" /> : <ToggleLeft size={18} className="text-gray-400" />}
-                          <span className="text-sm font-semibold text-gray-900">{f.label}</span>
+                          {settingsForm[f.key]
+                            ? <ToggleRight size={18} className={(f as any).critical ? 'text-[#0D4B4B]' : 'text-[#0D4B4B]'} />
+                            : <ToggleLeft size={18} className={(f as any).critical ? 'text-red-500' : 'text-gray-400'} />}
+                          <span className={`text-sm font-semibold ${(f as any).critical && !settingsForm[f.key] ? 'text-red-700' : 'text-gray-900'}`}>{f.label}</span>
                         </div>
-                        <p className="text-xs text-gray-400">{f.desc}</p>
+                        <p className={`text-xs ${(f as any).critical && !settingsForm[f.key] ? 'text-red-600' : 'text-gray-400'}`}>{f.desc}</p>
                       </button>
                     ))}
                   </div>

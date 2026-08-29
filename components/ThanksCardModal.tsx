@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   X, Heart, MessageCircle, Phone, Upload, Image as ImageIcon,
-  Loader2, Send, CheckCircle2, Info, Undo2, Sparkles, BadgeCheck, Lock,
+  Loader2, Send, CheckCircle2, Info, Undo2, PartyPopper, BadgeCheck, Lock,
 } from 'lucide-react';
 import { confirmToast } from '@/lib/confirmToast';
 
@@ -293,8 +293,8 @@ export default function ThanksCardModal({
           <div className={`mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] font-medium ${isBypassed ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
             {isBypassed ? <BadgeCheck size={14} /> : <Lock size={14} />}
             {isBypassed
-              ? 'Bypassed account — no send limit. Guests can be thanked any number of times.'
-              : 'Standard account — each guest can be thanked only once.'}
+              ? 'Bypassed account - no send limit. Guests can be thanked any number of times.'
+              : 'Standard account - each guest can be thanked only once.'}
           </div>
 
           {/* Tabs */}
@@ -385,7 +385,7 @@ export default function ThanksCardModal({
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Sparkles size={16} className="text-blue-600" />
+                  <PartyPopper size={16} className="text-blue-600" />
                   <p className="text-sm font-bold text-blue-800">Individualized message · variables</p>
                 </div>
                 <p className="text-[12px] text-blue-700 leading-snug">

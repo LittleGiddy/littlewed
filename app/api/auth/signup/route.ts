@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       email,
       password: hashedPassword,
       name,
-      phone: phone || null, // was silently dropped before — never got saved
+      phone: phone || null, // was silently dropped before - never got saved
       role: 'CLIENT',
       tenantId: tenant.id,
       isActive: false,

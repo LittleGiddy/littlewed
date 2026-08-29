@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         </div>
       </div>
       <div style="padding: 16px 32px; text-align: center;">
-        <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Wedding Management Platform</p>
+        <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Wedding Management Platform</p>
       </div>
     </div>
   `;

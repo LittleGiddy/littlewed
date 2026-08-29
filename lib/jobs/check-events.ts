@@ -29,7 +29,7 @@ export interface CheckEventsResult {
  * Safe to call repeatedly / concurrently-ish: every mutation is guarded by a
  * "not already done" flag (reminderSent / expiredNotified / status checks) so
  * re-running the sweep never double-sends emails or double-processes events.
- * Each event is handled independently — one failure doesn't block the rest.
+ * Each event is handled independently - one failure doesn't block the rest.
  */
 export async function checkEventStatuses(): Promise<CheckEventsResult> {
   const now = new Date();
@@ -86,7 +86,7 @@ export async function checkEventStatuses(): Promise<CheckEventsResult> {
     } catch (err: any) {
       result.reminderFailures++;
       result.errors.push(`reminder(${event.id}): ${err?.message ?? String(err)}`);
-      // Deliberately NOT marking reminderSent here — leave it false so the
+      // Deliberately NOT marking reminderSent here - leave it false so the
       // next sweep retries this event instead of silently losing it.
     }
   }
@@ -95,7 +95,7 @@ export async function checkEventStatuses(): Promise<CheckEventsResult> {
   // 3️⃣a Expire ACTIVE events that have NEVER been resumed (24h after event
   //      date) -> pause + open a 7-day resume window.
   //
-  //      Gated on `resumedAt: null` — this is the critical fix. A resumed
+  //      Gated on `resumedAt: null` - this is the critical fix. A resumed
   //      event keeps its original (past) `date`, so without this guard it
   //      would match this query again on the very next cron tick (its
   //      `expiredNotified` was just reset to false by the resume route),
@@ -131,7 +131,7 @@ export async function checkEventStatuses(): Promise<CheckEventsResult> {
           await sendEventExpiredEmail(email, event.name);
         }
       } catch (emailErr: any) {
-        // Status change already succeeded — an email failure shouldn't be
+        // Status change already succeeded - an email failure shouldn't be
         // reported as an expiry failure, just logged separately.
         result.expiredEmailFailures++;
         result.errors.push(`expired-email(${event.id}): ${emailErr?.message ?? String(emailErr)}`);
@@ -144,7 +144,7 @@ export async function checkEventStatuses(): Promise<CheckEventsResult> {
   // ──────────────────────────────────────────────
   // 3️⃣b Once-resumed events get exactly one grace period: 7 days after
   //      `resumedAt`, archive directly (no second pause/resume cycle).
-  //      This needs no extra flag — the moment status flips to ARCHIVED it
+  //      This needs no extra flag - the moment status flips to ARCHIVED it
   //      stops matching `status: 'ACTIVE'`, so re-running this sweep is
   //      naturally idempotent.
   // ──────────────────────────────────────────────

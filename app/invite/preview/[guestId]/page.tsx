@@ -94,7 +94,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
         <div className="mt-4 text-center">
           {isTestMode ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium mb-2"><FlaskConical size={14} /> Test Mode – Preview Only</p>
+              <p className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium mb-2"><FlaskConical size={14} /> Test Mode - Preview Only</p>
               {checkedIn ? (
                 <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-semibold"><CheckCircle size={16} /> Guest is checked in</span>
               ) : (

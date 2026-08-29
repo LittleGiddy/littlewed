@@ -261,7 +261,7 @@ export default function EventDetailPage() {
                           {g.deliveredMessages}/{g.totalMessages}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-xs font-mono text-gray-500">{g.cardNumber || '—'}</td>
+                      <td className="px-4 py-2.5 text-xs font-mono text-gray-500">{g.cardNumber || '-'}</td>
                     </tr>
                   ))
                 )}

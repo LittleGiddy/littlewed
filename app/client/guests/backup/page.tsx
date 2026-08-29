@@ -140,7 +140,7 @@ export default function BackupGuestsPage() {
             <ArrowLeft size={14} /> Dashboard
           </Link>
           <h1 className="font-serif text-3xl font-black text-gray-900 mt-3">Guest Database</h1>
-          <p className="text-sm text-gray-500">All guests across all events – {guests.length} total</p>
+          <p className="text-sm text-gray-500">All guests across all events - {guests.length} total</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
@@ -229,7 +229,7 @@ export default function BackupGuestsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-100">
           <span className="text-sm text-gray-400">
-            Showing {((currentPage - 1) * pageSize) + 1} – {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length}
+            Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} of {filtered.length}
           </span>
           <div className="flex gap-1">
             <button

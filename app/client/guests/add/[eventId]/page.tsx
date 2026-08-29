@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ArrowLeft, User, Phone, Hash, UserCheck, Sparkles, CheckCircle, XCircle, Loader2, 
+  ArrowLeft, User, Phone, Hash, UserCheck, Coins, CheckCircle, XCircle, Loader2, 
   AlertCircle, Info, RotateCw, Users, UserPlus 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -147,7 +147,7 @@ export default function AddGuestPage() {
               >
                 <div className="p-4 bg-amber-50 border-b border-amber-200">
                   <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
-                    <Sparkles size={18} />
+                    <Coins size={18} />
                     No credits left
                   </h3>
                 </div>

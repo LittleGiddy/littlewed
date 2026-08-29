@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Coins, ChevronRight, Minus, Plus, Sparkles } from 'lucide-react';
+import { X, Coins, ChevronRight, Minus, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface BuyCreditsModalProps {
@@ -467,14 +467,14 @@ export default function BuyCreditsModal({
             <div className="bcm-summary-left">
               <div className="bcm-summary-getting">You're getting</div>
               <div className="bcm-summary-credits">
-                {activeCredits > 0 ? activeCredits.toLocaleString() : '—'}
+                {activeCredits > 0 ? activeCredits.toLocaleString() : '-'}
                 <span>credits</span>
               </div>
             </div>
             <div className="bcm-summary-right">
               <div className="bcm-summary-paying">Total</div>
               <div className="bcm-summary-amount">
-                {activeCredits > 0 ? totalTZS.toLocaleString() : '—'}
+                {activeCredits > 0 ? totalTZS.toLocaleString() : '-'}
                 <span>TZS</span>
               </div>
             </div>
@@ -492,7 +492,7 @@ export default function BuyCreditsModal({
             >
               {loading
                 ? <><div className="bcm-spinner" /> Processing…</>
-                : <><Sparkles size={15} /> Pay {activeCredits > 0 ? `${totalTZS.toLocaleString()} TZS` : 'Now'}</>
+                : <><Coins size={15} /> Pay {activeCredits > 0 ? `${totalTZS.toLocaleString()} TZS` : 'Now'}</>
               }
             </button>
           </div>

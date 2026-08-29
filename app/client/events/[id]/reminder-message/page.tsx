@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, 
-  MessageCircle, Phone, Info, Sparkles, Calendar, User,
+  MessageCircle, Phone, Info, Gift, Calendar, User,
   CreditCard, AlertCircle, CheckCircle, Bell, MessageSquare,
   FileText, CornerDownRight, Hash
 } from 'lucide-react';
@@ -180,7 +180,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           <ArrowLeft size={20} />
         </Link>
         <h1 className="font-serif text-2xl font-black text-gray-900">
-          Kumbusha Michango – {event.name}
+          Kumbusha Michango - {event.name}
         </h1>
       </div>
 
@@ -294,7 +294,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                   <div className="text-xs text-gray-400">
                     {guest.reminderCount < 2 ? (
                       <span className="text-[#0D4B4B] flex items-center gap-0.5">
-                        <Sparkles size={10} /> Free
+                        <Gift size={10} /> Free
                       </span>
                     ) : (
                       <span>50 TZS</span>

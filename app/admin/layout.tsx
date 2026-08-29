@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Building2, Users, UserCog, Palette,
   LogOut, Menu, X, ChevronLeft, ChevronRight,
-  Bell, Search, Zap, Coins, BarChart3, Activity, Megaphone
+  Bell, Search, Coins, BarChart3, Activity, Megaphone, AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
@@ -67,6 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { path: '/admin/staff', icon: UserCog, label: 'Staff' },
     { path: '/admin/credit-requests', icon: Coins, label: 'Credit Requests' },
     { path: '/admin/logs', icon: Activity, label: 'Message Logs' },
+    { path: '/admin/system-logs', icon: AlertTriangle, label: 'System Logs' },
     { path: '/admin/reports', icon: BarChart3, label: 'Reports' },
     { path: '/admin/templates', icon: Palette, label: 'Templates' },
     { path: '/admin/broadcast', icon: Megaphone, label: 'Broadcast' },
@@ -83,8 +84,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className={`flex flex-col h-full transition-all duration-300 ${effectiveCollapsed && !isMobile ? 'items-center' : ''}`}>
       {/* Brand */}
       <div className={`flex items-center w-full px-5 h-16 border-b border-gray-100 flex-shrink-0 ${effectiveCollapsed && !isMobile ? 'justify-center px-3' : 'gap-3'}`}>
-        <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] flex items-center justify-center flex-shrink-0">
-          <Zap size={16} className="text-white" />
+        <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <img src="/White Little Wed Logo.svg" alt="Little Wed" className="w-7 h-7 object-contain" />
         </div>
         {(!effectiveCollapsed || isMobile) && (
           <div className="flex flex-col min-w-0">

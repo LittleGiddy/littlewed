@@ -22,7 +22,7 @@ export async function GET(
       select: {
         id: true, name: true, subdomain: true, plan: true, status: true,
         subscriptionStatus: true, credits: true, maxGuests: true,
-        simpleEventMode: true, bypassPayment: true, testMode: true,
+        simpleEventMode: true, bypassPayment: true, testMode: true, creditsEnabled: true,
         templateCardUrl: true, thanksCardUrl: true, whatsappTemplate: true,
         whatsappAccount: true, adminEmail: true,
       },
@@ -51,7 +51,7 @@ export async function PATCH(
     const allowed = [
       'plan', 'maxGuests', 'credits', 'simpleEventMode', 'bypassPayment',
       'testMode', 'subscriptionStatus', 'whatsappTemplate', 'whatsappAccount',
-      'adminEmail',
+      'adminEmail', 'creditsEnabled',
     ];
     const updateData: any = {};
     for (const key of allowed) {

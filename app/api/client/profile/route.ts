@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
-// GET /api/client/profile – get current user profile
+// GET /api/client/profile - get current user profile
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(user);
 }
 
-// PUT /api/client/profile – update user profile
+// PUT /api/client/profile - update user profile
 export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {

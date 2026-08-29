@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         plan: true,
         subscriptionStatus: true,
         credits: true,
+        creditsEnabled: true,
         bypassPayment: true,
         testMode: true,
         createdAt: true,

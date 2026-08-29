@@ -5,10 +5,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateUniquePassCode } from '@/lib/utils';
 import { fetchTemplateBuffer, generateCardForGuest, runWithConcurrency } from '@/lib/image-storage';
+import { logSystemEvent } from '@/lib/systemLog';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // Hobby-plan max — a safety net, not the main strategy
-const CONCURRENCY = 5;          // simultaneous sharp/Cloudinary/db ops — keep Neon happy
+export const maxDuration = 300; // Hobby-plan max - a safety net, not the main strategy
+const CONCURRENCY = 5;          // simultaneous sharp/Cloudinary/db ops - keep Neon happy
 const MAX_PER_REQUEST = 50;     // client chunks the full guest list into pieces this size
 
 // Fail fast if Cloudinary isn't configured, instead of failing silently
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
     if (guestIds.length > MAX_PER_REQUEST) {
       return NextResponse.json(
-        { error: `Send at most ${MAX_PER_REQUEST} guestIds per request — chunk client-side.` },
+        { error: `Send at most ${MAX_PER_REQUEST} guestIds per request - chunk client-side.` },
         { status: 400 }
       );
     }
@@ -118,6 +119,15 @@ export async function POST(req: NextRequest) {
         };
       } catch (error: any) {
         console.error(`Failed to generate card for ${guest.name}:`, error.message);
+        await logSystemEvent({
+          tenantId: event.tenantId,
+          eventId: event.id,
+          guestId: guest.id,
+          type: 'card_generation',
+          level: 'ERROR',
+          message: `Card generation failed for ${guest.name}`,
+          details: { error: error?.message || String(error) },
+        });
         return { 
           guestId: guest.id, 
           name: guest.name, 

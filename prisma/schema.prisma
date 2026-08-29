@@ -88,6 +88,7 @@ model Tenant {
   maxGuests          Int      @default(200)
   createdAt          DateTime @default(now())
   credits            Int      @default(0)
+  creditsEnabled     Boolean  @default(true) // super admin can suspend credit usage
   transactions       Transaction[]
   simpleEventMode    Boolean  @default(false)
   bypassPayment      Boolean  @default(false)
@@ -105,6 +106,7 @@ model Tenant {
   events             Event[]
   pendingEvents      PendingEvent[]
   creditRequests     CreditRequest[]
+  systemLogs         SystemLog[]
 }
 
 model Event {
@@ -384,5 +386,27 @@ model DeliveryLog {
   createdAt   DateTime @default(now())
 
   @@index([messageId])
+  @@index([createdAt])
+}
+
+// ─── System / Technical Logging (super admin monitoring) ───────────────────
+// Captures card generation failures, send failures and other technical events
+// that never reach a MessageLog (e.g. card image render errors, provider
+// failures) so the super admin can monitor all tenants' technical health.
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  eventId   String?
+  guestId   String?
+  type      String   // e.g. "card_generation", "send", "technical"
+  level     String   @default("ERROR") // "ERROR" | "WARN" | "INFO"
+  message   String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([tenantId, createdAt])
   @@index([createdAt])
 }

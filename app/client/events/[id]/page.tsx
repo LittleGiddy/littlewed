@@ -10,9 +10,10 @@ import {
   Square, ArrowUp, Heart, X, Image as ImageIcon, Bell,
   Search, Download, Clock, AlertCircle, Timer, CalendarClock,
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
-  Check, Coins, Sparkles, Hash, Loader2, MoreVertical, Compass,
-  Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
+  Check, Coins, CreditCard, Hash, Loader2, MoreVertical, Compass,
+  PenTool, Wand, Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
@@ -60,7 +61,7 @@ type FlowStep = 'guests' | 'design' | 'generate' | 'send';
 const STEPS: { id: FlowStep; label: string; short: string; icon: React.ReactNode }[] = [
   { id: 'guests', label: 'Guests', short: '1', icon: <Users size={16} /> },
   { id: 'design', label: 'Design', short: '2', icon: <Palette size={16} /> },
-  { id: 'generate', label: 'Cards', short: '3', icon: <Sparkles size={16} /> },
+  { id: 'generate', label: 'Cards', short: '3', icon: <CreditCard size={16} /> },
   { id: 'send', label: 'Send', short: '4', icon: <Send size={16} /> },
 ];
 
@@ -145,6 +146,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [countdownKey, setCountdownKey] = useState(0);
   const [activeStep, setActiveStep] = useState<FlowStep>('guests');
+  const [showJourneyIntro, setShowJourneyIntro] = useState(true);
   const [generatingCards, setGeneratingCards] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
@@ -547,8 +549,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const nextUp = (() => {
     if (activeStep === 'guests') {
       return stepComplete.guests
-        ? 'Great — your guest list is ready. Next, design a single invitation template that will be used for every guest.'
-        : 'Start by adding your guests — you can import a spreadsheet or add them one by one. You need at least one guest to continue.';
+        ? 'Great - your guest list is ready. Next, design a single invitation template that will be used for every guest.'
+        : 'Start by adding your guests - you can import a spreadsheet or add them one by one. You need at least one guest to continue.';
     }
     if (activeStep === 'design') {
       return stepComplete.generate
@@ -558,11 +560,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (activeStep === 'generate') {
       return stepComplete.generate
         ? 'All cards are generated. Next, send your invitations by WhatsApp or SMS.'
-        : 'Generate a personalised card for each guest. Missing cards are shown below — click Generate when ready.';
+        : 'Generate a personalised card for each guest. Missing cards are shown below - click Generate when ready.';
     }
     return stepComplete.send
       ? 'All invitations sent! Your guests can now receive their personal cards. You\'re all set.'
-      : 'Ready to share the love — send your invitations now. You can pick WhatsApp, SMS, or both.';
+      : 'Ready to share the love - send your invitations now. You can pick WhatsApp, SMS, or both.';
   })();
 
   // ─── Generate Cards Handler (Smart - Only for guests without cards) ──
@@ -1266,7 +1268,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <p className="text-xs font-bold text-red-700 flex items-center gap-2">
                   <AlertCircle size={14} />
                   {canResume
-                    ? `Paused — ${daysRemainingToResume.toFixed(0)} days left to resume.`
+                    ? `Paused - ${daysRemainingToResume.toFixed(0)} days left to resume.`
                     : 'Archived and cannot be resumed.'}
                 </p>
               </div>
@@ -1303,73 +1305,57 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           ) : (
             <>
-                  {/* ─── Step Rail ─── */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-3 py-3 mb-4">
-                    <div className="flex items-start">
-                      {STEPS.map((s) => (
-                        <div
-                          key={s.id}
-                          className={`step-pill ${activeStep === s.id ? 'active' : ''} ${stepComplete[s.id] ? 'done' : ''
-                            }`}
-                          onClick={() => goToStep(s.id)}
-                        >
-                          <div className="step-line" />
-                          <div className="step-circle">
-                            {stepComplete[s.id] && activeStep !== s.id ? <Check size={16} /> : s.icon}
-                          </div>
-                          <span className="step-label">{s.label}</span>
-                          <span className="step-count">
-                            {s.id === 'guests' && `${guests.length || 0}`}
-                            {s.id === 'generate' && `${guestsWithCards.length}/${guests.length}`}
-                            {s.id === 'send' && `${sentCount}/${guests.length}`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ─── Journey Overview ─── */}
-                  <div className="bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] rounded-2xl shadow-sm border border-[#0D4B4B]/10 overflow-hidden mb-4">
-                    <div className="px-5 py-4 text-white">
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <Compass size={16} className="text-[#FFD9D2]" />
-                        <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#FFD9D2]/90">Your invitation journey</p>
-                      </div>
-                      <p className="text-sm text-white/85 leading-relaxed">
-                        Set up your wedding invitations in <strong>{STEPS.length} simple steps</strong> — add your
-                        guests, design one card, generate a personalised card for each guest, then send them.
-                        Here&apos;s where you are now:
-                      </p>
-                      <div className="mt-3 flex flex-col gap-2">
-                        {STEPS.map((s, i) => {
-                          const state = activeStep === s.id
-                            ? { dot: 'bg-[#FF6B5C]', text: 'text-white', label: '', badge: 'Current' }
-                            : stepComplete[s.id]
-                              ? { dot: 'bg-green-400', text: 'text-white/70', label: <Check size={13} className="text-green-300" />, badge: 'Done' }
-                              : { dot: 'bg-white/25', text: 'text-white/55', label: <span className="text-white/40">{i + 1}</span>, badge: '' };
-                          return (
+                  {/* ─── Journey Intro (appears on page entry, animated one-by-one) ─── */}
+                  <AnimatePresence>
+                    {showJourneyIntro && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.35, ease: 'easeOut' }}
+                        className="bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] rounded-2xl shadow-sm border border-[#0D4B4B]/10 overflow-hidden mb-4"
+                      >
+                        <div className="px-5 py-4 text-white">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Compass size={16} className="text-[#FFD9D2]" />
+                            <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#FFD9D2]/90">Your invitation journey</p>
                             <button
-                              key={s.id}
-                              onClick={() => goToStep(s.id)}
-                              className="flex items-center gap-3 text-left w-full rounded-lg px-2.5 py-1.5 transition hover:bg-white/10"
+                              onClick={() => setShowJourneyIntro(false)}
+                              className="ml-auto p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition"
+                              title="Dismiss"
                             >
-                              <span className={`w-2 h-2 rounded-full ${state.dot} flex-shrink-0`} />
-                              <span className={`text-xs font-semibold ${state.text}`}>
-                                Step {i + 1} · {s.label} {state.label}
-                              </span>
-                              {state.badge && (
-                                <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  state.badge === 'Current' ? 'bg-white/20 text-white' : 'bg-green-400/20 text-green-200'
-                                }`}>
-                                  {state.badge}
-                                </span>
-                              )}
+                              <X size={14} />
                             </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                          </div>
+                          <p className="text-sm text-white/85 leading-relaxed mb-3">
+                            Set up your wedding invitations in <strong>{STEPS.length} simple steps</strong>.
+                            You&apos;re on step {stepIndex + 1} of {STEPS.length} right now:
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {STEPS.map((s, i) => (
+                              <motion.div
+                                key={s.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.15 + i * 0.12, duration: 0.35, ease: 'easeOut' }}
+                                className={`rounded-xl px-3 py-2.5 flex items-center gap-2 min-w-0 ${
+                                  activeStep === s.id ? 'bg-white/15 ring-1 ring-white/25' : 'bg-white/5'
+                                }`}
+                              >
+                                <span className={`shrink-0 ${activeStep === s.id ? 'text-[#FFD9D2]' : 'text-white/50'}`}>
+                                  {s.icon}
+                                </span>
+                                <span className={`min-w-0 ${activeStep === s.id ? 'text-white' : 'text-white/55'}`}>
+                                  <span className="block text-[9px] font-bold uppercase tracking-wide opacity-70">Step {s.short}</span>
+                                  <span className="block text-xs font-semibold truncate">{s.label}</span>
+                                </span>
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
 
               {/* ─── Generation Progress ─── */}
@@ -1494,7 +1480,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {totalPages > 1 && (
                           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                             <span className="text-xs text-gray-500">
-                              {(currentPage - 1) * pageSize + 1} –{' '}
+                              {(currentPage - 1) * pageSize + 1} -{' '}
                               {Math.min(currentPage * pageSize, filteredGuests.length)} of {filteredGuests.length}
                             </span>
                             <div className="flex gap-1">
@@ -1549,9 +1535,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
                   </Link>
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
-                    <Sparkles size={28} className="text-gray-300 mx-auto mb-2" />
+                    <PenTool size={28} className="text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
-                      Design one invitation template — it gets used to generate a personalized card for every
+                      Design one invitation template - it gets used to generate a personalized card for every
                       guest in the next step.
                     </p>
                   </div>
@@ -1577,7 +1563,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {generatingCards ? (
                           <Loader2 size={16} className="animate-spin" />
                         ) : (
-                          <Sparkles size={16} />
+                          <Wand size={16} />
                         )}
                         {generatingCards
                           ? 'Generating...'
@@ -1746,18 +1732,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
-              {/* ─── Next Up Guidance ─── */}
-              <div className="bg-[#0D4B4B]/[0.05] border border-[#0D4B4B]/15 rounded-2xl px-4 py-3.5 mb-3 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <ArrowRight size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold tracking-[1.2px] uppercase text-[#0D4B4B] mb-0.5">Next up</p>
-                  <p className="text-[13px] font-medium text-gray-700 leading-relaxed">{nextUp}</p>
-                </div>
-              </div>
-
-              {/* ─── Bottom Sticky Step Navigation ─── */}
+              {/* ─── Bottom Sticky Step Navigation (animated) ─── */}
               <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 sm:px-6 py-3 z-30">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                   <button
@@ -1767,9 +1742,27 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   >
                     <ArrowLeft size={16} />
                   </button>
-                  <span className="flex-1 text-center text-xs font-semibold text-gray-400">
-                    Step {stepIndex + 1} of {STEPS.length} — {STEPS[stepIndex].label}
-                  </span>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={activeStep}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.22, ease: 'easeOut' }}
+                        className="text-center min-w-0"
+                      >
+                        <p className="text-xs font-semibold text-gray-800 truncate flex items-center justify-center gap-1.5">
+                          <span className="text-gray-400 font-medium">
+                            Step {stepIndex + 1} of {STEPS.length}
+                          </span>
+                          <span className="inline-flex items-center text-[#0D4B4B]">{STEPS[stepIndex].icon}</span>
+                          <span>{STEPS[stepIndex].label}</span>
+                        </p>
+                        <p className="text-[11px] text-gray-400 truncate mt-0.5">{nextUp}</p>
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
                   {stepIndex < STEPS.length - 1 ? (
                     <button onClick={goNextStep} className="btn-primary flex-shrink-0">
                       Continue to {STEPS[stepIndex + 1].label} <ArrowRight size={16} />

@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-// GET /api/notifications – fetch notifications for the current user
+// GET /api/notifications - fetch notifications for the current user
 // Default (bell) returns unread. Pass ?all=1 to return everything recent
 // first, with ?read=true|false to filter by read state.
 export async function GET(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(notifications);
 }
 
-// POST /api/notifications – create a notification (admin only)
+// POST /api/notifications - create a notification (admin only)
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || (session.user as any).role !== 'SUPER_ADMIN') {
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(notification);
 }
 
-// PATCH /api/notifications – mark notifications as read
+// PATCH /api/notifications - mark notifications as read
 // Body: { ids?: string[], all?: boolean }
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -90,7 +90,7 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-// DELETE /api/notifications – clear read notifications
+// DELETE /api/notifications - clear read notifications
 export async function DELETE(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

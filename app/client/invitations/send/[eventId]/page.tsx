@@ -6,11 +6,11 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
-  ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw,
+  ArrowLeft, Users, AlertCircle, Loader2, RefreshCw,
   ChevronDown, ChevronUp, Copy, Check, Filter, CheckSquare,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
-  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick
+  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick, Wand
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
@@ -553,13 +553,13 @@ export default function SendInvitationsPage() {
       if (failed === 0) {
         toast.success(`${completed} cards generated`, { duration: 3000 });
       } else if (completed > 0) {
-        toast(`${completed} generated, ${failed} failed — click Cards again to retry`, { duration: 4000 });
+        toast(`${completed} generated, ${failed} failed - click Cards again to retry`, { duration: 4000 });
       } else {
         toast.error('Failed to generate cards', { duration: 3000 });
       }
     } catch (err) {
       console.error('Generation error:', err);
-      toast.error('Network error — click Cards again to resume', { duration: 3000 });
+      toast.error('Network error - click Cards again to resume', { duration: 3000 });
     } finally {
       setGeneratingCards(false);
       setTimeout(() => setGenProgress(null), 1500);
@@ -857,7 +857,7 @@ export default function SendInvitationsPage() {
             disabled={generatingCards || guests.length === 0}
             className="px-3 sm:px-4 py-1.5 sm:py-2 bg-amber-600 text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-1.5"
           >
-            {generatingCards ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {generatingCards ? <Loader2 size={14} className="animate-spin" /> : <Wand size={14} />}
             <span className="hidden xs:inline">Cards</span>
             <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">
               {guestsWithoutPassCode}
@@ -912,7 +912,7 @@ export default function SendInvitationsPage() {
         <div className="mb-4 bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
           <div className="flex items-center justify-between text-xs sm:text-sm mb-1.5">
             <span className="font-medium text-gray-700 flex items-center gap-1.5">
-              <Sparkles size={14} className="text-amber-600" />
+              <Wand size={14} className="text-amber-600" />
               Generating cards
             </span>
             <span className="text-gray-400 font-mono">
@@ -1381,7 +1381,7 @@ Card No: {cardNumber} {guestType}`}
       <div className="bg-[#EDFAF4] border border-[#A8D5C4] rounded-2xl px-3 sm:px-4 py-2.5 flex items-start gap-2.5">
         <Info size={16} className="text-[#1A7A4A] flex-shrink-0 mt-0.5" />
         <p className="text-xs sm:text-sm text-[#14532d] leading-relaxed">
-          <span className="font-semibold">How sending works:</span> Sending is free — credits are only used when you
+          <span className="font-semibold">How sending works:</span> Sending is free - credits are only used when you
           <span className="font-medium"> add or import</span> a guest (1 credit per guest). <span className="font-semibold">Send All</span> only sends to guests who
           haven't received their invitation yet, so you can send safely without duplicating.
         </p>
@@ -1411,7 +1411,7 @@ Card No: {cardNumber} {guestType}`}
                     <p className="text-xs text-red-600 truncate">{f.phone || 'No phone'}</p>
                   </div>
                   <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full flex-shrink-0">
-                    {f.status === 'REJECTED' ? 'Rejected' : 'Failed'} — retry by SMS
+                    {f.status === 'REJECTED' ? 'Rejected' : 'Failed'} - retry by SMS
                   </span>
                 </div>
               ))}

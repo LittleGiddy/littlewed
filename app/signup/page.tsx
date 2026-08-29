@@ -90,7 +90,7 @@ export default function SignupPage() {
   };
 
   // ── Google Sign-up handler ──
-  // No localStorage hand-off anymore — the org name/subdomain is collected
+  // No localStorage hand-off anymore - the org name/subdomain is collected
   // AFTER Google auth completes, on /auth/google-callback. That's what
   // guarantees a Google user always ends up with a tenant before they can
   // reach a dashboard.
@@ -629,7 +629,7 @@ export default function SignupPage() {
                         onFocus={() => setFocused('phone')}
                         onBlur={() => setFocused(null)}
                       />
-                      <div className="hint">Only used for administrative records – no verification.</div>
+                      <div className="hint">Only used for administrative records - no verification.</div>
                     </div>
                     <div className="field-wrap">
                       <label className={`field-label ${focused === 'password' || form.password ? 'up' : ''}`}>Password</label>

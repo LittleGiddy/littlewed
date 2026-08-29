@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
 import { fetchTemplateBuffer, generateCardForGuest } from '@/lib/image-storage';
+import { logSystemEvent } from '@/lib/systemLog';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
@@ -110,6 +111,15 @@ export async function POST(req: NextRequest) {
           };
         } catch (error: any) {
           console.error(`Failed for ${guest.name}:`, error);
+          await logSystemEvent({
+            tenantId: event.tenantId,
+            eventId: event.id,
+            guestId: guest.id,
+            type: 'card_generation',
+            level: 'ERROR',
+            message: `Card generation failed for ${guest.name}`,
+            details: { error: error?.message || String(error) },
+          });
           return {
             guestId: guest.id,
             name: guest.name,

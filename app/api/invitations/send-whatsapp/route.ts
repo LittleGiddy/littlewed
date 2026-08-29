@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       : (guest.invitationCard || guest.event?.imageUrl || '');
 
     // ─── Send WhatsApp invitation (no link button) ──────────────────────
-    // Variable values come from the user's event/guest data — no hardcoded
+    // Variable values come from the user's event/guest data - no hardcoded
     // fallbacks. Empty fields send empty values to the template.
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,

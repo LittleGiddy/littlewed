@@ -26,7 +26,7 @@ export default function LoginPage() {
       titleLine1: 'Weddings,',
       titleHighlight: 'Beautifully Managed',
       sub: 'Send invitations, track RSVPs, and check guests in all from one simple dashboard.',
-      mobileSub: 'Invitations, RSVPs, and check-in — all in one place.',
+      mobileSub: 'Invitations, RSVPs, and check-in - all in one place.',
     },
     {
       image: '/Gemini_Generated_Image_shs33shs33shs33s.png',

@@ -16,7 +16,7 @@ export async function GET(
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    include: { tenant: { select: { bypassPayment: true, credits: true } } },
+    include: { tenant: { select: { bypassPayment: true, credits: true, creditsEnabled: true } } },
   });
 
   if (!event) {
@@ -28,12 +28,14 @@ export async function GET(
   });
 
   const guestLimit = event.tenant?.bypassPayment ? 0 : (event.guestCount || 0);
-  const credits = event.tenant?.bypassPayment ? -1 : (event.tenant?.credits ?? 0);
+  const creditsDisabled = event.tenant?.creditsEnabled === false;
+  const credits = creditsDisabled ? 0 : (event.tenant?.bypassPayment ? -1 : (event.tenant?.credits ?? 0));
 
   return NextResponse.json({
     guestCount: guestLimit,
     totalGuests,
     credits,
     bypassPayment: event.tenant?.bypassPayment || false,
+    creditsDisabled,
   });
 }

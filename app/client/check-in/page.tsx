@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   QrCode, Key, Loader2, CheckCircle, XCircle, User, Users, 
   ArrowLeft, Camera, Smartphone, AlertCircle, Scan, Hash,
-  Info, Clock, Calendar, MapPin, Sparkles, Trash2, Eye, 
+  Info, Clock, Calendar, MapPin, Trash2, Eye, 
   ChevronRight, Search, Download, UserPlus, UserCheck,
   CheckCheck, RefreshCw, PartyPopper, Hand, UserRound
 } from 'lucide-react';
@@ -451,7 +451,7 @@ export default function CheckInPage() {
         {eventInfo && (
           <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 sm:mb-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm">
-              <Sparkles size={14} className="text-[#FF6B5C] flex-shrink-0" />
+              <PartyPopper size={14} className="text-[#FF6B5C] flex-shrink-0" />
               <span className="font-semibold text-gray-800 truncate">{eventInfo.name}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-500 mt-0.5">
@@ -685,7 +685,7 @@ export default function CheckInPage() {
                           <div className="text-right flex-shrink-0">
                             <span className={`text-[9px] sm:text-[10px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full flex items-center gap-0.5 sm:gap-1 ${status.color}`}>
                               <StatusIcon size={9} className="sm:text-xs" />
-                              {isFullyCheckedIn ? '✓✓' : count > 0 ? `${count}/${maxCheckIns}` : '—'}
+                              {isFullyCheckedIn ? '✓✓' : count > 0 ? `${count}/${maxCheckIns}` : '-'}
                             </span>
                           </div>
                         </div>

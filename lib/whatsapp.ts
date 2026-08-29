@@ -192,7 +192,7 @@ export async function sendInvitationTemplate(
   });
 
   // Match template placeholders: {1} through {9}
-  // Variable values come from the user's event/guest data — no hardcoded fallbacks.
+  // Variable values come from the user's event/guest data - no hardcoded fallbacks.
   const params = [
     fullName,                                    // {1}
     event.hostFamily || '',                      // {2}

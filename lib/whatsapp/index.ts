@@ -150,7 +150,7 @@ export async function sendWeddingInvitation(
   console.log('[WhatsApp] Template:', templateName);
 
   // ─── Header with image ────────────────────────────────────────────────
-  // Only attach a header when a real card image exists — never a placeholder.
+  // Only attach a header when a real card image exists - never a placeholder.
   const header = data.imageUrl
     ? {
         image: {

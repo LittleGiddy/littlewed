@@ -97,7 +97,7 @@ export default function PushManager() {
       const data = event.data;
       if (!data || data.type !== 'LITTLEWED_PUSH') return;
       playChime();
-      const body = data.payload?.body ? ` — ${data.payload.body}` : '';
+      const body = data.payload?.body ? ` - ${data.payload.body}` : '';
       toast.success(`${data.payload?.title || 'Notification'}${body}`);
     };
 
@@ -173,7 +173,7 @@ export default function PushManager() {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-gray-800 text-sm">Get important updates</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Enable notifications to hear about check-ins, credits, and messages — even when the
+              Enable notifications to hear about check-ins, credits, and messages - even when the
               app isn&apos;t open.
             </p>
             <div className="flex items-center gap-2 mt-3">

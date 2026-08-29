@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, Sparkles, Calendar, Users, QrCode } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap, Calendar, Users, QrCode } from 'lucide-react';
 
 const slides = [
   {
@@ -125,7 +125,7 @@ export function HeroCarousel() {
       {/* Feature badges on carousel */}
       <div className="absolute bottom-12 right-6 hidden md:flex gap-2 z-10">
         <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10">
-          <Sparkles size={12} /> Smart Planning
+          <Zap size={12} /> Smart Planning
         </div>
         <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm text-white/80 text-xs font-medium px-3 py-1.5 rounded-full border border-white/10">
           <QrCode size={12} /> QR Check-in

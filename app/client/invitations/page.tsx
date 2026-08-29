@@ -411,7 +411,7 @@ export default function GuestsPage() {
             )}
           </td>
           <td className="px-4 py-3 text-sm text-gray-500">
-            {guest.invitationSentAt ? new Date(guest.invitationSentAt).toLocaleString() : '—'}
+            {guest.invitationSentAt ? new Date(guest.invitationSentAt).toLocaleString() : '-'}
           </td>
           <td className="px-4 py-3">
             <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass === 'status-checked' ? 'bg-green-50 text-green-700' : statusClass === 'status-sent' ? 'bg-blue-50 text-[#0D4B4B]' : 'bg-amber-50 text-amber-700'}`}>

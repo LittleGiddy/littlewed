@@ -14,7 +14,7 @@ try {
   console.log(`[fonts] fontsDir=${fontsDir} files=${JSON.stringify(files)}`);
 
   if (files.length === 0) {
-    console.error('[fonts] WARNING: public/fonts is empty — text will render as boxes.');
+    console.error('[fonts] WARNING: public/fonts is empty - text will render as boxes.');
   }
 
   const fontsConf = `<?xml version="1.0"?>

@@ -388,7 +388,7 @@ export default function StaffDashboard() {
             onChange={e => loadGuests(e.target.value)}
             className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent outline-none bg-white"
           >
-            <option value="">— Choose an event —</option>
+            <option value="">- Choose an event -</option>
             {events.map(e => (
               <option key={e.id} value={e.id}>
                 {e.name} · {new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

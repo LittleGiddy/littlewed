@@ -143,7 +143,7 @@ export default function ReportsPage() {
         sections: [{
           children: [
             new Paragraph({ children: [new TextRun({ text: 'LittleWed Monthly Report', bold: true, size: 32, color: '0D4B4B' })], heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
-            new Paragraph({ children: [new TextRun({ text: `${data.tenant.name} — ${data.tenant.plan} Plan`, size: 22, color: '666666' })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+            new Paragraph({ children: [new TextRun({ text: `${data.tenant.name} - ${data.tenant.plan} Plan`, size: 22, color: '666666' })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
             new Paragraph({ children: [new TextRun({ text: `Total: ${summary.totalEvents} events, ${summary.totalGuests} guests, ${summary.totalCheckedIn} checked in`, size: 20 })], spacing: { after: 300 } }),
             new Table({ rows: [new TableRow({ children: headerCells, tableHeader: true }), ...rows] }),
           ],
@@ -203,7 +203,7 @@ export default function ReportsPage() {
               <BarChart3 size={14} /> Analytics
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900">Monthly Report</h1>
-            <p className="text-sm text-gray-500 mt-1">{data?.tenant?.name} — {data?.tenant?.plan} Plan</p>
+            <p className="text-sm text-gray-500 mt-1">{data?.tenant?.name} - {data?.tenant?.plan} Plan</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">

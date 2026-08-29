@@ -82,20 +82,24 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
-      include: { tenant: { select: { bypassPayment: true, credits: true } } },
+      include: { tenant: { select: { bypassPayment: true, credits: true, creditsEnabled: true } } },
     });
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
     // ─── Credit check (1 credit per guest; credits are now the only limit) ─
-    if (!event.tenant?.bypassPayment) {
-      const tenantCredits = event.tenant.credits ?? 0;
+    const creditsDisabled = event.tenant?.creditsEnabled === false;
+    if (!event.tenant?.bypassPayment || creditsDisabled) {
+      const tenantCredits = creditsDisabled ? 0 : (event.tenant.credits ?? 0);
       if (tenantCredits < 1) {
         return NextResponse.json(
           {
-            error: `You've run out of credits. Each guest costs 1 credit, and you have ${tenantCredits} credits. Request more credits from the admin to add additional guests.`,
-            needsCredits: true,
+            error: creditsDisabled
+              ? "Your account's credits have been disabled by the admin. Please contact support to re-enable them."
+              : `You've run out of credits. Each guest costs 1 credit, and you have ${tenantCredits} credits. Request more credits from the admin to add additional guests.`,
+            needsCredits: !creditsDisabled,
+            creditsDisabled,
             credits: tenantCredits,
           },
           { status: 400 }
@@ -132,7 +136,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ─── Deduct 1 credit for adding this guest (skip if bypassPayment) ──
-    if (!event.tenant?.bypassPayment) {
+    if (!event.tenant?.bypassPayment && event.tenant?.creditsEnabled !== false) {
       await prisma.tenant.update({
         where: { id: event.tenantId },
         data: { credits: { decrement: 1 } },

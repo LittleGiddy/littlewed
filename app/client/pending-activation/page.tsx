@@ -4,7 +4,7 @@
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, AlertCircle, Mail, LogOut, Sparkles } from 'lucide-react';
+import { Clock, AlertCircle, Mail, LogOut, RefreshCw } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
 export default function PendingActivationPage() {
@@ -113,7 +113,7 @@ export default function PendingActivationPage() {
 
             {/* Auto-refresh indicator */}
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-6">
-              <Sparkles size={12} className="text-[#0D4B4B]" />
+              <RefreshCw size={12} className="text-[#0D4B4B]" />
               <span>This page automatically refreshes to check your status</span>
             </div>
 

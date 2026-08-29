@@ -6,7 +6,7 @@ import {
   Calendar, MapPin, Users, Smartphone, CheckCircle, Clock, ArrowLeft, 
   Hash, MessageCircle, Phone, User, Users as UsersIcon, 
   UserCheck, UserPlus, UserX, UserCog, PartyPopper,
-  TrendingUp, TrendingDown, Minus, Award, Star, Sparkles
+  TrendingUp, TrendingDown, Minus, Award, Star
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -168,7 +168,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
                           {guest.cardNumber}
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-3 md:px-4 py-3">
@@ -200,7 +200,7 @@ export default async function EventPage({ params }: { params: { id: string } }) 
                           {guest.guestType}
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs text-gray-400">-</span>
                       )}
                     </td>
                     <td className="px-3 md:px-4 py-3">

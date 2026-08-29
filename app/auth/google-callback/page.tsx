@@ -152,7 +152,7 @@ function GoogleCallbackInner() {
           {intent === 'login' ? (
             <>
               We don't see an organization linked to <strong>{session?.user?.email}</strong> yet. Create one to
-              continue — it only takes a second.
+              continue - it only takes a second.
             </>
           ) : (
             <>

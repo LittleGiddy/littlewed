@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Menu, X, Heart, Sparkles, Mail, Bell, CheckCircle2, ShieldCheck,
+  Menu, X, Heart, Wand, Mail, Bell, CheckCircle2, ShieldCheck,
   MessageCircle, Phone, Users, LayoutDashboard, ArrowRight, HeartHandshake
 } from 'lucide-react';
 
@@ -76,7 +76,7 @@ export default function PricingPage() {
     {
       icon: <Bell size={20} />,
       title: 'Reminders & Thanks',
-      desc: 'Send polite reminder messages before the event and heartfelt thank-you cards after — to the guests who attended.',
+      desc: 'Send polite reminder messages before the event and heartfelt thank-you cards after - to the guests who attended.',
     },
     {
       icon: <Mail size={20} />,
@@ -204,7 +204,7 @@ export default function PricingPage() {
         <span className="hero-badge"><HeartHandshake size={15} /> Simple, fair pricing</span>
         <h1>Beautiful weddings & events, <span>without surprise fees</span></h1>
         <p>
-          Pay per guest or per invite. No subscription traps — just the tools you need to
+          Pay per guest or per invite. No subscription traps - just the tools you need to
           invite, manage, and check in your guests.
         </p>
       </section>
@@ -255,7 +255,7 @@ export default function PricingPage() {
       <section className="cta-strip">
         <h2>Ready to get started?</h2>
         <p>Create your account in minutes and invite your first guest today.</p>
-        <Link href="/signup" className="btn btn-primary"><Sparkles size={16} /> Get Started Free</Link>
+        <Link href="/signup" className="btn btn-primary"><Wand size={16} /> Get Started Free</Link>
       </section>
 
       <footer className="footer">

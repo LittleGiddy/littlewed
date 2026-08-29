@@ -6,8 +6,8 @@ import {
   AlignLeft, AlignCenter, AlignRight, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
   Square, Minus, Plus, Copy, ArrowUp, ArrowDown, 
   Layers, Eye, EyeOff, Undo, Redo, Lock, Unlock, Grid, ChevronDown, ChevronRight,
-  Settings, QrCode, User, Users, UserCheck, Hash, Sparkles, AlertCircle, RotateCw,
-  X, Maximize, Minimize, ArrowRight, Zap, Sliders, Move as MoveIcon, 
+  Settings, QrCode, User, Users, UserCheck, Hash, AlertCircle, RotateCw,
+  X, Maximize, Minimize, ArrowRight, Zap, Wand, Sliders, Move as MoveIcon, 
   GripVertical, Crosshair, Dot
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -108,6 +108,10 @@ export default function InvitationDesigner() {
 
   // ─── Debounce timer for history ──────────────────────────────────────
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ─── rAF throttle for drag/resize ───────────────────────────────────
+  const rafRef = useRef<number | null>(null);
+  const pendingMoveRef = useRef<{ x: number; y: number } | null>(null);
 
   // Drag state
   const [dragging, setDragging] = useState<{ type: string; index: number; point?: 'start' | 'end'; isTouch?: boolean } | null>(null);
@@ -544,14 +548,8 @@ export default function InvitationDesigner() {
     setDragging({ type: 'linePoint', index, point, isTouch });
   };
 
-  const moveDrag = (e: React.MouseEvent | React.TouchEvent) => {
+  const moveDrag = (clientX: number, clientY: number) => {
     if (!dragging || !canvasRef.current) return;
-    
-    e.preventDefault();
-    
-    const isTouch = 'touches' in e;
-    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     const rect = canvasRef.current.getBoundingClientRect();
     
     let newX = (clientX - rect.left) / rect.width * 100 - dragOffset.x;
@@ -634,12 +632,8 @@ export default function InvitationDesigner() {
     setResizing({ index, type: layer.type });
   };
 
-  const moveResize = (e: React.MouseEvent | React.TouchEvent) => {
+  const moveResize = (clientX: number, clientY: number) => {
     if (!resizing || !canvasRef.current) return;
-    e.preventDefault();
-    const isTouch = 'touches' in e;
-    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
     const rect = canvasRef.current.getBoundingClientRect();
     const idx = resizing.index;
     const layer = layers[idx];
@@ -666,11 +660,27 @@ export default function InvitationDesigner() {
   const endResize = () => setResizing(null);
 
   const moveCanvas = (e: React.MouseEvent | React.TouchEvent) => {
-    if (resizing) moveResize(e);
-    else moveDrag(e);
+    const isTouch = 'touches' in e;
+    const clientX = isTouch ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = isTouch ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    pendingMoveRef.current = { x: clientX, y: clientY };
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const p = pendingMoveRef.current;
+      if (!p) return;
+      pendingMoveRef.current = null;
+      if (resizing) moveResize(p.x, p.y);
+      else moveDrag(p.x, p.y);
+    });
   };
 
   const endCanvas = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      pendingMoveRef.current = null;
+    }
     endDrag(e);
     endResize();
   };
@@ -1174,7 +1184,7 @@ export default function InvitationDesigner() {
             {/* ─── Quick Add ─── */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 space-y-2">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles size={14} className="text-[#0D4B4B]" /> Quick Add
+                <Zap size={14} className="text-[#0D4B4B]" /> Quick Add
               </p>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
@@ -1689,7 +1699,7 @@ export default function InvitationDesigner() {
                   }}
                   className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2"
                 >
-                  <Sparkles size={18} />
+                  <Wand size={18} />
                   Go Generate Cards
                 </button>
                 <button

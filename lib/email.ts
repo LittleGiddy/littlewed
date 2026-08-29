@@ -45,7 +45,7 @@ async function sendAdminAlert(
           </div>
         </div>
         <div style="padding: 16px 32px; text-align: center;">
-          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Admin Notifications</p>
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Admin Notifications</p>
         </div>
       </div>
     `,
@@ -62,7 +62,7 @@ export async function sendNewSignupToAdmin(params: {
   method: 'email' | 'google';
 }) {
   const rows: { label: string; value: string }[] = [
-    { label: 'Name', value: params.name || '—' },
+    { label: 'Name', value: params.name || '-' },
     { label: 'Email', value: params.email },
     { label: 'Method', value: params.method },
   ];
@@ -71,7 +71,7 @@ export async function sendNewSignupToAdmin(params: {
   if (params.subdomain) rows.push({ label: 'Subdomain', value: `${params.subdomain}.littlewed.co.tz` });
 
   await sendAdminAlert(
-    `New user signed up — ${params.name || params.email}`,
+    `New user signed up - ${params.name || params.email}`,
     'New User Signup',
     rows,
     'View Pending Users',
@@ -86,13 +86,13 @@ export async function sendApprovalRequestToAdmin(params: {
   tenantName?: string;
 }) {
   const rows: { label: string; value: string }[] = [
-    { label: 'Name', value: params.name || '—' },
+    { label: 'Name', value: params.name || '-' },
     { label: 'Email', value: params.email },
   ];
   if (params.tenantName) rows.push({ label: 'Organization', value: params.tenantName });
 
   await sendAdminAlert(
-    `Approval request — ${params.name || params.email}`,
+    `Approval request - ${params.name || params.email}`,
     'Account Awaiting Approval',
     rows,
     'Review & Approve',
@@ -152,7 +152,7 @@ export async function sendCreditRequestSubmittedEmail(
   await resend.emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: `Credit Request Received — ${credits} credits`,
+    subject: `Credit Request Received - ${credits} credits`,
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
         <div style="background: #0D4B4B; padding: 32px; text-align: center; border-radius: 16px 16px 0 0;">
@@ -195,7 +195,7 @@ export async function sendCreditRequestSubmittedEmail(
           </div>
         </div>
         <div style="padding: 16px 32px; text-align: center;">
-          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Wedding Management Platform</p>
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Wedding Management Platform</p>
         </div>
       </div>
     `,
@@ -248,7 +248,7 @@ export async function sendCreditGrantedEmail(
           </div>
         </div>
         <div style="padding: 16px 32px; text-align: center;">
-          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Wedding Management Platform</p>
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Wedding Management Platform</p>
         </div>
       </div>
     `,
@@ -265,7 +265,7 @@ export async function sendCreditRequestToAdmin(  adminEmail: string,
   await resend.emails.send({
     from: FROM_ADDRESS,
     to: adminEmail,
-    subject: `New Credit Request — ${tenantName} (${credits} credits)`,
+    subject: `New Credit Request - ${tenantName} (${credits} credits)`,
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
         <div style="background: #0D4B4B; padding: 32px; text-align: center; border-radius: 16px 16px 0 0;">
@@ -307,7 +307,7 @@ export async function sendCreditRequestToAdmin(  adminEmail: string,
           </div>
         </div>
         <div style="padding: 16px 32px; text-align: center;">
-          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed — Admin Notifications</p>
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Admin Notifications</p>
         </div>
       </div>
     `,

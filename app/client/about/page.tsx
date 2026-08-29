@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
-import { Heart, Mail, Phone, Calendar, Users, QrCode, MessageCircle, Shield, Award, Sparkles } from 'lucide-react';
+import { Heart, Mail, Phone, Calendar, Users, QrCode, MessageCircle, Shield, Award, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AboutPage() {
@@ -13,7 +13,7 @@ export default function AboutPage() {
     {
       icon: <QrCode className="w-6 h-6" />,
       title: 'QR Code Check‑In',
-      description: 'Guests check in instantly using unique QR codes – no paper lists, no delays.',
+      description: 'Guests check in instantly using unique QR codes - no paper lists, no delays.',
     },
     {
       icon: <Users className="w-6 h-6" />,
@@ -88,7 +88,7 @@ export default function AboutPage() {
           <p className="text-gray-600 max-w-3xl mx-auto text-lg leading-relaxed">
             We believe every couple deserves a stress‑free wedding planning experience. 
             LittleWed brings together guest management, invitations, and real‑time check‑ins 
-            into one beautiful platform – so you can focus on what truly matters.
+            into one beautiful platform - so you can focus on what truly matters.
           </p>
         </motion.div>
 
@@ -158,7 +158,7 @@ export default function AboutPage() {
               </p>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-[#0D4B4B] flex-shrink-0 mt-0.5" />
+                  <Clock className="w-5 h-5 text-[#0D4B4B] flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-gray-600">
                     <span className="font-semibold text-gray-800">Response time:</span> Within 24 hours on business days.
                   </p>
@@ -179,7 +179,7 @@ export default function AboutPage() {
 
         {/* Footer Note */}
         <div className="text-center mt-12 text-xs text-gray-400">
-          <p>© {new Date().getFullYear()} LittleWed – Beautiful weddings, perfectly managed.</p>
+          <p>© {new Date().getFullYear()} LittleWed - Beautiful weddings, perfectly managed.</p>
         </div>
       </div>
     </div>

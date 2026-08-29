@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Send, CheckCircle, XCircle, Clock, MessageCircle, Phone, Image as ImageIcon,
-  ArrowLeft, Users, Sparkles, AlertCircle, Loader2, RefreshCw, 
+  ArrowLeft, Users, AlertCircle, Loader2, RefreshCw, 
   Eye, EyeOff, ChevronDown, ChevronUp, Copy, Check, Filter,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText // ✅ Added FileText

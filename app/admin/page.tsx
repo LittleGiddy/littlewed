@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import {
   Building2, Users, CreditCard, UserCheck, UserCog,
-  TrendingUp, ArrowUpRight, ChevronRight, Sparkles, Activity, Bell,
+  TrendingUp, ArrowUpRight, ChevronRight, Activity, Bell,
 } from 'lucide-react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
@@ -57,7 +57,7 @@ export default async function AdminDashboard() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles size={18} className="text-[#0D4B4B]" />
+          <img src="/Little Wed Logo_.svg" alt="Little Wed" className="h-6 w-auto object-contain" />
           <span className="text-xs font-bold tracking-wider text-[#0D4B4B] uppercase">Admin Panel</span>
         </div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>

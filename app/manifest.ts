@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'LittleWed – Wedding Management',
+    name: 'LittleWed - Wedding Management',
     short_name: 'LittleWed',
     description:
-      'Send invitations, track RSVPs, check in guests, and send reminders & thanks — all from one platform.',
+      'Send invitations, track RSVPs, check in guests, and send reminders & thanks - all from one platform.',
     start_url: '/login',
     scope: '/',
     display: 'standalone',

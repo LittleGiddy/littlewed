@@ -463,7 +463,7 @@ export default function ImportGuestsPage() {
       const deficit = newCount - credits;
       setCreditDeficit(deficit);
       setLimitWarning(
-        `You're importing ${newCount} guest${newCount === 1 ? '' : 's'} but only have ${credits} credit${credits === 1 ? '' : 's'} left. Credits are used 1 per guest — request ${deficit} more credits from the admin to import all of these.`
+        `You're importing ${newCount} guest${newCount === 1 ? '' : 's'} but only have ${credits} credit${credits === 1 ? '' : 's'} left. Credits are used 1 per guest - request ${deficit} more credits from the admin to import all of these.`
       );
     } else {
       setCreditDeficit(0);
@@ -638,7 +638,7 @@ export default function ImportGuestsPage() {
     return;
   }
   if (limitWarning) {
-    toast.error('Cannot import – exceeds guest limit');
+    toast.error('Cannot import - exceeds guest limit');
     return;
   }
   const guestsToImport = validGuests.map(g => ({
@@ -920,7 +920,7 @@ export default function ImportGuestsPage() {
             eventDetails.credits < 0
               ? 'Unlimited (payment bypassed)'
               : `${eventDetails.credits} credit${eventDetails.credits === 1 ? '' : 's'} left`
-          ) : '—'}
+          ) : '-'}
         </div>
       </div>
 
@@ -1017,7 +1017,7 @@ export default function ImportGuestsPage() {
                             ) : (
                               <>
                                 <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                  {guest.title || '—'}
+                                  {guest.title || '-'}
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
@@ -1153,7 +1153,7 @@ export default function ImportGuestsPage() {
                             ) : (
                               <div className="flex items-center gap-1">
                                 <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
-                                  {guest.title || '—'}
+                                  {guest.title || '-'}
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
@@ -1209,7 +1209,7 @@ export default function ImportGuestsPage() {
                             )}
                           </td>
                           <td className="px-4 py-2 font-mono text-xs break-all">{guest.normalizedPhone || guest.phone}</td>
-                          <td className="px-4 py-2 break-words">{guest.email || '—'}</td>
+                          <td className="px-4 py-2 break-words">{guest.email || '-'}</td>
                           <td className="px-4 py-2">
                             {guest.guestType ? (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${guest.guestType.toLowerCase() === 'double' ? 'bg-purple-100 text-purple-700' :
@@ -1218,9 +1218,9 @@ export default function ImportGuestsPage() {
                                 }`}>
                                 {guest.guestType}
                               </span>
-                            ) : '—'}
+                            ) : '-'}
                           </td>
-                          <td className="px-4 py-2 font-mono text-xs">{guest.cardNumber || '—'}</td>
+                          <td className="px-4 py-2 font-mono text-xs">{guest.cardNumber || '-'}</td>
                           <td className="px-4 py-2">
                             {guest.isValid ? (
                               <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">

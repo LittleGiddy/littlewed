@@ -68,7 +68,7 @@ export default function SendTestPage({ params }: { params: Promise<{ eventId: st
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-serif font-bold text-gray-900">Send Invitations</h1>
-          <p className="text-gray-600 mt-2">(Test Mode – No Login Required)</p>
+          <p className="text-gray-600 mt-2">(Test Mode - No Login Required)</p>
         </div>
 
         <div className="flex gap-4 mb-8">

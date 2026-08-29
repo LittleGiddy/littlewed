@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
+import { logSystemEvent } from '@/lib/systemLog';
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
@@ -91,6 +92,15 @@ export async function POST(req: NextRequest) {
               cardImageUrl = await generateAndStoreCardForGuest(guest.id);
             } catch (error) {
               console.error(`[Batch] Failed to generate card image for ${guest.name}:`, error);
+              await logSystemEvent({
+                tenantId,
+                eventId,
+                guestId: guest.id,
+                type: 'card_generation',
+                level: 'ERROR',
+                message: `Card generation failed for ${guest.name}`,
+                details: { error: error instanceof Error ? error.message : String(error) },
+              });
             }
           }
 
@@ -117,7 +127,7 @@ export async function POST(req: NextRequest) {
 
             // ─── Send WhatsApp ────────────────────────────────────────────
             // Variable values come from the user's inputs (whatsappVariables),
-            // then the event data — no hardcoded fallbacks.
+            // then the event data - no hardcoded fallbacks.
             result = await sendWeddingInvitation(guest.phone!, {
               guestName: actualGuestName,
               hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
@@ -289,6 +299,15 @@ export async function POST(req: NextRequest) {
           } else {
             failCount++;
             console.error(`[Batch] Failed to send to ${guest.name}:`, result.error);
+            await logSystemEvent({
+              tenantId,
+              eventId,
+              guestId: guest.id,
+              type: 'send',
+              level: 'ERROR',
+              message: `Send failed for ${guest.name} via ${guest.routingChannel || 'unknown'}`,
+              details: { channel: guest.routingChannel || 'unknown', error: result.error || undefined },
+            });
           }
 
           results.push({
