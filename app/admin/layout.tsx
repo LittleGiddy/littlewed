@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
+import SessionRevokedGuard from '@/components/SessionRevokedGuard';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -83,16 +84,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const SidebarContent = ({ isMobile = false, onClose }: { isMobile?: boolean; onClose?: () => void }) => (
     <div className={`flex flex-col h-full transition-all duration-300 ${effectiveCollapsed && !isMobile ? 'items-center' : ''}`}>
       {/* Brand */}
-      <div className={`flex items-center w-full px-5 h-16 border-b border-gray-100 flex-shrink-0 ${effectiveCollapsed && !isMobile ? 'justify-center px-3' : 'gap-3'}`}>
-        <div className="w-8 h-8 rounded-lg bg-[#0D4B4B] flex items-center justify-center flex-shrink-0 overflow-hidden">
-          <img src="/White Little Wed Logo.svg" alt="Little Wed" className="w-7 h-7 object-contain" />
-        </div>
-        {(!effectiveCollapsed || isMobile) && (
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-gray-900 text-sm tracking-tight">LittleWed</span>
-            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Admin</span>
-          </div>
-        )}
+      <div className={`flex items-center w-full px-5 h-16 border-b border-gray-100 flex-shrink-0 ${effectiveCollapsed && !isMobile ? 'justify-center px-3' : ''}`}>
+        <img src="/Little Wed Logo_.svg" alt="Little Wed" className={`h-8 w-auto object-contain flex-shrink-0 ${effectiveCollapsed && !isMobile ? '' : ''}`} />
         {isMobile && (
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors ml-auto">
             <X size={18} />
@@ -168,6 +161,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-gray-50 flex overflow-x-clip">
+      <SessionRevokedGuard />
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:block fixed top-0 left-0 bottom-0 bg-white border-r border-gray-200 transition-all duration-300 z-30 ${

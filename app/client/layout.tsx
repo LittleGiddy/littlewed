@@ -7,6 +7,7 @@ import { Home, Calendar, Users, Mail, Settings, UserPlus, LogOut, Info, BarChart
 import Link from 'next/link';
 import NotificationBell from '@/components/NotificationBell';
 import IdleSessionTimeout from '@/components/IdleSessionTimeout';
+import SessionRevokedGuard from '@/components/SessionRevokedGuard';
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -181,6 +182,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Auto sign-out after 30 min of inactivity (kept off live check-in stations) */}
       {!pathname.startsWith('/client/check-in') && <IdleSessionTimeout />}
+      <SessionRevokedGuard />
 
       {/* ── Desktop Sidebar ── */}
       <aside

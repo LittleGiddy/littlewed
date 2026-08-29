@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import { UserCog, Building2, Mail, Calendar, Users } from 'lucide-react';

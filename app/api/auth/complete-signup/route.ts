@@ -1,6 +1,6 @@
 // app/api/auth/complete-signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendNewSignupToAdmin } from '@/lib/email';

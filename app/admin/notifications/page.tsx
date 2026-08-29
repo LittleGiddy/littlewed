@@ -1,4 +1,4 @@
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/lib/auth';
 import NotificationsPage from '@/components/NotificationsPage';

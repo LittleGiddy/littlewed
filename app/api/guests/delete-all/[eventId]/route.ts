@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth'; // ✅ import authOptions
 import { prisma } from '@/lib/prisma';
 import { refundCreditsForUnsentDeleted } from '@/lib/credits';

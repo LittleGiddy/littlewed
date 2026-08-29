@@ -110,6 +110,9 @@ export const authOptions: NextAuthOptions = {
 
     // ── jwt ──────────────────────────────────────────────────────────────
     async jwt({ token, user, account, trigger }) {
+      let sessionRole: string | undefined;
+      let sessionUserId: string | undefined;
+
       if (user) {
         if (account?.provider === 'google') {
           const dbUser = await prisma.user.findUnique({
@@ -128,6 +131,8 @@ export const authOptions: NextAuthOptions = {
             token.image = dbUser.image ?? undefined;
             token.createdAt = dbUser.createdAt;
             token.emailVerified = dbUser.emailVerified ?? undefined;
+            sessionRole = dbUser.role;
+            sessionUserId = dbUser.id;
           } else {
             token.id = (user as any).id;
           }
@@ -142,6 +147,25 @@ export const authOptions: NextAuthOptions = {
           token.image = (user as any).image;
           token.createdAt = (user as any).createdAt;
           token.emailVerified = (user as any).emailVerified;
+          sessionRole = (user as any).role;
+          sessionUserId = (user as any).id;
+        }
+
+        // ── Single-device login: rotate the active session id so any
+        //    previous device's token no longer matches the stored value. ──
+        const role = sessionRole;
+        const userId = sessionUserId ?? (token.id as string);
+        if ((role === 'CLIENT' || role === 'STAFF') && userId) {
+          const sid = crypto.randomUUID();
+          token.sid = sid;
+          try {
+            await prisma.user.update({
+              where: { id: userId },
+              data: { activeSessionId: sid },
+            });
+          } catch (error) {
+            console.error('[NextAuth] Failed to rotate active session id:', error);
+          }
         }
       } else if (trigger === 'update' && token.id) {
         const dbUser = await prisma.user.findUnique({
@@ -175,6 +199,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).phone = token.phone;
         (session.user as any).createdAt = token.createdAt;
         (session.user as any).emailVerified = token.emailVerified;
+        (session as any).sid = token.sid;
         if (token.image) {
           session.user.image = token.image as string;
         }

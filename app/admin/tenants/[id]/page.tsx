@@ -8,10 +8,12 @@ import {
   TrendingUp, CheckCircle, XCircle, Clock, Mail, Phone, Search,
   RefreshCw, ToggleLeft, ToggleRight, Save, Trash2, Eye, ExternalLink,
   MessageSquare, MapPin, DollarSign, BarChart3, Activity, AlertTriangle,
-  ChevronRight, UserCheck, Send, Smartphone,
+  ChevronRight, UserCheck, Send, Smartphone, FileDown, FileSpreadsheet, FileText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import Papa from 'papaparse';
+import { jsPDF } from 'jspdf';
 
 type Tab = 'overview' | 'events' | 'staff' | 'guests' | 'settings';
 
@@ -196,6 +198,143 @@ export default function TenantDetailPage() {
     const q = guestSearch.toLowerCase();
     return g.name?.toLowerCase().includes(q) || g.phone?.includes(q) || g.email?.toLowerCase().includes(q) || g.cardNumber?.includes(q);
   });
+
+  // ─── Export helpers (guest list) ────────────────────────────────────
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${filteredGuests.length} guests`);
+  };
+
+  const exportFilename = (ext: string) => {
+    const safe = (v?: string) => (v || '').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase();
+    const eventPart = guestEventFilter !== 'all'
+      ? '_' + safe(tenant.events.find(e => e.id === guestEventFilter)?.name)
+      : '';
+    return `guests_${safe(tenant.name)}${eventPart}_${new Date().toISOString().slice(0, 10)}.${ext}`;
+  };
+
+  const exportCSV = () => {
+    const rows = filteredGuests.map(g => ({
+      Name: g.name || '',
+      Email: g.email || '',
+      Phone: g.phone || '',
+      'On WhatsApp': g.onWhatsApp ? 'Yes' : 'No',
+      'Guest Type': g.guestType || '',
+      Event: g.event?.name || '',
+      'Event Date': g.event?.date ? new Date(g.event.date).toLocaleDateString() : '',
+      'RSVP Status': g.attending || '',
+      'Checked In': g.checkedIn ? 'Yes' : 'No',
+      'Checked In At': g.checkedInAt ? new Date(g.checkedInAt).toLocaleString() : '',
+      'Card Number': g.cardNumber || '',
+      Channel: g.routingChannel || '',
+      'Invitation Sent At': g.invitationSentAt ? new Date(g.invitationSentAt).toLocaleString() : '',
+      'Invitation Delivered At': g.invitationDeliveredAt ? new Date(g.invitationDeliveredAt).toLocaleString() : '',
+      'Invitation Opened At': g.invitationOpenedAt ? new Date(g.invitationOpenedAt).toLocaleString() : '',
+      'Thanks Card Sent At': g.thanksSentAt ? new Date(g.thanksSentAt).toLocaleString() : '',
+      'Reminders Sent': g.reminderCount || 0,
+      'Delivered Messages': g.deliveredMessages || 0,
+      'Total Messages': g.totalMessages || 0,
+    }));
+    const csv = Papa.unparse(rows);
+    downloadBlob(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }), exportFilename('csv'));
+  };
+
+  const escapeVCard = (v?: string) => (v || '').replace(/([\\;,])/g, '\\$1').replace(/\r?\n/g, '\\n');
+
+  const exportVCard = () => {
+    const cards = filteredGuests.map(g => {
+      const parts = [
+        'BEGIN:VCARD',
+        'VERSION:3.0',
+        `FN:${escapeVCard(g.name)}`,
+        `N:${escapeVCard(g.name)};;;`,
+        `ORG:${escapeVCard(tenant.name)}`,
+      ];
+      if (g.email) parts.push(`EMAIL;TYPE=INTERNET:${escapeVCard(g.email)}`);
+      if (g.phone) parts.push(`TEL;TYPE=CELL:${escapeVCard(g.phone)}`);
+      const note = [`Event: ${g.event?.name || ''}`, `Card#: ${g.cardNumber || ''}`].join(' | ');
+      parts.push(`NOTE:${escapeVCard(note)}`, 'END:VCARD');
+      return parts.join('\r\n');
+    });
+    downloadBlob(new Blob([cards.join('\r\n')], { type: 'text/vcard' }), exportFilename('vcf'));
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const cols = ['#', 'Name', 'Phone', 'Email', 'Event', 'Status', 'Card', 'Delivery'];
+    const colWidths = [8, 38, 32, 48, 55, 26, 22, 30];
+    const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+    const lineHeight = 6;
+    let y = 16;
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Guest List \u2014 ${tenant.name}${tenant.subdomain ? ` (${tenant.subdomain})` : ''}`, margin, y);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    y += 5;
+    const eventLabel = guestEventFilter !== 'all'
+      ? tenant.events.find(e => e.id === guestEventFilter)?.name || ''
+      : 'All events';
+    doc.text(`${eventLabel} \u2014 ${filteredGuests.length} guest${filteredGuests.length === 1 ? '' : 's'}`, margin, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    let x = margin;
+    cols.forEach((c, i) => { doc.text(c, x + 1, y + 4); x += colWidths[i]; });
+    doc.setDrawColor(120);
+    doc.line(margin, y + 5, margin + tableWidth, y + 5);
+    y += 7;
+
+    const fit = (s: string, w: number) => {
+      let out = s || '';
+      while (out && doc.getTextWidth(out) > w) out = out.slice(0, -1);
+      return out || '\u2013';
+    };
+
+    doc.setFont('helvetica', 'normal');
+    filteredGuests.forEach((g, idx) => {
+      if (y > pageHeight - margin) {
+        doc.addPage('a4', 'landscape');
+        y = margin + 6;
+      }
+      const status = g.checkedIn ? 'Checked in' : g.attending || 'Pending';
+      const delivery = g.totalMessages ? `${g.deliveredMessages || 0}/${g.totalMessages}` : '\u2013';
+      const cells = [
+        String(idx + 1),
+        fit(g.name || '', colWidths[1] - 2),
+        g.phone || '',
+        fit(g.email || '', colWidths[3] - 2),
+        fit(g.event?.name || '', colWidths[4] - 2),
+        status,
+        g.cardNumber || '\u2013',
+        delivery,
+      ];
+      x = margin;
+      cells.forEach((c, i) => { doc.text(c, x + 1, y); x += colWidths[i]; });
+      y += lineHeight;
+    });
+
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 4, { align: 'right' });
+    }
+    doc.save(exportFilename('pdf'));
+  };
 
   const tabs: { key: Tab; label: string; icon: any; count?: number }[] = [
     { key: 'overview', label: 'Overview', icon: BarChart3 },
@@ -519,6 +658,20 @@ export default function TenantDetailPage() {
               <button onClick={fetchGuests} disabled={loadingGuests} className="px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 flex items-center gap-1.5">
                 <RefreshCw size={14} className={loadingGuests ? 'animate-spin' : ''} /> Refresh
               </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-xs text-gray-400 hidden sm:block">{filteredGuests.length} guest{filteredGuests.length === 1 ? '' : 's'}</span>
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1">
+                  <button onClick={exportCSV} disabled={filteredGuests.length === 0} title="Export CSV" className="p-2 rounded-lg hover:bg-[#0D4B4B]/5 text-gray-600 hover:text-[#0D4B4B] transition-colors disabled:opacity-40 disabled:pointer-events-none">
+                    <FileSpreadsheet size={15} />
+                  </button>
+                  <button onClick={exportVCard} disabled={filteredGuests.length === 0} title="Export vCard" className="p-2 rounded-lg hover:bg-[#0D4B4B]/5 text-gray-600 hover:text-[#0D4B4B] transition-colors disabled:opacity-40 disabled:pointer-events-none">
+                    <FileText size={15} />
+                  </button>
+                  <button onClick={exportPDF} disabled={filteredGuests.length === 0} title="Export PDF" className="p-2 rounded-lg hover:bg-[#0D4B4B]/5 text-gray-600 hover:text-[#0D4B4B] transition-colors disabled:opacity-40 disabled:pointer-events-none">
+                    <FileDown size={15} />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

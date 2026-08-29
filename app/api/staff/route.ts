@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth'; // ✅ add import
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';

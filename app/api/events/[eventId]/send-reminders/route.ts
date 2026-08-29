@@ -1,6 +1,6 @@
 // app/api/events/[eventId]/send-reminders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS

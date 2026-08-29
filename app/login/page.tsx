@@ -81,6 +81,11 @@ export default function LoginPage() {
       setLoading(false);
     }
 
+    if (errorParam === 'SessionExpired') {
+      setError('You were signed out because your account signed in on another device.');
+      setLoading(false);
+    }
+
     // If coming back from Google sign-in, check status
     if (fromGoogle === 'google') {
       routeAfterAuth();

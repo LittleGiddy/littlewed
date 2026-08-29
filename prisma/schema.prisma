@@ -22,6 +22,7 @@ model User {
   emailVerified DateTime? // null = not verified (for email/password users)
   isActive      Boolean   @default(false)
   image         String?   // profile picture from Google OAuth
+  activeSessionId String? // single-device login: token sid must match this for CLIENT/STAFF
 
   // NextAuth relations
   accounts      Account[]

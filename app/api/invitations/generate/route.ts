@@ -1,6 +1,6 @@
 // app/api/invitations/generate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
