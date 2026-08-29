@@ -68,7 +68,7 @@ export default function LoginPage() {
 
 
     if (errorParam === 'UserNotFound') {
-      setError('No account associated, Create one?');
+      setError('No account related, create one?');
       setUserNotFound(true);
       setIsInactiveUser(false);
       setLoading(false);
@@ -109,8 +109,8 @@ export default function LoginPage() {
         return;
       }
 
-      // ✅ Check if user is inactive (pending activation)
-      if (data.isActive === false) {
+      // ✅ Check if user is inactive (pending activation) - never blocks SUPER_ADMIN
+      if (data.isActive === false && data.role !== 'SUPER_ADMIN') {
         setError('Your account is pending activation. Please contact support or wait for a super admin to activate your account.');
         setIsInactiveUser(true);
         setLoading(false);
