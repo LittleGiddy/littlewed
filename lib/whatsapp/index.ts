@@ -141,8 +141,9 @@ export async function sendWeddingInvitation(
     cardType: string;
     imageUrl?: string;
     inviteLink?: string;
-    templateName?: string; // e.g. 'Mwalikotemp' | 'Mwalikosecond'
-    contact?: string;     // {var10} for Mwalikosecond
+    templateName?: string; // e.g. 'Mwalikotemp' | 'Mwalikosecond' | 'MwalikoForth'
+    contact?: string;     // {var10} for Mwalikosecond, {var11} for MwalikoForth
+    eventType?: string;   // {var3} event type for MwalikoForth (e.g. 'harusi')
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
@@ -174,24 +175,53 @@ export async function sendWeddingInvitation(
   }
 
   // ─── Send template with proper variable mapping ──────────────────────
-  // IMPORTANT: Match the exact case from your template:
-  // var1, var2, var3, var4, var5, var6, var7, Var8 (capital V), var9
-  const personalisation: Record<string, string> = {
-    "var1": data.guestName,      // ✅ Habari {var1}
-    "var2": data.hostFamily,     // ✅ Familia ya {var2}
-    "var3": data.person1,        // ✅ {var3}
-    "var4": data.person2,        // ✅ {var4}
-    "var5": data.date,           // ✅ {var5}
-    "var6": data.venue,          // ✅ {var6}
-    "var7": data.time,           // ✅ {var7}
-    "Var8": data.cardNumber,     // ✅ {Var8} - CAPITAL V!
-    "var9": data.cardType,       // ✅ {var9}
-  };
+  // MwalikoForth uses a different variable layout than Mwaliko(temp):
+  //   {var1}=guest, {var2}=hostFamily, {var3}=eventType, {var4}=couple,
+  //   {var6}=date, {var7}=venue, {var8}=time, {var9}=cardNo,
+  //   {var10}=cardType, {var11}=contact
+  const isForth = templateName === 'MwalikoForth';
 
-  // Mwalikosecond adds {var10} for further contact info.
-  if (data.contact) {
-    personalisation["var10"] = data.contact;
-  }
+  const coupleName =
+    data.person1 && data.person2
+      ? `${data.person1} na ${data.person2}`
+      : data.person1 || data.person2 || '';
+
+  const personalisation: Record<string, string> = isForth
+    ? {
+        // "Habari {var1}"
+        "var1": data.guestName,
+        // "Familia ya {var2}"
+        "var2": data.hostFamily,
+        // "inakualika katika {var3} ya {var4}"
+        "var3": data.eventType || 'harusi',
+        "var4": coupleName,
+        // "itakayofanyika tarehe {var6}"
+        "var6": data.date,
+        // "Mahali: {var7}"
+        "var7": data.venue,
+        // "Muda: Kuanzia saa {var8}"
+        "var8": data.time,
+        // "Card No: {var9}"
+        "var9": data.cardNumber,
+        // "{var10}" card type
+        "var10": data.cardType,
+        // "kwa mawasiliano zaidi: {var11}"
+        ...(data.contact ? {  "var11": data.contact } : {}),
+      }
+    : {
+        // Legacy layout: Mwalikotemp / Mwalikosecond
+        "var1": data.guestName,      // ✅ Habari {var1}
+        "var2": data.hostFamily,     // ✅ Familia ya {var2}
+        "var3": data.person1,        // ✅ {var3}
+        "var4": data.person2,        // ✅ {var4}
+        "var5": data.date,           // ✅ {var5}
+        "var6": data.venue,          // ✅ {var6}
+        "var7": data.time,           // ✅ {var7}
+        "Var8": data.cardNumber,     // ✅ {Var8} - CAPITAL V!
+        "var9": data.cardType,       // ✅ {var9}
+        // Mwalikosecond adds {var10} for further contact info.
+        ...(data.contact ? { "var10": data.contact } : {}),
+      };
 
   return sendWhatsAppTemplate({
     to: phone,

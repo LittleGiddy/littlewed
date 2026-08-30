@@ -30,6 +30,9 @@ export async function POST(req: NextRequest) {
       retry,
       whatsappTemplate,
       whatsappContact,
+      dailyLimit,
+      eventType,
+      forceChannel,
     } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
@@ -52,6 +55,27 @@ export async function POST(req: NextRequest) {
     const results = [];
     let successCount = 0;
     let failCount = 0;
+    let skippedCount = 0;
+
+    // ─── Daily WhatsApp limit enforcement ───────────────────────────────
+    // The WhatsApp API has a daily cap (a newly-registered number starts low,
+    // e.g. 250). We count how many WhatsApp invitations were already accepted
+    // today (status SENT) and stop sending WhatsApp once the configured limit
+    // is reached. SMS is not affected by the WhatsApp cap.
+    const limit = typeof dailyLimit === 'number' && dailyLimit > 0 ? Math.floor(dailyLimit) : null;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    let waUsed = limit
+      ? await prisma.messageLog.count({
+          where: {
+            type: 'WHATSAPP',
+            status: 'SENT',
+            createdAt: { gte: startOfToday },
+            guest: { event: { tenantId } },
+          },
+        })
+      : 0;
+    const waLimitReached = () => limit !== null && waUsed >= limit;
 
     // ─── Process in batches ────────────────────────────────────────────
     for (let i = 0; i < guests.length; i += BATCH_SIZE) {
@@ -59,6 +83,7 @@ export async function POST(req: NextRequest) {
       console.log(`[Batch] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(guests.length / BATCH_SIZE)}`);
 
       for (const guest of batch) {
+        let channel: 'whatsapp' | 'sms' = guest.routingChannel === 'whatsapp' ? 'whatsapp' : 'sms';
         try {
           // ─── Build common data ──────────────────────────────────────
           const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
@@ -113,9 +138,47 @@ export async function POST(req: NextRequest) {
 
           let result;
 
+          // ─── Channel selection ────────────────────────────────────────
+          // By default each guest is sent on their stored routing channel.
+          // When `forceChannel` is given ('whatsapp' | 'sms'), the request
+          // sends EVERY guest on that single channel — enabling the user to
+          // independently send WhatsApp and SMS so each guest can receive
+          // both messages (WhatsApp where reachable + an SMS reminder).
+          const channelSelection =
+            forceChannel === 'whatsapp' || forceChannel === 'sms'
+              ? forceChannel
+              : guest.routingChannel;
+          channel = channelSelection as 'whatsapp' | 'sms';
+
           // ─── Send via appropriate channel ──────────────────────────
-          if (guest.routingChannel === 'whatsapp') {
+          if (channel === 'whatsapp') {
             console.log(`[Batch] Sending WhatsApp to ${guest.name} (${guest.phone})`);
+
+            // ─── Daily limit reached → skip this guest (didn't receive) ──
+            if (waLimitReached()) {
+              console.warn(
+                `[Batch] WhatsApp daily limit (${limit}) reached - skipping ${guest.name}`
+              );
+              await prisma.guest.update({
+                where: { id: guest.id },
+                data: {
+                  lastSendStatus: 'SKIPPED_LIMIT',
+                  lastSendError: `WhatsApp daily limit of ${limit} reached`,
+                },
+              }).catch(() => {});
+              skippedCount++;
+              results.push({
+                guestId: guest.id,
+                name: guest.name,
+                success: false,
+                skipped: true,
+                reason: 'limit',
+                error: `WhatsApp daily limit (${limit}) reached`,
+                channel: 'whatsapp',
+              });
+              await new Promise(r => setTimeout(r, MESSAGE_DELAY));
+              continue;
+            }
 
             // ─── Get WhatsApp variables ──────────────────────────────────
             const vars = whatsappVariables || {};
@@ -142,6 +205,7 @@ export async function POST(req: NextRequest) {
               inviteLink: inviteLink,
               templateName: whatsappTemplate,
               contact: whatsappContact,
+              eventType: eventType,
             });
 
             // ─── WhatsApp failed → fall back to SMS ──────────────────────
@@ -279,18 +343,32 @@ export async function POST(req: NextRequest) {
           if (result.success) {
             successCount++;
 
+            // A successful send that went out over the WhatsApp API (i.e.
+            // NOT an SMS fallback) consumes one unit of the daily cap.
+            const fellBackFromWhatsApp = !!(result.data as any)?.fellBackFromWhatsapp;
+            const sentChannel = fellBackFromWhatsApp ? 'sms' : channel;
+            if (!fellBackFromWhatsApp && channel === 'whatsapp') {
+              waUsed++;
+            }
+
             await prisma.guest.update({
               where: { id: guest.id },
-              data: { invitationSentAt: new Date() },
+              data: { invitationSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
             });
 
+            // Always record a SENT log for WhatsApp so the daily-usage counter
+            // (which counts SENT MessageLogs) is accurate even when the provider
+            // returns no messageId.
+            if (sentChannel === 'whatsapp' && !result.messageId) {
+              result.messageId = `wa_${Date.now()}_${guest.id}`;
+            }
             if (result.messageId) {
               await prisma.messageLog.create({
                 data: {
                   messageId: result.messageId,
                   guestId: guest.id,
-                  type: guest.routingChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
-                  template: guest.routingChannel === 'whatsapp' ? 'swahili_invitation' : 'custom',
+                  type: sentChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
+                  template: sentChannel === 'whatsapp' ? 'swahili_invitation' : 'custom',
                   status: 'SENT',
                   rawData: result.data || {},
                 },
@@ -299,6 +377,13 @@ export async function POST(req: NextRequest) {
           } else {
             failCount++;
             console.error(`[Batch] Failed to send to ${guest.name}:`, result.error);
+            await prisma.guest.update({
+              where: { id: guest.id },
+              data: {
+                lastSendStatus: 'FAILED',
+                lastSendError: result.error || 'Send failed',
+              },
+            }).catch(() => {});
             await logSystemEvent({
               tenantId,
               eventId,
@@ -314,19 +399,25 @@ export async function POST(req: NextRequest) {
             guestId: guest.id,
             name: guest.name,
             success: result.success,
+            skipped: !!(result as any).skipped,
+            reason: (result as any).reason,
             error: result.error,
-            channel: guest.routingChannel,
+            channel,
           });
 
         } catch (error: any) {
           failCount++;
           console.error(`[Batch] Error sending to ${guest.name}:`, error.message);
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: { lastSendStatus: 'FAILED', lastSendError: error.message || 'Unknown error' },
+          }).catch(() => {});
           results.push({
             guestId: guest.id,
             name: guest.name,
             success: false,
             error: error.message || 'Unknown error',
-            channel: guest.routingChannel,
+            channel,
           });
         }
 
@@ -346,6 +437,10 @@ export async function POST(req: NextRequest) {
       total: guests.length,
       successCount,
       failCount,
+      skippedCount,
+      waLimit: limit,
+      waUsed: waUsed,
+      waLimitReached: waLimitReached(),
       results,
     });
 

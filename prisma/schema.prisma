@@ -228,6 +228,8 @@ model Guest {
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
   reminderCount   Int      @default(0)
+  lastSendStatus String?   // "SENT" | "FAILED" | "SKIPPED_LIMIT" | "NOT_SENT" - last WhatsApp attempt outcome
+  lastSendError  String?   // error/reason for the last send attempt
   guestType  String?   @default("SINGLE")
   title          String?   @default("Mr")
   cardNumber     String?   @unique

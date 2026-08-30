@@ -10,7 +10,8 @@ import {
   ChevronDown, ChevronUp, Copy, Check, Filter, CheckSquare,
   Smartphone, QrCode, Calendar, MapPin, User, Hash,
   FileText, Info, Eye, AlertTriangle, RotateCw, EyeOff, Zap,
-  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick, Wand
+  HelpCircle, Edit3, Send as SendIcon, Globe, Lock, Save, MousePointerClick, Wand,
+  ArrowUpDown, Activity
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
@@ -29,6 +30,8 @@ interface Guest {
   passCode?: string | null;
   checkedIn?: boolean;
   guestType?: string | null;
+  lastSendStatus?: string | null;
+  lastSendError?: string | null;
 }
 
 interface EventData {
@@ -51,6 +54,8 @@ interface SendResult {
   error?: string;
   channel?: string;
   messageId?: string;
+  skipped?: boolean;
+  reason?: string;
 }
 
 // ─── SMS Template Default ───────────────────────────────────────────────
@@ -94,12 +99,19 @@ const SMS_FIELD_LABELS: Record<string, string> = {
 // corresponding SMS body. `hasContact` adds the var10 / {contact} variable.
 const INVITE_TEMPLATES: Record<
   string,
-  { label: string; whatsappName: string; hasContact: boolean; smsBody: string }
+  {
+    label: string;
+    whatsappName: string;
+    hasContact: boolean;
+    hasEventType: boolean;
+    smsBody: string;
+  }
 > = {
   mwaliko: {
     label: 'Mwaliko',
     whatsappName: 'Mwalikotemp',
     hasContact: false,
+    hasEventType: false,
     smsBody: `Habari {guestName},
 
 Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}.
@@ -115,10 +127,28 @@ Karibu sana!`,
     label: 'Mwalikosecond',
     whatsappName: 'Mwalikosecond',
     hasContact: true,
+    hasEventType: false,
     smsBody: `Habari {guestName}
 Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}
 Reception itafanyika {venue} kuanzia saa {time}
 Card No: {cardNumber} {guestType}
+kwa mawasiliano zaidi: {contact}
+Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante`,
+  },
+  mwalikoforth: {
+    label: 'MwalikoForth',
+    whatsappName: 'MwalikoForth',
+    hasContact: true,
+    hasEventType: true,
+    smsBody: `Habari {guestName}
+
+Familia ya {hostFamily} inakualika katika {eventType} ya {person1} na {person2} itakayofanyika tarehe {eventDate}
+
+Mahali: {venue}
+Muda: Kuanzia saa {time}
+
+Card No: {cardNumber} {guestType}
+
 kwa mawasiliano zaidi: {contact}
 Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante`,
   },
@@ -155,6 +185,25 @@ export default function SendInvitationsPage() {
   >([]);
   const [showDeliveryFailures, setShowDeliveryFailures] = useState(false);
 
+  // ─── Daily WhatsApp limit tracking ────────────────────────────────────
+  const [dailyLimit, setDailyLimit] = useState<number>(250);
+  const [todayWaUsage, setTodayWaUsage] = useState(0);
+  const [limitReached, setLimitReached] = useState(false);
+  const [waLimitInfo, setWaLimitInfo] = useState<{ limit: number | null; used: number }>({ limit: null, used: 0 });
+
+  // ─── Logs panel ───────────────────────────────────────────────────────
+  const [logs, setLogs] = useState<
+    { messageId: string; status: string; error?: string | null; sentAt: string; guestId: string; name: string; phone: string | null }[]
+  >([]);
+  const [showLogs, setShowLogs] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  // ─── Sorting ─────────────────────────────────────────────────────────
+  const [sortBy, setSortBy] = useState<'name' | 'receivedTime' | 'notReceived'>('name');
+
+  // ─── Filter additions ────────────────────────────────────────────────
+  const [filterDeliver, setFilterDeliver] = useState<'all' | 'received' | 'notreceived'>('all');
+
   // ─── Selection for "send to selected guests" ─────────────────────────
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
@@ -175,14 +224,16 @@ export default function SendInvitationsPage() {
   // ─── Template picker + contact info (var10) ─────────────────────────
   const [selectedTemplate, setSelectedTemplate] = useState<string>('mwaliko');
   const [contactInfo, setContactInfo] = useState('');
+  const [eventType, setEventType] = useState('harusi');
 
   // ─── WhatsApp Variables ──────────────────────────────────────────────
   const [whatsappVariables, setWhatsappVariables] = useState<Record<string, string>>({});
   const [isWhatsappSaving, setIsWhatsappSaving] = useState(false);
 
   // ─── Stats ──────────────────────────────────────────────────────────────
-  const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
-  const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
+const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
+    const smsCount = guests.filter(g => g.routingChannel === 'sms').length;
+    const guestsWithPhone = guests.filter(g => g.phone).length;
   const sentCount = guests.filter(g => g.invitationSentAt).length;
   const failedCount = results.filter(r => !r.success).length;
   const successCount = results.filter(r => r.success).length;
@@ -321,6 +372,31 @@ export default function SendInvitationsPage() {
       } catch (err) {
         console.error('Failed to load delivery failures:', err);
       }
+
+      // ─── Load today's WhatsApp usage (for the daily limit) ────────────
+      try {
+        const usageRes = await fetch(`/api/invitations/usage/whatsapp?eventId=${eventId}`, { credentials: 'include' });
+        if (usageRes.ok) {
+          const usage = await usageRes.json();
+          setTodayWaUsage(usage.todayCount ?? 0);
+        }
+      } catch (err) {
+        console.error('Failed to load WhatsApp usage:', err);
+      }
+
+      // ─── Restore saved daily limit, else default ─────────────────────
+      try {
+        const saved = localStorage.getItem(`wa_daily_limit_${eventId}`);
+        if (saved) {
+          const num = parseInt(saved, 10);
+          if (!isNaN(num) && num > 0) setDailyLimit(num);
+        }
+      } catch (err) {
+        // ignore localStorage errors
+      }
+
+      // ─── Load message logs ────────────────────────────────────────────
+      await loadLogs();
     } catch (error) {
       console.error('Load error:', error);
       toast.error('Failed to load data');
@@ -333,6 +409,52 @@ export default function SendInvitationsPage() {
   useEffect(() => {
     loadData();
   }, [eventId]);
+
+  // ─── Load message logs for the event ─────────────────────────────────
+  const loadLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const res = await fetch(`/api/invitations/logs?eventId=${eventId}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setLogs(data.logs || []);
+      }
+    } catch (error) {
+      console.error('Failed to load logs:', error);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  // ─── Change & persist the daily WhatsApp limit ───────────────────────
+  const handleDailyLimitChange = (value: string) => {
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num > 0) {
+      setDailyLimit(num);
+      try {
+        localStorage.setItem(`wa_daily_limit_${eventId}`, String(num));
+      } catch (err) {
+        // ignore localStorage errors
+      }
+    } else if (value === '') {
+      setDailyLimit(250);
+    }
+  };
+
+  // ─── Resend invites to guests who have NOT received yet (within limit)
+  const resendNotReceived = async () => {
+    const notReceivedWa = guests.filter(
+      (g) => g.routingChannel === 'whatsapp' && !g.invitationSentAt
+    );
+    if (notReceivedWa.length === 0) {
+      toast('All WhatsApp guests have received their invitation');
+      return;
+    }
+    setFilterDeliver('notreceived');
+    setFilterStatus('pending');
+    setFilterChannel('whatsapp');
+    await performSend(notReceivedWa, 'No WhatsApp guests are missing an invitation');
+  };
 
   // ─── Helper: Insert variable at cursor position ──────────────────────
   const insertVariable = (variable: string) => {
@@ -397,10 +519,11 @@ export default function SendInvitationsPage() {
       venue: smsVariables.venue,
       time: smsVariables.time,
       contact: contactInfo,
+      eventType,
     };
 
     return template.replace(
-      /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|hostFamily|person1|person2|eventDate|venue|time|contact)\}/g,
+      /\{(guestName|guestTitle|title|name|fullName|cardNumber|cardNo|guestType|cardType|hostFamily|person1|person2|eventDate|venue|time|contact|eventType)\}/g,
       (match: string, key: string) => varsMap[key] ?? match
     );
   };
@@ -567,7 +690,11 @@ export default function SendInvitationsPage() {
   };
 
   // ─── Core send routine (send-batch) ───────────────────────────────────
-  const performSend = async (targetGuests: Guest[], noSelectionMessage?: string) => {
+  const performSend = async (
+    targetGuests: Guest[],
+    noSelectionMessage?: string,
+    forceChannel?: 'whatsapp' | 'sms'
+  ) => {
     if (targetGuests.length === 0) {
       toast.error(noSelectionMessage || 'No guests matching the current filters');
       return;
@@ -593,6 +720,9 @@ export default function SendInvitationsPage() {
           whatsappVariables,
           whatsappTemplate: INVITE_TEMPLATES[selectedTemplate]?.whatsappName,
           whatsappContact: contactInfo,
+          eventType,
+          dailyLimit,
+          ...(forceChannel ? { forceChannel } : {}),
         }),
         credentials: 'include',
       });
@@ -601,9 +731,12 @@ export default function SendInvitationsPage() {
 
       if (res.ok) {
         setResults(data.results || []);
+        setWaLimitInfo({ limit: data.waLimit ?? null, used: data.waUsed ?? 0 });
+        setLimitReached(!!data.waLimitReached);
+        if (typeof data.waUsed === 'number') setTodayWaUsage(data.waUsed);
 
         const failedWhatsApp = data.results?.filter(
-          (r: any) => r.channel === 'whatsapp' && !r.success
+          (r: any) => r.channel === 'whatsapp' && !r.success && !r.skipped
         ) || [];
 
         if (failedWhatsApp.length > 0) {
@@ -655,8 +788,13 @@ export default function SendInvitationsPage() {
           );
         }
 
-        if (data.successCount === data.total) {
+        if (data.successCount === data.total && data.skippedCount === 0) {
           toast.success(`Sent to all ${data.total} guests`, { id: toastId, duration: 3000 });
+        } else if (data.skippedCount > 0) {
+          toast(
+            `${data.successCount} sent · ${data.skippedCount} skipped (WhatsApp daily limit reached)`,
+            { id: toastId, duration: 5000, icon: <AlertTriangle size={18} className="text-orange-500" /> }
+          );
         } else if (data.successCount > 0) {
           toast(`${data.successCount} of ${data.total} sent`, {
             id: toastId,
@@ -719,7 +857,9 @@ export default function SendInvitationsPage() {
           whatsappVariables,
           whatsappTemplate: INVITE_TEMPLATES[selectedTemplate]?.whatsappName,
           whatsappContact: contactInfo,
+          eventType,
           retry: true,
+          dailyLimit,
         }),
         credentials: 'include',
       });
@@ -747,14 +887,63 @@ export default function SendInvitationsPage() {
   };
 
   // ─── Send to specific channel ──────────────────────────────────────────
+  // Each channel button sends to ALL guests (regardless of their stored
+  // routing), so a guest can receive both the WhatsApp and the SMS invite.
+  // The user triggers each channel independently.
   const sendToChannel = async (channel: 'whatsapp' | 'sms') => {
-    const targetGuests = guests.filter(g => g.routingChannel === channel);
-    if (targetGuests.length === 0) {
-      toast.error(`No ${channel} guests found`);
+    const allGuests = guests.filter(g => g.phone);
+    if (allGuests.length === 0) {
+      toast.error('No guests with a phone number to send to');
       return;
     }
     setFilterChannel(channel);
-    await broadcast();
+
+    // Pre-send warning for WhatsApp: check the batch won't exceed the cap.
+    if (channel === 'whatsapp') {
+      const remaining = dailyLimit - todayWaUsage;
+      const wouldExceed = allGuests.length > remaining;
+
+      const proceed = await new Promise<boolean>((resolve) => {
+        toast(
+          (t) => (
+            <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-4 border border-amber-200">
+              <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm mb-2">
+                <AlertTriangle size={18} />
+                WhatsApp daily limit warning
+              </h3>
+              <p className="text-sm text-gray-600 mb-1">
+                Today's WhatsApp usage: <b>{todayWaUsage}</b> / <b>{dailyLimit}</b> (cap).
+              </p>
+              <p className="text-sm text-gray-600 mb-3">
+                Sending WhatsApp to <b>{allGuests.length}</b> guests.
+                {wouldExceed
+                  ? ` This exceeds the remaining quota of ${remaining}. Guests beyond the cap will be skipped (not marked as received).`
+                  : ' This fits within your remaining quota.'}
+              </p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { toast.dismiss(t.id); resolve(true); }}
+                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-[#0D4B4B] text-white hover:bg-[#0A3939]"
+                >
+                  Send anyway
+                </button>
+              </div>
+            </div>
+          ),
+          { duration: 20000 }
+        );
+      }).catch(() => false);
+
+      if (!proceed) return;
+    }
+
+    await performSend(allGuests, 'No guests to send to', channel);
   };
 
   // ─── Filter guests ──────────────────────────────────────────────────────
@@ -776,6 +965,12 @@ export default function SendInvitationsPage() {
       filtered = filtered.filter(g => g.routingChannel === filterChannel);
     }
 
+    if (filterDeliver === 'received') {
+      filtered = filtered.filter(g => g.invitationSentAt);
+    } else if (filterDeliver === 'notreceived') {
+      filtered = filtered.filter(g => !g.invitationSentAt);
+    }
+
     if (filterStatus === 'sent') {
       filtered = filtered.filter(g => g.invitationSentAt);
     } else if (filterStatus === 'pending') {
@@ -785,8 +980,28 @@ export default function SendInvitationsPage() {
       filtered = filtered.filter(g => failedIds.has(g.id));
     }
 
+    // ─── Sorting ─────────────────────────────────────────────────────
+    if (sortBy === 'receivedTime') {
+      filtered = [...filtered].sort((a, b) => {
+        const ta = a.invitationSentAt ? new Date(a.invitationSentAt).getTime() : 0;
+        const tb = b.invitationSentAt ? new Date(b.invitationSentAt).getTime() : 0;
+        return tb - ta; // most recently received first
+      });
+    } else if (sortBy === 'notReceived') {
+      filtered = [...filtered].sort((a, b) => {
+        const receivedSort = (g: Guest) => (g.invitationSentAt ? 1 : 0);
+        const dr = receivedSort(a) - receivedSort(b);
+        if (dr !== 0) return dr; // not-received first
+        const ta = a.invitationSentAt ? new Date(a.invitationSentAt).getTime() : 0;
+        const tb = b.invitationSentAt ? new Date(b.invitationSentAt).getTime() : 0;
+        return tb - ta;
+      });
+    } else {
+      filtered = [...filtered].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+
     return filtered;
-  }, [guests, filterChannel, filterStatus, results, searchQuery]);
+  }, [guests, filterChannel, filterStatus, results, searchQuery, filterDeliver, sortBy]);
 
   const filteredGuests = getFilteredGuests();
 
@@ -798,14 +1013,16 @@ export default function SendInvitationsPage() {
     sent: guests.filter(g => g.invitationSentAt).length,
     pending: guests.filter(g => !g.invitationSentAt).length,
     failed: results.filter(r => !r.success).length,
+    received: guests.filter(g => g.invitationSentAt).length,
+    notreceived: guests.filter(g => g.routingChannel === 'whatsapp' && !g.invitationSentAt).length,
   };
 
   // ─── Get guest status ──────────────────────────────────────────────────
-  const getGuestStatus = (guest: Guest): 'sent' | 'pending' | 'failed' => {
+  const getGuestStatus = (guest: Guest): 'sent' | 'pending' | 'failed' | 'skipped' => {
     const result = results.find(r => r.guestId === guest.id);
-    if (result) return result.success ? 'sent' : 'failed';
+    if (result) return result.success ? 'sent' : (result.skipped ? 'skipped' : 'failed');
     if (guest.invitationSentAt) return 'sent';
-    return 'pending';
+    return guest.lastSendStatus === 'FAILED' ? 'failed' : 'pending';
   };
 
   const getFullName = (guest: Guest) => {
@@ -874,23 +1091,23 @@ export default function SendInvitationsPage() {
           </button>
           <button
             onClick={() => sendToChannel('whatsapp')}
-            disabled={sending || whatsappCount === 0}
+            disabled={sending || guestsWithPhone === 0}
             className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0D4B4B] text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
           >
             <MessageCircle size={14} />
             <span className="hidden xs:inline">WhatsApp</span>
             <span className="xs:hidden">WA</span>
-            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{whatsappCount}</span>
+            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{guestsWithPhone}</span>
           </button>
           <button
             onClick={() => sendToChannel('sms')}
-            disabled={sending || smsCount === 0}
+            disabled={sending || guestsWithPhone === 0}
             className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-700 text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-gray-800 transition disabled:opacity-50 flex items-center gap-1.5"
           >
             <Phone size={14} />
             <span className="hidden xs:inline">SMS</span>
             <span className="xs:hidden">SMS</span>
-            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{smsCount}</span>
+            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{guestsWithPhone}</span>
           </button>
           {failedCount > 0 && (
             <button
@@ -1003,6 +1220,22 @@ export default function SendInvitationsPage() {
               value={contactInfo}
               onChange={(e) => setContactInfo(e.target.value)}
               placeholder="Enter contact for var10..."
+              className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+            />
+          </div>
+        )}
+
+        {INVITE_TEMPLATES[selectedTemplate]?.hasEventType && (
+          <div className="mt-4">
+            <label className="block text-[10px] font-medium text-gray-700 mb-1">
+              Event Type (variable: {'{eventType}'} / var3)
+              <span className="text-gray-400 text-[8px] ml-1">e.g. harusi, sherehe, arusi</span>
+            </label>
+            <input
+              type="text"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              placeholder="e.g. harusi"
               className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
             />
           </div>
@@ -1375,6 +1608,193 @@ Card No: {cardNumber} {guestType}`}
             )}
           </div>
         </div>
+
+        <div className="w-px h-5 bg-gray-200 my-2" />
+
+        {/* ─── Delivery status (received / not received) ─── */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setFilterDeliver('all')}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition ${filterDeliver === 'all'
+              ? 'bg-[#0D4B4B] text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            All Delivery
+          </button>
+          <button
+            onClick={() => setFilterDeliver('received')}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterDeliver === 'received'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            <CheckCircle size={10} /> Received
+            <span className="text-[9px] opacity-75">({filterCounts.received})</span>
+          </button>
+          <button
+            onClick={() => setFilterDeliver('notreceived')}
+            className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 ${filterDeliver === 'notreceived'
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+          >
+            <AlertTriangle size={10} /> Not Received
+            <span className="text-[9px] opacity-75">({filterCounts.notreceived})</span>
+          </button>
+
+          <div className="mx-1 w-px h-5 bg-gray-200 hidden sm:block" />
+
+          {/* ─── Sort control ─── */}
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown size={11} className="text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="text-[10px] sm:text-xs border border-gray-200 rounded-lg bg-gray-50 px-2 py-1 text-gray-600 focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+            >
+              <option value="name">Sort by name</option>
+              <option value="receivedTime">Sort by received time</option>
+              <option value="notReceived">Not-received first</option>
+            </select>
+          </div>
+
+          {/* ─── Logs toggle ─── */}
+          <button
+            onClick={() => { setShowLogs(!showLogs); if (!showLogs) loadLogs(); }}
+            className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-medium transition flex items-center gap-1 bg-indigo-600 text-white hover:bg-indigo-700"
+          >
+            <Activity size={10} />
+            {showLogs ? 'Hide Logs' : 'Send Logs'}
+            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[9px]">{logs.length}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Send Logs panel ─── */}
+      {showLogs && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+          <div className="px-3 sm:px-5 py-2.5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Activity size={16} className="text-[#0D4B4B]" />
+              <span className="font-semibold text-gray-800 text-sm">WhatsApp Send Logs</span>
+              <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                {logs.length} sent today / event
+              </span>
+            </div>
+            <button
+              onClick={() => setShowLogs(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition"
+            >
+              Close
+            </button>
+          </div>
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+            {loadingLogs ? (
+              <div className="flex justify-center py-10">
+                <Loader2 size={20} className="animate-spin text-[#0D4B4B]" />
+              </div>
+            ) : logs.length === 0 ? (
+              <div className="text-center py-10 text-gray-400 text-sm">
+                <Activity size={28} className="mx-auto mb-2 text-gray-300" />
+                No WhatsApp sends logged yet for this event.
+              </div>
+            ) : (
+              logs.map((log) => (
+                <div key={log.messageId} className="px-3 sm:px-5 py-2 flex items-center gap-3 text-xs sm:text-sm">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    log.status === 'SENT' ? 'bg-green-500' :
+                    log.status === 'FAILED' || log.status === 'REJECTED' ? 'bg-red-500' :
+                    'bg-amber-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 truncate">{log.name}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-400 truncate">{log.phone || 'No phone'}</p>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${
+                    log.status === 'SENT' ? 'bg-green-100 text-green-700' :
+                    log.status === 'FAILED' || log.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                    'bg-amber-100 text-amber-700'
+                  }`}>
+                    {log.status}
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-gray-400 flex-shrink-0">
+                    {new Date(log.sentAt).toLocaleString()}
+                  </span>
+                  {log.error && (
+                    <span className="text-[10px] text-red-500 hidden md:inline max-w-[220px] truncate flex-shrink-0" title={log.error}>
+                      {log.error}
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── WhatsApp Daily Limit ─── */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-4 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={18} className="text-green-600" />
+            <div>
+              <h2 className="font-semibold text-gray-800 text-sm">WhatsApp Daily Limit</h2>
+              <p className="text-[10px] sm:text-xs text-gray-400">
+                Sending stops automatically once today&apos;s WhatsApp allowance is used, so no guest is left partially sent without you knowing.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">Used today</p>
+              <p className={`text-lg sm:text-xl font-bold ${todayWaUsage >= dailyLimit ? 'text-red-600' : 'text-[#0D4B4B]'}`}>
+                {todayWaUsage}
+              </p>
+            </div>
+            <span className="text-gray-300 text-lg font-bold">/</span>
+            <div>
+              <label className="block text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Daily cap</label>
+              <input
+                type="number"
+                min={1}
+                value={dailyLimit}
+                onChange={(e) => handleDailyLimitChange(e.target.value)}
+                className={`w-20 p-1.5 text-center text-base font-bold border rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50 ${
+                  todayWaUsage >= dailyLimit ? 'border-red-300 text-red-600' : 'border-gray-200 text-gray-900'
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-3 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              todayWaUsage >= dailyLimit ? 'bg-red-500' : todayWaUsage / dailyLimit > 0.75 ? 'bg-amber-500' : 'bg-green-500'
+            }`}
+            style={{ width: `${Math.min((todayWaUsage / (dailyLimit || 1)) * 100, 100)}%` }}
+          />
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className={`text-[10px] sm:text-xs font-medium ${todayWaUsage >= dailyLimit ? 'text-red-600' : 'text-gray-500'}`}>
+            {todayWaUsage >= dailyLimit
+              ? 'Daily limit reached - WhatsApp sends are paused. Raise the cap or send again tomorrow.'
+              : `${dailyLimit - todayWaUsage} WhatsApp messages remaining today`}
+          </p>
+          <button
+            onClick={resendNotReceived}
+            disabled={sending || filterCounts.notreceived === 0}
+            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {sending ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}
+            <span className="hidden xs:inline">Resend Not-Received</span>
+            <span className="xs:hidden">Resend</span>
+            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{filterCounts.notreceived}</span>
+          </button>
+        </div>
       </div>
 
       {/* ─── Friendly helper note ─── */}
@@ -1630,6 +2050,7 @@ Card No: {cardNumber} {guestType}`}
                       {status === 'sent' && <CheckCircle size={14} className="sm:text-lg text-green-600" />}
                       {status === 'pending' && <Clock size={14} className="sm:text-lg text-amber-500" />}
                       {status === 'failed' && <XCircle size={14} className="sm:text-lg text-red-500" />}
+                      {status === 'skipped' && <AlertTriangle size={14} className="sm:text-lg text-orange-500" />}
                     </div>
 
                     {/* Expand */}

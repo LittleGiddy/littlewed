@@ -40,6 +40,9 @@ export async function GET(
         checkedIn: true,        // ✅ Add this field
         routingChannel: true,   // ✅ Add for completeness (used in UI)
         attending: true,        // ✅ Add for completeness
+        invitationSentAt: true,
+        lastSendStatus: true,
+        lastSendError: true,
       },
       orderBy: { name: 'asc' },
     });
