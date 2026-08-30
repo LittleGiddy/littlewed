@@ -58,99 +58,56 @@ interface SendResult {
   reason?: string;
 }
 
-// ─── SMS Template Default ───────────────────────────────────────────────
+// ─── SMS Default Message ────────────────────────────────────────────────
+// SMS is a free-form message the user writes. Only the per-guest variables
+// (guest name, card number, card type) are required/insertable.
 const DEFAULT_SMS_TEMPLATE = `Habari {guestName},
 
-Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}.
+Karibu! Hii ni kadi yako ya mwaliko.
 
-Reception: {venue}, saa {time}
+Card No: {cardNumber}
+Aina: {cardType}
 
-Card No: {cardNumber} {guestType}
+Tafadhali onyesha kadi hii kwaajili ya matumizi ya ukumbini.
+Ahsante!`;
 
-Tafadhali onyesha kadi hii wakati wa kuingia.
-Karibu sana!`;
-
-// ─── Available Variables ────────────────────────────────────────────────
+// ─── Available SMS Variables (only per-guest ones are used) ─────────────
 const SMS_VARIABLES = [
-  { key: '{guestName}', label: 'Guest Full Name', example: 'Mr John Doe' },
-  { key: '{guestTitle}', label: 'Guest Title', example: 'Mr' },
+  { key: '{guestName}', label: 'Guest Name', example: 'Mr John Doe' },
   { key: '{cardNumber}', label: 'Card Number', example: '00123' },
-  { key: '{guestType}', label: 'Guest Type', example: 'Single / Double' },
-  { key: '{hostFamily}', label: 'Host Family', example: 'Mr & Mrs Allan Swai' },
-  { key: '{person1}', label: 'Person 1', example: 'Agape' },
-  { key: '{person2}', label: 'Person 2', example: 'Gladness' },
-  { key: '{eventDate}', label: 'Event Date', example: '15 Septemba, 2026' },
-  { key: '{venue}', label: 'Venue', example: 'The Embassy Hall' },
-  { key: '{time}', label: 'Event Time', example: '5:00 PM' },
+  { key: '{cardType}', label: 'Card Type', example: 'Single / Double' },
 ];
 
-// ─── SMS Variables Form Fields ──────────────────────────────────────────
-const SMS_FIELD_LABELS: Record<string, string> = {
-  hostFamily: 'Host Family',
-  person1: 'Person 1 (e.g., Agape)',
-  person2: 'Person 2 (e.g., Gladness)',
-  eventDate: 'Event Date',
-  venue: 'Venue',
-  time: 'Event Time',
-};
-
-// ─── Approved Invitation Templates ─────────────────────────────────────
-// Each template maps to a WhatsApp (pre-approved) template name plus the
-// corresponding SMS body. `hasContact` adds the var10 / {contact} variable.
+// ─── Approved Invitation Templates (WhatsApp only) ─────────────────────
+// These are the pre-approved WhatsApp templates at the messaging provider.
+// `displayName` is what the user sees (Template 1, 2, ...); `whatsappName`
+// is the real provider template name sent to the WhatsApp API.
 const INVITE_TEMPLATES: Record<
   string,
   {
-    label: string;
+    displayName: string;
     whatsappName: string;
     hasContact: boolean;
     hasEventType: boolean;
-    smsBody: string;
   }
 > = {
   mwaliko: {
-    label: 'Mwaliko',
+    displayName: 'Template 1',
     whatsappName: 'Mwalikotemp',
     hasContact: false,
     hasEventType: false,
-    smsBody: `Habari {guestName},
-
-Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}.
-
-Reception: {venue}, saa {time}
-
-Card No: {cardNumber} {guestType}
-
-Tafadhali onyesha kadi hii wakati wa kuingia.
-Karibu sana!`,
   },
   mwalikosecond: {
-    label: 'Mwalikosecond',
+    displayName: 'Template 2',
     whatsappName: 'Mwalikosecond',
     hasContact: true,
     hasEventType: false,
-    smsBody: `Habari {guestName}
-Familia ya {hostFamily} inakualika katika sherehe ya harusi ya {person1} na {person2} itakayofanyika tarehe {eventDate}
-Reception itafanyika {venue} kuanzia saa {time}
-Card No: {cardNumber} {guestType}
-kwa mawasiliano zaidi: {contact}
-Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante`,
   },
   mwalikoforth: {
-    label: 'MwalikoForth',
+    displayName: 'Template 3',
     whatsappName: 'MwalikoForth',
     hasContact: true,
     hasEventType: true,
-    smsBody: `Habari {guestName}
-
-Familia ya {hostFamily} inakualika katika {eventType} ya {person1} na {person2} itakayofanyika tarehe {eventDate}
-
-Mahali: {venue}
-Muda: Kuanzia saa {time}
-
-Card No: {cardNumber} {guestType}
-
-kwa mawasiliano zaidi: {contact}
-Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante`,
   },
 };
 
@@ -175,8 +132,6 @@ export default function SendInvitationsPage() {
   const [generatingCards, setGeneratingCards] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [whatsappFailed, setWhatsappFailed] = useState<{ name: string; phone: string }[]>([]);
-  const [switchingChannel, setSwitchingChannel] = useState<string | null>(null);
-  const [switchingAll, setSwitchingAll] = useState(false);
   const [genProgress, setGenProgress] = useState<{ done: number; total: number } | null>(null);
   const [cardGenErrors, setCardGenErrors] = useState<{ name: string; error: string }[]>([]);
   const [selectedCard, setSelectedCard] = useState<{ url: string; name: string; cardNumber?: string } | null>(null);
@@ -492,8 +447,7 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
     const t = INVITE_TEMPLATES[id];
     if (!t) return;
     setSelectedTemplate(id);
-    setSmsTemplate(t.smsBody);
-    toast.success(`${t.label} template selected`);
+    toast.success(`${t.displayName} selected`);
   };
 
   // ─── Build SMS Message from Template ──────────────────────────────────
@@ -546,80 +500,6 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
       guestType: 'DOUBLE',
     };
     return buildSmsMessage(smsTemplate, sampleGuest);
-  };
-
-  // ─── Switch All Guests to WhatsApp ──────────────────────────────────
-  const switchAllToWhatsApp = async () => {
-    const smsGuests = guests.filter(g => g.routingChannel === 'sms');
-    if (smsGuests.length === 0) {
-      toast('All guests are already on WhatsApp');
-      return;
-    }
-
-    const ok = await confirmToast({ title: `Switch ${smsGuests.length} guests from SMS to WhatsApp?`, confirmText: 'Switch' });
-    if (!ok) return;
-
-    setSwitchingAll(true);
-    let successCount = 0;
-    let failCount = 0;
-
-    try {
-      for (const guest of smsGuests) {
-        try {
-          const res = await fetch(`/api/guests/${guest.id}/channel`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ routingChannel: 'whatsapp' }),
-            credentials: 'include',
-          });
-
-          if (res.ok) {
-            successCount++;
-          } else {
-            failCount++;
-          }
-        } catch {
-          failCount++;
-        }
-      }
-
-      await loadData();
-
-      if (successCount === smsGuests.length) {
-        toast.success(`All ${successCount} guests switched to WhatsApp`);
-      } else {
-        toast(`${successCount} switched, ${failCount} failed`);
-      }
-    } catch (error) {
-      toast.error('Network error');
-    } finally {
-      setSwitchingAll(false);
-    }
-  };
-
-  // ─── Switch Single Guest Channel ──────────────────────────────────────
-  const switchGuestChannel = async (guestId: string, newChannel: string) => {
-    setSwitchingChannel(guestId);
-    try {
-      const res = await fetch(`/api/guests/${guestId}/channel`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ routingChannel: newChannel }),
-        credentials: 'include',
-      });
-
-      if (res.ok) {
-        toast.success(`Switched to ${newChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
-        await loadData();
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to switch');
-      }
-    } catch (error) {
-      toast.error('Network error');
-    } finally {
-      setSwitchingChannel(null);
-    }
   };
 
   // ─── Generate Cards ────────────────────────────────────────────────────
@@ -1080,35 +960,6 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
               {guestsWithoutPassCode}
             </span>
           </button>
-          <button
-            onClick={switchAllToWhatsApp}
-            disabled={switchingAll || smsCount === 0}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {switchingAll ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-            <span className="hidden sm:inline">Switch All to WA</span>
-            <span className="sm:hidden">Switch to WA</span>
-          </button>
-          <button
-            onClick={() => sendToChannel('whatsapp')}
-            disabled={sending || guestsWithPhone === 0}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#0D4B4B] text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <MessageCircle size={14} />
-            <span className="hidden xs:inline">WhatsApp</span>
-            <span className="xs:hidden">WA</span>
-            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{guestsWithPhone}</span>
-          </button>
-          <button
-            onClick={() => sendToChannel('sms')}
-            disabled={sending || guestsWithPhone === 0}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-700 text-white rounded-xl font-semibold text-xs sm:text-sm hover:bg-gray-800 transition disabled:opacity-50 flex items-center gap-1.5"
-          >
-            <Phone size={14} />
-            <span className="hidden xs:inline">SMS</span>
-            <span className="xs:hidden">SMS</span>
-            <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-[10px]">{guestsWithPhone}</span>
-          </button>
           {failedCount > 0 && (
             <button
               onClick={retryFailed}
@@ -1178,7 +1029,7 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
           <h2 className="font-semibold text-gray-800 text-base">Choose Invitation Template</h2>
         </div>
         <p className="text-xs text-gray-400 mb-4">
-          Select an approved template. This sets both the WhatsApp template name and the SMS message.
+          Choose the approved WhatsApp template to use when sending via WhatsApp. (SMS does not use templates - you write the SMS message freely.)
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {Object.entries(INVITE_TEMPLATES).map(([id, t]) => (
@@ -1195,15 +1046,15 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
               <div className="flex items-center justify-between">
                 <p className="font-bold text-sm text-gray-900">
                   <Check size={14} className={`inline mr-1 ${selectedTemplate === id ? 'text-[#0D4B4B]' : 'text-gray-300'}`} />
-                  {t.label}
+                  {t.displayName}
                 </p>
-                <code className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500">
-                  {t.whatsappName}
-                </code>
+                <span className="text-[10px] text-gray-400">
+                  {selectedTemplate === id ? 'Selected' : 'WhatsApp'}
+                </span>
               </div>
               <p className="text-[11px] text-gray-400 mt-1">
-                WhatsApp template: <b>{t.whatsappName}</b>
-                {t.hasContact ? ' · includes a contact variable' : ''}
+                {t.hasContact ? 'Includes a contact variable' : 'Standard variable layout'}
+                {t.hasEventType ? ' · includes an event type variable' : ''}
               </p>
             </button>
           ))}
@@ -1248,8 +1099,8 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <FileText size={18} className="text-[#0D4B4B]" />
-              <h2 className="font-semibold text-gray-800 text-base">SMS Template</h2>
-              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Editable</span>
+              <h2 className="font-semibold text-gray-800 text-base">SMS Message</h2>
+              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Free-form</span>
             </div>
             <button
               onClick={() => setShowVariables(!showVariables)}
@@ -1260,26 +1111,12 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
             </button>
           </div>
 
-          {/* ─── SMS Variable Fields ─── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            {Object.entries(SMS_FIELD_LABELS).map(([key, label]) => (
-              <div key={key}>
-                <label className="block text-[10px] font-medium text-gray-700 mb-1">
-                  {label}
-                  <span className="text-gray-400 text-[8px] ml-1">(variable: {'{'}{key}{'}'})</span>
-                </label>
-                <input
-                  type="text"
-                  value={smsVariables[key] || ''}
-                  onChange={(e) => updateSmsVariable(key, e.target.value)}
-                  className="w-full p-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
-                  placeholder={`Enter ${label.toLowerCase()}`}
-                />
-              </div>
-            ))}
-          </div>
+          <p className="text-xs text-gray-400 mb-3">
+            Type your SMS invitation message below. Insert the guest&apos;s details using the variables.
+            No template is required - the message is sent to every guest as-is.
+          </p>
 
-          {/* ─── Variables Panel ─── */}
+          {/* ─── Variables Panel (only per-guest variables) ─── */}
           {showVariables && (
             <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
               <p className="text-xs font-medium text-blue-800 mb-2 flex items-center gap-1.5">
@@ -1302,14 +1139,14 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
             </div>
           )}
 
-          {/* ─── Template Editor ─── */}
+          {/* ─── Message Editor ─── */}
           <div className="relative">
             <textarea
               id="sms-template-editor"
               value={smsTemplate}
               onChange={(e) => setSmsTemplate(e.target.value)}
               className="w-full p-3 border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent min-h-[200px] resize-y"
-              placeholder="Write your SMS template here..."
+              placeholder="Write your SMS message here..."
             />
             <div className="absolute bottom-3 right-3 text-[10px] text-gray-400 bg-white/80 px-2 py-1 rounded">
               {smsTemplate.length} characters
@@ -1344,8 +1181,18 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
               <Save size={12} className="text-green-500" />
               <span>Auto-saved</span>
             </div>
-            <span>Changes are saved automatically</span>
+            <span>Message draft saved automatically</span>
           </div>
+
+          {/* ─── Send SMS button ─── */}
+          <button
+            onClick={() => sendToChannel('sms')}
+            disabled={sending || guestsWithPhone === 0}
+            className="mt-4 w-full py-2.5 bg-gray-800 text-white rounded-xl font-semibold text-sm hover:bg-gray-900 transition disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
+            Send SMS to {guestsWithPhone} guest{guestsWithPhone === 1 ? '' : 's'}
+          </button>
         </div>
       )}
 
@@ -1354,11 +1201,8 @@ const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <MessageCircle size={18} className="text-green-600" />
-            <h2 className="font-semibold text-gray-800 text-base">WhatsApp Template</h2>
+            <h2 className="font-semibold text-gray-800 text-base">WhatsApp - {INVITE_TEMPLATES[selectedTemplate]?.displayName || 'Template 1'}</h2>
             <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Pre-approved</span>
-            <code className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-              {INVITE_TEMPLATES[selectedTemplate]?.whatsappName || 'Mwalikotemp'}
-            </code>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1461,6 +1305,16 @@ Card No: {cardNumber} {guestType}`}
             </div>
             <span>Changes are saved automatically</span>
           </div>
+
+          {/* ─── Send WhatsApp button ─── */}
+          <button
+            onClick={() => sendToChannel('whatsapp')}
+            disabled={sending || guestsWithPhone === 0}
+            className="mt-4 w-full py-2.5 bg-[#0D4B4B] text-white rounded-xl font-semibold text-sm hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}
+            Send WhatsApp to {guestsWithPhone} guest{guestsWithPhone === 1 ? '' : 's'}
+          </button>
         </div>
       )}
 
@@ -2007,24 +1861,6 @@ Card No: {cardNumber} {guestType}`}
                           <span className="hidden xs:inline">{isWhatsApp ? 'WhatsApp' : 'SMS'}</span>
                           <span className="xs:hidden">{isWhatsApp ? 'WA' : 'SMS'}</span>
                         </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newChannel = isWhatsApp ? 'sms' : 'whatsapp';
-                            switchGuestChannel(guest.id, newChannel);
-                          }}
-                          disabled={switchingChannel === guest.id}
-                          className="text-[9px] sm:text-[10px] text-blue-500 hover:text-blue-700 transition font-medium disabled:opacity-50 flex items-center gap-0.5"
-                        >
-                          {switchingChannel === guest.id ? (
-                            <Loader2 size={9} className="animate-spin" />
-                          ) : (
-                            <>
-                              <RotateCw size={9} />
-                              <span className="hidden xs:inline">{isWhatsApp ? '→ SMS' : '→ WA'}</span>
-                            </>
-                          )}
-                        </button>
                         {guest.cardNumber && (
                           <span className="text-[9px] sm:text-xs text-gray-400 font-mono">#{guest.cardNumber}</span>
                         )}
