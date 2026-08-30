@@ -22,7 +22,13 @@ export async function POST(req: NextRequest) {
     // ─── Fetch guest with event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
-      include: { event: true },
+      include: {
+        event: {
+          include: {
+            tenant: { select: { bypassPayment: true } },
+          },
+        },
+      },
     });
 
     if (!guest) {
@@ -31,6 +37,16 @@ export async function POST(req: NextRequest) {
 
     if (!guest.phone) {
       return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
+    }
+
+    // ─── Once-per-channel guard (non-bypassed tenants) ───────────────────
+    // Failed attempts never set smsSentAt, so failed invites can always be
+    // retried. Bypassed tenants may resend freely.
+    const isBypassed = guest.event?.tenant?.bypassPayment === true;
+    if (!isBypassed && guest.smsSentAt) {
+      return NextResponse.json({
+        error: 'This guest has already received their SMS invitation (one invitation per guest per channel on your plan).',
+      }, { status: 400 });
     }
 
     // ─── Build guest full name ──────────────────────────────────────────
@@ -66,7 +82,10 @@ Ahsante.`;
         title: guest.title || '',
         name: guest.name || '',
         fullName: guestFullName,
+        guestName: guestFullName,
         cardNumber: guest.cardNumber || 'N/A',
+        cardType: guest.guestType === 'DOUBLE' ? 'Double' : 'Single',
+        guestType: guest.guestType === 'DOUBLE' ? 'Double' : 'Single',
         passCode: guest.passCode || 'N/A',
         event: guest.event?.name || '',
         date: formattedDate,
@@ -78,7 +97,7 @@ Ahsante.`;
         time: guest.event?.time || '',
       };
       smsMessage = message.replace(
-        /\{(title|name|fullName|cardNumber|passCode|event|date|venue|address|hostFamily|person1|person2|time)\}/g,
+        /\{(title|name|fullName|guestName|cardNumber|cardType|guestType|passCode|event|date|venue|address|hostFamily|person1|person2|time)\}/g,
         (match: string, key: string) => varsMap[key] ?? match
       );
     }
@@ -106,7 +125,7 @@ Ahsante.`;
 
       await prisma.guest.update({
         where: { id: guest.id },
-        data: { invitationSentAt: new Date() },
+        data: { invitationSentAt: new Date(), smsSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
       });
 
       return NextResponse.json({

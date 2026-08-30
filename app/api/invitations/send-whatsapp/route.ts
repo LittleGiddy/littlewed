@@ -22,7 +22,13 @@ export async function POST(req: NextRequest) {
     // ─── Fetch guest with event ──────────────────────────────────────────
     const guest = await prisma.guest.findFirst({
       where: { id: guestId, event: { tenantId } },
-      include: { event: true },
+      include: {
+        event: {
+          include: {
+            tenant: { select: { bypassPayment: true } },
+          },
+        },
+      },
     });
 
     if (!guest) {
@@ -36,6 +42,16 @@ export async function POST(req: NextRequest) {
     if (guest.routingChannel !== 'whatsapp') {
       return NextResponse.json({
         error: `Guest is not configured for WhatsApp. Channel: ${guest.routingChannel}`,
+      }, { status: 400 });
+    }
+
+    // ─── Once-per-channel guard (non-bypassed tenants) ───────────────────
+    // Failed attempts never set whatsappSentAt, so failed invites can always
+    // be retried. Bypassed tenants may resend freely.
+    const isBypassed = guest.event?.tenant?.bypassPayment === true;
+    if (!isBypassed && guest.whatsappSentAt) {
+      return NextResponse.json({
+        error: 'This guest has already received their WhatsApp invitation (one invitation per guest per channel on your plan).',
       }, { status: 400 });
     }
 
@@ -68,7 +84,8 @@ export async function POST(req: NextRequest) {
       venue: guest.event?.venue || '',
       time: guest.event?.time || '',
       cardNumber: guest.cardNumber || '',
-      cardType: guest.guestType || '',
+      cardType:
+        guest.guestType === 'DOUBLE' ? 'Double' : guest.guestType === 'SINGLE' ? 'Single' : '',
       imageUrl: cardImageUrl || undefined,  // ✅ Card image rendered in WhatsApp (omitted if none)
       // No inviteLink - removed!
     });
@@ -90,7 +107,7 @@ export async function POST(req: NextRequest) {
 
       await prisma.guest.update({
         where: { id: guest.id },
-        data: { invitationSentAt: new Date() },
+        data: { invitationSentAt: new Date(), whatsappSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
       });
 
       return NextResponse.json({

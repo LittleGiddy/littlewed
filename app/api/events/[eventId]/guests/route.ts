@@ -35,12 +35,18 @@ export async function GET(
       select: {
         id: true,
         name: true,
+        title: true,
         phone: true,
+        guestType: true,
+        cardNumber: true,
+        passCode: true,
         invitationCard: true,
         checkedIn: true,        // ✅ Add this field
         routingChannel: true,   // ✅ Add for completeness (used in UI)
         attending: true,        // ✅ Add for completeness
         invitationSentAt: true,
+        smsSentAt: true,
+        whatsappSentAt: true,
         lastSendStatus: true,
         lastSendError: true,
       },

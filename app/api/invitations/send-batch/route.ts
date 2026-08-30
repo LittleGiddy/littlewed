@@ -45,7 +45,13 @@ export async function POST(req: NextRequest) {
         id: { in: guestIds }, 
         event: { tenantId },
       },
-      include: { event: true },
+      include: {
+        event: {
+          include: {
+            tenant: { select: { bypassPayment: true } },
+          },
+        },
+      },
     });
 
     if (guests.length === 0) {
@@ -56,6 +62,7 @@ export async function POST(req: NextRequest) {
     let successCount = 0;
     let failCount = 0;
     let skippedCount = 0;
+    let alreadySentCount = 0;
 
     // ─── Daily WhatsApp limit enforcement ───────────────────────────────
     // The WhatsApp API has a daily cap (a newly-registered number starts low,
@@ -150,6 +157,30 @@ export async function POST(req: NextRequest) {
               : guest.routingChannel;
           channel = channelSelection as 'whatsapp' | 'sms';
 
+          // ─── Once-per-channel guard (non-bypassed tenants) ─────────────
+          // For tenants that are NOT in bypass-payment mode, each guest can
+          // receive at most one successful invitation per channel. This stops
+          // duplicate sends (and wasted spend). Failed attempts never set the
+          // per-channel timestamp, so failed invitations remain retryable.
+          // Bypassed tenants keep the unlimited "free" resend behaviour.
+          const isBypassed = guest.event?.tenant?.bypassPayment === true;
+          const alreadyOnChannel =
+            channel === 'whatsapp' ? !!guest.whatsappSentAt : !!guest.smsSentAt;
+          if (!isBypassed && alreadyOnChannel) {
+            alreadySentCount++;
+            results.push({
+              guestId: guest.id,
+              name: guest.name,
+              success: false,
+              skipped: true,
+              reason: 'already_sent',
+              error: `Already sent via ${channel} (one invitation per guest per channel on your plan)`,
+              channel,
+            });
+            await new Promise(r => setTimeout(r, MESSAGE_DELAY));
+            continue;
+          }
+
           // ─── Send via appropriate channel ──────────────────────────
           if (channel === 'whatsapp') {
             console.log(`[Batch] Sending WhatsApp to ${guest.name} (${guest.phone})`);
@@ -186,7 +217,12 @@ export async function POST(req: NextRequest) {
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
             const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
-            const actualCardType = guest.guestType || vars.cardType || '';
+            const actualCardType =
+              guest.guestType === 'DOUBLE'
+                ? 'Double'
+                : guest.guestType === 'SINGLE'
+                  ? 'Single'
+                  : vars.cardType || '';
 
             // ─── Send WhatsApp ────────────────────────────────────────────
             // Variable values come from the user's inputs (whatsappVariables),
@@ -285,9 +321,15 @@ export async function POST(req: NextRequest) {
             // ─── Get SMS variables & build message from the user's template ─
             const vars = smsVariables || {};
 
+            const guestTitle = guest.title || '';
             const actualGuestName = guestFullName;
             const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
-            const actualCardType = guest.guestType || vars.cardType || '';
+            const actualCardType =
+              guest.guestType === 'DOUBLE'
+                ? 'Double'
+                : guest.guestType === 'SINGLE'
+                  ? 'Single'
+                  : vars.cardType || '';
 
             // ─── Base template: prefer the SMS template edited by the user ──
             const smsTemplateText =
@@ -295,8 +337,6 @@ export async function POST(req: NextRequest) {
               message ||
               `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
 
-            // ─── Replace variables using a function to avoid $/regex corruption ─
-            const guestTitle = guest.title || '';
             const varsMap: Record<string, string> = {
               guestName: actualGuestName,
               guestTitle,
@@ -353,7 +393,15 @@ export async function POST(req: NextRequest) {
 
             await prisma.guest.update({
               where: { id: guest.id },
-              data: { invitationSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
+              data: {
+                invitationSentAt: new Date(),
+                lastSendStatus: 'SENT',
+                lastSendError: null,
+                // Track per-channel so each channel's send screen can tell
+                // who has already received an invitation on that channel.
+                ...(sentChannel === 'whatsapp' ? { whatsappSentAt: new Date() } : {}),
+                ...(sentChannel === 'sms' ? { smsSentAt: new Date() } : {}),
+              },
             });
 
             // Always record a SENT log for WhatsApp so the daily-usage counter
@@ -438,6 +486,7 @@ export async function POST(req: NextRequest) {
       successCount,
       failCount,
       skippedCount,
+      alreadySentCount,
       waLimit: limit,
       waUsed: waUsed,
       waLimitReached: waLimitReached(),

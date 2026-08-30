@@ -224,6 +224,8 @@ model Guest {
   event          Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
   createdAt      DateTime  @default(now())
   invitationSentAt   DateTime?
+  smsSentAt       DateTime?   // when the SMS invitation was successfully sent
+  whatsappSentAt  DateTime?   // when the WhatsApp invitation was successfully sent
   invitationDeliveredAt DateTime?
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
