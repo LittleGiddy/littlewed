@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Search, CheckCircle2, RefreshCw, AlertTriangle, MessageCircle, Gauge, Inbox } from 'lucide-react';
+import { Send, Search, CheckCircle2, RefreshCw, AlertTriangle, MessageCircle, Gauge, Inbox, ShieldCheck } from 'lucide-react';
 import {
   SendGuest,
   SendResult,
@@ -16,6 +16,7 @@ import {
   FlowHeader,
   Card,
   LoadingState,
+  SendProgressCard,
 } from '../../../components/shared';
 
 const DEFAULT_DAILY_LIMIT = 250;
@@ -23,12 +24,13 @@ const DEFAULT_DAILY_LIMIT = 250;
 export default function WhatsappGuestsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
-  const { event, loading, reload, whatsappPending } = useGuestData(eventId);
+  const { event, loading, reload, whatsappPending, bypassPayment } = useGuestData(eventId);
 
   const [view, setView] = useState<'pending' | 'failed'>('pending');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingTotal, setSendingTotal] = useState(0);
   const [failed, setFailed] = useState<SendResult[]>([]);
   const [dailyLimit, setDailyLimit] = useState(() => {
     try {
@@ -103,7 +105,13 @@ export default function WhatsappGuestsPage() {
   };
 
   async function doSend(guestIds: string[]): Promise<SendResult[]> {
+    if (guestIds.length === 0) return [];
     setSending(true);
+    setSendingTotal(guestIds.length);
+    toast.loading(`Sending ${guestIds.length} WhatsApp invitation${guestIds.length === 1 ? '' : 's'}…`, {
+      id: 'send-invites-toast',
+      duration: Infinity,
+    });
     try {
       const res = await fetch('/api/invitations/send-batch', {
         method: 'POST',
@@ -122,8 +130,9 @@ export default function WhatsappGuestsPage() {
         }),
       });
       const data = await res.json();
+      toast.dismiss('send-invites-toast');
       if (!res.ok) {
-        toast.error(data.error || 'Send failed. Please try again.');
+        toast.error(data.error || 'Send failed. Please try again.', { duration: 6000 });
         setSending(false);
         return [];
       }
@@ -132,14 +141,18 @@ export default function WhatsappGuestsPage() {
         (r: SendResult) => !r.success && r.reason !== 'already_sent' && r.reason !== 'limit'
       );
       if (data.successCount > 0) {
-        toast.success(`Sent ${data.successCount} WhatsApp invitation${data.successCount === 1 ? '' : 's'}`);
+        toast.success(
+          `Sent ${data.successCount} WhatsApp invitation${data.successCount === 1 ? '' : 's'}`,
+          { duration: 5000 }
+        );
       }
       if (data.waLimitReached) {
-        toast.error(`WhatsApp daily limit of ${data.waLimit} reached for today.`);
+        toast.error(`WhatsApp daily limit of ${data.waLimit} reached for today.`, { duration: 8000 });
       }
       return failedResults;
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.dismiss('send-invites-toast');
+      toast.error('Network error. Please try again.', { duration: 6000 });
       return [];
     } finally {
       setSending(false);
@@ -152,7 +165,9 @@ export default function WhatsappGuestsPage() {
     setFailed(result);
     setSelected(new Set());
     if (result.length > 0) {
-      toast.error(`${result.length} invitation${result.length === 1 ? '' : 's'} need attention`);
+      toast.error(`${result.length} invitation${result.length === 1 ? '' : 's'} need attention`, {
+        duration: 8000,
+      });
       setView('failed');
     }
     await reload();
@@ -242,16 +257,17 @@ export default function WhatsappGuestsPage() {
             {sending ? 'Sending…' : 'Send'}
           </button>
         </div>
-        {sending && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-3 rounded-xl bg-[#25D366]/5 px-4 py-2.5 text-xs text-[#15803d]"
-          >
-            Sending {selected.size} invitations with short pauses between messages. Please keep this screen open.
-          </motion.div>
-        )}
       </Card>
+
+      {sending && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4">
+          <SendProgressCard
+            total={sendingTotal}
+            channel="whatsapp"
+            note={limitReached ? `WhatsApp is capped at ${dailyLimit} per day — anyone past the cap stays in "To send" for tomorrow.` : undefined}
+          />
+        </motion.div>
+      )}
 
       {/* ─── View toggle ─── */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 mb-4 w-max">
@@ -310,7 +326,7 @@ export default function WhatsappGuestsPage() {
                     className="flex-shrink-0 px-3.5 py-1.5 bg-amber-700 text-white rounded-lg text-xs font-semibold hover:bg-amber-800 transition disabled:opacity-40 flex items-center gap-1.5"
                   >
                     {sending ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                    {limitReached ? 'Limit reached' : 'Retry all'}
+                    {limitReached ? 'Limit reached' : 'Resend all'}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -359,6 +375,32 @@ export default function WhatsappGuestsPage() {
       ) : (
         <AnimatePresence mode="wait">
           <motion.div key="pending" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {/* ─── Cap reached: friendly "come back tomorrow" card ─── */}
+            {limitReached && pendingPool.length > 0 && (
+              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
+                <Gauge size={16} className="text-amber-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">Today&apos;s WhatsApp cap is reached</p>
+                  <p className="text-[11px] text-amber-700 leading-relaxed">
+                    You&apos;ve used {waUsed} of {dailyLimit} WhatsApp sends today. The {pendingPool.length} remaining
+                    guests are saved and will stay in &quot;To send&quot; — just come back tomorrow and send the rest,
+                    or switch to SMS anytime.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Plan transparency note ─── */}
+            {!bypassPayment && pendingPool.length > 0 && !limitReached && (
+              <div className="mb-4 rounded-2xl border border-[#0D4B4B]/10 bg-[#0D4B4B]/[0.03] px-4 py-3 flex items-start gap-2.5">
+                <ShieldCheck size={15} className="text-[#0D4B4B] flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-gray-600 leading-relaxed">
+                  One WhatsApp per guest on your plan — guests who already received theirs won&apos;t appear here, and
+                  only failed ones stay for retry, so nobody is ever messaged twice by accident.
+                </p>
+              </div>
+            )}
+
             {pendingPool.length > 0 && (
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex-1 relative">

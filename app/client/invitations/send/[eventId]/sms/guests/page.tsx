@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Search, CheckCircle2, RefreshCw, AlertTriangle, Phone, Inbox, Users } from 'lucide-react';
+import { Send, Search, CheckCircle2, RefreshCw, AlertTriangle, Phone, Inbox, Users, ShieldCheck } from 'lucide-react';
 import {
   SendGuest,
   SendResult,
@@ -18,17 +18,19 @@ import {
   Card,
   LoadingState,
   NeedCardsBanner,
+  SendProgressCard,
 } from '../../../components/shared';
 
 export default function SmsGuestsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
-  const { event, loading, reload, smsPending, missingCards } = useGuestData(eventId);
+  const { event, loading, reload, smsPending, missingCards, bypassPayment } = useGuestData(eventId);
 
   const [view, setView] = useState<'pending' | 'failed'>('pending');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendingTotal, setSendingTotal] = useState(0);
   const [failed, setFailed] = useState<SendResult[]>([]);
 
   const smsTemplate = useMemo(() => readSmsTemplateDraft(id), [id]);
@@ -67,7 +69,13 @@ export default function SmsGuestsPage() {
   };
 
   async function doSend(guestIds: string[]): Promise<SendResult[]> {
+    if (guestIds.length === 0) return [];
     setSending(true);
+    setSendingTotal(guestIds.length);
+    toast.loading(`Sending ${guestIds.length} SMS invitation${guestIds.length === 1 ? '' : 's'}…`, {
+      id: 'send-invites-toast',
+      duration: Infinity,
+    });
     try {
       const res = await fetch('/api/invitations/send-batch', {
         method: 'POST',
@@ -81,8 +89,9 @@ export default function SmsGuestsPage() {
         }),
       });
       const data = await res.json();
+      toast.dismiss('send-invites-toast');
       if (!res.ok) {
-        toast.error(data.error || 'Send failed. Please try again.');
+        toast.error(data.error || 'Send failed. Please try again.', { duration: 6000 });
         setSending(false);
         return [];
       }
@@ -90,11 +99,15 @@ export default function SmsGuestsPage() {
         (r: SendResult) => !r.success && r.reason !== 'already_sent'
       );
       if (data.successCount > 0) {
-        toast.success(`Sent ${data.successCount} SMS invitation${data.successCount === 1 ? '' : 's'}`);
+        toast.success(
+          `Sent ${data.successCount} SMS invitation${data.successCount === 1 ? '' : 's'}`,
+          { duration: 5000 }
+        );
       }
       return failedResults;
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.dismiss('send-invites-toast');
+      toast.error('Network error. Please try again.', { duration: 6000 });
       return [];
     } finally {
       setSending(false);
@@ -107,7 +120,9 @@ export default function SmsGuestsPage() {
     setFailed(result);
     setSelected(new Set());
     if (result.length > 0) {
-      toast.error(`${result.length} invitation${result.length === 1 ? '' : 's'} need attention`);
+      toast.error(`${result.length} invitation${result.length === 1 ? '' : 's'} need attention`, {
+        duration: 8000,
+      });
       setView('failed');
     }
     await reload();
@@ -118,7 +133,7 @@ export default function SmsGuestsPage() {
     const result = await doSend(failed.map(f => f.guestId));
     setFailed(result);
     if (result.length === 0) {
-      toast.success('All failed invitations were sent');
+      toast.success('All failed invitations were sent', { duration: 5000 });
       setView('pending');
     }
     await reload();
@@ -136,14 +151,14 @@ export default function SmsGuestsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`${getFullName(guest)} · SMS sent`);
+        toast.success(`${getFullName(guest)} · SMS sent`, { duration: 4500 });
         setFailed(prev => prev.filter(f => f.guestId !== guest.id));
       } else {
-        toast.error(data.error || 'Retry failed');
+        toast.error(data.error || 'Retry failed', { duration: 6000 });
         setFailed(prev => prev.map(f => (f.guestId === guest.id ? { ...f, error: data.error || f.error } : f)));
       }
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.error('Network error. Please try again.', { duration: 6000 });
     } finally {
       setSending(false);
       await reload();
@@ -176,17 +191,13 @@ export default function SmsGuestsPage() {
             {sending ? 'Sending…' : 'Send'}
           </button>
         </div>
-        {sending && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-3 rounded-xl bg-[#0D4B4B]/5 px-4 py-2.5 text-xs text-[#0D4B4B]"
-          >
-            Sending {selected.size} invitations with short pauses between messages. Please keep this screen open — it
-            takes a moment.
-          </motion.div>
-        )}
       </Card>
+
+      {sending && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-4">
+          <SendProgressCard total={sendingTotal} channel="sms" />
+        </motion.div>
+      )}
 
       {missingCards.length > 0 && (
         <div className="mb-4">
@@ -250,7 +261,7 @@ export default function SmsGuestsPage() {
                     className="flex-shrink-0 px-3.5 py-1.5 bg-amber-700 text-white rounded-lg text-xs font-semibold hover:bg-amber-800 transition disabled:opacity-40 flex items-center gap-1.5"
                   >
                     {sending ? <RefreshCw size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                    Retry all
+                    Resend all
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -289,6 +300,17 @@ export default function SmsGuestsPage() {
       ) : (
         <AnimatePresence mode="wait">
           <motion.div key="pending" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {/* ─── Plan transparency note ─── */}
+            {!bypassPayment && pendingPool.length > 0 && (
+              <div className="mb-4 rounded-2xl border border-[#0D4B4B]/10 bg-[#0D4B4B]/[0.03] px-4 py-3 flex items-start gap-2.5">
+                <ShieldCheck size={15} className="text-[#0D4B4B] flex-shrink-0 mt-0.5" />
+                <p className="text-[11px] text-gray-600 leading-relaxed">
+                  One SMS per guest on your plan — guests who already received theirs are counted as sent and won&apos;t
+                  appear here. Only failed ones stay for retry, so nobody is ever messaged twice by accident.
+                </p>
+              </div>
+            )}
+
             {/* ─── Search + select all ─── */}
             {pendingPool.length > 0 && (
               <div className="flex items-center gap-2 mb-4">

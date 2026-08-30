@@ -1,13 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { RefreshCw, Phone, MessageCircle, CheckCircle2, Lock, Copy, Check } from 'lucide-react';
 import {
   SendGuest,
+  SendResult,
+  INVITE_TEMPLATES,
   getFullName,
+  readSmsTemplateDraft,
   useGuestData,
   FlowSteps,
   FlowHeader,
@@ -25,6 +28,23 @@ function formatDate(value?: string | null): string {
   });
 }
 
+function readWhatsappDraftObject(eventId?: string): {
+  template?: string;
+  vars?: Record<string, string>;
+  contact?: string;
+  eventType?: string;
+} | null {
+  if (!eventId) return null;
+  try {
+    const raw = localStorage.getItem(`whatsapp_draft_${eventId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed.template === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function SentInvitationsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
@@ -32,7 +52,32 @@ export default function SentInvitationsPage() {
 
   const [tab, setTab] = useState<'whatsapp' | 'sms'>('whatsapp');
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendingAll, setSendingAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [waUsed, setWaUsed] = useState(0);
+  const [waLimit] = useState(() => {
+    if (!id) return 250;
+    try {
+      const saved = parseInt(localStorage.getItem(`wa_daily_limit_${id}`) || '', 10);
+      return saved > 0 ? saved : 250;
+    } catch {
+      return 250;
+    }
+  });
+
+  // ─── Load today's WhatsApp usage (only used for the Resend-all cap) ─────
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/invitations/usage/whatsapp?eventId=${id}`, { credentials: 'include' });
+        const data = await res.json();
+        if (typeof data.count === 'number') setWaUsed(data.count);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [id]);
 
   const list = useMemo(() => (tab === 'whatsapp' ? whatsappSent : smsSent), [tab, whatsappSent, smsSent]);
 
@@ -41,17 +86,7 @@ export default function SentInvitationsPage() {
     try {
       const route = channel === 'whatsapp' ? '/api/invitations/send-whatsapp' : '/api/invitations/send-sms';
       const body: Record<string, unknown> = { guestId: guest.id, eventId: id };
-      if (channel === 'sms') {
-        try {
-          const saved = localStorage.getItem(`sms_template_${id}`);
-          const parsed = saved ? JSON.parse(saved) : null;
-          if (parsed && typeof parsed.template === 'string' && parsed.template.trim()) {
-            body.message = parsed.template;
-          }
-        } catch {
-          // ignore
-        }
-      }
+      if (channel === 'sms') body.message = readSmsTemplateDraft(id);
       const res = await fetch(route, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,15 +95,79 @@ export default function SentInvitationsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Resent to ${getFullName(guest)} via ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`);
+        toast.success(`Resent to ${getFullName(guest)} via ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`, {
+          duration: 4500,
+        });
         await reload();
       } else {
-        toast.error(data.error || 'Resend failed');
+        toast.error(data.error || 'Resend failed', { duration: 6000 });
       }
     } catch {
-      toast.error('Network error. Please try again.');
+      toast.error('Network error. Please try again.', { duration: 6000 });
     } finally {
       setSendingId(null);
+    }
+  }
+
+  async function handleResendAll() {
+    if (!bypassPayment || list.length === 0 || sendingAll) return;
+    const ids = list.map(g => g.id);
+    setSendingAll(true);
+    toast.loading(`Resending ${ids.length} ${tab === 'whatsapp' ? 'WhatsApp' : 'SMS'} invitation${ids.length === 1 ? '' : 's'}…`, {
+      id: 'resend-all-toast',
+      duration: Infinity,
+    });
+    try {
+      const body: Record<string, unknown> = { eventId: id, guestIds: ids, forceChannel: tab };
+      if (tab === 'sms') {
+        body.smsTemplate = readSmsTemplateDraft(id);
+      } else {
+        const draft = readWhatsappDraftObject(id);
+        const tpl = draft?.template && INVITE_TEMPLATES[draft.template] ? INVITE_TEMPLATES[draft.template] : null;
+        body.whatsappTemplate = tpl ? tpl.whatsappName : undefined;
+        body.whatsappContact = draft?.contact || '';
+        body.eventType = draft?.eventType || 'harusi';
+        body.whatsappVariables = draft?.vars || {};
+        body.dailyLimit = waLimit;
+      }
+      const res = await fetch('/api/invitations/send-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      toast.dismiss('resend-all-toast');
+      if (!res.ok) {
+        toast.error(data.error || 'Resend failed. Please try again.', { duration: 6000 });
+        setSendingAll(false);
+        return;
+      }
+      if (data.successCount > 0) {
+        toast.success(
+          `Resent ${data.successCount} ${tab === 'whatsapp' ? 'WhatsApp' : 'SMS'} invitation${data.successCount === 1 ? '' : 's'}`,
+          { duration: 5000 }
+        );
+      }
+      const stillFailed: SendResult[] = (data.results || []).filter(
+        (r: SendResult) => !r.success && r.reason !== 'already_sent'
+      );
+      if (stillFailed.length > 0) {
+        const names = stillFailed.slice(0, 3).map(r => r.name).join(', ');
+        toast.error(`${stillFailed.length} could not be sent${names ? `: ${names}${stillFailed.length > 3 ? '…' : ''}` : ''}`, {
+          duration: 8000,
+        });
+      }
+      if (data.waLimitReached) {
+        toast.error(`WhatsApp daily limit of ${data.waLimit} reached for today.`, { duration: 8000 });
+      }
+      if (typeof data.waUsed === 'number') setWaUsed(data.waUsed);
+      await reload();
+    } catch {
+      toast.dismiss('resend-all-toast');
+      toast.error('Network error. Please try again.', { duration: 6000 });
+    } finally {
+      setSendingAll(false);
     }
   }
 
@@ -79,7 +178,7 @@ export default function SentInvitationsPage() {
       setCopiedId(guest.id);
       setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      toast.error('Could not copy');
+      toast.error('Could not copy', { duration: 3000 });
     }
   }
 
@@ -119,26 +218,39 @@ export default function SentInvitationsPage() {
         </div>
       )}
 
-      {/* ─── Channel tabs ─── */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 mb-4 w-max">
-        <button
-          type="button"
-          onClick={() => setTab('whatsapp')}
-          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
-            tab === 'whatsapp' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
-          }`}
-        >
-          <MessageCircle size={12} className="text-[#15803d]" /> WhatsApp · {whatsappSent.length}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('sms')}
-          className={`px-4 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
-            tab === 'sms' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
-          }`}
-        >
-          <Phone size={12} className="text-gray-500" /> SMS · {smsSent.length}
-        </button>
+      {/* ─── Channel tabs + Resend all ─── */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 w-max">
+          <button
+            type="button"
+            onClick={() => setTab('whatsapp')}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
+              tab === 'whatsapp' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+            }`}
+          >
+            <MessageCircle size={12} className="text-[#15803d]" /> WhatsApp · {whatsappSent.length}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('sms')}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
+              tab === 'sms' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
+            }`}
+          >
+            <Phone size={12} className="text-gray-500" /> SMS · {smsSent.length}
+          </button>
+        </div>
+        {bypassPayment && list.length > 0 && (
+          <button
+            type="button"
+            onClick={handleResendAll}
+            disabled={sendingAll}
+            className="flex-shrink-0 px-3.5 py-2 bg-[#0D4B4B] text-white rounded-xl text-xs font-semibold hover:bg-[#0A3939] transition disabled:opacity-40 flex items-center gap-1.5"
+          >
+            <RefreshCw size={13} className={sendingAll ? 'animate-spin' : ''} />
+            {sendingAll ? 'Resending…' : 'Resend all'}
+          </button>
+        )}
       </div>
 
       {list.length === 0 ? (
@@ -195,7 +307,8 @@ export default function SentInvitationsPage() {
               </div>
               {guest.lastSendStatus === 'FAILED' && (
                 <p className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
-                  Last send failed: {guest.lastSendError || 'unknown error'}
+                  Last send failed: {guest.lastSendError || 'unknown error'} · sent:{' '}
+                  {tab === 'whatsapp' ? formatDate(guest.whatsappSentAt) : formatDate(guest.smsSentAt)}
                 </p>
               )}
               {!bypassPayment && (
@@ -209,9 +322,10 @@ export default function SentInvitationsPage() {
       )}
 
       {bypassPayment && (
-        <div className="mt-5">
-          <p className="text-[10px] text-center text-gray-400">
-            You&apos;re on unlimited-resend mode, so resend is available for every guest.
+        <div className="mt-5 rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 px-4 py-3">
+          <p className="text-[11px] text-gray-600 text-center leading-relaxed">
+            You&apos;re on <span className="font-semibold text-[#0D4B4B]">unlimited-resend mode</span>, so you can
+            resend any guest (individually or all at once).{tab === 'whatsapp' ? ` Today: ${waUsed} of ${waLimit} WhatsApp sends used.` : ''}
           </p>
         </div>
       )}

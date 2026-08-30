@@ -334,7 +334,90 @@ export function ChannelBadge({ channel }: { channel: string }) {
   );
 }
 
-// ─── "Needs cards generated" banner ──────────────────────────────────────────
+// ─── Friendly "what's happening" send progress ────────────────────────────────
+// The batch endpoint throttles on purpose (groups of 5, short pauses) so the
+// WhatsApp/SMS provider never rejects the account. This card animates realistic
+// progress while the request runs, then the screen swaps it for exact totals.
+
+const SEND_STATUSES: Record<'whatsapp' | 'sms', string[]> = {
+  whatsapp: [
+    'Contacting WhatsApp…',
+    'Finding your guests on WhatsApp…',
+    'Sending the card image…',
+    'Delivering the invitation + Confirm button…',
+    'Confirming delivery…',
+    'Finishing up…',
+  ],
+  sms: [
+    'Dialing the SMS gateway…',
+    'Sending your messages…',
+    'Delivering card details…',
+    'Confirming delivery…',
+    'Finishing up…',
+  ],
+};
+
+export function useSendSimulation(total: number, channel: 'whatsapp' | 'sms') {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (total <= 0) return;
+    const start = Date.now();
+    // Roughly matches server throttling: ~1.1s per message + 2s pause every 5.
+    const expectedMs = total * 1100 + Math.ceil(total / 5) * 2000;
+    const id = setInterval(() => {
+      setProgress(Math.min(0.95, (Date.now() - start) / expectedMs));
+    }, 250);
+    return () => clearInterval(id);
+  }, [total]);
+
+  const statuses = SEND_STATUSES[channel];
+  const processed = Math.round(progress * total);
+  const status = statuses[Math.min(Math.floor(progress * statuses.length), statuses.length - 1)];
+  return { percent: Math.round(progress * 100), processed, status };
+}
+
+export function SendProgressCard({
+  total,
+  channel,
+  note,
+}: {
+  total: number;
+  channel: 'whatsapp' | 'sms';
+  note?: string;
+}) {
+  const { percent, processed, status } = useSendSimulation(total, channel);
+  const isWa = channel === 'whatsapp';
+  const accent = isWa ? '#25D366' : '#0D4B4B';
+  const text = isWa ? '#15803d' : '#0D4B4B';
+
+  return (
+    <div className="rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 p-4">
+      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-gray-800">
+        <span className="flex items-center gap-1.5">
+          <Loader2 size={13} className="animate-spin" style={{ color: accent }} />
+          Sending {total} {isWa ? 'WhatsApp' : 'SMS'} invitation{total === 1 ? '' : 's'}…
+        </span>
+        <span className="tabular-nums text-gray-600">~{processed} of {total}</span>
+      </div>
+      <div className="mt-2.5 h-2 rounded-full bg-white border border-gray-200 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{ width: `${Math.max(2, percent)}%`, backgroundColor: accent }}
+        />
+      </div>
+      <p className="mt-2 text-[11px] font-medium" style={{ color: text }}>
+        {status} <span className="text-gray-400 tabular-nums">({percent}%)</span>
+      </p>
+      <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+        {isWa
+          ? 'Invitations go out in small groups with built-in pauses so WhatsApp never blocks your number. Please keep this screen open so the batch isn\u2019t interrupted.'
+          : 'Invitations go out in small groups with short pauses so the SMS gateway never rejects you. Please keep this screen open until it finishes.'}
+      </p>
+      {note && <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">{note}</p>}
+    </div>
+  );
+}
 
 export function NeedCardsBanner({ count }: { count: number }) {
   return (

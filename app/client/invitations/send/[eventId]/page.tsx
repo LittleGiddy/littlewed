@@ -42,6 +42,16 @@ export default function SendChannelPickerPage() {
         </div>
       )}
 
+      {bypassPayment && anyGuests && (
+        <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-[#1A7A4A]/20 bg-[#1A7A4A]/[0.06] px-4 py-3">
+          <ShieldCheck size={16} className="text-[#1A7A4A] flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-gray-600 leading-relaxed">
+            <span className="font-semibold text-gray-800">Unlimited-send mode.</span> You can send or resend any guest
+            anytime on either channel — no per-guest send limits, and failed sends stay retryable.
+          </p>
+        </div>
+      )}
+
       {!anyGuests ? (
         <div className="bg-white rounded-3xl border border-gray-200 shadow-sm px-6 py-12 text-center">
           <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
