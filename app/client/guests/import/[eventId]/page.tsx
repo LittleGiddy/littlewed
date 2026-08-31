@@ -508,10 +508,11 @@ export default function ImportGuestsPage() {
 
   const downloadSamplePDF = () => {
     const sampleData = [
-      'SN  TITLE    NAME                    PHONE       CARD',
-      '1   Mr       ADRIAN                  766084935   DOUBLE',
-      '2   Mrs      AGNES LWAMBANO          713502010   DOUBLE',
-      '3            ALIPHONSINA             715164791   DOUBLE',
+      'SN  TITLE    NAME                   PHONE       CARD',
+      '1   Mr       JOHN DOE               712345678   SINGLE',
+      '2   Mrs      AGNES LWAMBANO         713502010   DOUBLE',
+      '3   Mr       PETER JONES            715164791   DOUBLE',
+      '4            ALIPHONSINA            715164792   SINGLE',
     ].join('\n');
 
     const blob = new Blob([sampleData], { type: 'text/plain' });
@@ -828,10 +829,11 @@ export default function ImportGuestsPage() {
             </p>
             <div className="bg-white p-3 rounded-lg font-mono text-xs text-gray-700 border border-gray-200 overflow-x-auto">
               <pre>
-                {`SN  TITLE    NAME                    PHONE       CARD
-1   Mr       ADRIAN                  766084935   DOUBLE
-2   Mrs      AGNES LWAMBANO          713502010   DOUBLE
-3            ALIPHONSINA             715164791   DOUBLE`}
+                {`SN  TITLE    NAME                   PHONE       CARD
+1   Mr       JOHN DOE               712345678   SINGLE
+2   Mrs      AGNES LWAMBANO         713502010   DOUBLE
+3   Mr       PETER JONES            715164791   DOUBLE
+4            ALIPHONSINA            715164792   SINGLE`}
               </pre>
             </div>
             <p className="text-xs text-gray-500 mt-2">

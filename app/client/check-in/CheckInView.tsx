@@ -115,6 +115,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // ─── Load Data ──────────────────────────────────────────────────────
   const loadEventInfo = async () => {
@@ -160,33 +161,41 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   }, [eventId]);
 
   // ─── QR Scanner ──────────────────────────────────────────────────────
+  const startCamera = async () => {
+    try {
+      // Clean up any lingering stream before opening a new one
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.play();
+        setScanning(true);
+      }
+    } catch (err) {
+      toast.error('Camera access denied');
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'scan') return;
-    let stream: MediaStream | null = null;
 
-    const startCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.setAttribute('playsinline', 'true');
-          videoRef.current.play();
-          setScanning(true);
-        }
-      } catch (err) {
-        toast.error('Camera access denied');
-      }
-    };
     startCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
       setScanning(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const scanFrame = () => {
@@ -205,8 +214,9 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const qr = jsQR(imageData.data, canvas.width, canvas.height);
     if (qr) {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       }
       setScanning(false);
       processCheckin(qr.data);
@@ -271,8 +281,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
           setScannedGuest(null);
           setMessage('');
           setCardNumber('');
+          // Re-open the camera for the next scan. The previous stream was
+          // stopped when the QR was detected, so we must acquire a fresh
+          // stream (flipping `scanning` alone would leave a blank feed).
           if (activeTab === 'scan') {
-            setScanning(true);
+            startCamera();
             requestAnimationFrame(scanFrame);
           }
         }, 4000);

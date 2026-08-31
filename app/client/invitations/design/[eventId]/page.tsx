@@ -42,7 +42,7 @@ const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false,
   fontFamily: 'Playfair Display',
   color: '#ffffff',
   textAlign: 'left', // 'left' | 'center' | 'right'
-  shadow: { color: 'rgba(0,0,0,0.3)', blur: 4, offsetX: 0, offsetY: 2 },
+  shadow: null, // Text (incl. guest name) defaults to no shadow — enable via the Shadow toggle
   visible: true, locked: false,
   isGuestName,
   isGuestType,

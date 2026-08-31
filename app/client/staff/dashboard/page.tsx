@@ -113,6 +113,7 @@ export default function StaffDashboard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [scanning, setScanning] = useState(false);
 
   // ─── Auth + load events ────────────────────────────────────────────
@@ -146,29 +147,38 @@ export default function StaffDashboard() {
   };
 
   // ─── QR Scanner ────────────────────────────────────────────────────
+  const startCamera = async () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        videoRef.current.play();
+        setScanning(true);
+      }
+    } catch {
+      toast.error('Camera access denied or not available');
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== 'scan' || !selectedEventId) return;
-    let stream: MediaStream | null = null;
 
-    const startCamera = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.setAttribute('playsinline', 'true');
-          videoRef.current.play();
-          setScanning(true);
-        }
-      } catch {
-        toast.error('Camera access denied or not available');
-      }
-    };
     startCamera();
 
     return () => {
-      if (stream) stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
       setScanning(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedEventId]);
 
   const scanFrame = () => {
@@ -187,8 +197,9 @@ export default function StaffDashboard() {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const qr = jsQR(imageData.data, canvas.width, canvas.height);
     if (qr) {
-      if (videoRef.current?.srcObject) {
-        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
       }
       setScanning(false);
       processCheckin(qr.data);
@@ -259,7 +270,7 @@ export default function StaffDashboard() {
           setMessage('');
           setCardNumber('');
           if (activeTab === 'scan') {
-            setScanning(true);
+            startCamera();
             requestAnimationFrame(scanFrame);
           }
         }, 4000);
