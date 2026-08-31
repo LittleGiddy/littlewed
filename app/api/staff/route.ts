@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
       name,
       role: 'STAFF',
       tenantId,
+      isActive: true,
     },
   });
 
