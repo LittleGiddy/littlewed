@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 
-export default function AddGuestPage({ params }: { params: { eventId: string } }) {
+export default function AddGuestPage({ params }: { params: Promise<{ eventId: string }> }) {
   const router = useRouter()
+  const { eventId } = use(params)
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,7 +20,7 @@ export default function AddGuestPage({ params }: { params: { eventId: string } }
       res = await fetch('/api/guests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, eventId: params.eventId })
+        body: JSON.stringify({ name, phone, eventId })
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)
@@ -30,7 +31,7 @@ export default function AddGuestPage({ params }: { params: { eventId: string } }
     }
     if (res?.ok) {
       toast.success('Guest added')
-      router.push(`/events/${params.eventId}`)
+      router.push(`/events/${eventId}`)
     } else {
       toast.error(errorText)
       setLoading(false)

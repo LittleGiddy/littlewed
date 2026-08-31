@@ -27,6 +27,12 @@ export default function AddGuestPage() {
     email: '',
     guestType: 'SINGLE',
   });
+  const [guest2, setGuest2] = useState({
+    title: 'Mr',
+    name: '',
+    phone: '',
+    email: '',
+  });
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
 
   // Auto-generate card number on load
@@ -112,29 +118,54 @@ export default function AddGuestPage() {
       return;
     }
 
+    const isSharedDouble = form.guestType === 'DOUBLE' && guest2.name.trim() && guest2.phone.trim();
+    if (isSharedDouble && (!guest2.name.trim() || !guest2.phone.trim())) {
+      setError('Both guests must have a name and phone number');
+      setLoading(false);
+      return;
+    }
+
     try {
+      const payload: Record<string, any> = {
+        title: form.title,
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        cardNumber: form.cardNumber.trim() || undefined,
+        email: form.email.trim() || undefined,
+        eventId,
+        guestType: form.guestType,
+      };
+
+      if (isSharedDouble) {
+        payload.guest2 = {
+          title: guest2.title,
+          name: guest2.name.trim(),
+          phone: guest2.phone.trim(),
+          email: guest2.email.trim() || undefined,
+        };
+      }
+
       const res = await fetch('/api/guests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: form.title,
-          name: form.name.trim(),
-          phone: form.phone.trim(),
-          cardNumber: form.cardNumber.trim() || undefined,
-          email: form.email.trim() || undefined,
-          eventId,
-          guestType: form.guestType,
-        }),
+        body: JSON.stringify(payload),
         credentials: 'include',
       });
 
       const data = await res.json();
       if (res.ok) {
         const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
-        const guestTypeLabel = data.guestType === 'DOUBLE' ? 'Double' : 'Single';
-        toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
-          icon: <UserCheck size={18} className="text-green-600" />,
-        });
+        if (isSharedDouble && data.sharedGuest) {
+          toast.success(`Shared double card added: ${form.title} ${form.name} & ${guest2.title} ${guest2.name} (${channel})`, {
+            icon: <UserCheck size={18} className="text-green-600" />,
+            duration: 5000,
+          });
+        } else {
+          const guestTypeLabel = data.guestType === 'DOUBLE' ? 'Double' : 'Single';
+          toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
+            icon: <UserCheck size={18} className="text-green-600" />,
+          });
+        }
         router.push(`/client/events/${eventId}`);
       } else {
         setError(data.error || 'Failed to add guest');
@@ -319,6 +350,70 @@ export default function AddGuestPage() {
               </select>
               <p className="text-xs text-gray-400 mt-1">Select DOUBLE if this guest is bringing a plus-one</p>
             </div>
+
+            {/* ─── Second Guest (only for shared DOUBLE card) ─── */}
+            {form.guestType === 'DOUBLE' && (
+              <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-3 sm:p-4 space-y-3 sm:space-y-4">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <UserPlus size={13} /> Second Guest (shared card)
+                </p>
+                <p className="text-[11px] text-amber-600 -mt-2">
+                  This creates a 2-person double card. Both guests share one card number and receive one invitation card (2 credits).
+                </p>
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                  <select
+                    value={guest2.title}
+                    onChange={e => setGuest2(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
+                  >
+                    {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                {/* Name */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={guest2.name}
+                    onChange={e => setGuest2(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    placeholder="e.g., Jane Doe"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={guest2.phone}
+                    onChange={e => setGuest2(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    placeholder="+255712345678"
+                  />
+                </div>
+
+                {/* Email (optional) */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Email (optional)</label>
+                  <input
+                    type="email"
+                    value={guest2.email}
+                    onChange={e => setGuest2(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    placeholder="guest2@example.com"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ─── Card Number ─── */}
             <div>

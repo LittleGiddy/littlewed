@@ -4,10 +4,12 @@ import Link from 'next/link';
 import { CircleCheck } from 'lucide-react';
 import { generateGuestToken } from '@/lib/qr';
 
-export default async function GuestPage({ params }: { params: { token: string } }) {
+export default async function GuestPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+
   // ─── Find guest by token ──────────────────────────────────────────────
   const guest = await prisma.guest.findFirst({
-    where: { qrToken: params.token },
+    where: { qrToken: token },
     include: { event: true },
   });
 

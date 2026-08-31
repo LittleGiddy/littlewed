@@ -234,7 +234,8 @@ model Guest {
   lastSendError  String?   // error/reason for the last send attempt
   guestType  String?   @default("SINGLE")
   title          String?   @default("Mr")
-  cardNumber     String?   @unique
+  cardNumber     String?
+  cardGroupId    String?   // Shared by guests on a multi-person (DOUBLE) card
   waId           String?   // WhatsApp ID from Meta
   passCode       String?   @unique
 
@@ -244,6 +245,7 @@ model Guest {
   @@index([eventId])
   @@index([phone])
   @@index([cardNumber])
+  @@index([cardGroupId])
   @@index([passCode])
 }
 

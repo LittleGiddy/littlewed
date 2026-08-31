@@ -14,8 +14,10 @@ export async function POST(
 
   const { eventId } = await params;
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
+  const tenantId = (session.user as { tenantId?: string }).tenantId;
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
     include: { tenant: true },
   });
 

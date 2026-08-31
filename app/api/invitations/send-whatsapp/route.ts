@@ -67,10 +67,8 @@ export async function POST(req: NextRequest) {
     // ─── Build guest full name ──────────────────────────────────────────
     const guestFullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-    // ─── Build dynamic card URL using pass code ─────────────────────────
-    const cardImageUrl = guest.passCode 
-      ? `https://littlewed.co.tz/api/og/card?code=${guest.passCode}`
-      : (guest.invitationCard || guest.event?.imageUrl || '');
+    // ─── Build card image URL (Cloudinary-generated card; fallback to base image) ─
+    const cardImageUrl = guest.invitationCard || guest.event?.imageUrl || '';
 
     // ─── Send WhatsApp invitation (no link button) ──────────────────────
     // Variable values come from the user's event/guest data - no hardcoded

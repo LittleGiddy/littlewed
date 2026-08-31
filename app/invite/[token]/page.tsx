@@ -4,6 +4,14 @@ import RSVPForm from '@/components/RSVPForm'
 import { notFound } from 'next/navigation'
 
 async function getGuestFromToken(token: string) {
+  // Order: try passCode first (matches the /invite/<passCode> links used in
+  // invitations), then fall back to the legacy signed-JWT token.
+  const byPassCode = await prisma.guest.findUnique({
+    where: { passCode: token },
+    include: { event: true },
+  });
+  if (byPassCode) return byPassCode;
+
   try {
     const { payload } = await jwtVerify(
       token,
@@ -20,8 +28,9 @@ async function getGuestFromToken(token: string) {
   }
 }
 
-export default async function InvitePage({ params }: { params: { token: string } }) {
-  const guest = await getGuestFromToken(params.token)
+export default async function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const guest = await getGuestFromToken(token)
   
   if (!guest) {
     notFound()

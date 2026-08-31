@@ -34,6 +34,7 @@ interface Guest {
   title?: string | null;
   cardNumber?: string | null;
   guestType?: string | null;
+  cardGroupId?: string | null;
   passCode?: string | null;
   event?: EventData;
 }
@@ -805,6 +806,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   <Hash size={10} /> #{cardDisplay}
                 </span>
               )}
+              {guest.cardGroupId && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"
+                  title="Shared 2-person card"
+                >
+                  <Users size={10} /> 2ppl
+                </span>
+              )}
               {isCheckedIn && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
                   <CheckCircle size={12} /> Checked In
@@ -954,7 +963,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </a>
             </div>
           </div>
-          <div className="absolute top-2 right-2">
+          <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+            {guest.cardGroupId && (
+              <span className="text-[10px] font-medium bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                2ppl
+              </span>
+            )}
             <span className="text-xs font-medium bg-[#0D4B4B] text-white px-2 py-0.5 rounded-full">
               #{guest.cardNumber || guest.id.slice(0, 6)}
             </span>

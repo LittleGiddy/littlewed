@@ -3,7 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-const CREDIT_COST = 300; // TZS per credit
+const CREDIT_COST = 500; // TZS per credit (must match webhooks/stripe/clickpesa + BuyCreditsModal)
 
 // ─── ClickPesa: exchange client-id + api-key for a short-lived JWT ───────────
 async function getClickPesaToken(clientId: string, apiKey: string): Promise<string> {
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
   const tenantId = (session.user as any).tenantId;
   const { amount } = await req.json();
 
-  if (!amount || amount < 300) {
-    return NextResponse.json({ error: 'Minimum purchase is 300 TZS (1 credit)' }, { status: 400 });
+  if (!amount || amount < CREDIT_COST) {
+    return NextResponse.json({ error: `Minimum purchase is ${CREDIT_COST} TZS (1 credit)` }, { status: 400 });
   }
 
   const credits = Math.floor(amount / CREDIT_COST);
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     customerEmail: user.email || 'client@example.com',
     customerPhone: rawPhone,
     description: `Purchase ${credits} credits for LittleWed`,
-    callbackUrl: `${process.env.NEXTAUTH_URL}/api/webhooks/clickpesa`,
+    callbackUrl: process.env.CLICKPESA_WEBHOOK_URL || `${process.env.NEXTAUTH_URL}/api/webhooks/stripe/clickpesa`,
   };
 
   console.log('ClickPesa credit purchase payload:', JSON.stringify(payload, null, 2));

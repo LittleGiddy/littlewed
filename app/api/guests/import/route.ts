@@ -72,8 +72,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing guests or eventId' }, { status: 400 });
     }
 
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
+    const tenantId = (session.user as any).tenantId;
+
+    const event = await prisma.event.findFirst({
+      where: { id: eventId, tenantId },
       include: { tenant: { select: { bypassPayment: true, credits: true, creditsEnabled: true } } },
     });
 
@@ -163,6 +165,9 @@ export async function POST(req: NextRequest) {
     let smsCount = 0;
 
     const guestsToInsert = [];
+    // Maps a shared-card group id to the card number assigned to that group,
+    // so all rows in a shared DOUBLE card reuse the same card number.
+    const groupCardNumbers = new Map<string, string>();
 
     // ─── Sort guests by name to maintain consistent ordering ────────────
     const sortedGuests = [...uniqueGuests].sort((a, b) => {
@@ -196,19 +201,31 @@ export async function POST(req: NextRequest) {
         smsCount++;
       }
 
-      // ─── Generate UNIQUE RANDOM card number ──────────────────────────
-      // ✅ Generate a random 5-digit number for each guest
-      const cardNumber = await generateUniqueCardNumber(eventId);
+      // ─── Guest type & shared card grouping ──────────────────────────
+      // Rows that share a non-empty `cardGroupId` form a shared DOUBLE
+      // card (two guests, one card number, one composed card image).
+      const rawGroupId = typeof g.cardGroupId === 'string' ? g.cardGroupId.trim() : '';
+      const isGrouped = rawGroupId.length > 0;
+      const guestType = isGrouped ? 'DOUBLE' : validateGuestType(g.guestType);
 
-      // ─── Validate guest type ──────────────────────────────────────────
-      const guestType = validateGuestType(g.guestType);
+      // ─── Card number: reuse the group's number or mint a new one ──────
+      let cardNumber: string;
+      if (isGrouped && groupCardNumbers.has(rawGroupId)) {
+        cardNumber = groupCardNumbers.get(rawGroupId)!;
+      } else {
+        cardNumber = await generateUniqueCardNumber(eventId);
+        if (isGrouped) {
+          groupCardNumbers.set(rawGroupId, cardNumber);
+        }
+      }
 
       guestsToInsert.push({
         name: g.name.trim(),
         phone: g.phone,
         title: g.title || '',
-        cardNumber: cardNumber, // ✅ Random 5-digit number
+        cardNumber: cardNumber,
         guestType: guestType,
+        cardGroupId: isGrouped ? rawGroupId : null,
         email: null,
         eventId,
         routingChannel,

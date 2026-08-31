@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
@@ -12,8 +12,9 @@ interface GuestRow {
   table?: string
 }
 
-export default function ImportGuestsPage({ params }: { params: { eventId: string } }) {
+export default function ImportGuestsPage({ params }: { params: Promise<{ eventId: string }> }) {
   const router = useRouter()
+  const { eventId } = use(params)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<GuestRow[]>([])
   const [importing, setImporting] = useState(false)
@@ -66,7 +67,7 @@ export default function ImportGuestsPage({ params }: { params: { eventId: string
 
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('eventId', params.eventId)
+    formData.append('eventId', eventId)
 
     const res = await fetch('/api/guests/import', {
       method: 'POST',
@@ -74,7 +75,7 @@ export default function ImportGuestsPage({ params }: { params: { eventId: string
     })
 
     if (res.ok) {
-      router.push(`/guests/${params.eventId}`)
+      router.push(`/guests/${eventId}`)
     } else {
       toast.error('Import failed')
       setImporting(false)

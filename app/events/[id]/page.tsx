@@ -25,7 +25,7 @@ interface Guest {
   guestType: string | null;
 }
 
-export default async function EventPage({ params }: { params: { id: string } }) {
+export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   
   if (!session) {
@@ -36,8 +36,11 @@ export default async function EventPage({ params }: { params: { id: string } }) 
     );
   }
 
-  const event = await prisma.event.findUnique({
-    where: { id: params.id },
+  const { id } = await params;
+  const tenantId = (session.user as { tenantId?: string }).tenantId;
+
+  const event = await prisma.event.findFirst({
+    where: { id, tenantId },
     include: {
       guests: {
         orderBy: { createdAt: 'desc' },

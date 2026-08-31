@@ -112,7 +112,7 @@ export default function RequestCreditsModal({
               <Clock size={18} className="text-amber-600 shrink-0" />
               <div>
                 <p className="text-sm font-bold text-amber-800">Request pending</p>
-                <p className="text-xs text-amber-600 mt-0.5">You already have a credit request being reviewed by the admin.</p>
+                <p className="text-xs text-amber-600 mt-0.5">You already have a credit request being reviewed by the admin. Need it sooner? WhatsApp +255702529514.</p>
               </div>
             </div>
           )}

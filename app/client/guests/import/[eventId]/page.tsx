@@ -19,13 +19,14 @@ interface ParsedGuest {
   email?: string;
   guestType?: string;
   title?: string;
+  cardGroupId?: string;
   isValid: boolean;
   statusMessage?: string;
   cardNumber?: string;
 }
 
 interface ColumnMapping {
-  [key: string]: 'name' | 'phone' | 'email' | 'guestType' | 'title' | 'skip';
+  [key: string]: 'name' | 'phone' | 'email' | 'guestType' | 'title' | 'cardGroupId' | 'skip';
 }
 
 export default function ImportGuestsPage() {
@@ -339,6 +340,7 @@ export default function ImportGuestsPage() {
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
             else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
+            else if (['card group', 'cardgroup', 'card group id', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -372,6 +374,7 @@ export default function ImportGuestsPage() {
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
             else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
+            else if (['card group', 'cardgroup', 'card group id', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -484,11 +487,12 @@ export default function ImportGuestsPage() {
   };
 
   const downloadSampleCSV = () => {
-    const headers = ['title', 'name', 'phone', 'email', 'guestType'];
+    const headers = ['title', 'name', 'phone', 'email', 'guestType', 'cardGroupId'];
     const sampleData = [
-      ['Mr', 'John Doe', '+255712345678', 'john@example.com', 'single'],
-      ['', 'Jane Smith', '+255755123456', 'jane@example.com', 'double'],
-      ['Mr/Mrs', 'James & Mary Brown', '+255782345678', 'brown@example.com', 'double'],
+      ['Mr', 'John Doe', '+255712345678', 'john@example.com', 'single', ''],
+      ['', 'Jane Smith', '+255755123456', 'jane@example.com', 'double', ''],
+      ['MRS', 'Alice Brown', '+255782345678', 'alice@example.com', 'double', 'pair-1'],
+      ['MR', 'Bob Brown', '+255786345679', 'bob@example.com', 'double', 'pair-1'],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -601,6 +605,7 @@ export default function ImportGuestsPage() {
     const emailCol = Object.keys(mapping).find(k => mapping[k] === 'email');
     const guestTypeCol = Object.keys(mapping).find(k => mapping[k] === 'guestType');
     const titleCol = Object.keys(mapping).find(k => mapping[k] === 'title');
+    const cardGroupIdCol = Object.keys(mapping).find(k => mapping[k] === 'cardGroupId');
 
     if (!nameCol || !phoneCol) {
       setError('Please map the "name" and "phone" columns.');
@@ -612,6 +617,7 @@ export default function ImportGuestsPage() {
       const email = emailCol ? row[emailCol]?.toString().trim() : undefined;
       const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() : undefined;
       const title = titleCol ? row[titleCol]?.toString().trim() : undefined;
+      const cardGroupId = cardGroupIdCol ? String(row[cardGroupIdCol] ?? '').trim() : undefined;
       const norm = normalizePhone(phone);
       const { cleanName } = extractTitle(name);
       return {
@@ -623,6 +629,7 @@ export default function ImportGuestsPage() {
         email,
         guestType,
         title: title || '', // ✅ Empty string if no title
+        cardGroupId: cardGroupId || undefined,
       };
     }).filter(g => g.name && g.phone);
     setParsedGuests(guests);
@@ -648,6 +655,7 @@ export default function ImportGuestsPage() {
     guestType: g.guestType,
     cardNumber: g.cardNumber,
     title: g.title || '',
+    cardGroupId: g.cardGroupId,
   }));
   setUploading(true);
   setImportStatus('Importing guests...');
@@ -757,6 +765,9 @@ export default function ImportGuestsPage() {
         Upload a <strong>CSV</strong>, <strong>Excel (.xlsx)</strong>, <strong>vCard (.vcf)</strong>, or <strong>PDF</strong> file, or import from your phone contacts.
         For CSV/Excel, you'll be able to map columns to our fields. Phone numbers will be auto‑formatted to international format.
         <span className="block text-xs text-gray-400 mt-1">Leave <strong>Title</strong> column empty if you don't want to use titles.</span>
+        <span className="block text-xs text-gray-400 mt-1">
+          To create a shared 2-person DOUBLE card, put the same value in a <strong>Card Group</strong> column for two rows.
+        </span>
       </p>
 
       {step === 'upload' && (
@@ -865,6 +876,7 @@ export default function ImportGuestsPage() {
                       <option value="email">Email</option>
                       <option value="guestType">Guest Type</option>
                       <option value="title">Title (Mr/Mrs/etc.)</option>
+                      <option value="cardGroupId">Card Group (pair)</option>
                     </select>
                   </div>
                 ))}

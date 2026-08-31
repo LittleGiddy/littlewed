@@ -85,6 +85,12 @@ export async function POST(req: NextRequest) {
     const waLimitReached = () => limit !== null && waUsed >= limit;
 
     // ─── Process in batches ────────────────────────────────────────────
+    // Cache generated card URLs per card group within this request, so both
+    // members of a shared DOUBLE card reuse the same composed image instead of
+    // regenerating it twice.
+    const cardCache = new Map<string, string>();
+    const cardCacheKey = (g: any) => g.cardGroupId ? `group:${g.cardGroupId}` : `guest:${g.id}`;
+
     for (let i = 0; i < guests.length; i += BATCH_SIZE) {
       const batch = guests.slice(i, i + BATCH_SIZE);
       console.log(`[Batch] Processing batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(guests.length / BATCH_SIZE)}`);
@@ -119,9 +125,19 @@ export async function POST(req: NextRequest) {
                    // ─── Ensure card image exists ──────────────────────────────────
           let cardImageUrl = guest.invitationCard;
 
+          // For a shared DOUBLE card, reuse the composed image already
+          // generated for a group member earlier in this request.
+          const cacheKey = cardCacheKey(guest);
+          if (!cardImageUrl && cardCache.has(cacheKey)) {
+            cardImageUrl = cardCache.get(cacheKey)!;
+          }
+
           if (!cardImageUrl) {
             try {
               cardImageUrl = await generateAndStoreCardForGuest(guest.id);
+              if (cardImageUrl) {
+                cardCache.set(cacheKey, cardImageUrl);
+              }
             } catch (error) {
               console.error(`[Batch] Failed to generate card image for ${guest.name}:`, error);
               await logSystemEvent({

@@ -4,6 +4,7 @@ const CLIENT_ID = process.env.CLICKPESA_CLIENT_ID!;
 const API_KEY = process.env.CLICKPESA_API_KEY!;
 const BASE_URL = process.env.CLICKPESA_BASE_URL || 'https://api.clickpesa.com';
 const WEBHOOK_URL = process.env.CLICKPESA_WEBHOOK_URL;
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL?.replace(/\/+$/, '') || 'https://littlewed.co.tz';
 
 // ─── Get Access Token ────────────────────────────────────────────────────
 export async function getAccessToken(): Promise<string> {
@@ -14,8 +15,8 @@ export async function getAccessToken(): Promise<string> {
       throw new Error('CLICKPESA_CLIENT_ID or CLICKPESA_API_KEY is missing');
     }
 
-    // ✅ Hosted mode uses the same /generate-token endpoint
-    const res = await fetch(`${BASE_URL}/generate-token`, {
+    // ✅ Hosted mode uses /third-parties/generate-token (token already includes "Bearer ")
+    const res = await fetch(`${BASE_URL}/third-parties/generate-token`, {
       method: 'POST',
       headers: {
         'client-id': CLIENT_ID,
@@ -67,7 +68,7 @@ export async function generateCheckoutLink(params: {
       customerPhone: params.customerPhone || '',
       description: params.description || '',
       callbackUrl: WEBHOOK_URL,
-      redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success`,
+      redirectUrl: `${APP_URL}/payment/success`,
     };
 
     console.log('[ClickPesa] Checkout payload:', JSON.stringify(payload, null, 2));

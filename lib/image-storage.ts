@@ -43,6 +43,27 @@ function getGuestFullName(guest: any): string {
   return guest.title ? `${guest.title} ${guest.name}` : guest.name;
 }
 
+// Composes the display name for a card. For a shared DOUBLE card (multiple
+// guests sharing a cardGroupId), join the members' names with " & ".
+function composeCardName(guest: any, groupMembers: any[] = []): string {
+  const primaryName = getGuestFullName(guest);
+
+  if (!guest.cardGroupId || groupMembers.length === 0) {
+    return primaryName;
+  }
+
+  const memberNames = groupMembers
+    .slice()
+    .sort((a, b) => (a.id === guest.id ? -1 : b.id === guest.id ? 1 : 0))
+    .map((m) => getGuestFullName(m));
+
+  const unique = Array.from(new Set(memberNames));
+  if (unique.length === 1) {
+    return unique[0];
+  }
+  return unique.join(' & ');
+}
+
 export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buffer> {
   const response = await fetch(templateCardUrl);
   if (!response.ok) {
@@ -218,7 +239,8 @@ async function saveToCloudinary(buffer: Buffer, filePath: string): Promise<strin
 export async function generateCardForGuest(
   guest: any,
   event: EventLike,
-  cardBuffer: Buffer
+  cardBuffer: Buffer,
+  displayNameOverride?: string
 ): Promise<string> {
   // ─── 1. Get actual image dimensions ──────────────────────────────────
   const metadata = await sharp(cardBuffer).metadata();
@@ -270,7 +292,7 @@ export async function generateCardForGuest(
   if (designLayers.length > 0) {
     const textLayers = designLayers.filter(l => l.type === 'text');
     
-    const guestFullName = getGuestFullName(guest);
+    const guestFullName = displayNameOverride || getGuestFullName(guest);
     const guestTitle = guest?.title || '';
     const cardNumber = guest?.cardNumber || '';
     const guestType = guest?.guestType === 'DOUBLE' ? 'Double' : 'Single';
@@ -455,21 +477,38 @@ export async function generateAndStoreCardForGuest(guestId: string): Promise<str
   }
 
   const cardBuffer = await fetchTemplateBuffer(event.templateCardUrl);
-  const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
-  await prisma.guest.update({
-    where: { id: guest.id },
-    data: { invitationCard: imageUrl },
-  });
+  // ─── Group-aware shared DOUBLE card ─────────────────────────────────
+  // If this guest is part of a shared card group, generate ONE composed
+  // image (both names) and store the same URL on every group member.
+  const groupMembers = guest.cardGroupId
+    ? await prisma.guest.findMany({
+        where: {
+          eventId: guest.eventId,
+          cardGroupId: guest.cardGroupId,
+        },
+      })
+    : [];
+
+  const displayName = composeCardName(guest, groupMembers);
+  const imageUrl = await generateCardForGuest(guest, event, cardBuffer, displayName);
+
+  if (groupMembers.length > 0) {
+    const memberIds = groupMembers.map((m) => m.id);
+    await prisma.guest.updateMany({
+      where: { id: { in: memberIds } },
+      data: { invitationCard: imageUrl },
+    });
+  } else {
+    await prisma.guest.update({
+      where: { id: guest.id },
+      data: { invitationCard: imageUrl },
+    });
+  }
 
   return imageUrl;
 }
 
 export async function generateAndStoreCardImage(guestId: string): Promise<string> {
   return generateAndStoreCardForGuest(guestId);
-}
-
-export function getCardImageUrl(passCode: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://littlewed.co.tz';
-  return `${baseUrl}/api/og/card?code=${passCode}`;
 }

@@ -1,5 +1,8 @@
 // app/send-invitations-server/[eventId]/page.tsx
 import { prisma } from '@/lib/prisma';
+import { getServerSession } from '@/lib/authGuard';
+import { authOptions } from '@/lib/auth';
+import { notFound } from 'next/navigation';
 import { CircleCheck, CircleAlert } from 'lucide-react';
 import SendButton from '@/components/SendButtonClient';
 
@@ -9,6 +12,20 @@ export default async function SendInvitationsServerPage({
   params: Promise<{ eventId: string }>;
 }) {
   const { eventId } = await params;
+
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    notFound();
+  }
+  const tenantId = (session.user as { tenantId?: string }).tenantId;
+
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
+    select: { id: true },
+  });
+  if (!event) {
+    notFound();
+  }
 
   const guests = await prisma.guest.findMany({
     where: { eventId },

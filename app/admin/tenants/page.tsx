@@ -12,6 +12,7 @@ interface Tenant {
   id: string;
   name: string;
   subdomain: string;
+  phone: string | null;
   plan: string;
   subscriptionStatus: string;
   credits: number;
@@ -48,8 +49,10 @@ export default function AdminTenantsPage() {
 
   const filteredTenants = tenants
     .filter(t => {
+      const phone = t.phone || '';
       const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) ||
-                            t.subdomain.toLowerCase().includes(search.toLowerCase());
+                            t.subdomain.toLowerCase().includes(search.toLowerCase()) ||
+                            phone.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = filterStatus === 'all' || t.subscriptionStatus === filterStatus;
       return matchesSearch && matchesStatus;
     })
@@ -118,7 +121,7 @@ export default function AdminTenantsPage() {
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name or subdomain..."
+            placeholder="Search by name, subdomain, or phone..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] transition-colors"
@@ -155,6 +158,7 @@ export default function AdminTenantsPage() {
                   </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Subdomain</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
                 <th className="px-6 py-3 text-left">
                   <button onClick={() => handleSort('plan')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition-colors">
                     Plan <ArrowUpDown size={12} />
@@ -170,14 +174,14 @@ export default function AdminTenantsPage() {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={7} className="px-6 py-4">
+                    <td colSpan={8} className="px-6 py-4">
                       <div className="h-4 bg-gray-100 rounded-full animate-pulse w-3/4" />
                     </td>
                   </tr>
                 ))
               ) : filteredTenants.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={8} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
                         <Building2 size={24} className="text-gray-300" />
@@ -214,6 +218,7 @@ export default function AdminTenantsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-3.5 text-sm text-gray-500 font-mono">{tenant.subdomain}</td>
+                    <td className="px-6 py-3.5 text-sm text-gray-500">{tenant.phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-6 py-3.5">
                       <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-lg">{tenant.plan}</span>
                     </td>

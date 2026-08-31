@@ -120,7 +120,7 @@ export default function BillingPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center mb-4">
               <Clock size={28} className="text-amber-500 mx-auto mb-2" />
               <p className="text-sm font-bold text-amber-800">Request Under Review</p>
-              <p className="text-xs text-amber-600 mt-1">Your credit request is being reviewed by the admin. You&apos;ll be notified when it&apos;s approved.</p>
+              <p className="text-xs text-amber-600 mt-1">Your credit request is being reviewed by the admin. You&apos;ll be notified when it&apos;s approved. Need it sooner? WhatsApp +255702529514.</p>
             </div>
           ) : (
             <div className="bg-[#0D4B4B]/5/50 border border-[#0D4B4B]/10 rounded-2xl p-5 text-center mb-4">

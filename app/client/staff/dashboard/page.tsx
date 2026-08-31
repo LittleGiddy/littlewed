@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
+import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
 
 interface Guest {
   id: string;
@@ -238,9 +239,17 @@ export default function StaffDashboard() {
         setShowSuccess(true);
         setMessage(data.message || 'Checked in successfully');
 
-        if (isFully && max > 1) toast.success(`${fullName} fully checked in (${count}/${max})`);
-        else if (max > 1) toast.success(`${fullName} checked in (${count}/${max})`);
-        else toast.success(`Welcome ${fullName}`);
+        const welcomeSub = isFully && max > 1
+          ? `Fully checked in (${count}/${max})`
+          : max > 1
+            ? `Checked in (${count}/${max})`
+            : undefined;
+
+        showCheckInWelcome({
+          name: fullName,
+          subtitle: welcomeSub,
+          onDismiss: () => router.refresh(),
+        });
 
         await loadGuests(selectedEventId);
 

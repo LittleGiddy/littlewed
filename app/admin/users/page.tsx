@@ -12,6 +12,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   isActive: boolean;
   createdAt: string;
   tenant: { name: string } | null;
@@ -84,14 +85,14 @@ export default function AdminUsersPage() {
     }
   };
 
-  const inactiveUsers = users.filter(u => {
-    const matchesSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    return !u.isActive && matchesSearch;
-  });
-  const activeUsers = users.filter(u => {
-    const matchesSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    return u.isActive && matchesSearch;
-  });
+  const matchesSearch = (u: User) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const phone = u.phone || '';
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || phone.toLowerCase().includes(q);
+  };
+  const inactiveUsers = users.filter(u => !u.isActive && matchesSearch(u));
+  const activeUsers = users.filter(u => u.isActive && matchesSearch(u));
 
   const stats = [
     { label: 'Pending', value: inactiveUsers.length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -110,7 +111,7 @@ export default function AdminUsersPage() {
         <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
         <p className="text-xs text-gray-400 truncate">{user.email}</p>
         <p className="text-[11px] text-gray-300 mt-0.5">
-          {user.tenant?.name ?? 'No tenant'} &middot; Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {user.phone ? `${user.phone} · ` : ''}{user.tenant?.name ?? 'No tenant'} &middot; Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
@@ -195,7 +196,7 @@ export default function AdminUsersPage() {
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Search users by name or email..."
+          placeholder="Search users by name, email, or phone..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] transition-colors"

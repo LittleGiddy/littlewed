@@ -19,11 +19,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { businessName, subdomain } = await req.json();
+    const { businessName, subdomain, phone } = await req.json();
 
     if (!businessName || !subdomain) {
       return NextResponse.json(
         { error: 'Business name and subdomain are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!phone || !phone.trim()) {
+      return NextResponse.json(
+        { error: 'A phone number is required to complete signup' },
         { status: 400 }
       );
     }
@@ -85,7 +92,7 @@ export async function POST(req: NextRequest) {
       data: {
         tenantId: tenant.id,
         role: 'CLIENT',
-        
+        phone: phone.trim(),
       },
     });
 

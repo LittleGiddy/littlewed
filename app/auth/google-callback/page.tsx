@@ -13,6 +13,7 @@ function GoogleCallbackInner() {
 
   const [phase, setPhase] = useState<'checking' | 'needsOrg' | 'redirecting'>('checking');
   const [orgName, setOrgName] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -59,13 +60,17 @@ function GoogleCallbackInner() {
       setError('Please enter an organization name.');
       return;
     }
+    if (!phone.trim()) {
+      setError('Please enter your phone number.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
       const res = await fetch('/api/auth/complete-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessName: orgName.trim(), subdomain: subdomainFromName(orgName) }),
+        body: JSON.stringify({ businessName: orgName.trim(), subdomain: subdomainFromName(orgName), phone: phone.trim() }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -151,12 +156,12 @@ function GoogleCallbackInner() {
         <p style={{ color: '#7A8FA6', fontSize: 14, lineHeight: 1.6, marginBottom: 22 }}>
           {intent === 'login' ? (
             <>
-              We don't see an organization linked to <strong>{session?.user?.email}</strong> yet. Create one to
+              We don&apos;t see an organization linked to <strong>{session?.user?.email}</strong> yet. Create one to
               continue - it only takes a second.
             </>
           ) : (
             <>
-              You're signed in as <strong>{session?.user?.email}</strong>. Give your organization a name to finish
+              You&apos;re signed in as <strong>{session?.user?.email}</strong>. Give your organization a name to finish
               creating your account.
             </>
           )}
@@ -191,6 +196,30 @@ function GoogleCallbackInner() {
             </div>
           )}
 
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#0D4B4B', display: 'block', marginBottom: 6, marginTop: 14 }}>
+            Phone Number
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="e.g., +255 700 000 000"
+            disabled={submitting}
+            style={{
+              width: '100%',
+              padding: '13px 15px',
+              border: '1.5px solid #E2EAF0',
+              borderRadius: 13,
+              fontSize: 15,
+              outline: 'none',
+              fontFamily: 'inherit',
+              fontWeight: 500,
+            }}
+          />
+          <div style={{ fontSize: 11, color: '#9BAAB8', marginTop: 6 }}>
+            We&apos;ll use this to reach you about your account and credit requests.
+          </div>
+
           {error && (
             <div
               style={{
@@ -214,7 +243,7 @@ function GoogleCallbackInner() {
 
           <button
             type="submit"
-            disabled={submitting || !orgName.trim()}
+            disabled={submitting || !orgName.trim() || !phone.trim()}
             style={{
               width: '100%',
               marginTop: 18,
@@ -226,7 +255,7 @@ function GoogleCallbackInner() {
               fontSize: 14,
               fontWeight: 700,
               cursor: submitting ? 'not-allowed' : 'pointer',
-              opacity: submitting || !orgName.trim() ? 0.6 : 1,
+              opacity: submitting || !orgName.trim() || !phone.trim() ? 0.6 : 1,
             }}
           >
             {submitting ? 'Creating…' : 'Create Organization'}

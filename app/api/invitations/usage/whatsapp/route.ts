@@ -21,6 +21,16 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const eventId = url.searchParams.get('eventId');
 
+    if (eventId) {
+      const event = await prisma.event.findFirst({
+        where: { id: eventId, tenantId },
+        select: { id: true },
+      });
+      if (!event) {
+        return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      }
+    }
+
     // Start of today (local time, converted to Date)
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());

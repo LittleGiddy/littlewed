@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Users, Plus, Coins, Upload, Palette, Send,
   ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock,
+  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock, QrCode,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -194,6 +194,7 @@ export default function DashboardContent({
     { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event', color: 'text-amber-600', bg: 'bg-amber-50' },
     { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event', color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup', color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'Check-in', sub: 'Scan guests in', icon: QrCode, href: '/client/check-in/select-event', color: 'text-rose-600', bg: 'bg-rose-50' },
   ];
 
   const eventColors = ['bg-[#0D4B4B]', 'bg-green-600', 'bg-amber-600'];
@@ -289,7 +290,7 @@ export default function DashboardContent({
               <Clock size={18} className="text-amber-600 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-amber-800">Credit request pending</p>
-                <p className="text-xs text-amber-600 mt-0.5">Waiting for admin to review your credit request.</p>
+                <p className="text-xs text-amber-600 mt-0.5">Waiting for admin to review your credit request. Need it sooner? WhatsApp +255702529514.</p>
               </div>
             </div>
           </motion.div>

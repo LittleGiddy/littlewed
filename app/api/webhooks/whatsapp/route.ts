@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN;
+const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || process.env.NEXTSMS_WEBHOOK_TOKEN;
 
 // ─── GET: Webhook verification ──────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -12,6 +12,11 @@ export async function GET(req: NextRequest) {
   const challenge = searchParams.get('hub.challenge');
 
   console.log('[Webhook] Verification request:', { mode, token, challenge });
+
+  if (!WEBHOOK_TOKEN) {
+    console.error('[Webhook] ❌ WEBHOOK_TOKEN / NEXTSMS_WEBHOOK_TOKEN is not configured');
+    return new NextResponse('Webhook token not configured', { status: 503 });
+  }
 
   if (mode === 'subscribe' && token === WEBHOOK_TOKEN) {
     console.log('[Webhook] ✅ Webhook verified successfully');
@@ -30,8 +35,15 @@ export async function POST(req: NextRequest) {
     console.log('[Webhook] Payload:', JSON.stringify(body, null, 2));
 
     // ─── Verify webhook token ──────────────────────────────────────────
+    if (!WEBHOOK_TOKEN) {
+      console.error('[Webhook] ❌ WEBHOOK_TOKEN / NEXTSMS_WEBHOOK_TOKEN is not configured');
+      return NextResponse.json(
+        { error: 'Webhook token not configured. Set WEBHOOK_TOKEN (or NEXTSMS_WEBHOOK_TOKEN).' },
+        { status: 503 }
+      );
+    }
     const token = body.token;
-    if (WEBHOOK_TOKEN && token !== WEBHOOK_TOKEN) {
+    if (token !== WEBHOOK_TOKEN) {
       console.error('[Webhook] ❌ Invalid webhook token');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

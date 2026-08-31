@@ -30,6 +30,7 @@ export async function GET(
             title: true,
             guestType: true,
             cardNumber: true,
+            cardGroupId: true,
             passCode: true,
             routingChannel: true,
             checkedIn: true,

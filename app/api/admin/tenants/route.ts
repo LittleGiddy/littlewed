@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         testMode: true,
         createdAt: true,
         users: {
-          select: { id: true },
+          select: { id: true, phone: true },
         },
         // Optionally include event count
         _count: {
@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     // Format the response with additional stats
     const formattedTenants = tenants.map(tenant => ({
       ...tenant,
+      phone: (tenant.users && tenant.users.find(u => u.phone)?.phone) || null,
       eventsCount: tenant._count.events,
       _count: undefined, // Remove the _count field
     }));

@@ -164,9 +164,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
+    // ─── GROUP-AWARE RESOLUTION (shared DOUBLE cards) ────────────────
+    // When this guest was found by scanning a shared card number (multiple
+    // guests share one cardGroupId), the scan is ambiguous about WHICH person
+    // is checking in — so we auto-assign the first member with an available
+    // slot (1 check-in per person). Explicit guestId selection is unaffected.
+    let checkInGuest = guest;
+    let isSharedGroup = false;
+    let groupMembers: any[] = [];
+
+    if (!guestIdFromQuery && guest.cardGroupId) {
+      groupMembers = await prisma.guest.findMany({
+        where: { eventId: guest.eventId, cardGroupId: guest.cardGroupId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (groupMembers.length > 1) {
+        isSharedGroup = true;
+        const available = groupMembers.find((m) => (m.checkInCount || 0) < 1);
+        if (!available) {
+          return NextResponse.json(
+            {
+              error: 'Everyone on this card has already checked in.',
+              checkedIn: true,
+              checkInCount: groupMembers.length,
+              maxCheckIns: groupMembers.length,
+            },
+            { status: 400 }
+          );
+        }
+        checkInGuest = available;
+      }
+    }
+
     // ─── TIME VALIDATION: Check if event has started ──────────────────
     const event = await prisma.event.findFirst({
-      where: { id: guest.eventId, tenantId: (session.user as any).tenantId },
+      where: { id: checkInGuest.eventId, tenantId: (session.user as any).tenantId },
       select: {
         id: true,
         name: true,
@@ -201,9 +234,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── DOUBLE CHECK-IN LOGIC ──────────────────────────────────────
-    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
-    const currentCount = guest.checkInCount || 0;
+    // ─── CHECK-IN LOGIC ───────────────────────────────────────────────
+    // Shared group members have 1 available slot each (1 per person).
+    // Legacy single-row DOUBLE (no cardGroupId) counts to 2 on one row.
+    const isGroupMember = isSharedGroup;
+    const maxCheckIns = isGroupMember ? 1 : (checkInGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1);
+    const currentCount = checkInGuest.checkInCount || 0;
 
     // ─── Check if already checked in maximum times ──────────────────
     if (currentCount >= maxCheckIns) {
@@ -223,7 +259,7 @@ export async function POST(req: NextRequest) {
     const isFullyCheckedIn = newCount >= maxCheckIns;
 
     const updated = await prisma.guest.update({
-      where: { id: guest.id },
+      where: { id: checkInGuest.id },
       data: {
         checkInCount: newCount,
         checkedIn: isFullyCheckedIn,
@@ -231,13 +267,32 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // ─── Compute group progress for the response/message ───────────────
+    let reportTotal = maxCheckIns;
+    let reportCompleted = newCount;
+    if (isGroupMember) {
+      reportTotal = groupMembers.length;
+      const allNow = await prisma.guest.findMany({
+        where: { eventId: checkInGuest.eventId, cardGroupId: checkInGuest.cardGroupId },
+        select: { checkInCount: true },
+      });
+      reportCompleted = allNow.reduce((s, m) => s + (m.checkInCount || 0), 0);
+    }
+
     // ─── Notify the tenant owner(s) of the check-in (fire & forget) ──
     const fullName = updated.title ? `${updated.title} ${updated.name}` : updated.name;
+    const groupRef = isGroupMember
+      ? reportCompleted >= reportTotal
+        ? 'All guests on the card'
+        : `${reportCompleted}/${reportTotal} people on the card`
+      : `${reportCompleted}/${reportTotal}`;
     sendPushToTenantRole((session.user as any).tenantId, 'CLIENT', {
       title: `${fullName} checked in`,
-      body: isFullyCheckedIn
-        ? `${fullName} has fully checked in to ${event.name} (${newCount}/${maxCheckIns}).`
-        : `${fullName} checked in to ${event.name} (${newCount}/${maxCheckIns}).`,
+      body: isGroupMember
+        ? `${fullName} checked in. ${groupRef} now checked in (${event.name}).`
+        : isFullyCheckedIn
+          ? `${fullName} has fully checked in to ${event.name} (${newCount}/${maxCheckIns}).`
+          : `${fullName} checked in to ${event.name} (${newCount}/${maxCheckIns}).`,
       url: '/client/dashboard',
       type: 'success',
       sound: true,
@@ -251,6 +306,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Success Response ──────────────────────────────────────────────
+    const reportedGuestName = isGroupMember ? guest.name : updated.name;
     return NextResponse.json(
       {
         success: true,
@@ -261,12 +317,20 @@ export async function POST(req: NextRequest) {
           guestType: updated.guestType || 'SINGLE',
           checkInCount: newCount,
           maxCheckIns: maxCheckIns,
-          fullyCheckedIn: isFullyCheckedIn,
+          fullyCheckedIn: isGroupMember ? reportCompleted >= reportTotal : isFullyCheckedIn,
           checkedInAt: updated.checkedInAt,
+          sharedGroup: isGroupMember,
+          groupMembers: groupMembers.map((m) => ({
+            id: m.id,
+            name: m.title ? `${m.title} ${m.name}` : m.name,
+            checkedIn: (m.checkInCount || 0) >= 1,
+          })),
         },
-        message: isFullyCheckedIn
-          ? `${updated.name} fully checked in (${newCount}/${maxCheckIns})`
-          : `${updated.name} checked in (${newCount}/${maxCheckIns}) - ${maxCheckIns - newCount} more allowed`,
+        message: isGroupMember
+          ? `${reportedGuestName} checked in. ${reportCompleted}/${reportTotal} people on the card now checked in.`
+          : isFullyCheckedIn
+            ? `${updated.name} fully checked in (${newCount}/${maxCheckIns})`
+            : `${updated.name} checked in (${newCount}/${maxCheckIns}) - ${maxCheckIns - newCount} more allowed`,
       },
       {
         headers: {
