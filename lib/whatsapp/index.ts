@@ -195,18 +195,18 @@ export async function sendWeddingInvitation(
         // "inakualika katika {var3} ya {var4}"
         "var3": data.eventType || 'harusi',
         "var4": coupleName,
-        // "itakayofanyika tarehe {var6}"
-        "var6": data.date,
-        // "Mahali: {var7}"
-        "var7": data.venue,
-        // "Muda: Kuanzia saa {var8}"
-        "var8": data.time,
-        // "Card No: {var9}"
-        "var9": data.cardNumber,
-        // "{var10}" card type
-        "var10": data.cardType,
-        // "kwa mawasiliano zaidi: {var11}"
-        ...(data.contact ? {  "var11": data.contact } : {}),
+        // "itakayofanyika tarehe {var5}"
+        "var5": data.date,
+        // "Mahali: {var6}"
+        "var6": data.venue,
+        // "Muda: Kuanzia saa {var7}"
+        "var7": data.time,
+        // "Card No: {Var8}"
+        "Var8": data.cardNumber,
+        // "{var9}" card type
+        "var9": data.cardType,
+        // "kwa mawasiliano zaidi: {var10}"
+        ...(data.contact ? { "var10": data.contact } : {}),
       }
     : {
         // Legacy layout: Mwalikotemp / Mwalikosecond
@@ -274,4 +274,34 @@ export async function sendWhatsAppThanksCard({
 
 export function getThanksWhatsAppTemplate(): string {
   return process.env.THANKS_WHATSAPP_TEMPLATE || 'mwalikothanks';
+}
+
+/**
+ * Sends a WhatsApp reminder to a single guest. The approved reminder template
+ * embeds only a per-guest NAME variable ({var1} = guest name). Once the new
+ * reminder template is approved, set REMINDER_WHATSAPP_TEMPLATE (or update the
+ * default below) to its approved name.
+ */
+const REMINDER_TEMPLATE_DEFAULT = 'mwaliko_reminder';
+
+export function getReminderWhatsAppTemplate(): string {
+  return process.env.REMINDER_WHATSAPP_TEMPLATE || REMINDER_TEMPLATE_DEFAULT;
+}
+
+export async function sendWhatsAppReminder({
+  to,
+  guestName,
+  templateName,
+}: {
+  to: string;
+  guestName: string;
+  templateName: string;
+}): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING REMINDER ======');
+  console.log('[WhatsApp] Template:', templateName);
+  return sendWhatsAppTemplate({
+    to,
+    template: templateName,
+    personalisation: [{ var1: guestName }],
+  });
 }

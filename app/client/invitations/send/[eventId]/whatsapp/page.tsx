@@ -49,7 +49,7 @@ export default function ComposeWhatsappPage() {
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, whatsappPending } = useGuestData(eventId);
 
-  const [template, setTemplate] = useState(() => readWhatsappDraft(id)?.template || 'mwaliko');
+  const [template, setTemplate] = useState(() => readWhatsappDraft(id)?.template || 'mwalikoforth');
   const [vars, setVars] = useState<Record<string, string>>(() => readWhatsappDraft(id)?.vars || {});
   const [contact, setContact] = useState(() => readWhatsappDraft(id)?.contact || '');
   const [eventType, setEventType] = useState(() => {
@@ -101,15 +101,13 @@ export default function ComposeWhatsappPage() {
       return [
         `Habari ${name}`,
         '',
-        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika ${eventType || 'harusi'} ya ${couple || '...'}`,
-        '',
-        `itakayofanyika tarehe: ${effectiveVars.date || '{date}'}`,
+        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika ${eventType || 'harusi'} ya ${couple || '...'} itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
         `Mahali: ${effectiveVars.venue || '{venue}'}`,
         `Muda: Kuanzia saa ${effectiveVars.time || '{time}'}`,
-        '',
-        `Card No: ${cardNumber}`,
-        `${cardType}`,
+        `Card No: ${cardNumber} ${cardType}`,
         ...(contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
+        '',
+        'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
       ].join('\n');
     }
     return [

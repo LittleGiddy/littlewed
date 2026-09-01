@@ -68,7 +68,7 @@ export default function WhatsappGuestsPage() {
   }, [id]);
 
   const limitReached = dailyLimit > 0 && waUsed >= dailyLimit;
-  const tplName = draft && typeof draft.template === 'string' ? draft.template : 'mwaliko';
+  const tplName = draft && typeof draft.template === 'string' ? draft.template : 'mwalikoforth';
   const templateInfo = INVITE_TEMPLATES[tplName];
 
   const pendingPool = useMemo(() => whatsappPending.filter(g => !!g.passCode), [whatsappPending]);

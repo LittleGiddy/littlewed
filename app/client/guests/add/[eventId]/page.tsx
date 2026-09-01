@@ -246,8 +246,10 @@ export default function AddGuestPage() {
             <ArrowLeft size={20} />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate">Add Guest</h1>
-            <p className="text-xs sm:text-sm text-gray-500 truncate">Add a new guest to your event</p>
+            <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate">Add Guest(s)</h1>
+            <p className="text-xs sm:text-sm text-gray-500 truncate">
+              Add a guest, or a plus-one so both share the same card
+            </p>
           </div>
           <button
             type="button"
@@ -348,7 +350,10 @@ export default function AddGuestPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">Select DOUBLE if this guest is bringing a plus-one</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Select DOUBLE to add a plus-one who shares the same card number — both phone numbers
+                will receive the invitation card.
+              </p>
             </div>
 
             {/* ─── Second Guest (only for shared DOUBLE card) ─── */}

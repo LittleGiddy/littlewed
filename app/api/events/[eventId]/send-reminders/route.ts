@@ -4,7 +4,10 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
+import { sendWhatsAppReminder, getReminderWhatsAppTemplate } from '@/lib/whatsapp/index';
 import { sendPushToTenantRole } from '@/lib/push';
+
+const REMINDER_COST = 50; // credits per reminder for the 3rd+ reminder
 
 export async function POST(
   req: NextRequest,
@@ -16,12 +19,13 @@ export async function POST(
   }
   const tenantId = (session.user as any).tenantId;
   const { eventId } = await params;
-  const { guestIds, message } = await req.json();
+  const { guestIds, message, channel } = await req.json();
 
   if (!guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
     return NextResponse.json({ error: 'No guests selected' }, { status: 400 });
   }
-  if (!message || message.trim().length === 0) {
+  const chan = channel === 'whatsapp' ? 'whatsapp' : 'sms';
+  if (chan === 'sms' && (!message || message.trim().length === 0)) {
     return NextResponse.json({ error: 'Message is required' }, { status: 400 });
   }
 
@@ -46,17 +50,27 @@ export async function POST(
       eventId,
       phone: { not: null },
     },
-    select: { id: true, name: true, phone: true, reminderCount: true },
+    select: { id: true, name: true, title: true, phone: true, reminderCount: true, routingChannel: true },
   });
 
   if (guests.length === 0) {
     return NextResponse.json({ error: 'No valid guests with phone numbers' }, { status: 400 });
   }
 
-  // Calculate cost: first reminder free, subsequent cost 50 TZS
+  // Filter to guests matching the chosen channel
+  const channelGuests = chan === 'whatsapp'
+    ? guests.filter(g => g.routingChannel === 'whatsapp')
+    : guests.filter(g => g.routingChannel === 'sms');
+  if (channelGuests.length === 0) {
+    return NextResponse.json({
+      error: `No ${chan === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests selected for this reminder.`,
+    }, { status: 400 });
+  }
+
+  // Calculate cost in credits: first 2 reminders per guest free, then 50 credits each
   let totalCost = 0;
-  for (const g of guests) {
-    totalCost += g.reminderCount === 0 ? 0 : 50;
+  for (const g of channelGuests) {
+    totalCost += g.reminderCount < 2 ? 0 : REMINDER_COST;
   }
 
   const creditsDisabled = event.tenant.creditsEnabled === false;
@@ -83,21 +97,33 @@ export async function POST(
     });
   }
 
-  // ─── Send SMS via NexSMS ─────────────────────────────────────────────
+  const remainingCredits = event.tenant.bypassPayment
+    ? event.tenant.credits
+    : (event.tenant.credits ?? 0) - totalCost;
+
+  // ─── Send via chosen channel ─────────────────────────────────────────
+  const whatsappTemplateName = getReminderWhatsAppTemplate();
   const results = [];
-  for (const guest of guests) {
+  for (const guest of channelGuests) {
     try {
       const phone = guest.phone as string;
-      const personalized = message
-        .replace(/{name}/g, guest.name)
-        .replace(/{event}/g, event.name);
+      let sendResult: { success: boolean; error?: string };
 
-      const smsResult = await sendSMS({
-        to: phone,
-        message: personalized,
-      });
+      if (chan === 'whatsapp') {
+        const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+        sendResult = await sendWhatsAppReminder({
+          to: phone,
+          guestName: fullName,
+          templateName: whatsappTemplateName,
+        });
+      } else {
+        const personalized = message
+          .replace(/{name}/g, guest.name)
+          .replace(/{event}/g, event.name);
+        sendResult = await sendSMS({ to: phone, message: personalized });
+      }
 
-      if (smsResult.success) {
+      if (sendResult.success) {
         await prisma.guest.update({
           where: { id: guest.id },
           data: { reminderCount: { increment: 1 } },
@@ -107,7 +133,7 @@ export async function POST(
         results.push({
           guestId: guest.id,
           success: false,
-          error: smsResult.error || 'SMS sending failed',
+          error: sendResult.error || (chan === 'whatsapp' ? 'WhatsApp sending failed' : 'SMS sending failed'),
         });
       }
     } catch (error) {
@@ -138,7 +164,8 @@ export async function POST(
     success: true,
     successCount,
     totalCost,
-    remainingCredits: event.tenant.credits - totalCost,
+    channel: chan,
+    remainingCredits,
     errors: errors.length > 0 ? errors : undefined,
     details: results,
   });

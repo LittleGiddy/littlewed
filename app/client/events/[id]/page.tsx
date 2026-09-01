@@ -1183,12 +1183,15 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <QrCode size={15} className="text-gray-400" /> Check-in guests
                   </button>
                   <button
-                    onClick={openKumbushaModal}
+                    onClick={() => {
+                      setShowManageMenu(false);
+                      router.push(`/client/events/${event.id}/remind`);
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
                   >
                     <Bell size={15} className="text-gray-400" /> Remind guests{' '}
-                    {kumbushaCount > 0 && (
-                      <span className="ml-auto text-xs text-amber-600 font-bold">{kumbushaCount}</span>
+                    {guests.length > 0 && (
+                      <span className="ml-auto text-xs text-amber-600 font-bold">{guests.length}</span>
                     )}
                   </button>
                   {checkedInCount > 0 && (
@@ -1403,6 +1406,22 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {/* ─── Step 1: Guests ─── */}
               {activeStep === 'guests' && (
                 <div className="space-y-4">
+                  <Link
+                    href={`/client/events/${event.id}/remind`}
+                    className="action-tile"
+                  >
+                    <div className="action-tile-icon bg-[#25D366]/10 text-[#15803d]">
+                      <Bell size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-gray-800">Remind guests</p>
+                      <p className="text-xs text-gray-400">
+                        Send SMS or WhatsApp reminders ({guests.length} guests)
+                      </p>
+                    </div>
+                    <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                  </Link>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Link href={`/client/guests/import/${event.id}`} className="action-tile">
                       <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
@@ -1420,7 +1439,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-gray-800">Add a single guest</p>
-                        <p className="text-xs text-gray-400">Enter one guest by hand</p>
+                        <p className="text-xs text-gray-400">
+                          Enter one guest by hand (add a plus-one to share a card)
+                        </p>
                       </div>
                       <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
                     </Link>

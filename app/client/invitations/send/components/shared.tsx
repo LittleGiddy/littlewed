@@ -58,9 +58,9 @@ export const INVITE_TEMPLATES: Record<
   string,
   { displayName: string; whatsappName: string; hasContact: boolean; hasEventType: boolean }
 > = {
-  mwaliko: { displayName: 'Template 1', whatsappName: 'Mwalikotemp', hasContact: false, hasEventType: false },
-  mwalikosecond: { displayName: 'Template 2', whatsappName: 'Mwalikosecond', hasContact: true, hasEventType: false },
-  mwalikoforth: { displayName: 'Template 3', whatsappName: 'MwalikoForth', hasContact: true, hasEventType: true },
+  mwalikoforth: { displayName: 'Template 1', whatsappName: 'MwalikoForth', hasContact: true, hasEventType: true },
+  mwaliko: { displayName: 'Template 2', whatsappName: 'Mwalikotemp', hasContact: false, hasEventType: false },
+  mwalikosecond: { displayName: 'Template 3', whatsappName: 'Mwalikosecond', hasContact: true, hasEventType: false },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
