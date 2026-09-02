@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { title, name, phone, cardNumber, email, eventId, guestType, guest2 } = await req.json();
+    const { title, name, phone, cardNumber, email, eventId, guestType, guest2, guestCount } = await req.json();
 
     if (!name || !phone || !eventId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -61,9 +61,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Validate guest type ──────────────────────────────────────────
-    const validGuestType = guestType && ['SINGLE', 'DOUBLE'].includes(guestType.toUpperCase())
+    const validGuestType = guestType && ['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE'].includes(guestType.toUpperCase())
       ? guestType.toUpperCase()
       : 'SINGLE';
+
+    // Validate guestCount for group types (FAMILIA/WAKWE)
+    const numericGuestCount = Number(guestCount);
+    const validGuestCount = Number.isFinite(numericGuestCount) && numericGuestCount > 0
+      ? Math.floor(numericGuestCount)
+      : null;
 
     const isSharedDouble = validGuestType === 'DOUBLE' && guest2 && guest2.name && guest2.phone;
 
@@ -240,6 +246,7 @@ export async function POST(req: NextRequest) {
         eventId,
         routingChannel: 'sms',
         guestType: validGuestType,
+        guestCount: validGuestCount,
         passCode,
         qrToken: randomBytes(16).toString('hex'),
       },

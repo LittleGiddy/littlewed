@@ -3,6 +3,7 @@ import './fonts';
 import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
+import { guestTypeLabel } from './guestTypes';
 import sharp from 'sharp';
 
 // ─── Cloudinary Configuration ──────────────────────────────────────────
@@ -45,7 +46,7 @@ function getGuestFullName(guest: any): string {
 
 // Composes the display name for a card. For a shared DOUBLE card (multiple
 // guests sharing a cardGroupId), join the members' names with " & ".
-function composeCardName(guest: any, groupMembers: any[] = []): string {
+export function composeCardName(guest: any, groupMembers: any[] = []): string {
   const primaryName = getGuestFullName(guest);
 
   if (!guest.cardGroupId || groupMembers.length === 0) {
@@ -226,8 +227,14 @@ async function saveToCloudinary(buffer: Buffer, filePath: string): Promise<strin
         if (error) {
           console.error('[Cloudinary] Upload error:', error);
           reject(error);
+        } else if (!result?.secure_url) {
+          // Never resolve with an empty URL - treat it as a failure so callers
+          // don't persist blank card URLs and strand guests with no card.
+          const err = new Error(`[Cloudinary] Upload returned no secure_url for ${filePath}`);
+          console.error(err.message);
+          reject(err);
         } else {
-          resolve(result?.secure_url || '');
+          resolve(result.secure_url);
         }
       }
     );
@@ -274,7 +281,8 @@ export async function generateCardForGuest(
   try {
     if (event.designLayers) {
       if (typeof event.designLayers === 'string') {
-        designLayers = JSON.parse(event.designLayers);
+        const parsed = JSON.parse(event.designLayers);
+        if (Array.isArray(parsed)) designLayers = parsed;
       } else if (Array.isArray(event.designLayers)) {
         designLayers = event.designLayers;
       }
@@ -283,6 +291,10 @@ export async function generateCardForGuest(
     console.warn('Failed to parse designLayers:', e);
     designLayers = [];
   }
+
+  // Guard against malformed stored layers (null elements) so one bad layer
+  // can never crash card generation.
+  designLayers = (designLayers || []).filter((l) => l && typeof l === 'object');
 
   console.log('[CardGen] Design layers count:', designLayers.length);
 
@@ -295,7 +307,8 @@ export async function generateCardForGuest(
     const guestFullName = displayNameOverride || getGuestFullName(guest);
     const guestTitle = guest?.title || '';
     const cardNumber = guest?.cardNumber || '';
-    const guestType = guest?.guestType === 'DOUBLE' ? 'Double' : 'Single';
+    // FAMILIA/WAKWE render with their group count, e.g. "Familia 30".
+    const guestType = guestTypeLabel(guest?.guestType, guest?.guestCount);
     const eventName = event?.name || '';
     const eventDate = event?.date ? new Date(event.date).toLocaleDateString('sw-TZ', {
       day: 'numeric',
@@ -389,8 +402,6 @@ export async function generateCardForGuest(
   const qrColor = event.qrColor || '#0D4B4B';
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
-  
-  const qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, qrColor);
 
   const qrTopLeftX = ((qrX) / 100) * actualWidth - qrSize / 2;
   const qrTopLeftY = ((qrY) / 100) * actualHeight - qrSize / 2;
@@ -411,28 +422,43 @@ export async function generateCardForGuest(
   });
 
   let finalBuffer = processedBuffer;
-  
+
+  // QR generation is isolated so an invalid QR color / oversized card number
+  // degrades to "no QR on this card" instead of aborting card generation.
   try {
+    let qrBuffer: Buffer;
+    try {
+      qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, qrColor);
+    } catch (colorError) {
+      // Fall back to the default QR color once before giving up.
+      console.error('[CardGen] QR color invalid, retrying with default:', colorError);
+      qrBuffer = await generateQRFromCardNumber(cardNumber, qrSize, '#0D4B4B');
+    }
+
     let qrToComposite = qrBuffer;
-    if (qrRotation !== 0) {
-      qrToComposite = await sharp(qrBuffer)
-        .rotate(qrRotation)
+    try {
+      if (qrRotation !== 0) {
+        qrToComposite = await sharp(qrBuffer)
+          .rotate(qrRotation)
+          .png()
+          .toBuffer();
+      }
+
+      finalBuffer = await sharp(processedBuffer)
+        .composite([
+          {
+            input: qrToComposite,
+            top: Math.round(clampedY),
+            left: Math.round(clampedX),
+          },
+        ])
         .png()
         .toBuffer();
+    } catch (qrError) {
+      console.error('Failed to composite QR code:', qrError);
     }
-    
-    finalBuffer = await sharp(processedBuffer)
-      .composite([
-        {
-          input: qrToComposite,
-          top: Math.round(clampedY),
-          left: Math.round(clampedX),
-        },
-      ])
-      .png()
-      .toBuffer();
-  } catch (qrError) {
-    console.error('Failed to composite QR code:', qrError);
+  } catch (qrGenError) {
+    console.error('QR generation failed entirely - card saved without QR:', qrGenError);
   }
 
   // ─── 7. Save to Cloudinary ──────────────────────────────────────────

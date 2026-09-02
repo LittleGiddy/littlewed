@@ -13,6 +13,7 @@ import {
   Card,
   LoadingState,
   SAMPLE_GUEST,
+  cardTypeLabel,
 } from '../../components/shared';
 
 interface WaDraft {
@@ -96,7 +97,7 @@ export default function ComposeWhatsappPage() {
         : effectiveVars.person1 || effectiveVars.person2;
     const name = getFullName(SAMPLE_GUEST);
     const cardNumber = SAMPLE_GUEST.cardNumber || '';
-    const cardType = SAMPLE_GUEST.guestType === 'DOUBLE' ? 'Double' : 'Single';
+    const cardType = cardTypeLabel(SAMPLE_GUEST);
     if (template === 'mwalikoforth') {
       return [
         `Habari ${name}`,

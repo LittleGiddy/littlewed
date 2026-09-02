@@ -129,8 +129,8 @@ export async function POST(
         });
       } else {
         const personalized = message
-          .replace(/{name}/g, guest.name)
-          .replace(/{event}/g, event.name);
+          .replace(/{name}/g, () => guest.name)
+          .replace(/{event}/g, () => event.name);
         sendResult = await sendSMS({ to: phone, message: personalized });
       }
 

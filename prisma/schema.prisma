@@ -241,7 +241,8 @@ model Guest {
   reminderCount   Int      @default(0)
   lastSendStatus String?   // "SENT" | "FAILED" | "SKIPPED_LIMIT" | "NOT_SENT" - last WhatsApp attempt outcome
   lastSendError  String?   // error/reason for the last send attempt
-  guestType  String?   @default("SINGLE")
+  guestType  String?   @default("SINGLE")  // SINGLE | DOUBLE | FAMILIA | WAKWE
+  guestCount Int?      // Total people for FAMILIA/WAKWE groups (determines allowed scans)
   title          String?   @default("Mr")
   cardNumber     String?
   cardGroupId    String?   // Shared by guests on a multi-person (DOUBLE) card

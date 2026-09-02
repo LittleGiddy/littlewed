@@ -38,6 +38,7 @@ export async function GET(
         title: true,
         phone: true,
         guestType: true,
+        guestCount: true,
         cardNumber: true,
         passCode: true,
         invitationCard: true,

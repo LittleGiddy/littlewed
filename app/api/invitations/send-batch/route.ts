@@ -7,6 +7,7 @@ import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
+import { guestTypeLabel } from '@/lib/guestTypes';
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       where: { 
         id: { in: guestIds }, 
         event: { tenantId },
+        phone: { not: null },
       },
       include: {
         event: {
@@ -233,12 +235,7 @@ export async function POST(req: NextRequest) {
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
             const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
-            const actualCardType =
-              guest.guestType === 'DOUBLE'
-                ? 'Double'
-                : guest.guestType === 'SINGLE'
-                  ? 'Single'
-                  : vars.cardType || '';
+            const actualCardType = guestTypeLabel(guest.guestType, guest.guestCount) || vars.cardType || '';
 
             // ─── Send WhatsApp ────────────────────────────────────────────
             // Variable values come from the user's inputs (whatsappVariables),
@@ -269,8 +266,7 @@ export async function POST(req: NextRequest) {
 
               const fallbackVars = smsVariables || {};
               const cardNumber = guest.cardNumber || fallbackVars.cardNumber || '';
-              const guestType =
-                guest.guestType === 'DOUBLE' ? 'Double' : guest.guestType === 'SINGLE' ? 'Single' : '';
+              const guestType = guestTypeLabel(guest.guestType, guest.guestCount);
 
               const smsTemplateText =
                 smsTemplate ||
@@ -340,12 +336,7 @@ export async function POST(req: NextRequest) {
             const guestTitle = guest.title || '';
             const actualGuestName = guestFullName;
             const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
-            const actualCardType =
-              guest.guestType === 'DOUBLE'
-                ? 'Double'
-                : guest.guestType === 'SINGLE'
-                  ? 'Single'
-                  : vars.cardType || '';
+            const actualCardType = guestTypeLabel(guest.guestType, guest.guestCount) || vars.cardType || '';
 
             // ─── Base template: prefer the SMS template edited by the user ──
             const smsTemplateText =

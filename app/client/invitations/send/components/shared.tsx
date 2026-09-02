@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Phone, MessageCircle, CheckCircle2 } from 'lucide-react';
+import { guestTypeLabel } from '@/lib/guestTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ export interface SendGuest {
   phone: string | null;
   routingChannel: string;
   guestType?: string | null;
+  guestCount?: number | null;
   cardNumber?: string | null;
   passCode?: string | null;
   invitationCard?: string | null;
@@ -39,7 +41,7 @@ export interface SendResult {
 export const SMS_VARIABLES = [
   { key: '{guestName}', label: 'Guest Name', example: 'Mr John Doe' },
   { key: '{cardNumber}', label: 'Card Number', example: '00123' },
-  { key: '{cardType}', label: 'Card Type', example: 'Single / Double' },
+  { key: '{cardType}', label: 'Card Type', example: 'Single / Double / Familia 10 / Wakwe 20' },
 ] as const;
 
 export const DEFAULT_SMS_TEMPLATE = `Habari {guestName},
@@ -69,8 +71,8 @@ export function getFullName(g: SendGuest): string {
   return g.title ? `${g.title} ${g.name}`.trim() : g.name;
 }
 
-export function cardTypeLabel(g: { guestType?: string | null }): string {
-  return g.guestType === 'DOUBLE' ? 'Double' : 'Single';
+export function cardTypeLabel(g: { guestType?: string | null; guestCount?: number | null }): string {
+  return guestTypeLabel(g.guestType, g.guestCount);
 }
 
 export function buildSmsMessage(template: string, guest: SendGuest): string {

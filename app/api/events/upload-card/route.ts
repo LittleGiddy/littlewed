@@ -6,6 +6,8 @@ import { prisma } from '@/lib/prisma';
 import cloudinary from '@/lib/cloudinary';
 import { Readable } from 'stream';
 
+const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -19,6 +21,14 @@ export async function POST(req: NextRequest) {
 
     if (!file || !eventId) {
       return NextResponse.json({ error: 'Missing file or eventId' }, { status: 400 });
+    }
+
+    // Validate type (JPEG/JPG/PNG/WebP) - other files break card generation later.
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Please upload a JPEG, JPG, PNG or WebP image.' },
+        { status: 400 }
+      );
     }
 
     // Validate file size (1MB max)

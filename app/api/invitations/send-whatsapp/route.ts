@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { guestTypeLabel } from '@/lib/guestTypes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,8 +83,7 @@ export async function POST(req: NextRequest) {
       venue: guest.event?.venue || '',
       time: guest.event?.time || '',
       cardNumber: guest.cardNumber || '',
-      cardType:
-        guest.guestType === 'DOUBLE' ? 'Double' : guest.guestType === 'SINGLE' ? 'Single' : '',
+      cardType: guestTypeLabel(guest.guestType, guest.guestCount),
       imageUrl: cardImageUrl || undefined,  // ✅ Card image rendered in WhatsApp (omitted if none)
       // No inviteLink - removed!
     });

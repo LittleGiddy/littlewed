@@ -29,6 +29,7 @@ export async function GET(
             email: true,
             title: true,
             guestType: true,
+            guestCount: true,
             cardNumber: true,
             cardGroupId: true,
             passCode: true,

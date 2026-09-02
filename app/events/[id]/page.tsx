@@ -23,6 +23,7 @@ interface Guest {
   createdAt: Date;
   routingChannel: string;
   guestType: string | null;
+  guestCount: number | null;
 }
 
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
@@ -70,6 +71,8 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   const guestsWithCard = guests.filter(g => g.cardNumber).length;
   const whatsappCount = guests.filter(g => g.routingChannel === 'whatsapp').length;
   const doubleCount = guests.filter(g => g.guestType?.toUpperCase() === 'DOUBLE').length;
+  const familiaCount = guests.filter(g => g.guestType?.toUpperCase() === 'FAMILIA').length;
+  const wakweCount = guests.filter(g => g.guestType?.toUpperCase() === 'WAKWE').length;
   const singleCount = guests.filter(g => g.guestType?.toUpperCase() === 'SINGLE' || !g.guestType).length;
 
   return (
@@ -127,6 +130,12 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               </span>
               <span className="flex items-center gap-1 text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
                 <UsersIcon size={12} /> {doubleCount}
+              </span>
+              <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
+                <UsersIcon size={12} /> {familiaCount}
+              </span>
+              <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                <UsersIcon size={12} /> {wakweCount}
               </span>
               <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                 <MessageCircle size={12} /> {whatsappCount}
@@ -193,14 +202,20 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                         <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-lg ${
                           guest.guestType.toUpperCase() === 'DOUBLE'
                             ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
+                            : ['FAMILIA', 'WAKWE'].includes(guest.guestType.toUpperCase())
+                              ? 'bg-teal-100 text-teal-700'
+                              : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {guest.guestType.toUpperCase() === 'DOUBLE' ? (
+                          {['FAMILIA', 'WAKWE'].includes(guest.guestType.toUpperCase()) ? (
+                            <UsersIcon size={13} />
+                          ) : guest.guestType.toUpperCase() === 'DOUBLE' ? (
                             <UsersIcon size={13} />
                           ) : (
                             <User size={13} />
                           )}
-                          {guest.guestType}
+                          {(guest.guestType.toUpperCase() === 'FAMILIA' || guest.guestType.toUpperCase() === 'WAKWE')
+                            ? `${guest.guestType} ${guest.guestCount || ''}`.trim()
+                            : guest.guestType}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">-</span>

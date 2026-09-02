@@ -166,8 +166,8 @@ export default function ImportGuestsPage() {
       // Skip header rows
       if (/^(SN|NO|#|S\/N|NAME|PHONE|CARD|TYPE|GUEST|TITLE)/i.test(trimmed)) continue;
 
-      // Pattern 1: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE")
-      let match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      // Pattern 1: SN NAME PHONE CARD (e.g., "1 ADRIAN 766084935 DOUBLE" or "5 MAMA 766084935 WAKWE 30")
+      let match = trimmed.match(/^(\d+)\s+([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+(?:\s+\d+)?)$/);
       if (match) {
         const name = match[2].trim();
         const phone = match[3];
@@ -185,7 +185,7 @@ export default function ImportGuestsPage() {
       }
 
       // Pattern 2: NAME PHONE CARD (without SN)
-      match = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+)$/);
+      match = trimmed.match(/^([A-Za-z\s\.&]+)\s+(\+\d+|\d+)\s+([A-Z]+(?:\s+\d+)?)$/);
       if (match) {
         const name = match[1].trim();
         const phone = match[2];
@@ -228,10 +228,15 @@ export default function ImportGuestsPage() {
 
         if (name && name.length > 2) {
           let cardType = 'SINGLE';
-          const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i);
+          const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY|FAMILIA|WAKWE)(?:\s+(\d+))?\b/i);
           if (cardMatch) {
             cardType = cardMatch[1].toUpperCase();
-            name = name.replace(/\b(SINGLE|DOUBLE|COUPLE|FAMILY)\b/i, '').trim();
+            if (cardType === 'COUPLE') cardType = 'DOUBLE';
+            if (cardType === 'FAMILY') cardType = 'FAMILIA';
+            if (cardMatch[2]) {
+              cardType = `${cardType} ${cardMatch[2]}`;
+            }
+            name = name.replace(/\b(SINGLE|DOUBLE|COUPLE|FAMILY|FAMILIA|WAKWE)(?:\s+\d+)?\b/i, '').trim();
           }
 
           const { cleanName, title } = extractTitle(name);
@@ -493,6 +498,8 @@ export default function ImportGuestsPage() {
       ['', 'Jane Smith', '+255755123456', 'jane@example.com', 'double', ''],
       ['MRS', 'Alice Brown', '+255782345678', 'alice@example.com', 'double', 'pair-1'],
       ['MR', 'Bob Brown', '+255786345679', 'bob@example.com', 'double', 'pair-1'],
+      ['MRS', 'Diana Mwaka', '+255788123456', 'diana@example.com', 'familia 30', ''],
+      ['', 'James Mwaka', '+255789654321', 'james@example.com', 'wakwe 20', ''],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -513,6 +520,8 @@ export default function ImportGuestsPage() {
       '2   Mrs      AGNES LWAMBANO         713502010   DOUBLE',
       '3   Mr       PETER JONES            715164791   DOUBLE',
       '4            ALIPHONSINA            715164792   SINGLE',
+      '5   MRS      DIANA MWAKA            718123456   FAMILIA 30',
+      '6            JAMES MWAKA            719654321   WAKWE 20',
     ].join('\n');
 
     const blob = new Blob([sampleData], { type: 'text/plain' });

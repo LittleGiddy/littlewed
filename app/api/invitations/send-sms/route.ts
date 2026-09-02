@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms';
+import { guestTypeLabel } from '@/lib/guestTypes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -67,7 +68,7 @@ Familia ya ${guest.event?.hostFamily || ''} inakualika katika harusi ya ${guest.
 
 Venue: ${guest.event?.venue || ''}, saa ${guest.event?.time || ''}.
 
-Card No: ${guest.cardNumber || ''} • ${guest.guestType || ''}
+Card No: ${guest.cardNumber || ''} • ${guestTypeLabel(guest.guestType, guest.guestCount)}
 
 Tafadhali onyesha kadi hii wakati wa kuingia.
 Karibu na ufurahie sherehe!
@@ -84,8 +85,8 @@ Ahsante.`;
         fullName: guestFullName,
         guestName: guestFullName,
         cardNumber: guest.cardNumber || 'N/A',
-        cardType: guest.guestType === 'DOUBLE' ? 'Double' : 'Single',
-        guestType: guest.guestType === 'DOUBLE' ? 'Double' : 'Single',
+        cardType: guestTypeLabel(guest.guestType, guest.guestCount),
+        guestType: guestTypeLabel(guest.guestType, guest.guestCount),
         passCode: guest.passCode || 'N/A',
         event: guest.event?.name || '',
         date: formattedDate,

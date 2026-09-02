@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
+import { guestTypeMaxScans } from '@/lib/guestTypes';
 
 // ─── Helper Functions ────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ export async function GET(req: NextRequest) {
         title: true,
         cardNumber: true,
         guestType: true,
+        guestCount: true,
         checkInCount: true,
         checkedIn: true,
         checkedInAt: true,
@@ -237,8 +239,11 @@ export async function POST(req: NextRequest) {
     // ─── CHECK-IN LOGIC ───────────────────────────────────────────────
     // Shared group members have 1 available slot each (1 per person).
     // Legacy single-row DOUBLE (no cardGroupId) counts to 2 on one row.
+    // FAMILIA/WAKWE count up to guestCount scans on one row.
     const isGroupMember = isSharedGroup;
-    const maxCheckIns = isGroupMember ? 1 : (checkInGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1);
+    const maxCheckIns = isGroupMember
+      ? 1
+      : guestTypeMaxScans(checkInGuest.guestType, checkInGuest.guestCount);
     const currentCount = checkInGuest.checkInCount || 0;
 
     // ─── Check if already checked in maximum times ──────────────────
@@ -315,6 +320,7 @@ export async function POST(req: NextRequest) {
           name: updated.name,
           cardNumber: updated.cardNumber,
           guestType: updated.guestType || 'SINGLE',
+          guestCount: updated.guestCount || null,
           checkInCount: newCount,
           maxCheckIns: maxCheckIns,
           fullyCheckedIn: isGroupMember ? reportCompleted >= reportTotal : isFullyCheckedIn,

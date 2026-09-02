@@ -36,6 +36,7 @@ export async function POST(
             phone: true,
             routingChannel: true,
             guestType: true,
+            guestCount: true,
             cardNumber: true,
             thanksSentAt: true,
           },

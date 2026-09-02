@@ -10,7 +10,8 @@ import {
 import toast from 'react-hot-toast';
 
 const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
-const GUEST_TYPES = ['SINGLE', 'DOUBLE'];
+const GUEST_TYPES = ['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE']; // FAMILIA/WAKWE are group types with a guestCount
+const GROUP_TYPES = new Set(['FAMILIA', 'WAKWE']);
 
 export default function AddGuestPage() {
   const { eventId } = useParams();
@@ -26,6 +27,7 @@ export default function AddGuestPage() {
     cardNumber: '',
     email: '',
     guestType: 'SINGLE',
+    guestCount: 2,
   });
   const [guest2, setGuest2] = useState({
     title: 'Mr',
@@ -134,6 +136,7 @@ export default function AddGuestPage() {
         email: form.email.trim() || undefined,
         eventId,
         guestType: form.guestType,
+        guestCount: GROUP_TYPES.has(form.guestType) ? form.guestCount : undefined,
       };
 
       if (isSharedDouble) {
@@ -161,7 +164,11 @@ export default function AddGuestPage() {
             duration: 5000,
           });
         } else {
-          const guestTypeLabel = data.guestType === 'DOUBLE' ? 'Double' : 'Single';
+          const guestTypeLabel = GROUP_TYPES.has(data.guestType)
+            ? `${data.guestType === 'FAMILIA' ? 'Familia' : 'Wakwe'} ${data.guestCount || ''}`
+            : data.guestType === 'DOUBLE'
+              ? 'Double'
+              : 'Single';
           toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
             icon: <UserCheck size={18} className="text-green-600" />,
           });
@@ -346,15 +353,40 @@ export default function AddGuestPage() {
               >
                 {GUEST_TYPES.map(type => (
                   <option key={type} value={type}>
-                    {type === 'SINGLE' ? 'Single (1 person)' : 'Double (2 people)'}
+                    {type === 'SINGLE' ? 'Single (1 person)' : type === 'DOUBLE' ? 'Double (2 people)' : type === 'FAMILIA' ? 'Familia (group card)' : 'Wakwe (group card)'}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-1">
-                Select DOUBLE to add a plus-one who shares the same card number — both phone numbers
-                will receive the invitation card.
+                {GROUP_TYPES.has(form.guestType) ? (
+                  <>Select FAMILIA or WAKWE for group cards — every member scans the same card, up to the number of people set below.</>
+                ) : form.guestType === 'DOUBLE' ? (
+                  <>Select DOUBLE to add a plus-one who shares the same card number — both phone numbers will receive the invitation card.</>
+                ) : (
+                  <>A single guest receives one invitation card and the QR is scanned once.</>
+                )}
               </p>
             </div>
+
+            {/* ─── Guest Count (only for FAMILIA / WAKWE group types) ─── */}
+            {GROUP_TYPES.has(form.guestType) && (
+              <div>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Users size={14} className="sm:text-base" />
+                  Number of People
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  value={form.guestCount}
+                  onChange={e => setForm(prev => ({ ...prev, guestCount: Math.max(2, Number(e.target.value) || 2) }))}
+                  className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  The card will be labelled &quot;{form.guestType === 'FAMILIA' ? 'Familia' : 'Wakwe'} {form.guestCount}&quot; and can be scanned up to {form.guestCount} times (1 credit).
+                </p>
+              </div>
+            )}
 
             {/* ─── Second Guest (only for shared DOUBLE card) ─── */}
             {form.guestType === 'DOUBLE' && (

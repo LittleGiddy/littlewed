@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
+import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
 
 interface Guest {
   id: string;
@@ -18,6 +19,7 @@ interface Guest {
   title: string | null;
   cardNumber: string | null;
   guestType: string | null;
+  guestCount?: number | null;
   checkInCount: number;
   checkedIn: boolean;
   checkedInAt: string | null;
@@ -74,13 +76,13 @@ const playSound = (type: 'success' | 'fail') => {
 
 const getFullName = (guest: Guest) => guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-const getGuestTypeLabel = (type: string | null) => {
+const getGuestTypeLabel = (type: string | null, count?: number | null) => {
   if (!type) return 'SINGLE';
-  return type.toUpperCase();
+  return guestTypeBadge(type, count);
 };
 
 const getCheckInStatus = (guest: Guest) => {
-  const max = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+  const max = guestTypeMaxScans(guest.guestType, guest.guestCount);
   const count = guest.checkInCount || 0;
   if (count >= max) return { label: 'Fully Checked In', color: 'text-green-600 bg-green-50', icon: CheckCheck };
   if (count > 0) return { label: `Partial (${count}/${max})`, color: 'text-amber-600 bg-amber-50', icon: UserCheck };
@@ -349,11 +351,11 @@ export default function StaffDashboard() {
 
   const totalGuests = guests.length;
   const fullyCheckedIn = guests.filter(g => {
-    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const max = guestTypeMaxScans(g.guestType, g.guestCount);
     return (g.checkInCount || 0) >= max;
   }).length;
   const partiallyCheckedIn = guests.filter(g => {
-    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const max = guestTypeMaxScans(g.guestType, g.guestCount);
     return (g.checkInCount || 0) > 0 && (g.checkInCount || 0) < max;
   }).length;
   const notCheckedIn = totalGuests - fullyCheckedIn - partiallyCheckedIn;
@@ -543,14 +545,17 @@ export default function StaffDashboard() {
                         <p className="font-bold text-gray-800 text-sm sm:text-base truncate">{getFullName(scannedGuest)}</p>
                         <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
                           <span className="font-mono">#{scannedGuest.cardNumber}</span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {getGuestTypeLabel(scannedGuest.guestType)}
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
+                            guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {getGuestTypeLabel(scannedGuest.guestType, scannedGuest.guestCount)}
                           </span>
                         </div>
                       </div>
                       <div className="text-right text-xs flex-shrink-0">
                         <span className="text-green-600 font-medium">
-                          {scannedGuest.checkInCount || 1}/{scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                          {scannedGuest.checkInCount || 1}/{guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount)}
                         </span>
                       </div>
                     </div>
@@ -606,7 +611,7 @@ export default function StaffDashboard() {
                       {filteredGuests.map(guest => {
                         const status = getCheckInStatus(guest);
                         const StatusIcon = status.icon;
-                        const max = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+                        const max = guestTypeMaxScans(guest.guestType, guest.guestCount);
                         const count = guest.checkInCount || 0;
                         const isFully = count >= max;
                         return (
@@ -619,8 +624,11 @@ export default function StaffDashboard() {
                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{getFullName(guest)}</p>
                                 <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs">
                                   <span className="font-mono text-gray-400 text-[10px] sm:text-xs">#{guest.cardNumber}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${guest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    {getGuestTypeLabel(guest.guestType)}
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
+                                    guest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
+                                    guestTypeMaxScans(guest.guestType, guest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {getGuestTypeLabel(guest.guestType, guest.guestCount)}
                                   </span>
                                   {guest.routingChannel === 'whatsapp' && (
                                     <span className="text-[9px] sm:text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">WA</span>
@@ -659,8 +667,11 @@ export default function StaffDashboard() {
                   <p className="font-bold text-gray-800 text-sm sm:text-base">{getFullName(selectedGuest)}</p>
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
                     <span className="font-mono">#{selectedGuest.cardNumber}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {getGuestTypeLabel(selectedGuest.guestType)}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                      selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
+                      guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {getGuestTypeLabel(selectedGuest.guestType, selectedGuest.guestCount)}
                     </span>
                   </div>
                 </div>
@@ -669,7 +680,7 @@ export default function StaffDashboard() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-[10px] text-gray-400">Check-in Status</p>
-                  <p className="font-medium text-sm">{selectedGuest.checkInCount || 0}/{selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}</p>
+                  <p className="font-medium text-sm">{selectedGuest.checkInCount || 0}/{guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount)}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-[10px] text-gray-400">Channel</p>

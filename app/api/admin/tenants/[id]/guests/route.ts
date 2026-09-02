@@ -47,6 +47,7 @@ export async function GET(
       checkedIn: g.checkedIn,
       checkedInAt: g.checkedInAt,
       guestType: g.guestType,
+      guestCount: g.guestCount,
       cardNumber: g.cardNumber,
       routingChannel: g.routingChannel,
       invitationSentAt: g.invitationSentAt,

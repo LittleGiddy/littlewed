@@ -1356,7 +1356,7 @@ export default function InvitationDesigner() {
                             <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with guest's name</p>
                           )}
                           {selectedLayer.isGuestType && (
-                            <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with "Single" or "Double"</p>
+                            <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with card type e.g. &quot;Single&quot;, &quot;Double&quot;, &quot;Familia 30&quot; or &quot;Wakwe 20&quot;</p>
                           )}
                           {selectedLayer.isCardNumber && (
                             <p className="text-[8px] text-[#0D4B4B] mt-0.5">→ Replaced with card number</p>

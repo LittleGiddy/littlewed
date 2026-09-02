@@ -177,8 +177,8 @@ export async function sendWeddingInvitation(
   // ─── Send template with proper variable mapping ──────────────────────
   // MwalikoForth uses a different variable layout than Mwaliko(temp):
   //   {var1}=guest, {var2}=hostFamily, {var3}=eventType, {var4}=couple,
-  //   {var6}=date, {var7}=venue, {var8}=time, {var9}=cardNo,
-  //   {var10}=cardType, {var11}=contact
+  //   {var5}=date, {var6}=venue, {var7}=time, {Var8}=cardNo,
+  //   {var9}=cardType, {var10}=contact
   const isForth = templateName === 'MwalikoForth';
 
   const coupleName =

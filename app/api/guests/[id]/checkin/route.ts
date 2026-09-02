@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
+import { guestTypeMaxScans } from '@/lib/guestTypes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── Determine max check-ins based on guest type ────────────────────
-    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const maxCheckIns = guestTypeMaxScans(guest.guestType, guest.guestCount);
     const currentCount = guest.checkInCount || 0;
 
     // ─── Check if already checked in maximum times ──────────────────────
@@ -105,6 +106,7 @@ export async function POST(req: NextRequest) {
         name: updated.name,
         cardNumber: updated.cardNumber,
         guestType: updated.guestType || 'SINGLE',
+        guestCount: updated.guestCount || null,
         checkInCount: newCount,
         maxCheckIns: maxCheckIns,
         fullyCheckedIn: isFullyCheckedIn,
@@ -147,7 +149,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
-    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const maxCheckIns = guestTypeMaxScans(guest.guestType, guest.guestCount);
 
     const updated = await prisma.guest.update({
       where: { id: guest.id },
@@ -175,6 +177,7 @@ export async function PATCH(
         name: updated.name,
         cardNumber: updated.cardNumber,
         guestType: updated.guestType || 'SINGLE',
+        guestCount: updated.guestCount || null,
         checkInCount: maxCheckIns,
         maxCheckIns,
         fullyCheckedIn: true,
@@ -220,6 +223,7 @@ export async function GET(req: NextRequest) {
         title: true,
         cardNumber: true,
         guestType: true,
+        guestCount: true,
         checkInCount: true,
         checkedIn: true,
         checkedInAt: true,

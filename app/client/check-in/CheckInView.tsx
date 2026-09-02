@@ -13,6 +13,7 @@ import {
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
+import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
 
 interface Guest {
   id: string;
@@ -20,6 +21,7 @@ interface Guest {
   title: string | null;
   cardNumber: string | null;
   guestType: string | null;
+  guestCount?: number | null;
   checkInCount: number;
   checkedIn: boolean;
   checkedInAt: string | null;
@@ -76,14 +78,14 @@ const getFullName = (guest: Guest) => {
 };
 
 // ─── Helper: Get guest type label ─────────────────────────────────────
-const getGuestTypeLabel = (type: string | null) => {
+const getGuestTypeLabel = (type: string | null, count?: number | null) => {
   if (!type) return 'SINGLE';
-  return type.toUpperCase();
+  return guestTypeBadge(type, count);
 };
 
 // ─── Helper: Get check-in status ──────────────────────────────────────
 const getCheckInStatus = (guest: Guest) => {
-  const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+  const maxCheckIns = guestTypeMaxScans(guest.guestType, guest.guestCount);
   const count = guest.checkInCount || 0;
   
   if (count >= maxCheckIns) {
@@ -394,11 +396,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   // ─── Stats ──────────────────────────────────────────────────────────
   const totalGuests = guests.length;
   const fullyCheckedIn = guests.filter(g => {
-    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const max = guestTypeMaxScans(g.guestType, g.guestCount);
     return (g.checkInCount || 0) >= max;
   }).length;
   const partiallyCheckedIn = guests.filter(g => {
-    const max = g.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+    const max = guestTypeMaxScans(g.guestType, g.guestCount);
     return (g.checkInCount || 0) > 0 && (g.checkInCount || 0) < max;
   }).length;
   const notCheckedIn = totalGuests - fullyCheckedIn - partiallyCheckedIn;
@@ -584,15 +586,17 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         scannedGuest.guestType?.toUpperCase() === 'DOUBLE' 
                           ? 'bg-purple-100 text-purple-700' 
-                          : 'bg-blue-100 text-blue-700'
+                          : guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount) > 1
+                            ? 'bg-teal-100 text-teal-700'
+                            : 'bg-blue-100 text-blue-700'
                       }`}>
-                        {getGuestTypeLabel(scannedGuest.guestType)}
+                        {getGuestTypeLabel(scannedGuest.guestType, scannedGuest.guestCount)}
                       </span>
                     </div>
                   </div>
                   <div className="text-right text-xs flex-shrink-0">
                     <span className="text-green-600 font-medium">
-                      {scannedGuest.checkInCount || 1}/{scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                      {scannedGuest.checkInCount || 1}/{guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount)}
                     </span>
                   </div>
                 </div>
@@ -653,7 +657,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                   {filteredGuests.map((guest) => {
                     const status = getCheckInStatus(guest);
                     const StatusIcon = status.icon;
-                    const maxCheckIns = guest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1;
+                    const maxCheckIns = guestTypeMaxScans(guest.guestType, guest.guestCount);
                     const count = guest.checkInCount || 0;
                     const isFullyCheckedIn = count >= maxCheckIns;
 
@@ -678,9 +682,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                               <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
                                 guest.guestType?.toUpperCase() === 'DOUBLE' 
                                   ? 'bg-purple-100 text-purple-700' 
-                                  : 'bg-blue-100 text-blue-700'
+                                  : guestTypeMaxScans(guest.guestType, guest.guestCount) > 1
+                                    ? 'bg-teal-100 text-teal-700'
+                                    : 'bg-blue-100 text-blue-700'
                               }`}>
-                                {getGuestTypeLabel(guest.guestType)}
+                                {getGuestTypeLabel(guest.guestType, guest.guestCount)}
                               </span>
                               {guest.routingChannel === 'whatsapp' && (
                                 <span className="text-[9px] sm:text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
@@ -728,9 +734,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                       selectedGuest.guestType?.toUpperCase() === 'DOUBLE' 
                         ? 'bg-purple-100 text-purple-700' 
-                        : 'bg-blue-100 text-blue-700'
+                        : guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount) > 1
+                          ? 'bg-teal-100 text-teal-700'
+                          : 'bg-blue-100 text-blue-700'
                     }`}>
-                      {getGuestTypeLabel(selectedGuest.guestType)}
+                      {getGuestTypeLabel(selectedGuest.guestType, selectedGuest.guestCount)}
                     </span>
                   </div>
                 </div>
@@ -740,7 +748,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-[10px] text-gray-400">Check-in Status</p>
                   <p className="font-medium text-sm">
-                    {selectedGuest.checkInCount || 0}/{selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 2 : 1}
+                    {selectedGuest.checkInCount || 0}/{guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount)}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-2">

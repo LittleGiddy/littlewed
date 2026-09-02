@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { generateQRFromCardNumber, compositeQROnCard } from '@/lib/qr';
 import { fetchTemplateBuffer, generateCardForGuest } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
+import { generateUniquePassCode } from '@/lib/utils';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
@@ -96,10 +97,13 @@ export async function POST(req: NextRequest) {
           // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
           const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
 
+          // ─── Ensure a pass code exists (required by the send flows) ──
+          const passCode = guest.passCode || (await generateUniquePassCode(prisma));
+
           // ─── Update database ──────────────────────────────────────────────
           await prisma.guest.update({
             where: { id: guest.id },
-            data: { invitationCard: imageUrl },
+            data: { invitationCard: imageUrl, passCode },
           });
 
           const fullName = getGuestFullName(guest);

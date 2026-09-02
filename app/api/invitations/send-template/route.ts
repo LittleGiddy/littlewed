@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { sendWeddingInvitation } from '@/lib/whatsapp/index';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
+import { guestTypeLabel } from '@/lib/guestTypes';
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
       venue: guest.event?.venue || '',
       time: guest.event?.time || '',
       cardNumber: guest.cardNumber || '',
-      cardType: guest.guestType || '',
+      cardType: guestTypeLabel(guest.guestType, guest.guestCount),
       imageUrl: cardImageUrl || undefined,
       inviteLink: inviteLink,
     });

@@ -4,7 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateUniquePassCode } from '@/lib/utils';
-import { fetchTemplateBuffer, generateCardForGuest, runWithConcurrency } from '@/lib/image-storage';
+import { fetchTemplateBuffer, generateCardForGuest, composeCardName, runWithConcurrency } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
 
 export const runtime = 'nodejs';
@@ -96,19 +96,41 @@ export async function POST(req: NextRequest) {
     const results = await runWithConcurrency(guests, CONCURRENCY, async (guest) => {
       try {
         const passCode = guest.passCode || (await generateUniquePassCode(prisma));
-        
+
+        // ─── Group-aware shared DOUBLE card composition ─────────────────
+        // If this guest shares a card (cardGroupId), pull the group members
+        // so the composed card shows "Name1 & Name2" (same behaviour as the
+        // send-batch regeneration path) instead of a single name.
+        const groupMembers = guest.cardGroupId
+          ? await prisma.guest.findMany({
+              where: { eventId: event.id, cardGroupId: guest.cardGroupId },
+            })
+          : [];
+        const displayName = composeCardName(guest, groupMembers);
+
         // ─── Generate the card using the Cloudinary-enabled function ─────
         // This handles: QR with rotation, text layers, overlay, guest type badge, etc.
-        // The image is now uploaded to Cloudinary instead of Vercel Blob
-        const imageUrl = await generateCardForGuest(guest, event, cardBuffer);
+        const imageUrl = await generateCardForGuest(guest, event, cardBuffer, displayName);
 
-        await prisma.guest.update({
-          where: { id: guest.id },
-          data: { 
-            passCode, 
-            invitationCard: imageUrl,
-          },
-        });
+        // Store the same composed image on every member of the shared card.
+        if (groupMembers.length > 0) {
+          await prisma.guest.updateMany({
+            where: { id: { in: groupMembers.map((m) => m.id) } },
+            data: { invitationCard: imageUrl },
+          });
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: { passCode },
+          });
+        } else {
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: {
+              passCode,
+              invitationCard: imageUrl,
+            },
+          });
+        }
 
         return { 
           guestId: guest.id, 
