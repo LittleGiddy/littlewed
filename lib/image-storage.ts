@@ -567,7 +567,7 @@ export async function generateReminderCardForGuest(
       x,
       y,
       rotation: 0,
-      shadow: true,
+      shadow: false,
       textAlign: align,
     });
 

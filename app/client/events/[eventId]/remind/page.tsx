@@ -533,7 +533,6 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
                               fontSize: `calc(${cardDesign.size || 34} / 8 * 1cqw)`,
                               color: cardDesign.color || '#ffffff',
                               fontFamily: `'${cardDesign.font}', Georgia, serif`,
-                              textShadow: '0 2px 6px rgba(0,0,0,0.45)',
                             }}
                           >
                             {'{GuestName}'}
