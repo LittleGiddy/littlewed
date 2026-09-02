@@ -6,10 +6,19 @@ import Link from 'next/link';
 import {
   ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X,
   MessageCircle, Phone, Info, Gift, Bell, MessageSquare,
-  FileText, Hash, Coins, ShieldCheck, UserRound
+  FileText, Hash, Coins, ShieldCheck,
+  ImageUp, AlignLeft, AlignCenter, AlignRight, Trash2, Palette
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import ModernColorPicker from '@/app/components/ModernColorPicker';
+
+const REMINDER_FONTS = [
+  'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
+  'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
+  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
+  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
+];
 
 interface Guest {
   id: string;
@@ -26,9 +35,31 @@ interface EventData {
   id: string;
   name: string;
   manualReminderSent?: boolean;
+  reminderCardUrl?: string | null;
+  reminderCardNameX?: number | null;
+  reminderCardNameY?: number | null;
+  reminderCardNameSize?: number | null;
+  reminderCardNameColor?: string | null;
+  reminderCardNameAlign?: string | null;
+  reminderCardNameFont?: string | null;
 }
 
 type Channel = 'whatsapp' | 'sms';
+
+interface GuestCard {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
+interface CardDesign {
+  x: number;
+  y: number;
+  size: number;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  font: string;
+}
 
 export default function RemindGuestsPage({ params }: { params: Promise<{ eventId: string }> }) {
   const router = useRouter();
@@ -43,6 +74,19 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
   const [bypassPayment, setBypassPayment] = useState(false);
   const [channel, setChannel] = useState<Channel>('sms');
 
+  // Reminder card mini-designer state
+  const [card, setCard] = useState<GuestCard | null>(null);
+  const [cardDesign, setCardDesign] = useState<CardDesign>({
+    x: 50,
+    y: 40,
+    size: 34,
+    color: '#ffffff',
+    align: 'center',
+    font: 'Playfair Display',
+  });
+  const [uploadingCard, setUploadingCard] = useState(false);
+  const [savingDesign, setSavingDesign] = useState(false);
+
   const fetchEvent = async (id: string) => {
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
@@ -51,6 +95,19 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
       setEvent(data.event);
       setGuests(data.guests || []);
       setBypassPayment(!!data.bypassPayment);
+      if (data.event?.reminderCardUrl) {
+        setCard({ url: data.event.reminderCardUrl });
+        setCardDesign({
+          x: data.event.reminderCardNameX ?? 50,
+          y: data.event.reminderCardNameY ?? 40,
+          size: data.event.reminderCardNameSize ?? 34,
+          color: data.event.reminderCardNameColor ?? '#ffffff',
+          align: data.event.reminderCardNameAlign === 'left' || data.event.reminderCardNameAlign === 'right'
+            ? data.event.reminderCardNameAlign
+            : 'center',
+          font: data.event.reminderCardNameFont ?? 'Playfair Display',
+        });
+      }
     } catch {
       toast.error('Could not load event data');
     } finally {
@@ -99,6 +156,94 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
   const selectChannel = (c: Channel) => {
     setChannel(c);
     setSelectedGuests(new Set());
+  };
+
+  const handleCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !eventId) return;
+
+    const valid = ['image/jpeg', 'image/jpg', 'image/png'].includes(file.type);
+    if (!valid) {
+      toast.error('Please upload a JPEG, JPG or PNG image.');
+      return;
+    }
+    if (file.size > 1 * 1024 * 1024) {
+      toast.error('Image is too large. Maximum size is 1MB.');
+      return;
+    }
+
+    setUploadingCard(true);
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('eventId', eventId);
+    try {
+      const res = await fetch('/api/events/upload-reminder-card', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setCard({ url: data.url });
+      toast.success('Card uploaded. Adjust the highlight below, then save.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.');
+    } finally {
+      setUploadingCard(false);
+    }
+  };
+
+  const saveCardDesign = async () => {
+    if (!eventId) return;
+    setSavingDesign(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reminderCardUrl: card?.url ?? null,
+          reminderCardNameX: cardDesign.x,
+          reminderCardNameY: cardDesign.y,
+          reminderCardNameSize: cardDesign.size,
+          reminderCardNameColor: cardDesign.color,
+          reminderCardNameAlign: cardDesign.align,
+          reminderCardNameFont: cardDesign.font,
+        }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      toast.success('Reminder card saved.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save design.');
+    } finally {
+      setSavingDesign(false);
+    }
+  };
+
+  const removeCard = async () => {
+    if (!eventId) return;
+    setCard(null);
+    setCardDesign({ x: 50, y: 40, size: 34, color: '#ffffff', align: 'center', font: 'Playfair Display' });
+    try {
+      await fetch(`/api/events/${eventId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reminderCardUrl: null,
+          reminderCardNameX: 50,
+          reminderCardNameY: 40,
+          reminderCardNameSize: 34,
+          reminderCardNameColor: '#ffffff',
+          reminderCardNameAlign: 'center',
+          reminderCardNameFont: 'Playfair Display',
+        }),
+        credentials: 'include',
+      });
+    } catch {
+      // ignore — the local reset is enough
+    }
   };
 
   const selectedCount = selectedGuests.size;
@@ -312,42 +457,210 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
 
           <div className="p-5">
             {channel === 'whatsapp' ? (
-              /* ─── WhatsApp reminder card ─── */
+              /* ─── WhatsApp reminder card designer ─── */
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-1">
                   <MessageCircle size={16} className="text-[#15803d]" />
-                  <h2 className="font-semibold text-gray-800">WhatsApp reminder card</h2>
+                  <h2 className="font-semibold text-gray-800">Reminder card</h2>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">
-                  A WhatsApp reminder is sent using an approved template. Only the selected guests&apos; names are
-                  filled in automatically — you don&apos;t need to type anything.
+                  Upload a card image (JPEG, JPG or PNG) and use the {'{GuestName}'} overlay. Each selected
+                  guest receives this card with their own name highlighted — no typing needed.
                 </p>
 
-                {/* Simple card preview */}
-                <div className="rounded-2xl bg-[#e7f7ec] p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center">
-                      <MessageCircle size={16} />
+                {!card ? (
+                  /* ─── Upload zone ─── */
+                  <label className="block cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".jpeg,.jpg,.png,image/jpeg,image/jpg,image/png"
+                      className="hidden"
+                      onChange={handleCardUpload}
+                    />
+                    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:border-[#0D4B4B] hover:bg-[#0D4B4B]/[0.02] transition">
+                      {uploadingCard ? (
+                        <>
+                          <Loader2 size={28} className="text-[#0D4B4B] animate-spin mb-2" />
+                          <p className="text-sm font-medium text-gray-600">Uploading…</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-[#0D4B4B]/[0.06] flex items-center justify-center mb-2">
+                            <ImageUp size={22} className="text-[#0D4B4B]" />
+                          </div>
+                          <p className="text-sm font-semibold text-gray-700">Upload a reminder card</p>
+                          <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
+                            JPEG, JPG or PNG · up to 1MB
+                          </p>
+                        </>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-gray-800">Reminder</p>
-                      <p className="text-[10px] text-gray-500">Guest name filled automatically</p>
+                  </label>
+                ) : (
+                  /* ─── Preview + controls ─── */
+                  <div className="space-y-4">
+                    <div className="mx-auto max-w-[260px]">
+                      <div
+                        className="relative rounded-2xl overflow-hidden"
+                        style={{ containerType: 'inline-size' }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={card.url}
+                          alt="Reminder card"
+                          className="w-full h-auto block"
+                        />
+                        <div
+                          className="absolute"
+                          style={{
+                            width: '100%',
+                            top: `${cardDesign.y}%`,
+                            left: cardDesign.align === 'center'
+                              ? `${cardDesign.x}%`
+                              : cardDesign.align === 'right'
+                                ? `${100 - cardDesign.x}%`
+                                : `${cardDesign.x}%`,
+                            transform: cardDesign.align === 'center'
+                              ? 'translate(-50%, -50%)'
+                              : cardDesign.align === 'right'
+                                ? 'translate(0, -50%)'
+                                : 'none',
+                          }}
+                        >
+                          <span
+                            className="inline-block font-bold whitespace-nowrap leading-tight text-center"
+                            style={{
+                              fontSize: `calc(${cardDesign.size || 34} / 8 * 1cqw)`,
+                              color: cardDesign.color || '#ffffff',
+                              fontFamily: `'${cardDesign.font}', Georgia, serif`,
+                              textShadow: '0 2px 6px rgba(0,0,0,0.45)',
+                            }}
+                          >
+                            {'{GuestName}'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-center text-gray-400 mt-1.5">
+                        Live preview — each guest sees their own name here.
+                      </p>
+                    </div>
+
+                    {/* Controls */}
+                    <div className="space-y-3.5 bg-gray-50 rounded-2xl p-4">
+                      {/* Font */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Font</label>
+                        <select
+                          value={cardDesign.font}
+                          onChange={(e) => setCardDesign({ ...cardDesign, font: e.target.value })}
+                          className="w-full p-2 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                        >
+                          {REMINDER_FONTS.map(f => (
+                            <option key={f} value={f} style={{ fontFamily: `'${f}', Georgia, serif` }}>
+                              {f}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Size */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                          Text size · {cardDesign.size}px
+                        </label>
+                        <input
+                          type="range"
+                          min={14}
+                          max={90}
+                          value={cardDesign.size}
+                          onChange={(e) => setCardDesign({ ...cardDesign, size: Number(e.target.value) })}
+                          className="w-full accent-[#0D4B4B]"
+                        />
+                      </div>
+
+                      {/* Alignment */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-500 mb-1">
+                          Alignment
+                        </label>
+                        <div className="flex gap-1">
+                          {(['left', 'center', 'right'] as const).map((a) => {
+                            const Icon = a === 'left' ? AlignLeft : a === 'center' ? AlignCenter : AlignRight;
+                            return (
+                              <button
+                                key={a}
+                                type="button"
+                                onClick={() => setCardDesign({ ...cardDesign, align: a })}
+                                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 capitalize ${
+                                  cardDesign.align === a
+                                    ? 'bg-[#0D4B4B] text-white'
+                                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                                }`}
+                              >
+                                <Icon size={13} /> {a}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* X & Y position */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">Horizontal · {cardDesign.x}%</label>
+                          <input
+                            type="range"
+                            min={5}
+                            max={95}
+                            value={cardDesign.x}
+                            onChange={(e) => setCardDesign({ ...cardDesign, x: Number(e.target.value) })}
+                            className="w-full accent-[#0D4B4B]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-gray-500 mb-1">Vertical · {cardDesign.y}%</label>
+                          <input
+                            type="range"
+                            min={5}
+                            max={95}
+                            value={cardDesign.y}
+                            onChange={(e) => setCardDesign({ ...cardDesign, y: Number(e.target.value) })}
+                            className="w-full accent-[#0D4B4B]"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Color */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1">
+                          <Palette size={12} /> Text color
+                        </label>
+                        <ModernColorPicker
+                          value={cardDesign.color}
+                          onChange={(c) => setCardDesign({ ...cardDesign, color: c })}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={saveCardDesign}
+                          disabled={savingDesign}
+                          className="flex-1 bg-[#0D4B4B] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {savingDesign ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
+                          Save design
+                        </button>
+                        <button
+                          onClick={removeCard}
+                          className="px-4 border border-gray-200 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-200 transition flex items-center justify-center"
+                          title="Remove card"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <UserRound size={13} className="text-[#15803d]" />
-                    <span className="text-[11px] font-semibold text-[#15803d]">Guest variable</span>
-                  </div>
-                  <div
-                    className="bg-white rounded-xl p-3.5 text-[13px] text-gray-700 whitespace-pre-wrap"
-                    style={{ lineHeight: '1.55' }}
-                  >
-                    {'{guest name}'} — filled in automatically for each selected WhatsApp guest.
-                  </div>
-                  <div className="mt-2 rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3 inline-block">
-                    Remind
-                  </div>
-                </div>
+                )}
               </div>
             ) : (
               /* ─── SMS message ─── */

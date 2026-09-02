@@ -189,6 +189,15 @@ model Event {
   thankYouMessageY      Float?   @default(50)
   thankYouMessageSize   Int?     @default(32)
   thankYouMessageColor  String?  @default("#ffffff")
+
+  // Reminder card (WhatsApp reminder designer - uploaded background + guest name overlay)
+  reminderCardUrl           String?
+  reminderCardNameX         Float?   @default(50)
+  reminderCardNameY         Float?   @default(40)
+  reminderCardNameSize      Int?     @default(34)
+  reminderCardNameColor     String?  @default("#ffffff")
+  reminderCardNameAlign     String?  @default("center") // "left" | "center" | "right"
+  reminderCardNameFont      String?  @default("Playfair Display")
 }
 
 model PendingEvent {

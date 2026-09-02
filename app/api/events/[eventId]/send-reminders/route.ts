@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
 import { sendWhatsAppReminder, getReminderWhatsAppTemplate } from '@/lib/whatsapp/index';
+import { generateReminderCardForGuest } from '@/lib/image-storage';
 import { sendPushToTenantRole } from '@/lib/push';
 
 const REMINDER_COST = 50; // credits per reminder for the 3rd+ reminder
@@ -111,10 +112,20 @@ export async function POST(
 
       if (chan === 'whatsapp') {
         const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
+        let cardUrl: string | undefined;
+        if (event.reminderCardUrl) {
+          try {
+            cardUrl = await generateReminderCardForGuest(guest, event);
+          } catch (cardError) {
+            console.error(`[Reminders] Card composition failed for ${guest.name}:`, cardError);
+            cardUrl = undefined;
+          }
+        }
         sendResult = await sendWhatsAppReminder({
           to: phone,
           guestName: fullName,
           templateName: whatsappTemplateName,
+          cardUrl,
         });
       } else {
         const personalized = message

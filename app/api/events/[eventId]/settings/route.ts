@@ -50,6 +50,13 @@ export async function GET(
       customMessage: true,
       designLayers: true,
       thankYouCardUrl: true,
+      reminderCardUrl: true,
+      reminderCardNameX: true,
+      reminderCardNameY: true,
+      reminderCardNameSize: true,
+      reminderCardNameColor: true,
+      reminderCardNameAlign: true,
+      reminderCardNameFont: true,
     },
   });
 
@@ -121,6 +128,15 @@ export async function PUT(
 
   // Thank You Card
   if (body.thankYouCardUrl !== undefined) updateData.thankYouCardUrl = body.thankYouCardUrl;
+
+  // Reminder Card (WhatsApp reminder designer)
+  if (body.reminderCardUrl !== undefined) updateData.reminderCardUrl = body.reminderCardUrl;
+  if (body.reminderCardNameX !== undefined) updateData.reminderCardNameX = body.reminderCardNameX;
+  if (body.reminderCardNameY !== undefined) updateData.reminderCardNameY = body.reminderCardNameY;
+  if (body.reminderCardNameSize !== undefined) updateData.reminderCardNameSize = body.reminderCardNameSize;
+  if (body.reminderCardNameColor !== undefined) updateData.reminderCardNameColor = body.reminderCardNameColor;
+  if (body.reminderCardNameAlign !== undefined) updateData.reminderCardNameAlign = body.reminderCardNameAlign;
+  if (body.reminderCardNameFont !== undefined) updateData.reminderCardNameFont = body.reminderCardNameFont;
 
   await prisma.event.updateMany({
     where: { id: eventId, tenantId },

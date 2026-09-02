@@ -278,9 +278,10 @@ export function getThanksWhatsAppTemplate(): string {
 
 /**
  * Sends a WhatsApp reminder to a single guest. The approved reminder template
- * embeds only a per-guest NAME variable ({var1} = guest name). Once the new
- * reminder template is approved, set REMINDER_WHATSAPP_TEMPLATE (or update the
- * default below) to its approved name.
+ * embeds a per-guest NAME variable ({var1} = guest name). When a reminder card
+ * image is composed, it is attached as the template header image so each guest
+ * receives their personalised card. REMINDER_WHATSAPP_TEMPLATE is configurable;
+ * update it once the new reminder template is approved.
  */
 const REMINDER_TEMPLATE_DEFAULT = 'mwaliko_reminder';
 
@@ -292,16 +293,22 @@ export async function sendWhatsAppReminder({
   to,
   guestName,
   templateName,
+  cardUrl,
 }: {
   to: string;
   guestName: string;
   templateName: string;
+  cardUrl?: string;
 }): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING REMINDER ======');
   console.log('[WhatsApp] Template:', templateName);
+  const header = cardUrl
+    ? { image: { file: cardUrl, name: 'Reminder Card' } }
+    : undefined;
   return sendWhatsAppTemplate({
     to,
     template: templateName,
     personalisation: [{ var1: guestName }],
+    header,
   });
 }

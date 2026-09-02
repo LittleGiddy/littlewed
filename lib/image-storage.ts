@@ -512,3 +512,77 @@ export async function generateAndStoreCardForGuest(guestId: string): Promise<str
 export async function generateAndStoreCardImage(guestId: string): Promise<string> {
   return generateAndStoreCardForGuest(guestId);
 }
+
+// ─── Reminder card composition ────────────────────────────────────────────
+// Composes the WhatsApp reminder card for a single guest: the uploaded
+// background with the guest's name drawn using the saved designer settings
+// (position, size, color, alignment, font). Stores the result to Cloudinary
+// under the tenant/guest and returns the URL.
+export async function generateReminderCardForGuest(
+  guest: { id?: string; title?: string | null; name: string },
+  event: EventLike & {
+    reminderCardUrl: string | null;
+    reminderCardNameX?: number | null;
+    reminderCardNameY?: number | null;
+    reminderCardNameSize?: number | null;
+    reminderCardNameColor?: string | null;
+    reminderCardNameAlign?: string | null;
+    reminderCardNameFont?: string | null;
+  }
+): Promise<string> {
+  if (!event.reminderCardUrl) {
+    throw new Error('No reminder card configured for this event');
+  }
+
+  const cardBuffer = await fetchTemplateBuffer(event.reminderCardUrl);
+
+  // ─── 1. Actual image dimensions ──────────────────────────────────────
+  const metadata = await sharp(cardBuffer).metadata();
+  const actualWidth = metadata.width || 800;
+  const actualHeight = metadata.height || 1200;
+
+  // Reminder cards scale their name by width (matches the preview's 1cqw units).
+  const scaleFactor = actualWidth / DESIGNER_WIDTH;
+
+  // ─── 2. Guest name ───────────────────────────────────────────────────
+  const name = getGuestFullName(guest);
+  if (!name) {
+    throw new Error('Guest has no name');
+  }
+
+  const x = ((event.reminderCardNameX ?? 50) / 100) * actualWidth;
+  const y = ((event.reminderCardNameY ?? 40) / 100) * actualHeight;
+  const fontSize = Math.round((event.reminderCardNameSize ?? 34) * scaleFactor);
+  const align = (event.reminderCardNameAlign === 'left' || event.reminderCardNameAlign === 'right'
+    ? event.reminderCardNameAlign
+    : 'center') as 'left' | 'center' | 'right';
+
+  try {
+    const textImage = await renderTextSvg(name, {
+      fontSize,
+      fontFamily: event.reminderCardNameFont || 'Playfair Display',
+      color: event.reminderCardNameColor || '#ffffff',
+      width: actualWidth,
+      height: actualHeight,
+      x,
+      y,
+      rotation: 0,
+      shadow: true,
+      textAlign: align,
+    });
+
+    const finalBuffer = await sharp(cardBuffer)
+      .composite([{ input: textImage, top: 0, left: 0 }])
+      .png()
+      .toBuffer();
+
+    const filePath = `${event.tenantId}/${guest.id}-reminder`;
+    const publicUrl = await saveToCloudinary(finalBuffer, filePath);
+
+    console.log('[ReminderCard] ✅ Saved:', publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error('[ReminderCard] Composition failed:', error);
+    throw error;
+  }
+}
