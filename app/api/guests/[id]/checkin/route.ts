@@ -141,6 +141,8 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const allGroup = body?.allGroup === true;
 
     const guest = await prisma.guest.findFirst({
       where: { id, event: { tenantId } },
@@ -149,22 +151,43 @@ export async function PATCH(
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
-    const maxCheckIns = guestTypeMaxScans(guest.guestType, guest.guestCount);
+    // ─── Detect the group (shared DOUBLE card) ──────────────────────
+    const groupMembers = guest.cardGroupId
+      ? await prisma.guest.findMany({
+          where: { eventId: guest.eventId, cardGroupId: guest.cardGroupId },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
 
-    const updated = await prisma.guest.update({
-      where: { id: guest.id },
-      data: {
-        checkedIn: true,
-        checkInCount: maxCheckIns,
-        checkedInAt: new Date(),
-      },
-    });
+    const isGroup = groupMembers.length > 1;
+    // If the caller requested "all" but the guest isn't part of a real group,
+    // fall back to just this guest.
+    const targets = allGroup && isGroup ? groupMembers : [guest];
+
+    const updatedGuests = [];
+    for (const target of targets) {
+      const tMax = guestTypeMaxScans(target.guestType, target.guestCount);
+      const updated = await prisma.guest.update({
+        where: { id: target.id },
+        data: {
+          checkedIn: true,
+          checkInCount: tMax,
+          checkedInAt: new Date(),
+        },
+      });
+      updatedGuests.push(updated);
+    }
 
     // ─── Notify the tenant owner(s) of the force check-in (fire & forget) ──
-    const forceFullName = updated.title ? `${updated.title} ${updated.name}` : updated.name;
+    const firstName = updatedGuests[0];
+    const forceFullName = firstName.title ? `${firstName.title} ${firstName.name}` : firstName.name;
+    const label =
+      updatedGuests.length > 1
+        ? `${updatedGuests.length} guests on the card`
+        : forceFullName;
     sendPushToTenantRole(tenantId, 'CLIENT', {
-      title: `${forceFullName} force checked in`,
-      body: `${forceFullName} has been force checked in (${maxCheckIns}/${maxCheckIns}).`,
+      title: `${updatedGuests.length > 1 ? 'Card' : forceFullName} force checked in`,
+      body: `${label} has been force checked in.`,
       url: '/client/dashboard',
       type: 'success',
       sound: true,
@@ -172,18 +195,22 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
+      count: updatedGuests.length,
+      message:
+        updatedGuests.length > 1
+          ? `${updatedGuests.length} guests force checked in`
+          : `${firstName.name} force checked in`,
       guest: {
-        id: updated.id,
-        name: updated.name,
-        cardNumber: updated.cardNumber,
-        guestType: updated.guestType || 'SINGLE',
-        guestCount: updated.guestCount || null,
-        checkInCount: maxCheckIns,
-        maxCheckIns,
+        id: firstName.id,
+        name: firstName.name,
+        cardNumber: firstName.cardNumber,
+        guestType: firstName.guestType || 'SINGLE',
+        guestCount: firstName.guestCount || null,
+        checkInCount: guestTypeMaxScans(firstName.guestType, firstName.guestCount),
+        maxCheckIns: guestTypeMaxScans(firstName.guestType, firstName.guestCount),
         fullyCheckedIn: true,
-        checkedInAt: updated.checkedInAt,
+        checkedInAt: firstName.checkedInAt,
       },
-      message: `${updated.name} force checked in`,
     });
   } catch (error: any) {
     console.error('Force check-in error:', error);
@@ -230,6 +257,7 @@ export async function GET(req: NextRequest) {
         phone: true,
         routingChannel: true,
         createdAt: true,
+        cardGroupId: true,
       },
       orderBy: { cardNumber: 'asc' },
     });

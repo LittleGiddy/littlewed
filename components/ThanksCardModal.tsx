@@ -61,10 +61,16 @@ export default function ThanksCardModal({
   const [includeAll, setIncludeAll] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendTotal, setSendTotal] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<
     { name: string; channel: string; success: boolean; error?: string }[]
   >([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const accent = channel === 'whatsapp' ? '#25D366' : '#0D4B4B';
+  const accentText = channel === 'whatsapp' ? '#15803d' : '#0D4B4B';
+
 
   // All checked-in guests; optionally expand to include every guest.
   const baseGuests = useMemo(
@@ -90,6 +96,41 @@ export default function ThanksCardModal({
   }, [recipients, channel, isBypassed]);
 
   const getFullName = (g: ThanksGuest) => (g.title ? `${g.title} ${g.name}` : g.name);
+
+  // Animate a smooth progress bar while the batch send is in flight.
+  const sendingTotal = sendTotal || pending.length;
+  useEffect(() => {
+    if (!sending) {
+      setProgress(0);
+      return;
+    }
+    const start = Date.now();
+    // Roughly matches server speed: ~1.1s per message + short pauses every few.
+    const expectedMs = Math.max(1500, sendingTotal * 1100 + Math.ceil(sendingTotal / 5) * 800);
+    const id = setInterval(() => {
+      setProgress(Math.min(0.95, (Date.now() - start) / expectedMs));
+    }, 200);
+    return () => clearInterval(id);
+  }, [sending, sendingTotal]);
+
+  const sendPercent = Math.round(progress * 100);
+  const processed = Math.round(progress * sendingTotal);
+  const statusText =
+    channel === 'whatsapp'
+      ? [
+          'Uploading cards…',
+          'Sending to WhatsApp…',
+          'Confirming delivery…',
+          'Almost done…',
+        ]
+      : [
+          'Preparing messages…',
+          'Sending via SMS gateway…',
+          'Confirming delivery…',
+          'Almost done…',
+        ];
+  const sendStatus = statusText[Math.min(Math.floor(progress * statusText.length), statusText.length - 1)];
+
 
   const reset = () => {
     setCardFile(null);
@@ -185,6 +226,8 @@ export default function ThanksCardModal({
     if (!ok) return;
 
     setSending(true);
+    setSendTotal(pending.length);
+    setProgress(0);
     setResults([]);
     try {
       const res = await fetch(`/api/events/${eventId}/thanks-card/send`, {
@@ -317,6 +360,33 @@ export default function ThanksCardModal({
             </p>
           </div>
 
+          {/* ─── Sending progress ─── */}
+          {sending && (
+            <div className="mb-4 rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 p-4">
+              <div className="flex items-center justify-between gap-3 text-xs font-semibold text-gray-800">
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={13} className="animate-spin" style={{ color: accent }} />
+                  Sending {sendingTotal} {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} thank
+                  {sendingTotal === 1 ? '' : 's'}…
+                </span>
+                <span className="tabular-nums text-gray-600">~{processed} of {sendingTotal}</span>
+              </div>
+              <div className="mt-2.5 h-2 rounded-full bg-white border border-gray-200 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${Math.max(2, sendPercent)}%`, backgroundColor: accent }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] font-medium" style={{ color: accentText }}>
+                {sendStatus} <span className="text-gray-400 tabular-nums">({sendPercent}%)</span>
+              </p>
+              <p className="mt-1.5 text-[11px] text-gray-500 leading-relaxed">
+                Messages are sent in small groups so your {channel === 'whatsapp' ? 'WhatsApp number' : 'SMS gateway'} is
+                never blocked. Please keep this window open until it finishes.
+              </p>
+            </div>
+          )}
+
           {channel === 'whatsapp' ? (
             /* ─── WhatsApp: card upload ─── */
             <div className="space-y-3">
@@ -390,6 +460,28 @@ export default function ThanksCardModal({
               <div className="mt-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Preview</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{previewMessage}</p>
+              </div>
+            </div>
+          )}
+
+          {results.length > 0 && !sending && (
+            <div className={`mb-3 rounded-2xl px-4 py-3 flex items-center gap-3 border ${
+              results.every((r) => r.success)
+                ? 'bg-green-50 border-green-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <span className={results.every((r) => r.success) ? 'text-green-600' : 'text-amber-600'}>
+                <CheckCircle2 size={18} />
+              </span>
+              <div>
+                <p className={`text-sm font-semibold ${results.every((r) => r.success) ? 'text-green-800' : 'text-amber-800'}`}>
+                  {results.filter((r) => r.success).length} of {results.length} sent
+                </p>
+                <p className="text-[11px] text-gray-600">
+                  {results.every((r) => r.success)
+                    ? `All ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} thanks delivered.`
+                    : `${results.filter((r) => !r.success).length} failed — check the list below.`}
+                </p>
               </div>
             </div>
           )}

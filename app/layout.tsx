@@ -4,7 +4,7 @@ import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/700.css';
 import AuthProvider from '@/components/AuthProvider';
-import { Toaster } from 'react-hot-toast';
+import ToasterWithClose from '@/components/ToasterWithClose';
 import PushManager from '@/components/PushManager';
 import InstallPrompt from '@/components/InstallPrompt';
 
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PushManager />
           <InstallPrompt />
         </AuthProvider>
-        <Toaster
+        <ToasterWithClose
           position="top-right"
           toastOptions={{
             duration: 2500,

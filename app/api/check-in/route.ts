@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
         phone: true,
         routingChannel: true,
         createdAt: true,
+        cardGroupId: true,
       },
       orderBy: { cardNumber: 'asc' },
     });
