@@ -65,9 +65,13 @@ export async function POST(
       ? event.guests
       : event.guests.filter((g) => g.checkedIn);
 
-    const recipients = pool.filter(
-      (g) => g.phone && (isBypassed || channel === 'whatsapp' ? !g.thanksSentAt : !g.smsThanksSentAt)
-    );
+    const recipients = pool.filter((g) => {
+      if (!g.phone) return false;
+      // Bypassed (test/free) accounts are unlimited - never dedup.
+      if (isBypassed) return true;
+      // Standard accounts: thank each guest only once per channel.
+      return channel === 'whatsapp' ? !g.thanksSentAt : !g.smsThanksSentAt;
+    });
 
     if (recipients.length === 0) {
       return NextResponse.json({
