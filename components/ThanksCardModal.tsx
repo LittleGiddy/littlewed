@@ -106,8 +106,6 @@ export default function ThanksCardModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, eventId]);
 
-  if (!open) return null;
-
   const pickCard = (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file.');
@@ -221,6 +219,8 @@ export default function ThanksCardModal({
   };
 
   const totalCost = pending.length * 300;
+
+  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
