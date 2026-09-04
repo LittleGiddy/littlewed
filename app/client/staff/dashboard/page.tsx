@@ -26,6 +26,7 @@ interface Guest {
   phone: string | null;
   routingChannel: string;
   createdAt: string;
+  cardGroupId: string | null;
 }
 
 interface Event {
@@ -106,6 +107,7 @@ export default function StaffDashboard() {
   const [scannedGuest, setScannedGuest] = useState<Guest | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'fully' | 'partial' | 'not'>('all');
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [forceCheckinGuest, setForceCheckinGuest] = useState<Guest | null>(null);
@@ -303,16 +305,26 @@ export default function StaffDashboard() {
   };
 
   // ─── Force check-in ─────────────────────────────────────────────────
-  const handleForceCheckin = async (guest: Guest) => {
+  const getGroupMembers = (guest: Guest) => {
+    if (!guest.cardGroupId) return [];
+    return guests.filter(g => g.cardGroupId === guest.cardGroupId);
+  };
+
+  const handleForceCheckin = async (guest: Guest, allGroup: boolean) => {
     try {
       const res = await fetch(`/api/guests/${guest.id}/checkin`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkedIn: true }),
+        body: JSON.stringify({ checkedIn: true, allGroup }),
         credentials: 'include',
       });
       if (res.ok) {
-        toast.success(`${getFullName(guest)} force checked in`);
+        const data = await res.json();
+        toast.success(
+          allGroup && data.count > 1
+            ? `${data.count} guests force checked in`
+            : `${getFullName(guest)} force checked in`
+        );
         await loadGuests(selectedEventId);
         setForceCheckinGuest(null);
       } else {
@@ -343,21 +355,30 @@ export default function StaffDashboard() {
   };
 
   // ─── Derived data ──────────────────────────────────────────────────
+  const classifyGuest = (g: Guest): 'fully' | 'partial' | 'not' => {
+    const max = guestTypeMaxScans(g.guestType, g.guestCount);
+    const count = g.checkInCount || 0;
+    if (count >= max) return 'fully';
+    if (count > 0) return 'partial';
+    return 'not';
+  };
+
   const filteredGuests = guests.filter(g => {
+    const status = classifyGuest(g);
+    if (statusFilter !== 'all' && status !== statusFilter) return false;
+
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return true;
+
     const name = getFullName(g).toLowerCase();
     const card = g.cardNumber || '';
-    return name.includes(searchTerm.toLowerCase()) || card.includes(searchTerm);
+    const phone = g.phone || '';
+    return name.includes(term) || card.includes(term) || phone.replace(/\s/g, '').includes(term.replace(/\s/g, ''));
   });
 
   const totalGuests = guests.length;
-  const fullyCheckedIn = guests.filter(g => {
-    const max = guestTypeMaxScans(g.guestType, g.guestCount);
-    return (g.checkInCount || 0) >= max;
-  }).length;
-  const partiallyCheckedIn = guests.filter(g => {
-    const max = guestTypeMaxScans(g.guestType, g.guestCount);
-    return (g.checkInCount || 0) > 0 && (g.checkInCount || 0) < max;
-  }).length;
+  const fullyCheckedIn = guests.filter(g => classifyGuest(g) === 'fully').length;
+  const partiallyCheckedIn = guests.filter(g => classifyGuest(g) === 'partial').length;
   const notCheckedIn = totalGuests - fullyCheckedIn - partiallyCheckedIn;
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
@@ -568,22 +589,22 @@ export default function StaffDashboard() {
             {activeTab === 'data' && (
               <>
                 <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
-                    <p className="text-base sm:text-lg font-bold text-gray-800">{totalGuests}</p>
-                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Total</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
-                    <p className="text-base sm:text-lg font-bold text-green-600">{fullyCheckedIn}</p>
-                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Fully In</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
-                    <p className="text-base sm:text-lg font-bold text-amber-500">{partiallyCheckedIn}</p>
-                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Partial</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-2 text-center shadow-sm">
-                    <p className="text-base sm:text-lg font-bold text-gray-400">{notCheckedIn}</p>
-                    <p className="text-[8px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider">Not In</p>
-                  </div>
+                  <button onClick={() => setStatusFilter('all')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'all' ? 'bg-[#0D4B4B] border-[#0D4B4B]' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'all' ? 'text-white' : 'text-gray-800'}`}>{totalGuests}</p>
+                    <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'all' ? 'text-white/80' : 'text-gray-400'}`}>All</p>
+                  </button>
+                  <button onClick={() => setStatusFilter(statusFilter === 'fully' ? 'all' : 'fully')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'fully' ? 'bg-green-600 border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'fully' ? 'text-white' : 'text-green-600'}`}>{fullyCheckedIn}</p>
+                    <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'fully' ? 'text-white/80' : 'text-gray-400'}`}>Fully In</p>
+                  </button>
+                  <button onClick={() => setStatusFilter(statusFilter === 'partial' ? 'all' : 'partial')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'partial' ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'partial' ? 'text-white' : 'text-amber-500'}`}>{partiallyCheckedIn}</p>
+                    <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'partial' ? 'text-white/80' : 'text-gray-400'}`}>Partial</p>
+                  </button>
+                  <button onClick={() => setStatusFilter(statusFilter === 'not' ? 'all' : 'not')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'not' ? 'bg-gray-500 border-gray-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'not' ? 'text-white' : 'text-gray-400'}`}>{notCheckedIn}</p>
+                    <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'not' ? 'text-white/80' : 'text-gray-400'}`}>Not In</p>
+                  </button>
                 </div>
 
                 <div className="relative mb-3 sm:mb-4">
@@ -592,10 +613,27 @@ export default function StaffDashboard() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by name or card number..."
-                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
+                    placeholder="Search by name, card number, or phone..."
+                    className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
                   />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+                      <XCircle size={16} />
+                    </button>
+                  )}
                 </div>
+
+                {statusFilter !== 'all' && (
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <span className="text-xs font-medium text-gray-500">
+                      {statusFilter === 'fully' ? 'Fully checked in' : statusFilter === 'partial' ? 'Partially checked in' : 'Not checked in'}
+                      {filteredGuests.length > 0 && <span className="text-gray-400"> · {filteredGuests.length}</span>}
+                    </span>
+                    <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-[#0D4B4B] hover:underline">
+                      Show all ({totalGuests})
+                    </button>
+                  </div>
+                )}
 
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                   {loadingGuests ? (
@@ -708,24 +746,50 @@ export default function StaffDashboard() {
       )}
 
       {/* ─── Force Confirm ─── */}
-      {forceCheckinGuest && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-amber-600" /></div>
-              <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
-                <br /><span className="text-xs text-gray-400">This will mark them as checked in regardless of card type.</span>
-              </p>
-              <div className="flex gap-3 mt-4">
-                <button onClick={() => setForceCheckinGuest(null)} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
-                <button onClick={() => handleForceCheckin(forceCheckinGuest)} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">Confirm</button>
+      {forceCheckinGuest && (() => {
+        const { isGroup, groupCount } = (() => {
+          const members = getGroupMembers(forceCheckinGuest);
+          return { isGroup: members.length > 1, groupCount: members.length };
+        })();
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-amber-600" /></div>
+                <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
+                  <br /><span className="text-xs text-gray-400">This will mark them as checked in regardless of card type.</span>
+                </p>
+
+                {isGroup ? (
+                  <div className="mt-4 text-left">
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                      This card has {groupCount} guests
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }} className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">
+                        Force all {groupCount} guests
+                      </button>
+                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-amber-50 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition text-sm">
+                        Force just {getFullName(forceCheckinGuest)}
+                      </button>
+                      <button onClick={() => setForceCheckinGuest(null)} className="w-full py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-3 mt-4">
+                    <button onClick={() => setForceCheckinGuest(null)} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
+                    <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">Confirm</button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ─── Delete Confirm ─── */}
       {showDeleteConfirm && selectedGuest && (

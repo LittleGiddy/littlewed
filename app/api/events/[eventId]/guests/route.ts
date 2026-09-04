@@ -43,11 +43,16 @@ export async function GET(
         passCode: true,
         invitationCard: true,
         checkedIn: true,        // ✅ Add this field
+        checkInCount: true,     // ✅ Check-in progress (needed for check-in status)
+        checkedInAt: true,      // ✅ When they checked in
+        cardGroupId: true,      // ✅ Shared DOUBLE card group
         routingChannel: true,   // ✅ Add for completeness (used in UI)
         attending: true,        // ✅ Add for completeness
         invitationSentAt: true,
         smsSentAt: true,
         whatsappSentAt: true,
+        thanksSentAt: true,
+        smsThanksSentAt: true,
         lastSendStatus: true,
         lastSendError: true,
       },
