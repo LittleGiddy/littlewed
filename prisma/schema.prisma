@@ -238,6 +238,7 @@ model Guest {
   invitationDeliveredAt DateTime?
   invitationOpenedAt   DateTime?
   thanksSentAt DateTime?
+  smsThanksSentAt DateTime?   // when the SMS thanks message was successfully sent
   reminderCount   Int      @default(0)
   lastSendStatus String?   // "SENT" | "FAILED" | "SKIPPED_LIMIT" | "NOT_SENT" - last WhatsApp attempt outcome
   lastSendError  String?   // error/reason for the last send attempt
