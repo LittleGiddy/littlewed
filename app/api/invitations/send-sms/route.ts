@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms';
+import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { guestTypeLabel } from '@/lib/guestTypes';
 
 export async function POST(req: NextRequest) {
@@ -101,6 +102,14 @@ Ahsante.`;
         /\{(title|name|fullName|guestName|cardNumber|cardType|guestType|passCode|event|date|venue|address|hostFamily|person1|person2|time)\}/g,
         (match: string, key: string) => varsMap[key] ?? match
       );
+    }
+
+    // ─── Hard cap: standard tenants get one SMS per guest per send ────────
+    const smsParts = smsPartCount(smsMessage);
+    if (!isBypassed && smsParts > MAX_SMS_PARTS_PER_GUEST) {
+      return NextResponse.json({
+        error: smsPartsError(smsParts),
+      }, { status: 400 });
     }
 
     // ─── Send SMS ──────────────────────────────────────────────────────

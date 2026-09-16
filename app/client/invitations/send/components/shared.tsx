@@ -58,11 +58,12 @@ Ahsante!`;
 
 export const INVITE_TEMPLATES: Record<
   string,
-  { displayName: string; whatsappName: string; hasContact: boolean; hasEventType: boolean }
+  { displayName: string; whatsappName: string; hasContact: boolean; hasEventType: boolean; hasContact2?: boolean; hasMoreInfoButton?: boolean }
 > = {
   mwalikoforth: { displayName: 'Template 1', whatsappName: 'MwalikoForth', hasContact: true, hasEventType: true },
   mwaliko: { displayName: 'Template 2', whatsappName: 'Mwalikotemp', hasContact: false, hasEventType: false },
   mwalikosecond: { displayName: 'Template 3', whatsappName: 'Mwalikosecond', hasContact: true, hasEventType: false },
+  mwalikoplus: { displayName: 'Template 4 (With More Info)', whatsappName: 'Mwaliko Sixth', hasContact: true, hasEventType: true, hasContact2: true, hasMoreInfoButton: true },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ export function useGuestData(eventId: string | string[] | undefined) {
     name: string;
     date?: string;
     venue?: string;
+    address?: string;
     hostFamily?: string;
     person1?: string;
     person2?: string;

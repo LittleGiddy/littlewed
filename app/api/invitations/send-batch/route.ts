@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendWeddingInvitationPlus } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
+import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
 import { guestTypeLabel } from '@/lib/guestTypes';
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       retry,
       whatsappTemplate,
       whatsappContact,
+      whatsappContact2,
       dailyLimit,
       eventType,
       forceChannel,
@@ -240,22 +242,47 @@ export async function POST(req: NextRequest) {
             // ─── Send WhatsApp ────────────────────────────────────────────
             // Variable values come from the user's inputs (whatsappVariables),
             // then the event data - no hardcoded fallbacks.
-            result = await sendWeddingInvitation(guest.phone!, {
-              guestName: actualGuestName,
-              hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
-              person1: vars.person1 || guest.event?.person1 || '',
-              person2: vars.person2 || guest.event?.person2 || '',
-              date: vars.date || formattedDate,
-              venue: vars.venue || guest.event?.venue || '',
-              time: vars.time || guest.event?.time || '',
-              cardNumber: actualCardNumber,
-              cardType: actualCardType,
-              imageUrl: cardImageUrl || undefined,
-              inviteLink: inviteLink,
-              templateName: whatsappTemplate,
-              contact: whatsappContact,
-              eventType: eventType,
-            });
+            if (whatsappTemplate === 'Mwaliko Sixth') {
+              const person1Name = vars.person1 || guest.event?.person1 || '';
+              const person2Name = vars.person2 || guest.event?.person2 || '';
+              const celebrant = person1Name && person2Name
+                ? `${person1Name} na ${person2Name}`
+                : person1Name || person2Name || '';
+
+              result = await sendWeddingInvitationPlus(guest.phone!, {
+                guestName: actualGuestName,
+                hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+                area: vars.area || guest.event?.address || '',
+                eventType: eventType || 'harusi',
+                celebrant,
+                date: vars.date || formattedDate,
+                venue: vars.venue || guest.event?.venue || '',
+                time: vars.time || guest.event?.time || '',
+                cardNumber: actualCardNumber,
+                cardType: actualCardType,
+                contact1: whatsappContact || '',
+                contact2: whatsappContact2 || '',
+                imageUrl: cardImageUrl || undefined,
+                inviteLink: inviteLink,
+              });
+            } else {
+              result = await sendWeddingInvitation(guest.phone!, {
+                guestName: actualGuestName,
+                hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+                person1: vars.person1 || guest.event?.person1 || '',
+                person2: vars.person2 || guest.event?.person2 || '',
+                date: vars.date || formattedDate,
+                venue: vars.venue || guest.event?.venue || '',
+                time: vars.time || guest.event?.time || '',
+                cardNumber: actualCardNumber,
+                cardType: actualCardType,
+                imageUrl: cardImageUrl || undefined,
+                inviteLink: inviteLink,
+                templateName: whatsappTemplate,
+                contact: whatsappContact,
+                eventType: eventType,
+              });
+            }
 
             // ─── WhatsApp failed → fall back to SMS ──────────────────────
             // Since WhatsApp presence can't be detected ahead of time, if the
@@ -301,28 +328,41 @@ export async function POST(req: NextRequest) {
                 (m: string, key: string) => fallbackMap[key] ?? m
               );
 
-              const smsFallback = await sendSMS({ to: guest.phone!, message: fallbackMessage });
-
-              if (smsFallback.success) {
-                // Flip the guest's routing to SMS so they show on the SMS side
-                await prisma.guest.update({
-                  where: { id: guest.id },
-                  data: { routingChannel: 'sms', onWhatsApp: false, invitationSentAt: new Date() },
-                }).catch(() => {});
-
-                result = {
-                  success: true,
-                  error: undefined,
-                  data: { ...(smsFallback.data || {}), fellBackFromWhatsapp: true },
-                  messageId: smsFallback.messageId,
-                };
-              } else {
+              // Hard cap: standard tenants get a single SMS per send. Blocking
+              // the fallback here avoids a surprise multi-SMS bill after a
+              // failed WhatsApp send. Bypassed tenants always fall back.
+              const fallbackParts = smsPartCount(fallbackMessage);
+              if (!isBypassed && fallbackParts > MAX_SMS_PARTS_PER_GUEST) {
+                console.log(`[Batch] SMS fallback too long for ${guest.name} (${fallbackParts} SMS parts)`);
                 result = {
                   success: false,
-                  error: result.error || (smsFallback.error || 'WhatsApp failed and SMS fallback failed'),
-                  data: { whatsappData: result.data, smsFallbackData: smsFallback.data },
-                  messageId: result.messageId,
+                  error: smsPartsError(fallbackParts),
+                  data: { whatsappData: result.data },
                 };
+              } else {
+                const smsFallback = await sendSMS({ to: guest.phone!, message: fallbackMessage });
+
+                if (smsFallback.success) {
+                  // Flip the guest's routing to SMS so they show on the SMS side
+                  await prisma.guest.update({
+                    where: { id: guest.id },
+                    data: { routingChannel: 'sms', onWhatsApp: false, invitationSentAt: new Date() },
+                  }).catch(() => {});
+
+                  result = {
+                    success: true,
+                    error: undefined,
+                    data: { ...(smsFallback.data || {}), fellBackFromWhatsapp: true },
+                    messageId: smsFallback.messageId,
+                  };
+                } else {
+                  result = {
+                    success: false,
+                    error: result.error || (smsFallback.error || 'WhatsApp failed and SMS fallback failed'),
+                    data: { whatsappData: result.data, smsFallbackData: smsFallback.data },
+                    messageId: result.messageId,
+                  };
+                }
               }
             }
 
@@ -373,17 +413,30 @@ export async function POST(req: NextRequest) {
             );
 
             // ─── Send SMS ──────────────────────────────────────────────────
-            const smsResult = await sendSMS({
-              to: guest.phone!,
-              message: smsMessage,
-            });
+            // Hard cap: standard tenants get one SMS per guest per send.
+            // Rejecting here (rather than letting NextSMS bill a multi-part
+            // message) keeps the "one SMS per guest" plan honest. Bypassed
+            // tenants send any length.
+            const smsParts = smsPartCount(smsMessage);
+            if (!isBypassed && smsParts > MAX_SMS_PARTS_PER_GUEST) {
+              console.log(`[Batch] SMS too long for ${guest.name} (${smsParts} SMS parts)`);
+              result = {
+                success: false,
+                error: smsPartsError(smsParts),
+              };
+            } else {
+              const smsResult = await sendSMS({
+                to: guest.phone!,
+                message: smsMessage,
+              });
 
-            result = {
-              success: smsResult.success,
-              error: smsResult.error,
-              data: smsResult.data,
-              messageId: smsResult.messageId,
-            };
+              result = {
+                success: smsResult.success,
+                error: smsResult.error,
+                data: smsResult.data,
+                messageId: smsResult.messageId,
+              };
+            }
           }
 
           // ─── Handle result ─────────────────────────────────────────────

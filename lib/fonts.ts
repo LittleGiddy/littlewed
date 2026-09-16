@@ -1,33 +1,39 @@
-// lib/fonts.ts
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+export const GUEST_PAGE_FONTS = [
+  'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
+  'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
+  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
+  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script',
+] as const;
 
-const fontsDir = path.join(process.cwd(), 'public', 'fonts');
-const cacheDir = path.join(os.tmpdir(), 'fontconfig-cache');
-const fontsConfPath = path.join(os.tmpdir(), 'fonts.conf');
+export const FONT_STACKS: Record<string, string> = {
+  'Playfair Display': '"Playfair Display", Georgia, serif',
+  'DM Sans': '"DM Sans", sans-serif',
+  'Roboto': 'Roboto, sans-serif',
+  'Lora': '"Lora", serif',
+  'Montserrat': 'Montserrat, sans-serif',
+  'Georgia': 'Georgia, serif',
+  'Open Sans': '"Open Sans", sans-serif',
+  'Raleway': 'Raleway, sans-serif',
+  'Nunito': 'Nunito, sans-serif',
+  'Poppins': 'Poppins, sans-serif',
+  'Great Vibes': '"Great Vibes", cursive',
+  'Parisienne': '"Parisienne", cursive',
+  'Alex Brush': '"Alex Brush", cursive',
+  'Tangerine': '"Tangerine", cursive',
+  'Dancing Script': '"Dancing Script", cursive',
+  'Pacifico': '"Pacifico", cursive',
+  'Satisfy': '"Satisfy", cursive',
+  'Cedarville Cursive': '"Cedarville Cursive", cursive',
+  'Kaushan Script': '"Kaushan Script", cursive',
+};
 
-try {
-  fs.mkdirSync(cacheDir, { recursive: true });
+export function fontStack(fontFamily: string | null | undefined): string {
+  if (!fontFamily) return FONT_STACKS['Playfair Display'];
+  return FONT_STACKS[fontFamily] || FONT_STACKS['Playfair Display'];
+}
 
-  const files = fs.existsSync(fontsDir) ? fs.readdirSync(fontsDir) : [];
-  console.log(`[fonts] fontsDir=${fontsDir} files=${JSON.stringify(files)}`);
-
-  if (files.length === 0) {
-    console.error('[fonts] WARNING: public/fonts is empty - text will render as boxes.');
-  }
-
-  const fontsConf = `<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-  <dir>${fontsDir}</dir>
-  <cachedir>${cacheDir}</cachedir>
-</fontconfig>`;
-
-  fs.writeFileSync(fontsConfPath, fontsConf);
-  process.env.FONTCONFIG_FILE = fontsConfPath;
-
-  console.log(`[fonts] FONTCONFIG_FILE=${fontsConfPath}`);
-} catch (err) {
-  console.error('[fonts] Failed to configure fontconfig:', err);
+export function googleFontsImport(fontFamily: string | null | undefined): string {
+  const font = fontFamily && FONT_STACKS[fontFamily] ? fontFamily : 'Playfair Display';
+  const family = font.replace(/ /g, '+');
+  return `@import url('https://fonts.googleapis.com/css2?family=${family}:wght@400;500;600;700;800;900&display=swap');`;
 }

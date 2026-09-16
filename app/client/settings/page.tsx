@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import {
   User, Mail, Phone, Lock, Save, Loader2, Eye, EyeOff,
   Camera, Shield, Calendar, Building2, Bell, Trash2,
-  AlertTriangle, CheckCircle, CreditCard, Users,
+  AlertTriangle, CheckCircle, CreditCard, Users, Palette, ArrowRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   const { data: session, update } = useSession();
@@ -177,6 +178,23 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-5">
+        {/* ─── Appearance Link ─── */}
+        <Link
+          href="/client/settings/guest-page"
+          className="block bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] rounded-2xl p-5 shadow-md shadow-[#0D4B4B]/20 hover:shadow-lg hover:shadow-[#0D4B4B]/30 transition-all group"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:bg-white/20 transition-all shrink-0">
+              <Palette size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-serif font-extrabold m-0 group-hover:underline">Guest Page Theme</p>
+              <p className="text-[#9CC4C4] text-xs m-0 mt-0.5">Customize colors, font &amp; hero for your invitation link page</p>
+            </div>
+            <ArrowRight size={18} className="text-[#9CC4C4] group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
+          </div>
+        </Link>
+
         {/* ─── Profile Card ─── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {/* Avatar Section */}

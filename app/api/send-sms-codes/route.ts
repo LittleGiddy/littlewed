@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index';
+import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 
 // ─── Helper: Generate a unique 5-digit card number ──────────────────────
 async function generateUniqueCardNumber(eventId: string): Promise<string> {
@@ -51,12 +52,17 @@ export async function POST(req: NextRequest) {
 
     const event = await prisma.event.findFirst({
       where: { id: eventId, tenantId },
-      include: { guests: true },
+      include: {
+        guests: true,
+        tenant: { select: { bypassPayment: true } },
+      },
     });
 
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
+
+    const isBypassed = event.tenant?.bypassPayment === true;
 
     const customMessage = event.customMessage || "You're invited!";
 
@@ -97,6 +103,19 @@ export async function POST(req: NextRequest) {
         // ─── Prepare message ──────────────────────────────────────────────
         const fullName = guest.title ? `${guest.title} ${guest.name}` : guest.name;
         const message = `${customMessage} Hello ${fullName}, your entry card number for ${event.name} is: ${cardNumber}. Please show this at the entrance.`;
+
+        // ─── Hard cap: standard tenants get one SMS per guest per send ────
+        const smsParts = smsPartCount(message);
+        if (!isBypassed && smsParts > MAX_SMS_PARTS_PER_GUEST) {
+          console.error(`[SMS] Too long for ${guest.name}: ${smsParts} SMS parts`);
+          results.push({
+            guestId: guest.id,
+            name: guest.name,
+            success: false,
+            error: smsPartsError(smsParts),
+          });
+          continue;
+        }
 
         // ─── Send SMS via NexSMS ──────────────────────────────────────────
         const result = await sendSMS({

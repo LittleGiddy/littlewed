@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Send, Eye, EyeOff, Info, FileText, ArrowRight, Save, CheckCircle2 } from 'lucide-react';
+import SmsCounter from '@/components/SmsCounter';
+import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import {
   SMS_VARIABLES,
   SAMPLE_GUEST,
@@ -21,7 +23,7 @@ export default function ComposeSmsPage() {
   const { eventId } = useParams();
   const router = useRouter();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
-  const { event, loading, smsPending } = useGuestData(eventId);
+  const { event, loading, smsPending, bypassPayment } = useGuestData(eventId);
 
   const [smsTemplate, setSmsTemplate] = useState(() => readSmsTemplateDraft(id));
   const [showVariables, setShowVariables] = useState(true);
@@ -101,7 +103,7 @@ export default function ComposeSmsPage() {
           <span className="flex items-center gap-1">
             <Save size={11} className="text-green-500" /> Draft saved on this device
           </span>
-          <span>{smsTemplate.length} characters</span>
+          <SmsCounter text={preview} maxParts={bypassPayment ? null : MAX_SMS_PARTS_PER_GUEST} />
         </div>
 
         {/* ─── Preview ─── */}

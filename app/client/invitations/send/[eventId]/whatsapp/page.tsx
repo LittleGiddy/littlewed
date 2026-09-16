@@ -20,6 +20,7 @@ interface WaDraft {
   template?: string;
   vars?: Record<string, string>;
   contact?: string;
+  contact2?: string;
   eventType?: string;
 }
 
@@ -53,6 +54,7 @@ export default function ComposeWhatsappPage() {
   const [template, setTemplate] = useState(() => readWhatsappDraft(id)?.template || 'mwalikoforth');
   const [vars, setVars] = useState<Record<string, string>>(() => readWhatsappDraft(id)?.vars || {});
   const [contact, setContact] = useState(() => readWhatsappDraft(id)?.contact || '');
+  const [contact2, setContact2] = useState(() => readWhatsappDraft(id)?.contact2 || '');
   const [eventType, setEventType] = useState(() => {
     const e = readWhatsappDraft(id)?.eventType;
     return e || 'harusi';
@@ -65,14 +67,14 @@ export default function ComposeWhatsappPage() {
     if (!id) return;
     const t = setTimeout(() => {
       try {
-        const draft: WaDraft = { template, vars, contact, eventType };
+        const draft: WaDraft = { template, vars, contact, contact2, eventType };
         localStorage.setItem(`whatsapp_draft_${id}`, JSON.stringify(draft));
       } catch {
         // ignore
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [template, vars, contact, eventType, id]);
+  }, [template, vars, contact, contact2, eventType, id]);
 
   // ─── Effective values: event defaults, overridden by user edits ─────────
   const effectiveVars = useMemo(() => {
@@ -86,6 +88,7 @@ export default function ComposeWhatsappPage() {
       date,
       time: event?.time || '',
       venue: event?.venue || '',
+      area: event?.address || '',
       ...vars,
     };
   }, [event, vars]);
@@ -98,6 +101,22 @@ export default function ComposeWhatsappPage() {
     const name = getFullName(SAMPLE_GUEST);
     const cardNumber = SAMPLE_GUEST.cardNumber || '';
     const cardType = cardTypeLabel(SAMPLE_GUEST);
+    if (template === 'mwalikoplus') {
+      return [
+        `Habari ${name}`,
+        '',
+        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'harusi'} ${couple || '...'}`,
+        `itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
+        `Ukumbi: ${effectiveVars.venue || '{venue}'}`,
+        `Muda: ${effectiveVars.time || '{time}'}`,
+        `Card No: ${cardNumber} ${cardType}`,
+        ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
+        '',
+        'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante.',
+        '',
+        'Bonyeza Link Hapa Chini kwa kwa Maelezo zaidi👇️',
+      ].join('\n');
+    }
     if (template === 'mwalikoforth') {
       return [
         `Habari ${name}`,
@@ -124,7 +143,7 @@ export default function ComposeWhatsappPage() {
       `${cardType}`,
       ...(currentTpl.hasContact && contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
     ].join('\n');
-  }, [template, effectiveVars, contact, eventType, currentTpl]);
+  }, [template, effectiveVars, contact, contact2, eventType, currentTpl]);
 
   if (loading) return <LoadingState label="Loading WhatsApp..." />;
 
@@ -142,7 +161,7 @@ export default function ComposeWhatsappPage() {
           <h2 className="font-semibold text-gray-800">Choose a template</h2>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          WhatsApp only allows pre-approved templates. Each one includes the wedding card image and a confirm link.
+          WhatsApp only allows pre-approved templates. Each one includes the wedding card image and a link button — guests who tap it open their unique card page.
         </p>
         <div className="space-y-2">
           {Object.entries(INVITE_TEMPLATES).map(([key, tpl]) => (
@@ -166,11 +185,13 @@ export default function ComposeWhatsappPage() {
               <span className="flex-1">
                 <span className="block text-sm font-semibold text-gray-900">{tpl.displayName}</span>
                 <span className="block text-[11px] text-gray-500">
-                  {tpl.hasEventType
-                    ? 'Includes event type (harusi/arusi)'
-                    : tpl.hasContact
-                      ? 'Includes a contact line'
-                      : 'Extra contact info not included'}
+                  {tpl.hasMoreInfoButton
+                    ? 'Includes event type + More Info button (opens guest\u2019s card page)'
+                    : tpl.hasEventType
+                      ? 'Includes event type (harusi/arusi)'
+                      : tpl.hasContact
+                        ? 'Includes a contact line'
+                        : 'Extra contact info not included'}
                 </span>
               </span>
             </button>
@@ -201,6 +222,18 @@ export default function ComposeWhatsappPage() {
             </div>
           ))}
 
+          {currentTpl.hasMoreInfoButton && (
+            <div>
+              <label className="text-xs font-medium text-gray-600">Area / Location</label>
+              <input
+                value={effectiveVars.area || ''}
+                onChange={e => setVars(v => ({ ...v, area: e.target.value }))}
+                placeholder="e.g. Tabata Kimanga - Dar es salaam"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+              />
+            </div>
+          )}
+
           {currentTpl.hasEventType && (
             <div>
               <label className="text-xs font-medium text-gray-600">Event type</label>
@@ -219,7 +252,19 @@ export default function ComposeWhatsappPage() {
               <input
                 value={contact}
                 onChange={e => setContact(e.target.value)}
-                placeholder="e.g. +255 712 345 678"
+                placeholder="e.g. John Pambalu: 0769 999 902"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+              />
+            </div>
+          )}
+
+          {currentTpl.hasContact2 && (
+            <div>
+              <label className="text-xs font-medium text-gray-600">Second contact number</label>
+              <input
+                value={contact2}
+                onChange={e => setContact2(e.target.value)}
+                placeholder="e.g. Hamza Pambalu: 0655 555 033"
                 className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
               />
             </div>
@@ -250,7 +295,7 @@ export default function ComposeWhatsappPage() {
             {preview}
           </div>
           <div className="mt-2 rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3 inline-block">
-            Confirm
+            {template === 'mwalikoplus' ? 'Maelezo Zaidi' : 'Confirm'}
           </div>
         </div>
       </Card>

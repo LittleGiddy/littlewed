@@ -232,6 +232,82 @@ export async function sendWeddingInvitation(
   });
 }
 
+// ─── Wedding Invitation Template with More Info button ────────────────
+// "Mwaliko Sixth" carries a dynamic URL button (the url_link the template
+// approved in the NexSMS dashboard) that opens the guest's unique page at
+// littlewed.co.tz/invite/<passCode> with the wedding info + their card.
+
+export async function sendWeddingInvitationPlus(
+  phone: string,
+  data: {
+    guestName: string;
+    hostFamily: string;
+    area: string;          // {var3} e.g. "Tabata Kimanga - Dar es salaam"
+    eventType: string;     // {var4} e.g. "SendOff ya Binti yao mpendwa"
+    celebrant: string;     // {var5} e.g. "Norah Cyprian Ngiliule"
+    date: string;          // {var6}
+    venue: string;         // {var7}
+    time: string;          // {var8}
+    cardNumber: string;    // {var9} + {Var10} is the card type below
+    cardType: string;      // {var10}
+    contact1: string;      // {var11} first contact "John Pambalu: 0769999902"
+    contact2: string;      // {var12} second contact
+    imageUrl?: string;
+    inviteLink?: string;
+  }
+): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING WEDDING INVITATION (PLUS) ======');
+  console.log('[WhatsApp] Template: Mwaliko Sixth');
+
+  const header = data.imageUrl
+    ? {
+        image: {
+          file: data.imageUrl,
+          name: 'Wedding Invitation',
+        }
+      }
+    : undefined;
+
+  // ─── Dynamic URL button (More Info) ────────────────────────────────
+  // WhatsApp allows ONE URL button per template; the button text and the
+  // base URL (https://littlewed.co.tz/invite/) are fixed on the approved
+  // template, we only supply the per-guest passCode suffix.
+  let button = undefined;
+  if (data.inviteLink) {
+    const slug = toLinkSuffix(data.inviteLink);
+    button = {
+      personalisation: {
+        url_link: {
+          parameters: [slug],
+        },
+      },
+    };
+  }
+
+  const personalisation: Record<string, string> = {
+    "var1": data.guestName,          // Habari {var1}
+    "var2": data.hostFamily,         // Familia ya {var2}
+    "var3": data.area,               // wa {var3}
+    "var4": data.eventType,          // inakualika katika {var4}
+    "var5": data.celebrant,          // {var5}
+    "var6": data.date,               // itakayofanyika tarehe {var6}
+    "var7": data.venue,              // Ukumbi: {var7}
+    "var8": data.time,               // Muda: {var8}
+    "Var9": data.cardNumber,         // Card No: {Var9} — capital V!
+    "var10": data.cardType,          // {var10}
+    "var11": data.contact1,          // kwa mawasiliano zaidi: {var11}
+    "var12": data.contact2,          // {var12}
+  };
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'Mwaliko Sixth',
+    personalisation: [personalisation],
+    header,
+    button,
+  });
+}
+
 // ─── Helper: Convert full URL to slug ──────────────────────────────────
 
 export function toLinkSuffix(value: string): string {

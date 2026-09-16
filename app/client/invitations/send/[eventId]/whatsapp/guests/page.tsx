@@ -124,6 +124,7 @@ export default function WhatsappGuestsPage() {
           forceChannel: 'whatsapp',
           whatsappTemplate: templateInfo?.whatsappName,
           whatsappContact: draft?.contact || '',
+          whatsappContact2: draft?.contact2 || '',
           eventType: draft?.eventType || 'harusi',
           whatsappVariables: draft?.vars || {},
           dailyLimit,

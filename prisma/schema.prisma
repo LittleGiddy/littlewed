@@ -103,6 +103,15 @@ model Tenant {
   whatsappTemplate      String?  @default("event_invitation")
   whatsappAccount       String?  @default("TANZANIATIP")
 
+  // ─── Guest invitation page (the /invite/<passCode> page) ───────────────
+  guestPagePrimaryColor   String?  @default("#BE185D")
+  guestPageSecondaryColor String?  @default("#6D28D9")
+  guestPageAccentColor    String?  @default("#F6C445")
+  guestPageFontFamily     String?  @default("Playfair Display")
+  guestPageHeaderImage    String?
+  guestPageTitle          String?
+  guestPageSubtitle       String?
+
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]

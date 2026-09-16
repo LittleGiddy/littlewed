@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import SmsCounter from '@/components/SmsCounter';
+import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import ModernColorPicker from '@/app/components/ModernColorPicker';
 
 const REMINDER_FONTS = [
@@ -676,6 +678,17 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
                   className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none"
                   placeholder="e.g. Habari {name}, tunakumbusha kuhusu mchango wako kwa {event}. Asante."
                 />
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-400">
+                  <span>
+                    Preview counts with a typical guest name (actual count changes with each guest&apos;s name length).
+                  </span>
+                  <SmsCounter
+                    text={message
+                      .replace(/\{name\}/g, 'Mr John Doe')
+                      .replace(/\{event\}/g, event?.name || 'the event')}
+                    maxParts={bypassPayment ? null : MAX_SMS_PARTS_PER_GUEST}
+                  />
+                </div>
               </div>
             )}
 

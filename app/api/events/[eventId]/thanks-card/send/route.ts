@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendWhatsAppThanksCard, getThanksWhatsAppTemplate } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
+import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { guestTypeLabel } from '@/lib/guestTypes';
 import { sendPushToTenantRole } from '@/lib/push';
 
@@ -98,6 +99,25 @@ export async function POST(
       );
     }
 
+    // ─── Hard cap on SMS parts (standard tenants only) ───────────────────
+    // Reject before deducting credits, so a too-long SMS never consumes them.
+    // Bypassed tenants skip this check and may send any length.
+    if (channel === 'sms' && !isBypassed) {
+      const sampleMessage = message
+        .replace(/\{guestName\}/g, 'Mr John Doe')
+        .replace(/\{name\}/g, 'Mr John Doe')
+        .replace(/\{cardNumber\}/g, '00000')
+        .replace(/\{cardType\}/g, 'Single')
+        .replace(/\{event\}/g, event.name)
+        .replace(/\{eventName\}/g, event.name);
+      const sampleParts = smsPartCount(sampleMessage);
+      if (sampleParts > MAX_SMS_PARTS_PER_GUEST) {
+        return NextResponse.json({
+          error: smsPartsError(sampleParts),
+        }, { status: 400 });
+      }
+    }
+
     // ─── Credit check + deduction (skip for bypass, blocked when disabled) ─
     const totalCost = recipients.length * THANKS_COST_PER_MESSAGE;
     if (!isBypassed || creditsDisabled) {
@@ -148,7 +168,12 @@ export async function POST(
             .replace(/\{cardType\}/g, () => cardType)
             .replace(/\{event\}/g, () => event.name)
             .replace(/\{eventName\}/g, () => event.name);
-          sendResult = await sendSMS({ to: g.phone as string, message: personalized });
+          const parts = smsPartCount(personalized);
+          if (!isBypassed && parts > MAX_SMS_PARTS_PER_GUEST) {
+            sendResult = { success: false, error: smsPartsError(parts) };
+          } else {
+            sendResult = await sendSMS({ to: g.phone as string, message: personalized });
+          }
         }
 
         if (sendResult.success) {

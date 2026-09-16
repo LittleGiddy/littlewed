@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { confirmToast } from '@/lib/confirmToast';
 import { guestTypeLabel } from '@/lib/guestTypes';
+import SmsCounter from '@/components/SmsCounter';
+import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 
 interface ThanksGuest {
   id: string;
@@ -454,7 +456,10 @@ export default function ThanksCardModal({
                 className="w-full p-4 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent min-h-[160px] resize-y"
               />
               <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
-                <span>{smsMessage.length} characters</span>
+                <span>
+                  Counts with a sample guest name (actual count changes with each guest&apos;s name length).
+                </span>
+                <SmsCounter text={previewMessage} maxParts={isBypassed ? null : MAX_SMS_PARTS_PER_GUEST} />
               </div>
 
               <div className="mt-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">

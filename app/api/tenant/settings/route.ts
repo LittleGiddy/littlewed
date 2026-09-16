@@ -30,6 +30,13 @@ export async function GET() {
         qrPlacementY: true,
         qrSize: true,
         simpleEventMode: true,
+        guestPagePrimaryColor: true,
+        guestPageSecondaryColor: true,
+        guestPageAccentColor: true,
+        guestPageFontFamily: true,
+        guestPageHeaderImage: true,
+        guestPageTitle: true,
+        guestPageSubtitle: true,
       },
     });
 
@@ -40,6 +47,13 @@ export async function GET() {
       qrPlacementY: tenant?.qrPlacementY ?? 50,
       qrSize: tenant?.qrSize ?? 150,
       simpleEventMode: tenant?.simpleEventMode ?? false,
+      guestPagePrimaryColor: tenant?.guestPagePrimaryColor ?? '#BE185D',
+      guestPageSecondaryColor: tenant?.guestPageSecondaryColor ?? '#6D28D9',
+      guestPageAccentColor: tenant?.guestPageAccentColor ?? '#F6C445',
+      guestPageFontFamily: tenant?.guestPageFontFamily ?? 'Playfair Display',
+      guestPageHeaderImage: tenant?.guestPageHeaderImage ?? null,
+      guestPageTitle: tenant?.guestPageTitle ?? '',
+      guestPageSubtitle: tenant?.guestPageSubtitle ?? '',
     });
   } catch (error) {
     console.error('GET /api/tenant/settings error:', error);
@@ -66,7 +80,20 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
     }
 
-    const { templateCardUrl, qrPlacementX, qrPlacementY, qrSize, simpleEventMode } = await req.json();
+    const {
+      templateCardUrl,
+      qrPlacementX,
+      qrPlacementY,
+      qrSize,
+      simpleEventMode,
+      guestPagePrimaryColor,
+      guestPageSecondaryColor,
+      guestPageAccentColor,
+      guestPageFontFamily,
+      guestPageHeaderImage,
+      guestPageTitle,
+      guestPageSubtitle,
+    } = await req.json();
 
     await prisma.tenant.update({
       where: { id: tenantId },
@@ -76,6 +103,13 @@ export async function PUT(req: NextRequest) {
         qrPlacementY,
         qrSize,
         simpleEventMode,
+        guestPagePrimaryColor,
+        guestPageSecondaryColor,
+        guestPageAccentColor,
+        guestPageFontFamily,
+        guestPageHeaderImage: guestPageHeaderImage === '' ? null : guestPageHeaderImage,
+        guestPageTitle: guestPageTitle === '' ? null : guestPageTitle,
+        guestPageSubtitle: guestPageSubtitle === '' ? null : guestPageSubtitle,
       },
     });
 

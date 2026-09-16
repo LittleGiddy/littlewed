@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index';
+import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
@@ -35,7 +36,11 @@ export async function POST(req: NextRequest) {
         event: { tenantId },
       },
       include: {
-        event: true,
+        event: {
+          include: {
+            tenant: { select: { bypassPayment: true } },
+          },
+        },
       },
     });
 
@@ -62,6 +67,19 @@ export async function POST(req: NextRequest) {
         const fullName = getGuestFullName(guest);
         const cardInfo = guest.cardNumber ? ` (Card: ${guest.cardNumber})` : '';
         const finalMessage = `${message}${cardInfo}`;
+
+        // ─── Hard cap: standard tenants get one SMS per guest ────────────
+        const isBypassed = guest.event?.tenant?.bypassPayment === true;
+        const smsParts = smsPartCount(finalMessage);
+        if (!isBypassed && smsParts > MAX_SMS_PARTS_PER_GUEST) {
+          results.push({
+            guestId: guest.id,
+            name: guest.name,
+            success: false,
+            error: smsPartsError(smsParts),
+          });
+          continue;
+        }
 
         // ─── Send SMS via NexSMS ────────────────────────────────────────
         const result = await sendSMS({
