@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
+    const kind = (formData.get('kind') as string) === 'couple' ? 'guest-page-couple' : 'guest-page-header';
     const buffer = Buffer.from(await file.arrayBuffer());
-    const key = `tenants/${tenantId}/guest-page-header-${Date.now()}.png`;
+    const key = `tenants/${tenantId}/${kind}-${Date.now()}.png`;
     const url = await uploadToBlob(key, buffer, file.type);
 
     return NextResponse.json({ url });

@@ -114,6 +114,8 @@ model Tenant {
   guestPageDetailsTitle   String?  @default("The Invitation")
   guestPageRsvpTitle      String?  @default("Will You Attend?")
   guestPageFooterNote     String?  @default("With love")
+  guestPageThemeColor     String?  @default("#E8C46B")
+  guestPageCoupleImage    String?
 
   users              User[]
   events             Event[]
@@ -193,6 +195,21 @@ model Event {
   dateFontFamily      String? @default("DM Sans")
   venueFontFamily     String? @default("DM Sans")
   nameFontFamily      String? @default("Playfair Display")
+
+  // ─── Guest invitation page (/invite/<passCode>) ──────────────────────
+  // Per-event overrides; fall back to the owning tenant's values when null.
+  guestPagePrimaryColor   String?  @default("#BE185D")
+  guestPageSecondaryColor String?  @default("#6D28D9")
+  guestPageAccentColor    String?  @default("#F6C445")
+  guestPageThemeColor     String?  @default("#E8C46B")
+  guestPageFontFamily     String?  @default("Playfair Display")
+  guestPageHeaderImage    String?
+  guestPageCoupleImage    String?
+  guestPageTitle          String?
+  guestPageSubtitle       String?
+  guestPageDetailsTitle   String?  @default("The Invitation")
+  guestPageRsvpTitle      String?  @default("Will You Attend?")
+  guestPageFooterNote     String?  @default("With love")
 
   // Thank you card
   thankYouCardUrl       String?

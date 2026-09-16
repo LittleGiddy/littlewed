@@ -1557,18 +1557,32 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {/* ─── Step 2: Design ─── */}
               {activeStep === 'design' && (
                 <div className="space-y-4">
-                  <Link href={`/client/invitations/design/${event.id}`} className="action-tile">
-                    <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
-                      <Palette size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-sm text-gray-800">Open the card designer</p>
-                      <p className="text-xs text-gray-400">
-                        Choose a template and customize colors, text and photos
-                      </p>
-                    </div>
-                    <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
-                  </Link>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Link href={`/client/invitations/design/${event.id}`} className="action-tile">
+                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
+                        <Palette size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-800">Open the card designer</p>
+                        <p className="text-xs text-gray-400">
+                          Choose a template and customize colors, text and photos
+                        </p>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                    </Link>
+                    <Link href={`/client/events/${event.id}/guest-page`} className="action-tile">
+                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
+                        <QrCode size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-gray-800">Guest page &amp; Invitation</p>
+                        <p className="text-xs text-gray-400">
+                          Colors, photos &amp; wording shown to this event&apos;s guests
+                        </p>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
+                    </Link>
+                  </div>
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
                     <PenTool size={28} className="text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
