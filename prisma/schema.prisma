@@ -111,6 +111,9 @@ model Tenant {
   guestPageHeaderImage    String?
   guestPageTitle          String?
   guestPageSubtitle       String?
+  guestPageDetailsTitle   String?  @default("The Invitation")
+  guestPageRsvpTitle      String?  @default("Will You Attend?")
+  guestPageFooterNote     String?  @default("With love")
 
   users              User[]
   events             Event[]

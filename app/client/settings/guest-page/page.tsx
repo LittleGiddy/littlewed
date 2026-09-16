@@ -18,6 +18,9 @@ interface Draft {
   guestPageHeaderImage: string;
   guestPageTitle: string;
   guestPageSubtitle: string;
+  guestPageDetailsTitle: string;
+  guestPageRsvpTitle: string;
+  guestPageFooterNote: string;
 }
 
 const DEFAULTS: Draft = {
@@ -28,6 +31,9 @@ const DEFAULTS: Draft = {
   guestPageHeaderImage: '',
   guestPageTitle: '',
   guestPageSubtitle: '',
+  guestPageDetailsTitle: 'The Invitation',
+  guestPageRsvpTitle: 'Will You Attend?',
+  guestPageFooterNote: 'With love',
 };
 
 function readDraft(): Draft {
@@ -60,6 +66,9 @@ export default function GuestPageSettings() {
           guestPageHeaderImage: data.guestPageHeaderImage || local.guestPageHeaderImage,
           guestPageTitle: data.guestPageTitle || local.guestPageTitle,
           guestPageSubtitle: data.guestPageSubtitle || local.guestPageSubtitle,
+          guestPageDetailsTitle: data.guestPageDetailsTitle || local.guestPageDetailsTitle,
+          guestPageRsvpTitle: data.guestPageRsvpTitle || local.guestPageRsvpTitle,
+          guestPageFooterNote: data.guestPageFooterNote || local.guestPageFooterNote,
         });
       })
       .catch(() => setDraft(local))
@@ -309,6 +318,42 @@ export default function GuestPageSettings() {
                   className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
                 />
               </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-800">Details Section Title</label>
+                <p className="text-[11px] text-gray-400 m-0 mb-1.5">
+                  Heading for the event details section. Leave blank for default: &quot;The Invitation&quot;.
+                </p>
+                <input
+                  value={draft.guestPageDetailsTitle}
+                  onChange={e => set('guestPageDetailsTitle', e.target.value)}
+                  placeholder="e.g. The Invitation"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-800">RSVP Section Title</label>
+                <p className="text-[11px] text-gray-400 m-0 mb-1.5">
+                  Heading above the RSVP buttons. Leave blank for default: &quot;Will You Attend?&quot;.
+                </p>
+                <input
+                  value={draft.guestPageRsvpTitle}
+                  onChange={e => set('guestPageRsvpTitle', e.target.value)}
+                  placeholder="e.g. Will You Attend?"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-800">Footer Note</label>
+                <p className="text-[11px] text-gray-400 m-0 mb-1.5">
+                  The closing line at the bottom of the page. Leave blank for default: &quot;With love&quot;.
+                </p>
+                <input
+                  value={draft.guestPageFooterNote}
+                  onChange={e => set('guestPageFooterNote', e.target.value)}
+                  placeholder="e.g. With love"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -392,6 +437,26 @@ export default function GuestPageSettings() {
                   >
                     Guest&apos;s invitation card
                   </div>
+                  <div className="pt-1">
+                    <p className="font-semibold text-gray-700" style={{ fontFamily: fontClass, fontSize: '1.05rem' }}>
+                      {draft.guestPageDetailsTitle || 'The Invitation'}
+                    </p>
+                    <p className="text-xs text-gray-400 -mt-0.5">We would be honored to have you join us</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+                    <p className="font-semibold text-gray-700" style={{ fontFamily: fontClass }}>
+                      {draft.guestPageRsvpTitle || 'Will You Attend?'}
+                    </p>
+                    <p className="text-[11px] text-gray-400">Kindly RSVP so we can plan for you</p>
+                    <div className="flex justify-center gap-2 mt-2">
+                      <span className="bg-green-600 text-white text-[10px] px-2.5 py-1 rounded-full">Yes I&apos;ll attend</span>
+                      <span className="bg-red-600 text-white text-[10px] px-2.5 py-1 rounded-full">Sadly, no</span>
+                      <span className="bg-gray-600 text-white text-[10px] px-2.5 py-1 rounded-full">Maybe</span>
+                    </div>
+                  </div>
+                  <p className="text-center text-[10px] uppercase tracking-[3px] text-gray-400 font-semibold">
+                    &#10053; {draft.guestPageFooterNote || 'With love'} &#10053;
+                  </p>
                 </div>
               </motion.div>
             )}

@@ -82,6 +82,9 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
   const heroTitle = tenant?.guestPageTitle || autoTitle || (couple ? couple + ' Night' : event.name)
   const heroSubtitle = tenant?.guestPageSubtitle || 'You are cordially invited'
+  const detailsTitle = tenant?.guestPageDetailsTitle || 'The Invitation'
+  const rsvpTitle = tenant?.guestPageRsvpTitle || 'Will You Attend?'
+  const footerNote = tenant?.guestPageFooterNote || 'With love'
 
   const heroBackground = headerImage
     ? `linear-gradient(160deg, ${primaryColor}E6, ${secondaryColor}E6), url('${headerImage}') center/cover`
@@ -150,23 +153,23 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
         <span className="absolute bottom-6 left-6 w-10 h-10 border-b-2 border-l-2 rounded-bl-2xl opacity-60" style={{ borderColor: accentColor }} />
         <span className="absolute bottom-6 right-6 w-10 h-10 border-b-2 border-r-2 rounded-br-2xl opacity-60" style={{ borderColor: accentColor }} />
 
-        <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center">
-          {/* Flourish */}
-          <div className="gp-fade-in text-3xl mb-4" style={{ color: accentColor }}>&#10053;</div>
+<div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center px-1">
+            {/* Flourish */}
+            <div className="gp-fade-in text-3xl mb-4" style={{ color: accentColor }}>&#10053;</div>
 
-          <p
-            className="gp-fade-up gp-fade-up-1 text-[12px] uppercase font-semibold tracking-[4px] mb-5"
-            style={{ color: accentColor }}
-          >
-            {heroSubtitle}
-          </p>
+            <p
+              className="gp-fade-up gp-fade-up-1 text-[10px] sm:text-[12px] uppercase font-semibold tracking-[3px] sm:tracking-[4px] mb-5"
+              style={{ color: accentColor }}
+            >
+              {heroSubtitle}
+            </p>
 
-          <h1
-            className="gp-fade-up gp-fade-up-2 text-6xl sm:text-7xl font-black leading-[1.05] drop-shadow-lg mb-6"
-            style={{ fontFamily: titleFont, textShadow: '0 4px 30px rgba(0,0,0,0.25)' }}
-          >
-            {heroTitle}
-          </h1>
+            <h1
+              className="gp-fade-up gp-fade-up-2 text-[2.6rem] leading-[1.08] sm:text-6xl md:text-7xl font-black drop-shadow-lg mb-6 break-words max-w-full"
+              style={{ fontFamily: titleFont, textShadow: '0 4px 30px rgba(0,0,0,0.25)' }}
+            >
+              {heroTitle}
+            </h1>
 
           {/* Gold divider */}
           <div className="gp-fade-up gp-fade-up-3 flex items-center gap-3 mb-7">
@@ -207,17 +210,24 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       </section>
 
       {/* ═══════════════ DETAILS ═══════════════ */}
-      <section id="details" className="relative px-4 sm:px-6 py-16 max-w-2xl mx-auto">
+      <section id="details" className="relative px-4 sm:px-6 py-14 sm:py-20 max-w-2xl mx-auto">
         {/* Top ornament */}
-        <div className="flex justify-center mb-6">
+        <div className="flex justify-center mb-5">
           <span className="gp-ornament text-lg">&#10053;</span>
         </div>
 
+        {/* Soft accent underline */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <span className="h-px w-16 sm:w-24" style={{ backgroundColor: `${accentColor}`, opacity: 0.5 }} />
+          <span className="w-1.5 h-1.5 rotate-45" style={{ backgroundColor: accentColor }} />
+          <span className="h-px w-16 sm:w-24" style={{ backgroundColor: `${accentColor}`, opacity: 0.5 }} />
+        </div>
+
         <h2
-          className="text-center text-3xl sm:text-4xl font-black text-gray-800 mb-2"
-          style={{ fontFamily: titleFont }}
+          className="text-center text-3xl sm:text-4xl font-black mb-2 break-words"
+          style={{ fontFamily: titleFont, color: primaryColor }}
         >
-          The Invitation
+          {detailsTitle}
         </h2>
         <p className="text-center text-sm text-gray-400 mb-10">
           We would be honored to have you join us
@@ -246,8 +256,8 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             <img
               src={guest.invitationCard}
               alt={`Invitation card for ${guestName}`}
-              className="rounded-2xl shadow-2xl max-w-full mx-auto"
-              style={{ maxHeight: 560, width: 'auto' }}
+              className="rounded-2xl shadow-2xl max-w-full mx-auto max-h-[420px] sm:max-h-[560px] h-auto"
+              style={{ width: 'auto' }}
             />
           </div>
         )}
@@ -266,42 +276,42 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
 
         {/* Event info cards */}
         <div className="grid gap-3 mb-12">
-          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
             <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Date</p>
-              <p className="text-sm font-semibold text-gray-800 m-0">{formatDate(event.date)}</p>
+              <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{formatDate(event.date)}</p>
             </div>
           </div>
 
           {event.time && (
-            <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
+            <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
               <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${secondaryColor}88`, color: secondaryColor }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Time</p>
-                <p className="text-sm font-semibold text-gray-800 m-0">{event.time}</p>
+                <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{event.time}</p>
               </div>
             </div>
           )}
 
-          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
             <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Venue</p>
-              <p className="text-sm font-semibold text-gray-800 m-0">{event.venue}</p>
+              <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{event.venue}</p>
               {event.address && <p className="text-xs text-gray-400 m-0 mt-0.5">{event.address}</p>}
             </div>
           </div>
@@ -313,18 +323,18 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
             <span className="gp-ornament-sm text-xs mb-4" style={{ display: 'inline-flex', marginBottom: '0.75rem', borderColor: `${accentColor}88`, color: '#7A5B00' }}>
               &#10053;
             </span>
-            <h3 className="text-2xl font-black text-gray-800 mb-1" style={{ fontFamily: titleFont }}>
-              Will You Attend?
+            <h3 className="text-2xl font-black text-gray-800 mb-1 break-words" style={{ fontFamily: titleFont, color: primaryColor }}>
+              {rsvpTitle}
             </h3>
             <p className="text-sm text-gray-400">Kindly RSVP so we can plan for you &#10084;</p>
           </div>
-          <RSVPForm guestId={guest.id} currentStatus={guest.attending} />
+          <RSVPForm guestId={guest.id} currentStatus={guest.attending} primaryColor={primaryColor} secondaryColor={secondaryColor} />
         </div>
 
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-[11px] uppercase tracking-[3px] text-gray-300 font-semibold mb-2">
-            &#10053; With love &#10053;
+            &#10053; {footerNote} &#10053;
           </p>
           <p className="text-xs text-gray-400">
             {formatDateShort(event.date)} &middot; {event.venue}

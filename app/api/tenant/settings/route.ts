@@ -37,6 +37,9 @@ export async function GET() {
         guestPageHeaderImage: true,
         guestPageTitle: true,
         guestPageSubtitle: true,
+        guestPageDetailsTitle: true,
+        guestPageRsvpTitle: true,
+        guestPageFooterNote: true,
       },
     });
 
@@ -54,6 +57,9 @@ export async function GET() {
       guestPageHeaderImage: tenant?.guestPageHeaderImage ?? null,
       guestPageTitle: tenant?.guestPageTitle ?? '',
       guestPageSubtitle: tenant?.guestPageSubtitle ?? '',
+      guestPageDetailsTitle: tenant?.guestPageDetailsTitle ?? 'The Invitation',
+      guestPageRsvpTitle: tenant?.guestPageRsvpTitle ?? 'Will You Attend?',
+      guestPageFooterNote: tenant?.guestPageFooterNote ?? 'With love',
     });
   } catch (error) {
     console.error('GET /api/tenant/settings error:', error);
@@ -93,6 +99,9 @@ export async function PUT(req: NextRequest) {
       guestPageHeaderImage,
       guestPageTitle,
       guestPageSubtitle,
+      guestPageDetailsTitle,
+      guestPageRsvpTitle,
+      guestPageFooterNote,
     } = await req.json();
 
     await prisma.tenant.update({
@@ -110,6 +119,9 @@ export async function PUT(req: NextRequest) {
         guestPageHeaderImage: guestPageHeaderImage === '' ? null : guestPageHeaderImage,
         guestPageTitle: guestPageTitle === '' ? null : guestPageTitle,
         guestPageSubtitle: guestPageSubtitle === '' ? null : guestPageSubtitle,
+        guestPageDetailsTitle: guestPageDetailsTitle === '' ? null : guestPageDetailsTitle,
+        guestPageRsvpTitle: guestPageRsvpTitle === '' ? null : guestPageRsvpTitle,
+        guestPageFooterNote: guestPageFooterNote === '' ? null : guestPageFooterNote,
       },
     });
 

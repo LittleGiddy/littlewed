@@ -4,6 +4,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from './prisma';
 import { generateQRFromCardNumber } from './qr';
 import { guestTypeLabel } from './guestTypes';
+import { textSvg } from './cardFonts';
 import sharp from 'sharp';
 
 // ─── Cloudinary Configuration ──────────────────────────────────────────
@@ -73,41 +74,36 @@ export async function fetchTemplateBuffer(templateCardUrl: string): Promise<Buff
   return Buffer.from(await response.arrayBuffer());
 }
 
-function escapeXml(str: string): string {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
+async function renderTextSvg(
+  text: string,
+  options: {
+    fontSize: number;
+    fontFamily: string;
+    color: string;
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+    rotation: number;
+    shadow?: boolean;
+    textAlign?: 'left' | 'center' | 'right';
+  }
+): Promise<Buffer> {
+  const svg = textSvg({
+    text,
+    fontSize: options.fontSize,
+    fontFamily: options.fontFamily,
+    color: options.color,
+    width: options.width,
+    height: options.height,
+    x: options.x,
+    y: options.y,
+    rotation: options.rotation,
+    shadow: options.shadow,
+    textAlign: options.textAlign,
+  });
 
-function getSystemFont(fontFamily: string): string {
-  const fontMap: Record<string, string> = {
-    'Playfair Display': 'Georgia',
-    'DM Sans': 'Arial',
-    'Roboto': 'Arial',
-    'Lora': 'Georgia',
-    'Montserrat': 'Arial',
-    'Open Sans': 'Arial',
-    'Raleway': 'Arial',
-    'Nunito': 'Arial',
-    'Poppins': 'Arial',
-    'Great Vibes': 'Georgia',
-    'Parisienne': 'Georgia',
-    'Alex Brush': 'Georgia',
-    'Tangerine': 'Georgia',
-    'Dancing Script': 'Georgia',
-    'Pacifico': 'Georgia',
-    'Satisfy': 'Georgia',
-    'Cedarville Cursive': 'Georgia',
-    'Kaushan Script': 'Georgia',
-    'Georgia': 'Georgia',
-    'monospace': 'monospace',
-    'Arial': 'Arial',
-  };
-  return fontMap[fontFamily] || 'Georgia';
+  return await sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 async function applyOverlay(
@@ -145,69 +141,6 @@ async function applyOverlay(
     ])
     .png()
     .toBuffer();
-}
-
-async function renderTextSvg(
-  text: string,
-  options: {
-    fontSize: number;
-    fontFamily: string;
-    color: string;
-    width: number;
-    height: number;
-    x: number;
-    y: number;
-    rotation: number;
-    shadow?: boolean;
-    textAlign?: 'left' | 'center' | 'right';
-  }
-): Promise<Buffer> {
-  const { 
-    fontSize, fontFamily, color, width, height, x, y, rotation, shadow = true,
-    textAlign = 'left'
-  } = options;
-
-  const systemFont = getSystemFont(fontFamily);
-  
-  // Map textAlign to SVG text-anchor
-  let textAnchor = 'start';
-  let anchorX = x;
-  
-  if (textAlign === 'center') {
-    textAnchor = 'middle';
-    anchorX = x;
-  } else if (textAlign === 'right') {
-    textAnchor = 'end';
-    anchorX = x;
-  }
-  // left = 'start' (default)
-  
-  const shadowStyle = shadow ? `
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/>
-    </filter>
-  ` : '';
-
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    ${shadowStyle}
-  </defs>
-  <text
-    x="${anchorX}"
-    y="${y}"
-    font-family="${systemFont}, serif"
-    font-size="${fontSize}"
-    fill="${color}"
-    text-anchor="${textAnchor}"
-    dominant-baseline="middle"
-    transform="rotate(${rotation}, ${anchorX}, ${y})"
-    ${shadow ? 'filter="url(#shadow)"' : ''}
-    style="font-weight: bold;"
-  >${escapeXml(text)}</text>
-</svg>`;
-
-  return await sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 // ─── Save to Cloudinary ────────────────────────────────────────────────
