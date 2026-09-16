@@ -94,13 +94,13 @@ export function buildSmsMessage(template: string, guest: SendGuest): string {
 
 export const SAMPLE_GUEST: SendGuest = {
   id: 'sample',
-  name: 'John Doe',
+  name: 'Gideon Tegemeo',
   title: 'Mr',
-  phone: '+255712345678',
-  routingChannel: 'sms',
-  cardNumber: '00123',
+  phone: '+255769999902',
+  routingChannel: 'whatsapp',
+  cardNumber: '12356',
   passCode: 'WED-8F92',
-  guestType: 'DOUBLE',
+  guestType: 'SINGLE',
   invitationSentAt: null,
   smsSentAt: null,
   whatsappSentAt: null,

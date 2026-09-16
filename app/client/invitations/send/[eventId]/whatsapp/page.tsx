@@ -25,12 +25,12 @@ interface WaDraft {
 }
 
 const FIELDS = [
-  { key: 'hostFamily', label: 'Host family', placeholder: 'Familia ya ...', hint: 'Appears after "Familia ya"' },
-  { key: 'person1', label: 'Bridegroom', placeholder: 'e.g. Baraka', hint: '' },
-  { key: 'person2', label: 'Bride', placeholder: 'e.g. Neema', hint: '' },
-  { key: 'date', label: 'Date', placeholder: 'e.g. 12 Desemba 2026', hint: '' },
-  { key: 'time', label: 'Time', placeholder: 'e.g. 10:00 asubuhi', hint: '' },
-  { key: 'venue', label: 'Venue', placeholder: 'e.g. Calabar Hall, Dodoma', hint: '' },
+  { key: 'hostFamily', label: 'Host family', placeholder: 'e.g. Mr & Mrs Wambura', hint: '' },
+  { key: 'person1', label: 'Person 1 (celebrant)', placeholder: 'e.g. Norah Cyprian', hint: '' },
+  { key: 'person2', label: 'Person 2 (optional)', placeholder: 'e.g. Ngiliule', hint: 'Leave blank for single-person events' },
+  { key: 'date', label: 'Date', placeholder: 'e.g. 03/09/2026, Alhamisi', hint: '' },
+  { key: 'time', label: 'Time', placeholder: 'e.g. Saa 12:00 Jioni', hint: '' },
+  { key: 'venue', label: 'Venue', placeholder: 'e.g. Galilaya Hall, Garage - Ubungo', hint: '' },
 ] as const;
 
 function readWhatsappDraft(eventId?: string): WaDraft | null {
@@ -240,7 +240,7 @@ export default function ComposeWhatsappPage() {
               <input
                 value={eventType}
                 onChange={e => setEventType(e.target.value)}
-                placeholder="harusi"
+                placeholder="e.g. SendOff ya Binti yao mpendwa"
                 className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
               />
             </div>
@@ -252,7 +252,7 @@ export default function ComposeWhatsappPage() {
               <input
                 value={contact}
                 onChange={e => setContact(e.target.value)}
-                placeholder="e.g. John Pambalu: 0769 999 902"
+                placeholder="e.g. John Pambalu: 0769999902"
                 className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
               />
             </div>
@@ -264,7 +264,7 @@ export default function ComposeWhatsappPage() {
               <input
                 value={contact2}
                 onChange={e => setContact2(e.target.value)}
-                placeholder="e.g. Hamza Pambalu: 0655 555 033"
+                placeholder="e.g. Hamza Pambalu: 0655552033"
                 className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
               />
             </div>
