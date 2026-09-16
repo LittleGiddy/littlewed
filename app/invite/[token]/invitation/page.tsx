@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
-import { resolveGuestPageTheme, themeCss, fontImports } from '@/lib/inviteTheme'
+import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, googleMapsEmbedUrl } from '@/lib/inviteTheme'
 import { fontStack } from '@/lib/fonts'
+import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
+import WishForm from '@/components/WishForm'
 
 function formatDate(date: Date) {
   return new Date(date).toLocaleDateString('en-US', {
@@ -31,6 +33,14 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const event = guest.event
   const theme = resolveGuestPageTheme(event, event.tenant)
   const { primaryColor, secondaryColor, accentColor } = theme
+
+  const mapEmbedUrl = googleMapsEmbedUrl(theme.mapUrl)
+
+  const wishes = await prisma.guestWish.findMany({
+    where: { eventId: event.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  })
 
   const couple =
     event.person1 || event.person2
@@ -109,6 +119,31 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               {couple}
             </p>
           )}
+
+          {/* Wedding theme + color dots */}
+          {(theme.weddingTheme || theme.themeColors.length > 0) && (
+            <div className="gp-fade-scale mt-4 flex flex-col items-center gap-2.5 px-4">
+              {theme.weddingTheme && (
+                <p
+                  className="gp-script text-2xl tracking-wide"
+                  style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive`, color: `${primaryColor}cc` }}
+                >
+                  {theme.weddingTheme}
+                </p>
+              )}
+              {theme.themeColors.length > 0 && (
+                <div className="flex items-center gap-2.5">
+                  {theme.themeColors.map((c, i) => (
+                    <span
+                      key={i}
+                      className="gp-heartbeat w-3.5 h-3.5 rounded-full border border-white shadow-md"
+                      style={{ backgroundColor: c, boxShadow: `0 4px 12px -4px ${c}`, animationDelay: `${i * 0.25}s` }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Guest's invitation card */}
@@ -182,6 +217,89 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           </div>
         </div>
 
+        {/* Reception & Contacts */}
+        {(theme.contactPerson || theme.contactPersonPhone || theme.masterOfCeremony) && (
+          <div className="gp-fade-up gp-fade-up-3 mb-12">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Reception Notes</span>
+              <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+            </div>
+            <div className="grid gap-3">
+              {(theme.contactPerson || theme.contactPersonPhone) && (
+                <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+                  <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${secondaryColor}88`, color: secondaryColor }}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h1.5a1 1 0 01.9.55l1.1 2.2a1 1 0 01-.1 1.05l-1.3 1.7a14 14 0 006.5 6.5l1.7-1.3a1 1 0 011.05-.1l2.2 1.1a1 1 0 01.55.9V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Contact Person</p>
+                    <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">
+                      {theme.contactPerson}
+                      {theme.contactPersonPhone && (
+                        <>
+                          {' · '}
+                          <a
+                            href={`tel:${theme.contactPersonPhone.replace(/[^+\d]/g, '')}`}
+                            className="font-medium text-[#0D4B4B] hover:underline"
+                          >
+                            {theme.contactPersonPhone}
+                          </a>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {theme.masterOfCeremony && (
+                <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+                  <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a3 3 0 00-3 3v1.5M12 2a3 3 0 013 3v1.5M12 5a7 7 0 00-7 7v3a2 2 0 002 2h10a2 2 0 002-2v-3a7 7 0 00-7-7zm-5 12v2a3 3 0 006 0v-2" />
+                    </svg>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Master of Ceremony</p>
+                    <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{theme.masterOfCeremony}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Google Maps */}
+        {mapEmbedUrl && (
+          <div className="gp-fade-up gp-fade-up-3 mb-12">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Find the Venue</span>
+              <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+            </div>
+            <iframe
+              src={mapEmbedUrl}
+              title="Venue location"
+              className="w-full h-72 rounded-2xl border-0 shadow-sm"
+              style={{ filter: 'saturate(0.95)' }}
+              loading="lazy"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            {theme.mapUrl && (
+              <a
+                href={theme.mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-3 text-xs font-bold hover:underline"
+                style={{ color: secondaryColor }}
+              >
+                Open in Google Maps &#8599;
+              </a>
+            )}
+          </div>
+        )}
+
         {/* RSVP */}
         <div
           className="gp-fade-up gp-delay-4 bg-white rounded-3xl border border-gray-100 p-6 sm:p-8 shadow-lg"
@@ -197,6 +315,34 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           <RSVPForm guestId={guest.id} currentStatus={guest.attending} primaryColor={primaryColor} secondaryColor={secondaryColor} />
         </div>
 
+        {/* Wedding Wishes */}
+        <div className="gp-fade-up gp-delay-5 mt-12">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+            <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Wedding Wishes</span>
+            <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
+          </div>
+          <p className="text-center text-sm text-gray-400 mb-6">Leave a little love for the couple &#10084;</p>
+
+          <WishForm guestId={guest.id} primaryColor={primaryColor} secondaryColor={secondaryColor} />
+
+          {wishes.length > 0 && (
+            <div className="mt-6 space-y-3">
+              {wishes.map(wish => (
+                <div key={wish.id} className="gp-fade-scale bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <p className="text-sm font-bold text-gray-800" style={{ color: primaryColor }}>
+                      {wish.guestName}
+                    </p>
+                    <span className="gp-heartbeat text-xs" style={{ color: primaryColor }}>&#10084;</span>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed m-0">{wish.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Footer */}
         <div className="gp-fade-up gp-delay-5 text-center mt-12">
           <p className="text-[11px] uppercase tracking-[3px] font-semibold mb-2 gp-theme-shimmer" style={{ color: 'transparent' }}>
@@ -205,6 +351,18 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           <p className="text-xs text-gray-400">
             {formatDateShort(event.date)} &middot; {event.venue}
           </p>
+
+          {/* LittleWed footer */}
+          <div className="flex items-center justify-center gap-2 mt-4 opacity-70">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Little Wed Logo.svg"
+              alt="LittleWed"
+              className="h-7 w-auto object-contain"
+            />
+            <span className="text-[10px] uppercase tracking-[3px] text-gray-400 font-semibold">Inviting Made Easy</span>
+          </div>
+
           <Link href={`/invite/${token}`} className="inline-block mt-4 text-[11px] uppercase tracking-[2px] font-semibold text-gray-400 hover:text-gray-600 transition">
             &#11013; Back to the invitation cover
           </Link>

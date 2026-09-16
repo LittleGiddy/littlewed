@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Save, Loader2, Upload, Eye, RotateCcw, HeartHandshake, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Upload, Eye, RotateCcw, HeartHandshake, Image as ImageIcon, Plus, X, Palette as PaletteIcon, Phone, MicVocal, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
@@ -23,6 +23,12 @@ interface Draft {
   guestPageDetailsTitle: string;
   guestPageRsvpTitle: string;
   guestPageFooterNote: string;
+  weddingTheme: string;
+  themeColors: string[];
+  contactPerson: string;
+  contactPersonPhone: string;
+  masterOfCeremony: string;
+  mapUrl: string;
 }
 
 const DEFAULTS: Draft = {
@@ -38,9 +44,17 @@ const DEFAULTS: Draft = {
   guestPageDetailsTitle: 'The Invitation',
   guestPageRsvpTitle: 'Will You Attend?',
   guestPageFooterNote: 'With love',
+  weddingTheme: '',
+  themeColors: [],
+  contactPerson: '',
+  contactPersonPhone: '',
+  masterOfCeremony: '',
+  mapUrl: '',
 };
 
-const COLOR_FIELDS: { key: keyof Draft; label: string; hint: string }[] = [
+type ColorKey = 'guestPagePrimaryColor' | 'guestPageSecondaryColor' | 'guestPageAccentColor' | 'guestPageThemeColor';
+
+const COLOR_FIELDS: { key: ColorKey; label: string; hint: string }[] = [
   { key: 'guestPagePrimaryColor', label: 'Primary Color', hint: 'Hero gradient, headings' },
   { key: 'guestPageSecondaryColor', label: 'Secondary Color', hint: 'Gradient end, accents' },
   { key: 'guestPageAccentColor', label: 'Accent Color', hint: 'Gold details, dividers' },
@@ -54,6 +68,7 @@ interface Props {
   title: string;
   description: string;
   draftKey: string;
+  embedded?: boolean;
 }
 
 export default function GuestPageThemeEditor({
@@ -63,6 +78,7 @@ export default function GuestPageThemeEditor({
   title,
   description,
   draftKey,
+  embedded,
 }: Props) {
   const [draft, setDraft] = useState<Draft>(DEFAULTS);
   const [loading, setLoading] = useState(true);
@@ -86,6 +102,10 @@ export default function GuestPageThemeEditor({
     fetch(apiUrl, { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
+        const asColors = (v: unknown): string[] =>
+          Array.isArray(v)
+            ? (v as unknown[]).filter((c): c is string => typeof c === 'string' && c.trim() !== '').slice(0, 6)
+            : [];
         setDraft({
           guestPagePrimaryColor: data.guestPagePrimaryColor || local.guestPagePrimaryColor,
           guestPageSecondaryColor: data.guestPageSecondaryColor || local.guestPageSecondaryColor,
@@ -99,6 +119,12 @@ export default function GuestPageThemeEditor({
           guestPageDetailsTitle: data.guestPageDetailsTitle || local.guestPageDetailsTitle,
           guestPageRsvpTitle: data.guestPageRsvpTitle || local.guestPageRsvpTitle,
           guestPageFooterNote: data.guestPageFooterNote || local.guestPageFooterNote,
+          weddingTheme: data.weddingTheme || local.weddingTheme || '',
+          themeColors: asColors(data.themeColors).length > 0 ? asColors(data.themeColors) : local.themeColors,
+          contactPerson: data.contactPerson || local.contactPerson || '',
+          contactPersonPhone: data.contactPersonPhone || local.contactPersonPhone || '',
+          masterOfCeremony: data.masterOfCeremony || local.masterOfCeremony || '',
+          mapUrl: data.mapUrl || local.mapUrl || '',
         });
       })
       .catch(() => setDraft(local))
@@ -116,6 +142,19 @@ export default function GuestPageThemeEditor({
   }, [draft, loading, draftKey]);
 
   const set = (key: keyof Draft, value: string) => setDraft(d => ({ ...d, [key]: value }));
+
+  const addThemeColor = () => {
+    if (draft.themeColors.length >= 6) { toast.error('Up to 6 theme colors'); return; }
+    setDraft(d => ({ ...d, themeColors: [...d.themeColors, draft.guestPageThemeColor || '#E8C46B'] }));
+  };
+
+  const updateThemeColor = (index: number, color: string) => {
+    setDraft(d => ({ ...d, themeColors: d.themeColors.map((c, i) => (i === index ? color : c)) }));
+  };
+
+  const removeThemeColor = (index: number) => {
+    setDraft(d => ({ ...d, themeColors: d.themeColors.filter((_, i) => i !== index) }));
+  };
 
   const fontClass = fontStack(draft.guestPageFontFamily);
 
@@ -186,21 +225,23 @@ export default function GuestPageThemeEditor({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+    <div className={embedded ? 'w-full' : 'max-w-2xl mx-auto px-4 sm:px-6 py-6'}>
       {/* ─── Header ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-7">
-        <Link
-          href={backHref}
-          className="w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
-        >
-          <ArrowLeft size={17} />
-        </Link>
-        <div>
-          <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Appearance</p>
-          <h1 className="font-serif text-3xl font-black text-gray-900 leading-tight">{title}</h1>
-          <p className="text-sm text-gray-400 mt-1">{description}</p>
+      {!embedded && (
+        <div className="flex items-center gap-3 mb-7">
+          <Link
+            href={backHref}
+            className="w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
+          >
+            <ArrowLeft size={17} />
+          </Link>
+          <div>
+            <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Appearance</p>
+            <h1 className="font-serif text-3xl font-black text-gray-900 leading-tight">{title}</h1>
+            <p className="text-sm text-gray-400 mt-1">{description}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="space-y-5">
         {/* ─── Theme Colors ──────────────────────────────────────────── */}
@@ -244,6 +285,123 @@ export default function GuestPageThemeEditor({
             <p className="text-[11px] text-gray-400 mt-1.5" style={{ fontFamily: fontClass }}>
               Preview: J &amp; J Night
             </p>
+          </div>
+        </div>
+
+        {/* ─── Wedding Theme & Colors ─────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5">
+            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1 flex items-center gap-2">
+              <PaletteIcon size={17} className="text-[#0D4B4B]" /> Wedding Theme
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">
+              Give the celebration a name and a palette. Guests will see the words and matching color circles under Date &amp; Venue.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-1">Theme name / code</label>
+                <input
+                  value={draft.weddingTheme}
+                  onChange={e => set('weddingTheme', e.target.value)}
+                  placeholder="e.g. Brown & Lavender"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-800 mb-1">Theme colors</label>
+                <p className="text-[11px] text-gray-400 mb-2">Shown as a row of elegant circles next to the theme name.</p>
+                <div className="flex flex-wrap gap-3">
+                  {draft.themeColors.map((color, idx) => (
+                    <div key={idx} className="flex flex-col items-center gap-1">
+                      <div className="relative">
+                        <div
+                          className="w-10 h-10 rounded-full border-2 border-white shadow-md"
+                          style={{ backgroundColor: color, boxShadow: `0 4px 12px -4px ${color}` }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeThemeColor(idx)}
+                          className="absolute -top-1 -right-1 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                          title="Remove color"
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                      <ModernColorPicker value={color} onChange={(c: string) => updateThemeColor(idx, c)} className="w-28" />
+                    </div>
+                  ))}
+                  {draft.themeColors.length < 6 && (
+                    <button
+                      type="button"
+                      onClick={addThemeColor}
+                      className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 text-gray-400 flex items-center justify-center hover:border-[#0D4B4B] hover:text-[#0D4B4B] transition"
+                      title="Add theme color"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Event Contacts & Map ──────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5">
+            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Event Contacts &amp; Location</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <Phone size={13} className="text-[#0D4B4B]" /> Contact person
+                </label>
+                <input
+                  value={draft.contactPerson}
+                  onChange={e => set('contactPerson', e.target.value)}
+                  placeholder="e.g. Aunt Mary, +255 712 000 000"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Who can guests call with questions (with phone number).</p>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <Phone size={13} className="text-[#0D4B4B]" /> Contact phone number
+                </label>
+                <input
+                  value={draft.contactPersonPhone}
+                  onChange={e => set('contactPersonPhone', e.target.value)}
+                  placeholder="e.g. +255 712 000 000"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <MicVocal size={13} className="text-[#0D4B4B]" /> Master of Ceremony (MC)
+                </label>
+                <input
+                  value={draft.masterOfCeremony}
+                  onChange={e => set('masterOfCeremony', e.target.value)}
+                  placeholder="e.g. MC John Doe"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <MapPin size={13} className="text-[#0D4B4B]" /> Google Maps URL
+                </label>
+                <input
+                  value={draft.mapUrl}
+                  onChange={e => set('mapUrl', e.target.value)}
+                  placeholder="https://maps.app.goo.gl/...  or  https://www.google.com/maps/..."
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  An embedded map of the venue is shown on the invitee page.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -474,6 +632,23 @@ export default function GuestPageThemeEditor({
                   <span className="text-sm" style={{ color: draft.guestPageThemeColor }}>&#9830;</span>
                   <span className="h-px w-10" style={{ backgroundColor: draft.guestPageThemeColor, opacity: 0.6 }} />
                 </div>
+                {/* Wedding theme + color dots */}
+                {draft.weddingTheme && (
+                  <p className="gp-script text-2xl mt-3 leading-tight" style={{ color: draft.guestPageThemeColor }}>
+                    {draft.weddingTheme}
+                  </p>
+                )}
+                {draft.themeColors.length > 0 && (
+                  <div className="flex justify-center gap-2 mt-2">
+                    {draft.themeColors.map((c, i) => (
+                      <span
+                        key={i}
+                        className="w-3 h-3 rounded-full border border-white/70 gp-color-dot-glow"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -497,6 +672,18 @@ export default function GuestPageThemeEditor({
                     <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPageThemeColor + '18', color: draft.guestPageThemeColor }}>📍</span>
                     <span>Galilaya Hall, Ubungo</span>
                   </div>
+                  {draft.contactPerson && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPagePrimaryColor + '18', color: draft.guestPagePrimaryColor }}>📞</span>
+                      <span>{draft.contactPerson}{draft.contactPersonPhone ? ` · ${draft.contactPersonPhone}` : ''}</span>
+                    </div>
+                  )}
+                  {draft.masterOfCeremony && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPageSecondaryColor + '18', color: draft.guestPageSecondaryColor }}>🎤</span>
+                      <span>{draft.masterOfCeremony}</span>
+                    </div>
+                  )}
                   <div
                     className="mt-2 h-40 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-300 text-xs font-medium"
                   >

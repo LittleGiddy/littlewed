@@ -46,6 +46,12 @@ const GUEST_PAGE_FIELDS = [
   'guestPageDetailsTitle',
   'guestPageRsvpTitle',
   'guestPageFooterNote',
+  // New per-event invitee page content
+  'weddingTheme',
+  'contactPerson',
+  'contactPersonPhone',
+  'masterOfCeremony',
+  'mapUrl',
 ] as const;
 
 // GET - effective guest page settings for one event (event ?? tenant ?? default)
@@ -69,6 +75,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ eve
       const v = eventRow[key] ?? tenantRow?.[key];
       return typeof v === 'string' && v.trim() !== '' ? v : '';
     };
+    const pickColors = () => {
+      const eventRow = event as unknown as Record<string, unknown>;
+      const tenantRow = tenant as unknown as Record<string, unknown> | null;
+      const colors = eventRow['themeColors'] ?? tenantRow?.['themeColors'];
+      if (Array.isArray(colors)) {
+        return (colors as unknown[]).filter((c): c is string => typeof c === 'string' && c.trim() !== '').slice(0, 6);
+      }
+      return [];
+    };
 
     return NextResponse.json({
       guestPagePrimaryColor: pick('guestPagePrimaryColor', '#BE185D'),
@@ -83,6 +98,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ eve
       guestPageDetailsTitle: pick('guestPageDetailsTitle', 'The Invitation'),
       guestPageRsvpTitle: pick('guestPageRsvpTitle', 'Will You Attend?'),
       guestPageFooterNote: pick('guestPageFooterNote', 'With love'),
+      weddingTheme: pickNullable('weddingTheme'),
+      themeColors: pickColors(),
+      contactPerson: pickNullable('contactPerson'),
+      contactPersonPhone: pickNullable('contactPersonPhone'),
+      masterOfCeremony: pickNullable('masterOfCeremony'),
+      mapUrl: pickNullable('mapUrl'),
     });
   } catch (error) {
     console.error('GET /api/events/[eventId]/guest-page error:', error);
@@ -98,7 +119,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
     if (auth.error) return auth.error;
 
     const body = await req.json();
-    const data: Record<string, string | null> = {};
+    const data: Record<string, string | null | string[]> = {};
     for (const key of GUEST_PAGE_FIELDS) {
       const raw = body[key];
       if (typeof raw === 'string') {
@@ -106,10 +127,26 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
           key === 'guestPageHeaderImage' || key === 'guestPageCoupleImage' ||
           key === 'guestPageTitle' || key === 'guestPageSubtitle' ||
           key === 'guestPageDetailsTitle' || key === 'guestPageRsvpTitle' ||
-          key === 'guestPageFooterNote'
+          key === 'guestPageFooterNote' ||
+          key === 'weddingTheme' || key === 'contactPerson' ||
+          key === 'contactPersonPhone' || key === 'masterOfCeremony' ||
+          key === 'mapUrl'
             ? raw.trim() === '' ? null : raw.trim()
             : raw.trim();
       }
+    }
+    if (Array.isArray(body.themeColors)) {
+      data.themeColors = body.themeColors
+        .filter((c: unknown): c is string => typeof c === 'string')
+        .map((c: string) => c.trim())
+        .filter((c: string) => c !== '')
+        .slice(0, 6);
+    } else if (typeof body.themeColors === 'string') {
+      data.themeColors = body.themeColors
+        .split(',')
+        .map((c: string) => c.trim())
+        .filter(Boolean)
+        .slice(0, 6);
     }
 
     await prisma.event.update({

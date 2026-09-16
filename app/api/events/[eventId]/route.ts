@@ -51,6 +51,16 @@ export async function GET(
             bypassPayment: true,
           },
         },
+        rsvps: {
+          select: { id: true, guestId: true, guestName: true, status: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        },
+        wishes: {
+          select: { id: true, guestId: true, guestName: true, message: true, attending: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+          take: 200,
+        },
       },
     });
 
@@ -58,12 +68,14 @@ export async function GET(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    const { guests, tenant, ...eventData } = event;
+    const { guests, tenant, rsvps, wishes, ...eventData } = event;
     const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
 
     return NextResponse.json({
       event: { ...eventData, thankYouCardUrl },
       guests,
+      rsvps,
+      wishes,
       bypassPayment: tenant.bypassPayment || false,
     });
   } catch (error) {

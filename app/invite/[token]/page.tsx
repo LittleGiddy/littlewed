@@ -161,6 +161,31 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
             <span className="h-px w-10" style={{ backgroundColor: theme.accentColor, opacity: 0.7 }} />
           </div>
 
+          {/* Wedding theme + color dots */}
+          {(theme.weddingTheme || theme.themeColors.length > 0) && (
+            <div className="gp-fade-up gp-fade-up-3 gp-fade-scale flex flex-col items-center gap-2 px-4">
+              {theme.weddingTheme && (
+                <p
+                  className="gp-script text-xl sm:text-2xl tracking-wide"
+                  style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive`, color: theme.accentColor }}
+                >
+                  {theme.weddingTheme}
+                </p>
+              )}
+              {theme.themeColors.length > 0 && (
+                <div className="flex items-center gap-2.5">
+                  {theme.themeColors.map((c, i) => (
+                    <span
+                      key={i}
+                      className="gp-sway gp-color-dot-glow w-3.5 h-3.5 rounded-full border border-white/60"
+                      style={{ backgroundColor: c, animationDelay: `${i * 0.3}s` }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* CTA */}
           <a
             href={`/invite/${token}/invitation`}
@@ -177,10 +202,21 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
           </a>
         </div>
 
-        {/* Footer mini note */}
-        <p className="absolute bottom-3 inset-x-0 text-center text-[10px] uppercase tracking-[3px] text-white/50 z-10">
-          {formatDateShort(event.date)} &middot; {event.venue}
-        </p>
+        {/* Footer: logo + tagline + mini note */}
+        <div className="absolute bottom-3 inset-x-0 z-10 flex flex-col items-center gap-1.5 px-4 text-center">
+          <p className="text-[10px] uppercase tracking-[3px] text-white/50 leading-relaxed">
+            {formatDateShort(event.date)} &middot; {event.venue}
+          </p>
+          <div className="flex items-center justify-center gap-2 opacity-75">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/White Little Wed Logo.svg"
+              alt="LittleWed"
+              className="h-7 w-auto object-contain drop-shadow"
+            />
+            <span className="text-[10px] uppercase tracking-[3px] text-white/60">Inviting Made Easy</span>
+          </div>
+        </div>
       </section>
     </div>
   )

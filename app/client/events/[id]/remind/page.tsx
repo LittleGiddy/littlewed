@@ -63,7 +63,7 @@ interface CardDesign {
   font: string;
 }
 
-export default function RemindGuestsPage({ params }: { params: Promise<{ eventId: string }> }) {
+export default function RemindGuestsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
@@ -128,9 +128,9 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ eventId
   };
 
   useEffect(() => {
-    params.then(({ eventId }) => {
-      setEventId(eventId);
-      fetchEvent(eventId);
+    params.then(({ id }) => {
+      setEventId(id);
+      fetchEvent(id);
       fetchCredits();
     });
   }, [params]);

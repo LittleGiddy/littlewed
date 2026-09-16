@@ -5,7 +5,7 @@
 // landing page and the invitee (RSVP) page.
 import { googleFontsImport } from './fonts';
 
-export const GUEST_NAME_SCRIPT_FONT = 'Great Vibes';
+export const GUEST_NAME_SCRIPT_FONT = 'Parisienne';
 
 export interface GuestPageTheme {
   primaryColor: string;
@@ -20,6 +20,12 @@ export interface GuestPageTheme {
   detailsTitle: string | null;
   rsvpTitle: string | null;
   footerNote: string | null;
+  weddingTheme: string | null;
+  themeColors: string[];
+  contactPerson: string | null;
+  contactPersonPhone: string | null;
+  masterOfCeremony: string | null;
+  mapUrl: string | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,6 +37,22 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
   const pickNullable = (key: string): string | null => {
     const v = event?.[key] ?? tenant?.[key];
     return typeof v === 'string' && v.trim() !== '' ? v : null;
+  };
+  const pickArray = (key: string): string[] => {
+    const v = event?.[key] ?? tenant?.[key];
+    if (Array.isArray(v)) {
+      return v
+        .filter((c): c is string => typeof c === 'string' && c.trim() !== '')
+        .slice(0, 6);
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      return v
+        .split(',')
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .slice(0, 6);
+    }
+    return [];
   };
   return {
     primaryColor: pick('guestPagePrimaryColor', '#BE185D'),
@@ -45,7 +67,52 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
     detailsTitle: pick('guestPageDetailsTitle', 'The Invitation'),
     rsvpTitle: pick('guestPageRsvpTitle', 'Will You Attend?'),
     footerNote: pick('guestPageFooterNote', 'With love'),
+    weddingTheme: pickNullable('weddingTheme'),
+    themeColors: pickArray('themeColors'),
+    contactPerson: pickNullable('contactPerson'),
+    contactPersonPhone: pickNullable('contactPersonPhone'),
+    masterOfCeremony: pickNullable('masterOfCeremony'),
+    mapUrl: pickNullable('mapUrl'),
   };
+}
+
+// Converts a Google Maps URL into a URL that can be embadded in an <iframe>.
+// Short share links (maps.app.goo.gl) cannot be embedded - returns null for those.
+export function googleMapsEmbedUrl(url?: string | null): string | null {
+  if (!url || !url.trim()) return null;
+  let raw = url.trim();
+  if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'maps.app.goo.gl' || host === 'goo.gl') return null;
+
+  const isGoogleMaps =
+    (host === 'google.com' || host.endsWith('.google.com')) &&
+    parsed.pathname.startsWith('/maps');
+
+  if (isGoogleMaps) {
+    if (!parsed.searchParams.has('output')) {
+      parsed.searchParams.set('output', 'embed');
+    }
+    return parsed.toString();
+  }
+
+  // Generic embedded-map style: treat /maps/place/ or ?q= as embeddable.
+  if (host.includes('maps.') || parsed.searchParams.has('q')) {
+    if (!parsed.searchParams.has('output')) {
+      parsed.searchParams.set('output', 'embed');
+    }
+    return parsed.toString();
+  }
+
+  return null;
 }
 
 export function fontImports(theme: GuestPageTheme): string {
@@ -71,7 +138,7 @@ export function themeCss(theme: GuestPageTheme): string {
   --gp-font: ${JSON.stringify(theme.fontFamily.replace(/"/g, ''))};
 }
 
-.gp-script { font-family: 'Great Vibes', cursive; }
+.gp-script { font-family: 'Parisienne', cursive; }
 
 .gp-fade-in { animation: gpFadeIn 1s ease-out both; }
 .gp-fade-up { animation: gpFadeUp 0.9s ease-out both; }
@@ -169,5 +236,36 @@ export function themeCss(theme: GuestPageTheme): string {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-`;
+
+/* Scale + fade reveal (frames, theme colors, wishes) */
+.gp-fade-scale { animation: gpFadeScale 1s cubic-bezier(0.16,1,0.3,1) both; }
+.gp-fade-scale-1 { animation-delay: 0.2s; }
+.gp-fade-scale-2 { animation-delay: 0.35s; }
+.gp-fade-scale-3 { animation-delay: 0.5s; }
+@keyframes gpFadeScale {
+  from { opacity: 0; transform: scale(0.92) translateY(14px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Gentle swaying for decorations / letters */
+.gp-sway { animation: gpSway 5s ease-in-out infinite; }
+@keyframes gpSway {
+  0%, 100% { transform: translateX(-6px) rotate(-2deg); }
+  50% { transform: translateX(6px) rotate(2deg); }
+}
+
+/* Floating heart for the wishes section */
+.gp-heartbeat { animation: gpHeartbeat 1.8s ease-in-out infinite; }
+@keyframes gpHeartbeat {
+  0%, 100% { transform: scale(1); }
+  20% { transform: scale(1.12); }
+  40% { transform: scale(1); }
+}
+
+/* Soft glow pulse for the theme color dots */
+.gp-color-dot-glow { animation: gpColorGlow 2.8s ease-in-out infinite; }
+@keyframes gpColorGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  50% { box-shadow: 0 0 14px 3px rgba(255,255,255,0.35); }
+}`;
 }

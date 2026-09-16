@@ -117,6 +117,14 @@ model Tenant {
   guestPageThemeColor     String?  @default("#E8C46B")
   guestPageCoupleImage    String?
 
+  // ─── Invitee page content defaults (events fall back to these) ────────
+  weddingTheme        String?   // e.g. "Brown & Lavender"
+  themeColors         String[]  @default([]) // colors shown as circles next to the theme name
+  contactPerson       String?   // contact person's name shown on the invitee page
+  contactPersonPhone  String?   // contact person's phone number
+  masterOfCeremony    String?   // Master of Ceremony (MC)
+  mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
+
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]
@@ -135,6 +143,8 @@ model Event {
   tenantId        String
   tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guests          Guest[]
+  rsvps           Rsvp[]
+  wishes          GuestWish[]
   createdAt       DateTime @default(now())
   status        String   @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
   pausedAt      DateTime? // when the event was paused/expired
@@ -211,6 +221,14 @@ model Event {
   guestPageRsvpTitle      String?  @default("Will You Attend?")
   guestPageFooterNote     String?  @default("With love")
 
+  // ─── Invitee page content (set per event by the tenant) ──────────────
+  weddingTheme        String?   // e.g. "Brown & Lavender"
+  themeColors         String[]  @default([]) // colors shown as circles next to the theme name
+  contactPerson       String?   // contact person's name shown on the invitee page
+  contactPersonPhone  String?   // contact person's phone number
+  masterOfCeremony    String?   // Master of Ceremony (MC)
+  mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
+
   // Thank you card
   thankYouCardUrl       String?
   thankYouMessage       String?
@@ -281,12 +299,46 @@ model Guest {
 
   // ─── Relations ──────────────────────────────────────────────────────────
   messageLogs MessageLog[]
+  rsvps       Rsvp[]
+  wishes      GuestWish[]
 
   @@index([eventId])
   @@index([phone])
   @@index([cardNumber])
   @@index([cardGroupId])
   @@index([passCode])
+}
+
+// ─── RSVP submissions & guest wishes ──────────────────────────────────
+// Each RSVP submission is recorded so tenants can review a live feed of
+// "who replied when" on their dashboard.
+model Rsvp {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId   String?
+  guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  guestName String   // snapshot of the guest's name at submit time
+  status    String   // "yes" | "no" | "pending"
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([eventId, createdAt])
+}
+
+// A wish left by a guest for the couple / ceremony (shown on the invitee page).
+model GuestWish {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId   String?
+  guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  guestName String
+  message   String
+  attending String?  // snapshot of the guest's RSVP status when the wish was left
+  createdAt DateTime @default(now())
+
+  @@index([eventId, createdAt])
 }
 
 model UsageRecord {

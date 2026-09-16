@@ -36,6 +36,13 @@ export default async function ClientDashboard() {
     orderBy: { date: 'asc' },
   });
 
+  const rsvpCounts = await prisma.rsvp.groupBy({
+    by: ['eventId'],
+    _count: { id: true },
+    where: { event: { tenantId } },
+  });
+  const rsvpCountMap = new Map(rsvpCounts.map(r => [r.eventId, r._count.id]));
+
   const transformedEvents = events.map((event) => ({
     id: event.id,
     name: event.name,
@@ -43,6 +50,7 @@ export default async function ClientDashboard() {
     venue: event.venue,
     status: event.status,
     _count: { guests: event._count.guests },
+    respondedCount: rsvpCountMap.get(event.id) ?? 0,
   }));
 
   const simpleEventMode = tenant?.simpleEventMode ?? false;
@@ -50,6 +58,7 @@ export default async function ClientDashboard() {
 
   const totalGuests = await prisma.guest.count({ where: { event: { tenantId } } });
   const checkedIn = await prisma.guest.count({ where: { event: { tenantId }, checkedIn: true } });
+  const totalResponded = (await prisma.rsvp.count({ where: { event: { tenantId } } })) as number;
 
   const firstName = session.user.name?.split(' ')[0] ?? 'there';
 
@@ -59,6 +68,7 @@ export default async function ClientDashboard() {
       credits={tenant?.credits ?? 0}
       totalGuests={totalGuests}
       checkedIn={checkedIn}
+      responded={totalResponded}
       events={transformedEvents}
       newEventUrl={newEventUrl}
     />

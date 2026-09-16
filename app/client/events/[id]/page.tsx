@@ -12,12 +12,14 @@ import {
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
   Check, Coins, CreditCard, Hash, Loader2, MoreVertical, Compass,
   PenTool, Wand, Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
+  ChevronDown, PartyPopper,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import ThanksCardModal from '@/components/ThanksCardModal';
+import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 interface Guest {
@@ -55,6 +57,23 @@ interface EventData {
   reminderSent: boolean;
   expiredNotified: boolean;
   resumedBy: string | null;
+}
+
+interface RsvpRow {
+  id: string;
+  guestId: string | null;
+  guestName: string;
+  status: string;
+  createdAt: string;
+}
+
+interface WishRow {
+  id: string;
+  guestId: string | null;
+  guestName: string;
+  message: string;
+  attending: string | null;
+  createdAt: string;
 }
 
 type FlowStep = 'guests' | 'design' | 'generate' | 'send';
@@ -139,6 +158,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [rsvps, setRsvps] = useState<RsvpRow[]>([]);
+  const [wishes, setWishes] = useState<WishRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -172,6 +193,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [selectedCardGuest, setSelectedCardGuest] = useState<Guest | null>(null);
   const [showCardModal, setShowCardModal] = useState(false);
   const [showManageMenu, setShowManageMenu] = useState(false);
+  const [showGuestPageEditor, setShowGuestPageEditor] = useState(false);
+  const [showRsvpPanel, setShowRsvpPanel] = useState(true);
   const manageMenuRef = useRef<HTMLDivElement | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{
     total: number;
@@ -229,6 +252,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (!data?.event) throw new Error('Unexpected response format from server.');
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
+      setRsvps(Array.isArray(data.rsvps) ? data.rsvps : []);
+      setWishes(Array.isArray(data.wishes) ? data.wishes : []);
       setCurrentPage(1);
     } catch (err: any) {
       const msg = err?.message ?? 'Unknown error';
@@ -1406,6 +1431,83 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {/* ─── Step 1: Guests ─── */}
               {activeStep === 'guests' && (
                 <div className="space-y-4">
+                  {/* RSVP feed & wishes */}
+                  {(rsvps.length > 0 || wishes.length > 0) && (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setShowRsvpPanel(v => !v)}
+                        className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <PartyPopper size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-gray-800">Guest responses &amp; wishes</p>
+                            <p className="text-xs text-gray-400">
+                              {rsvps.length} RSVP{rsvps.length !== 1 ? 's' : ''} &middot; {wishes.length} wish{wishes.length !== 1 ? 'es' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronDown size={16} className={`text-gray-300 flex-shrink-0 transition-transform ${showRsvpPanel ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showRsvpPanel && (
+                        <div className="border-t border-gray-100 px-5 py-4 space-y-5 max-h-[26rem] overflow-y-auto">
+                          {rsvps.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-[2px] text-gray-400 mb-2">Latest RSVPs</p>
+                              <div className="space-y-2">
+                                {rsvps.map(r => {
+                                  const chip =
+                                    r.status === 'yes'
+                                      ? { label: 'Attending', cls: 'bg-green-50 text-green-700 ring-green-100' }
+                                      : r.status === 'no'
+                                        ? { label: 'Declined', cls: 'bg-red-50 text-red-600 ring-red-100' }
+                                        : { label: 'Maybe', cls: 'bg-amber-50 text-amber-700 ring-amber-100' };
+                                  return (
+                                    <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-3.5 py-2.5">
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-gray-800 truncate">{r.guestName}</p>
+                                        <p className="text-[11px] text-gray-400">
+                                          {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                                        </p>
+                                      </div>
+                                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ring-1 shrink-0 ${chip.cls}`}>
+                                        {chip.label}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {wishes.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-[2px] text-gray-400 mb-2">Guest wishes</p>
+                              <div className="space-y-2">
+                                {wishes.map(w => (
+                                  <div key={w.id} className="rounded-xl bg-white border border-gray-100 px-3.5 py-2.5">
+                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                      <p className="text-sm font-semibold text-gray-800 truncate">{w.guestName}</p>
+                                      <Heart size={12} className="text-[#0D4B4B] shrink-0" />
+                                    </div>
+                                    <p className="text-xs text-gray-500 leading-relaxed">{w.message}</p>
+                                    <p className="text-[10px] text-gray-300 mt-1">
+                                      {formatDistanceToNow(new Date(w.createdAt), { addSuffix: true })}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <Link
                     href={`/client/events/${event.id}/remind`}
                     className="action-tile"
@@ -1570,19 +1672,37 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       </div>
                       <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
                     </Link>
-                    <Link href={`/client/events/${event.id}/guest-page`} className="action-tile">
+<button
+                      type="button"
+                      onClick={() => setShowGuestPageEditor(v => !v)}
+                      className={`action-tile ${showGuestPageEditor ? 'border-[#0D4B4B]' : ''}`}
+                    >
                       <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
                         <QrCode size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-gray-800">Guest page &amp; Invitation</p>
                         <p className="text-xs text-gray-400">
-                          Colors, photos &amp; wording shown to this event&apos;s guests
+                          Colors, photos, theme &amp; wording shown to this event&apos;s guests
                         </p>
                       </div>
-                      <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
-                    </Link>
+                      <ChevronDown size={16} className={`text-gray-300 flex-shrink-0 transition-transform ${showGuestPageEditor ? 'rotate-180' : ''}`} />
+                    </button>
                   </div>
+
+                  {showGuestPageEditor && (
+                    <GuestPageThemeEditor
+                      key={event.id}
+                      apiUrl={`/api/events/${event.id}/guest-page`}
+                      uploadUrl={`/api/events/${event.id}/guest-page/upload`}
+                      backHref={`/client/events/${event.id}`}
+                      title="Guest page & invitation"
+                      description="Colors, photos, theme, contacts & wording shown to this event's guests"
+                      draftKey={`guestPage_${event.id}`}
+                      embedded
+                    />
+                  )}
+
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
                     <PenTool size={28} className="text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">

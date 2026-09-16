@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 // GET - fetch tenant settings
 export async function GET() {
@@ -42,6 +43,12 @@ export async function GET() {
         guestPageDetailsTitle: true,
         guestPageRsvpTitle: true,
         guestPageFooterNote: true,
+        weddingTheme: true,
+        themeColors: true,
+        contactPerson: true,
+        contactPersonPhone: true,
+        masterOfCeremony: true,
+        mapUrl: true,
       },
     });
 
@@ -64,6 +71,14 @@ export async function GET() {
       guestPageDetailsTitle: tenant?.guestPageDetailsTitle ?? 'The Invitation',
       guestPageRsvpTitle: tenant?.guestPageRsvpTitle ?? 'Will You Attend?',
       guestPageFooterNote: tenant?.guestPageFooterNote ?? 'With love',
+      weddingTheme: tenant?.weddingTheme ?? '',
+      themeColors: Array.isArray(tenant?.themeColors)
+        ? (tenant!.themeColors as unknown[]).filter((c): c is string => typeof c === 'string' && c.trim() !== '').slice(0, 6)
+        : [],
+      contactPerson: tenant?.contactPerson ?? '',
+      contactPersonPhone: tenant?.contactPersonPhone ?? '',
+      masterOfCeremony: tenant?.masterOfCeremony ?? '',
+      mapUrl: tenant?.mapUrl ?? '',
     });
   } catch (error) {
     console.error('GET /api/tenant/settings error:', error);
@@ -108,29 +123,60 @@ export async function PUT(req: NextRequest) {
       guestPageDetailsTitle,
       guestPageRsvpTitle,
       guestPageFooterNote,
+      weddingTheme,
+      themeColors,
+      contactPerson,
+      contactPersonPhone,
+      masterOfCeremony,
+      mapUrl,
     } = await req.json();
+
+    const themeColorList: string[] | undefined = Array.isArray(themeColors)
+      ? (themeColors as unknown[])
+          .filter((c: unknown): c is string => typeof c === 'string')
+          .map((c: string) => c.trim())
+          .filter((c: string) => c !== '')
+          .slice(0, 6)
+      : typeof themeColors === 'string'
+        ? themeColors
+            .split(',')
+            .map((c: string) => c.trim())
+            .filter(Boolean)
+            .slice(0, 6)
+        : undefined;
+
+    const nullable = (v: unknown): string | null | undefined =>
+      typeof v === 'string' ? (v.trim() === '' ? null : v.trim()) : undefined;
+
+    const data: Prisma.TenantUncheckedUpdateInput = {
+      templateCardUrl,
+      qrPlacementX,
+      qrPlacementY,
+      qrSize,
+      simpleEventMode,
+      guestPagePrimaryColor,
+      guestPageSecondaryColor,
+      guestPageAccentColor,
+      guestPageThemeColor,
+      guestPageFontFamily,
+      guestPageHeaderImage: guestPageHeaderImage === '' ? null : guestPageHeaderImage,
+      guestPageCoupleImage: guestPageCoupleImage === '' ? null : guestPageCoupleImage,
+      guestPageTitle: guestPageTitle === '' ? null : guestPageTitle,
+      guestPageSubtitle: guestPageSubtitle === '' ? null : guestPageSubtitle,
+      guestPageDetailsTitle: guestPageDetailsTitle === '' ? null : guestPageDetailsTitle,
+      guestPageRsvpTitle: guestPageRsvpTitle === '' ? null : guestPageRsvpTitle,
+      guestPageFooterNote: guestPageFooterNote === '' ? null : guestPageFooterNote,
+      weddingTheme: nullable(weddingTheme),
+      contactPerson: nullable(contactPerson),
+      contactPersonPhone: nullable(contactPersonPhone),
+      masterOfCeremony: nullable(masterOfCeremony),
+      mapUrl: nullable(mapUrl),
+      ...(themeColorList !== undefined ? { themeColors: themeColorList } : {}),
+    };
 
     await prisma.tenant.update({
       where: { id: tenantId },
-      data: {
-        templateCardUrl,
-        qrPlacementX,
-        qrPlacementY,
-        qrSize,
-        simpleEventMode,
-        guestPagePrimaryColor,
-        guestPageSecondaryColor,
-        guestPageAccentColor,
-        guestPageThemeColor,
-        guestPageFontFamily,
-        guestPageHeaderImage: guestPageHeaderImage === '' ? null : guestPageHeaderImage,
-        guestPageCoupleImage: guestPageCoupleImage === '' ? null : guestPageCoupleImage,
-        guestPageTitle: guestPageTitle === '' ? null : guestPageTitle,
-        guestPageSubtitle: guestPageSubtitle === '' ? null : guestPageSubtitle,
-        guestPageDetailsTitle: guestPageDetailsTitle === '' ? null : guestPageDetailsTitle,
-        guestPageRsvpTitle: guestPageRsvpTitle === '' ? null : guestPageRsvpTitle,
-        guestPageFooterNote: guestPageFooterNote === '' ? null : guestPageFooterNote,
-      },
+      data,
     });
 
     return NextResponse.json({ success: true });

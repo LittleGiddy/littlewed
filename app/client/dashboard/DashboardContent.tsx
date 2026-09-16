@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, Users, Plus, Coins, Upload, Palette, Send,
   ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock, QrCode,
+  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock, QrCode, PartyPopper,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,12 +18,14 @@ interface DashboardContentProps {
   credits: number;
   totalGuests: number;
   checkedIn: number;
+  responded: number;
   events: {
     id: string;
     name: string;
     date: string;
     venue: string;
     status: string;
+    respondedCount: number;
     _count: { guests: number };
   }[];
   newEventUrl: string;
@@ -159,6 +161,7 @@ export default function DashboardContent({
   credits,
   totalGuests,
   checkedIn,
+  responded,
   events,
   newEventUrl,
 }: DashboardContentProps) {
@@ -177,6 +180,7 @@ export default function DashboardContent({
   const stats = [
     { label: 'Credits', value: credits, icon: Coins, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', ring: 'ring-[#0D4B4B]/10', isCredits: true },
     { label: 'Total Guests', value: totalGuests, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100', isCredits: false },
+    { label: 'RSVPs', value: responded, icon: PartyPopper, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-100', isCredits: false },
     { label: 'Checked In', value: checkedIn, icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50', ring: 'ring-green-100', isCredits: false },
     { label: 'Events', value: events.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100', isCredits: false },
   ];
@@ -438,6 +442,11 @@ export default function DashboardContent({
                             <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0D4B4B]/5 text-[#0D4B4B] ring-1 ring-[#0D4B4B]/10">
                               {event.guestCount} guests
                             </span>
+                            {event.respondedCount > 0 && (
+                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                                {event.respondedCount} RSVPs
+                              </span>
+                            )}
                             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${event.statusInfo.bg} ${event.statusInfo.color}`}>
                               {event.statusInfo.label}
                             </span>
