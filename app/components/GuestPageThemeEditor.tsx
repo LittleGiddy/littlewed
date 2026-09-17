@@ -69,6 +69,13 @@ interface Props {
   description: string;
   draftKey: string;
   embedded?: boolean;
+  enableEventSelect?: boolean;
+}
+
+interface EventOption {
+  id: string;
+  name: string;
+  date: string;
 }
 
 export default function GuestPageThemeEditor({
@@ -79,27 +86,53 @@ export default function GuestPageThemeEditor({
   description,
   draftKey,
   embedded,
+  enableEventSelect,
 }: Props) {
   const [draft, setDraft] = useState<Draft>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<'header' | 'couple' | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [events, setEvents] = useState<EventOption[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<string>('__tenant__');
   const headerInputRef = useRef<HTMLInputElement>(null);
   const coupleInputRef = useRef<HTMLInputElement>(null);
 
-  const readDraft = (): Draft => {
+  const activeApiUrl = selectedEventId === '__tenant__' ? apiUrl : `/api/events/${selectedEventId}/guest-page`;
+  const activeUploadUrl = selectedEventId === '__tenant__' ? uploadUrl : `/api/events/${selectedEventId}/guest-page/upload`;
+  const activeDraftKey = selectedEventId === '__tenant__' ? draftKey : `${draftKey}_event_${selectedEventId}`;
+
+  const readDraft = (key: string): Draft => {
     try {
-      const saved = localStorage.getItem(draftKey);
+      const saved = localStorage.getItem(key);
       if (saved) return { ...DEFAULTS, ...JSON.parse(saved) };
     } catch { /* ignore */ }
     return { ...DEFAULTS };
   };
 
-  // ─── Load current settings ─────────────────────────────────────────
+  // ─── Load tenant events list for the event selector ───────────────
   useEffect(() => {
-    const local = readDraft();
-    fetch(apiUrl, { credentials: 'include' })
+    if (!enableEventSelect) return;
+    fetch('/api/events', { credentials: 'include' })
+      .then(r => r.json())
+      .then(list => {
+        if (Array.isArray(list)) {
+          setEvents(
+            list.map((e: { id: string; name: string; date: string }) => ({
+              id: e.id,
+              name: e.name,
+              date: e.date,
+            }))
+          );
+        }
+      })
+      .catch(() => { /* ignore */ });
+  }, [enableEventSelect]);
+
+  // ─── Load current settings (tenant default or selected event) ────
+  useEffect(() => {
+    const local = readDraft(activeDraftKey);
+    fetch(activeApiUrl, { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
         const asColors = (v: unknown): string[] =>
@@ -129,17 +162,16 @@ export default function GuestPageThemeEditor({
       })
       .catch(() => setDraft(local))
       .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiUrl, draftKey]);
+  }, [activeApiUrl, activeDraftKey]);
 
   // ─── Auto-save draft ───────────────────────────────────────────────
   useEffect(() => {
     if (loading) return;
     const t = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(draft)); } catch { /* */ }
+      try { localStorage.setItem(activeDraftKey, JSON.stringify(draft)); } catch { /* */ }
     }, 300);
     return () => clearTimeout(t);
-  }, [draft, loading, draftKey]);
+  }, [draft, loading, activeDraftKey]);
 
   const set = (key: keyof Draft, value: string) => setDraft(d => ({ ...d, [key]: value }));
 
@@ -164,15 +196,16 @@ export default function GuestPageThemeEditor({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(apiUrl, {
+      const res = await fetch(activeApiUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
         credentials: 'include',
       });
       if (res.ok) {
-        toast.success('Guest page settings saved');
-        try { localStorage.removeItem(draftKey); } catch { /* */ }
+        const savedFor = selectedEventId === '__tenant__' ? 'default' : events.find(e => e.id === selectedEventId)?.name || 'this event';
+        toast.success(selectedEventId === '__tenant__' ? 'Default guest page settings saved' : `"${savedFor}" guest page settings saved`);
+        try { localStorage.removeItem(activeDraftKey); } catch { /* */ }
       } else {
         const data = await res.json();
         toast.error(data.error || 'Save failed');
@@ -197,7 +230,7 @@ export default function GuestPageThemeEditor({
       const formData = new FormData();
       formData.append('image', file);
       formData.append('kind', kind);
-      const res = await fetch(uploadUrl, {
+      const res = await fetch(activeUploadUrl, {
         method: 'POST',
         body: formData,
         credentials: 'include',
@@ -239,6 +272,39 @@ export default function GuestPageThemeEditor({
             <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Appearance</p>
             <h1 className="font-serif text-3xl font-black text-gray-900 leading-tight">{title}</h1>
             <p className="text-sm text-gray-400 mt-1">{description}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Event selector ─────────────────────────────────────────── */}
+      {enableEventSelect && (
+        <div className="bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] rounded-2xl p-5 mb-5 shadow-md shadow-[#0D4B4B]/20">
+          <label className="flex items-center gap-2 text-white text-xs font-bold uppercase tracking-[2px] mb-2.5">
+            <HeartHandshake size={14} /> Customize for a specific event
+          </label>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <select
+              value={selectedEventId}
+              onChange={e => {
+                setLoading(true);
+                setSelectedEventId(e.target.value);
+              }}
+              className="flex-1 px-3.5 py-2.5 bg-white border border-white/20 rounded-xl text-sm focus:ring-2 focus:ring-white/30 outline-none transition-all appearance-none"
+            >
+              <option value="__tenant__">Default — applies to all events</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name} · {new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-[#9CC4C4] sm:max-w-[15rem] sm:text-right m-0">
+              {selectedEventId === '__tenant__'
+                ? 'Changes here become the default for every event'
+                : events.find(e => e.id === selectedEventId)?.name
+                  ? `Editing "${events.find(e => e.id === selectedEventId)?.name}" only`
+                  : 'Editing settings for this event only'}
+            </p>
           </div>
         </div>
       )}

@@ -9,8 +9,9 @@ export default function GuestPageSettings() {
       uploadUrl="/api/tenant/upload-guest-page-header"
       backHref="/client/settings"
       title="Guest Page Theme"
-      description="Default look applying to every event. Each event can override these — open an event and choose &quot;Guest Page &amp; Invitation&quot;."
+      description="Choose a default look for all events, or pick one event below to give it its own invitation look."
       draftKey="guest_page_theme"
+      enableEventSelect
     />
   );
 }

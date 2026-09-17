@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
-import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, googleMapsEmbedUrl } from '@/lib/inviteTheme'
+import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, googleMapsEmbedUrl, initialOf } from '@/lib/inviteTheme'
 import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
@@ -47,6 +47,10 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
       ? [event.person1, event.person2].filter(Boolean).join(' na ')
       : null
 
+  const monogram = couple
+    ? `${initialOf(event.person1)} & ${initialOf(event.person2)}`
+    : event.name.split(/\s+/).slice(0, 2).map(w => (w[0] || '').toUpperCase()).join(' & ') || 'J & J'
+
   const titleFont = fontStack(theme.fontFamily)
   const guestName = [guest.title, guest.name].filter(Boolean).join(' ')
 
@@ -88,6 +92,54 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
 
       {/* ═══════════════ DETAILS ═══════════════ */}
       <section className="relative px-4 sm:px-6 py-14 sm:py-20 max-w-2xl mx-auto">
+        {/* Bride & groom photo - half-rounded arch frame, animated */}
+        {(theme.coupleImage || couple) && (
+          <div className="gp-fade-in flex flex-col items-center mb-8">
+            <div
+              className="gp-couple-arch gp-float-soft relative w-44 h-56 sm:w-56 sm:h-72 overflow-hidden bg-gradient-to-br p-1.5"
+              style={{
+                borderColor: accentColor,
+                background: `linear-gradient(160deg, ${primaryColor}, ${secondaryColor})`,
+                boxShadow: `0 20px 44px -14px ${primaryColor}99`,
+              }}
+            >
+              <div
+                className="relative w-full h-full overflow-hidden"
+                style={{ borderRadius: '8.5rem 8.5rem 0.9rem 0.9rem' }}
+              >
+                {theme.coupleImage ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={theme.coupleImage}
+                    alt={couple || 'Bride and groom'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center text-3xl font-black"
+                    style={{ fontFamily: titleFont, color: accentColor }}
+                  >
+                    {monogram}
+                  </div>
+                )}
+                {/* Inner decorative frame */}
+                <div
+                  className="pointer-events-none absolute inset-2.5 border"
+                  style={{ borderColor: 'rgba(255,255,255,0.6)', borderRadius: '7.4rem 7.4rem 0.6rem 0.6rem' }}
+                />
+              </div>
+            </div>
+            {couple && (
+              <p
+                className="gp-fade-up gp-fade-up-1 mt-5 text-3xl sm:text-4xl font-black text-center break-words"
+                style={{ fontFamily: titleFont, color: primaryColor }}
+              >
+                {couple}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Top ornament */}
         <div className="gp-fade-in flex justify-center mb-5">
           <span className="gp-ornament text-lg">&#10053;</span>
@@ -114,33 +166,36 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         <div className="gp-fade-up gp-fade-up-2 text-center mb-10">
           <h3 className="text-lg font-bold uppercase tracking-[3px] text-gray-600 mb-2">{event.name}</h3>
           {event.hostFamily && <p className="text-sm text-gray-500 italic">Hosted by {event.hostFamily}</p>}
-          {couple && (
-            <p className="mt-2 text-2xl font-bold text-gray-800" style={{ fontFamily: titleFont }}>
-              {couple}
-            </p>
-          )}
 
-          {/* Wedding theme + color dots */}
+          {/* Wedding theme + color dots - shown clearly */}
           {(theme.weddingTheme || theme.themeColors.length > 0) && (
-            <div className="gp-fade-scale mt-4 flex flex-col items-center gap-2.5 px-4">
+            <div className="gp-fade-scale mt-5 mx-auto max-w-md rounded-2xl border border-gray-100 bg-white px-6 py-5 shadow-sm">
               {theme.weddingTheme && (
-                <p
-                  className="gp-script text-2xl tracking-wide"
-                  style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive`, color: `${primaryColor}cc` }}
-                >
-                  {theme.weddingTheme}
-                </p>
+                <>
+                  <p className="text-[10px] font-bold uppercase tracking-[3px] text-gray-400 mb-1.5">
+                    Wedding &middot; Ceremony Theme
+                  </p>
+                  <p
+                    className="gp-script text-3xl sm:text-4xl tracking-wide break-words"
+                    style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive`, color: primaryColor }}
+                  >
+                    {theme.weddingTheme}
+                  </p>
+                </>
               )}
               {theme.themeColors.length > 0 && (
-                <div className="flex items-center gap-2.5">
-                  {theme.themeColors.map((c, i) => (
-                    <span
-                      key={i}
-                      className="gp-heartbeat w-3.5 h-3.5 rounded-full border border-white shadow-md"
-                      style={{ backgroundColor: c, boxShadow: `0 4px 12px -4px ${c}`, animationDelay: `${i * 0.25}s` }}
-                    />
-                  ))}
-                </div>
+                <>
+                  {theme.weddingTheme && <span className="block h-px w-16 mx-auto my-3" style={{ backgroundColor: `${accentColor}66` }} />}
+                  <div className="flex items-center justify-center gap-3">
+                    {theme.themeColors.map((c, i) => (
+                      <span
+                        key={i}
+                        className="gp-heartbeat w-4 h-4 rounded-full border border-white shadow-md"
+                        style={{ backgroundColor: c, boxShadow: `0 4px 12px -4px ${c}`, animationDelay: `${i * 0.25}s` }}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -353,14 +408,14 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           </p>
 
           {/* LittleWed footer */}
-          <div className="flex items-center justify-center gap-2 mt-4 opacity-70">
+          <div className="flex flex-col items-center justify-center gap-1.5 mt-4 opacity-60">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Little Wed Logo.svg"
               alt="LittleWed"
-              className="h-7 w-auto object-contain"
+              className="h-10 w-auto object-contain"
             />
-            <span className="text-[10px] uppercase tracking-[3px] text-gray-400 font-semibold">Inviting Made Easy</span>
+            <span className="text-[9px] uppercase tracking-[3px] text-gray-400 font-semibold">Inviting Made Easy</span>
           </div>
 
           <Link href={`/invite/${token}`} className="inline-block mt-4 text-[11px] uppercase tracking-[2px] font-semibold text-gray-400 hover:text-gray-600 transition">

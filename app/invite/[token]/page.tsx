@@ -96,24 +96,34 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
         <div className="relative z-10 flex flex-col items-center gap-5 max-w-2xl mx-auto">
           {/* Couple photo or monogram */}
           {theme.coupleImage ? (
-            <div
-              className="gp-fade-in gp-ring-pulse w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden border-4 bg-white/10"
-              style={{ borderColor: theme.accentColor }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={theme.coupleImage} alt={heroTitle} className="w-full h-full object-cover" />
+            <div className="gp-fade-in flex flex-col items-center gap-3">
+              <div
+                className="gp-ring-pulse w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden border-4 bg-white/10"
+                style={{ borderColor: theme.accentColor }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={theme.coupleImage} alt={heroTitle} className="w-full h-full object-cover" />
+              </div>
+              <div className="gp-fade-in text-sm sm:text-base font-bold tracking-[6px] text-white/80" style={{ fontFamily: titleFont }}>
+                {monogram}
+              </div>
             </div>
           ) : (
-            <div
-              className="gp-fade-in gp-ring-pulse w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center text-3xl sm:text-4xl font-black border-2 backdrop-blur-sm"
-              style={{
-                borderColor: `${theme.accentColor}aa`,
-                background: 'rgba(255,255,255,0.12)',
-                color: theme.accentColor,
-                fontFamily: titleFont,
-              }}
-            >
-              {monogram}
+            <div className="gp-fade-in flex flex-col items-center gap-3">
+              <div
+                className="gp-ring-pulse w-36 h-36 sm:w-44 sm:h-44 rounded-full flex items-center justify-center text-3xl sm:text-4xl font-black border-2 backdrop-blur-sm"
+                style={{
+                  borderColor: `${theme.accentColor}aa`,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: theme.accentColor,
+                  fontFamily: titleFont,
+                }}
+              >
+                {monogram}
+              </div>
+              <div className="gp-fade-in text-sm sm:text-base font-bold tracking-[6px] text-white/80" style={{ fontFamily: titleFont }}>
+                {monogram}
+              </div>
             </div>
           )}
 
@@ -127,16 +137,18 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
             &#10053;
           </div>
 
-          {/* Animated fancy guest name */}
+          {/* "You are cordially invited" - small, tenant-controlled subtitle */}
+          <p className="gp-fade-up gp-fade-up-2 text-xs sm:text-sm uppercase tracking-[3px] sm:tracking-[4px] text-white/75 font-medium">
+            {theme.subtitle || 'You are cordially invited'}
+          </p>
+
+          {/* Animated fancy guest name - BIG */}
           <div className="gp-fade-up gp-fade-up-2 w-full px-2">
-            <p className="text-[11px] sm:text-sm uppercase tracking-[4px] text-white/90 font-medium mb-1">
-              Dear {guestName},
-            </p>
             <p
-              className="gp-script gp-shimmer text-5xl sm:text-6xl md:text-7xl leading-tight break-words"
+              className="gp-script gp-shimmer text-6xl sm:text-7xl md:text-8xl leading-tight break-words"
               style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive` }}
             >
-              You are cordially invited
+              Dear {guestName}
             </p>
           </div>
 
@@ -203,19 +215,19 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
         </div>
 
         {/* Footer: logo + tagline + mini note */}
-        <div className="absolute bottom-3 inset-x-0 z-10 flex flex-col items-center gap-1.5 px-4 text-center">
-          <p className="text-[10px] uppercase tracking-[3px] text-white/50 leading-relaxed">
-            {formatDateShort(event.date)} &middot; {event.venue}
-          </p>
-          <div className="flex items-center justify-center gap-2 opacity-75">
+        <div className="absolute bottom-3 inset-x-0 z-10 flex flex-col items-center gap-1 px-4 text-center">
+          <div className="flex flex-col items-center gap-1 opacity-70">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/White Little Wed Logo.svg"
               alt="LittleWed"
-              className="h-7 w-auto object-contain drop-shadow"
+              className="h-10 w-auto object-contain drop-shadow"
             />
-            <span className="text-[10px] uppercase tracking-[3px] text-white/60">Inviting Made Easy</span>
+            <span className="text-[9px] uppercase tracking-[3px] text-white/55">Inviting Made Easy</span>
           </div>
+          <p className="text-[9px] uppercase tracking-[3px] text-white/40 leading-relaxed">
+            {formatDateShort(event.date)} &middot; {event.venue}
+          </p>
         </div>
       </section>
     </div>
