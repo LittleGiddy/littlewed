@@ -9,11 +9,11 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const role = (session.user as any).role;
-    const tenantId = (session.user as any).tenantId;
+    const role = (session.user as { role?: string } | undefined)?.role;
+    const tenantId = (session.user as { tenantId?: string } | undefined)?.tenantId;
 
     if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,7 +23,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
     }
 
-    const tenant = await prisma.tenant.findUnique({
+const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
         templateCardUrl: true,
@@ -49,6 +49,21 @@ export async function GET() {
         contactPersonPhone: true,
         masterOfCeremony: true,
         mapUrl: true,
+        guestPageCoverHint: true,
+        guestPageCoverSubtitle: true,
+        guestPageGreetingText: true,
+        guestPageThemeLabel: true,
+        guestPageInvitationCardLabel: true,
+        guestPageReceptionLabel: true,
+        guestPageContactLabel: true,
+        guestPageMocLabel: true,
+        guestPageMapLabel: true,
+        guestPageWishesTitle: true,
+        guestPageWishesHint: true,
+        guestPageDateLabel: true,
+        guestPageTimeLabel: true,
+        guestPageVenueLabel: true,
+        guestPageRsvpHint: true,
       },
     });
 
@@ -79,6 +94,21 @@ export async function GET() {
       contactPersonPhone: tenant?.contactPersonPhone ?? '',
       masterOfCeremony: tenant?.masterOfCeremony ?? '',
       mapUrl: tenant?.mapUrl ?? '',
+      guestPageCoverHint: tenant?.guestPageCoverHint ?? 'Tap anywhere to open',
+      guestPageCoverSubtitle: tenant?.guestPageCoverSubtitle ?? 'your invitation awaits',
+      guestPageGreetingText: tenant?.guestPageGreetingText ?? 'we would be honored to have you join us',
+      guestPageThemeLabel: tenant?.guestPageThemeLabel ?? 'Wedding \u00b7 Ceremony Theme',
+      guestPageInvitationCardLabel: tenant?.guestPageInvitationCardLabel ?? 'Your invitation card',
+      guestPageReceptionLabel: tenant?.guestPageReceptionLabel ?? 'Reception Notes',
+      guestPageContactLabel: tenant?.guestPageContactLabel ?? 'Contact Person',
+      guestPageMocLabel: tenant?.guestPageMocLabel ?? 'Master of Ceremony',
+      guestPageMapLabel: tenant?.guestPageMapLabel ?? 'Find the Venue',
+      guestPageWishesTitle: tenant?.guestPageWishesTitle ?? 'Wedding Wishes',
+      guestPageWishesHint: tenant?.guestPageWishesHint ?? 'Leave a little love for the couple',
+      guestPageDateLabel: tenant?.guestPageDateLabel ?? 'Date',
+      guestPageTimeLabel: tenant?.guestPageTimeLabel ?? 'Time',
+      guestPageVenueLabel: tenant?.guestPageVenueLabel ?? 'Venue',
+      guestPageRsvpHint: tenant?.guestPageRsvpHint ?? 'Kindly RSVP so we can plan for you',
     });
   } catch (error) {
     console.error('GET /api/tenant/settings error:', error);
@@ -94,8 +124,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const role = (session.user as any).role;
-    const tenantId = (session.user as any).tenantId;
+    const role = (session.user as { role?: string } | undefined)?.role;
+    const tenantId = (session.user as { tenantId?: string } | undefined)?.tenantId;
 
     if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -129,6 +159,21 @@ export async function PUT(req: NextRequest) {
       contactPersonPhone,
       masterOfCeremony,
       mapUrl,
+      guestPageCoverHint,
+      guestPageCoverSubtitle,
+      guestPageGreetingText,
+      guestPageThemeLabel,
+      guestPageInvitationCardLabel,
+      guestPageReceptionLabel,
+      guestPageContactLabel,
+      guestPageMocLabel,
+      guestPageMapLabel,
+      guestPageWishesTitle,
+      guestPageWishesHint,
+      guestPageDateLabel,
+      guestPageTimeLabel,
+      guestPageVenueLabel,
+      guestPageRsvpHint,
     } = await req.json();
 
     const themeColorList: string[] | undefined = Array.isArray(themeColors)
@@ -171,6 +216,21 @@ export async function PUT(req: NextRequest) {
       contactPersonPhone: nullable(contactPersonPhone),
       masterOfCeremony: nullable(masterOfCeremony),
       mapUrl: nullable(mapUrl),
+      guestPageCoverHint: nullable(guestPageCoverHint),
+      guestPageCoverSubtitle: nullable(guestPageCoverSubtitle),
+      guestPageGreetingText: nullable(guestPageGreetingText),
+      guestPageThemeLabel: nullable(guestPageThemeLabel),
+      guestPageInvitationCardLabel: nullable(guestPageInvitationCardLabel),
+      guestPageReceptionLabel: nullable(guestPageReceptionLabel),
+      guestPageContactLabel: nullable(guestPageContactLabel),
+      guestPageMocLabel: nullable(guestPageMocLabel),
+      guestPageMapLabel: nullable(guestPageMapLabel),
+      guestPageWishesTitle: nullable(guestPageWishesTitle),
+      guestPageWishesHint: nullable(guestPageWishesHint),
+      guestPageDateLabel: nullable(guestPageDateLabel),
+      guestPageTimeLabel: nullable(guestPageTimeLabel),
+      guestPageVenueLabel: nullable(guestPageVenueLabel),
+      guestPageRsvpHint: nullable(guestPageRsvpHint),
       ...(themeColorList !== undefined ? { themeColors: themeColorList } : {}),
     };
 

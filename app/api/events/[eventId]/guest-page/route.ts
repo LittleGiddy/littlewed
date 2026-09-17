@@ -52,6 +52,22 @@ const GUEST_PAGE_FIELDS = [
   'contactPersonPhone',
   'masterOfCeremony',
   'mapUrl',
+  // Editable user-facing texts (cover + invitee page)
+  'guestPageCoverHint',
+  'guestPageCoverSubtitle',
+  'guestPageGreetingText',
+  'guestPageThemeLabel',
+  'guestPageInvitationCardLabel',
+  'guestPageReceptionLabel',
+  'guestPageContactLabel',
+  'guestPageMocLabel',
+  'guestPageMapLabel',
+  'guestPageWishesTitle',
+  'guestPageWishesHint',
+  'guestPageDateLabel',
+  'guestPageTimeLabel',
+  'guestPageVenueLabel',
+  'guestPageRsvpHint',
 ] as const;
 
 // GET - effective guest page settings for one event (event ?? tenant ?? default)
@@ -104,6 +120,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ eve
       contactPersonPhone: pickNullable('contactPersonPhone'),
       masterOfCeremony: pickNullable('masterOfCeremony'),
       mapUrl: pickNullable('mapUrl'),
+      guestPageCoverHint: pick('guestPageCoverHint', 'Tap anywhere to open'),
+      guestPageCoverSubtitle: pick('guestPageCoverSubtitle', 'your invitation awaits'),
+      guestPageGreetingText: pick('guestPageGreetingText', 'we would be honored to have you join us'),
+      guestPageThemeLabel: pick('guestPageThemeLabel', 'Wedding \u00b7 Ceremony Theme'),
+      guestPageInvitationCardLabel: pick('guestPageInvitationCardLabel', 'Your invitation card'),
+      guestPageReceptionLabel: pick('guestPageReceptionLabel', 'Reception Notes'),
+      guestPageContactLabel: pick('guestPageContactLabel', 'Contact Person'),
+      guestPageMocLabel: pick('guestPageMocLabel', 'Master of Ceremony'),
+      guestPageMapLabel: pick('guestPageMapLabel', 'Find the Venue'),
+      guestPageWishesTitle: pick('guestPageWishesTitle', 'Wedding Wishes'),
+      guestPageWishesHint: pick('guestPageWishesHint', 'Leave a little love for the couple'),
+      guestPageDateLabel: pick('guestPageDateLabel', 'Date'),
+      guestPageTimeLabel: pick('guestPageTimeLabel', 'Time'),
+      guestPageVenueLabel: pick('guestPageVenueLabel', 'Venue'),
+      guestPageRsvpHint: pick('guestPageRsvpHint', 'Kindly RSVP so we can plan for you'),
     });
   } catch (error) {
     console.error('GET /api/events/[eventId]/guest-page error:', error);
@@ -130,7 +161,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
           key === 'guestPageFooterNote' ||
           key === 'weddingTheme' || key === 'contactPerson' ||
           key === 'contactPersonPhone' || key === 'masterOfCeremony' ||
-          key === 'mapUrl'
+          key === 'mapUrl' ||
+          key === 'guestPageCoverHint' || key === 'guestPageCoverSubtitle' ||
+          key === 'guestPageGreetingText' || key === 'guestPageThemeLabel' ||
+          key === 'guestPageInvitationCardLabel' || key === 'guestPageReceptionLabel' ||
+          key === 'guestPageContactLabel' || key === 'guestPageMocLabel' ||
+          key === 'guestPageMapLabel' || key === 'guestPageWishesTitle' ||
+          key === 'guestPageWishesHint' || key === 'guestPageDateLabel' ||
+          key === 'guestPageTimeLabel' || key === 'guestPageVenueLabel' ||
+          key === 'guestPageRsvpHint'
             ? raw.trim() === '' ? null : raw.trim()
             : raw.trim();
       }

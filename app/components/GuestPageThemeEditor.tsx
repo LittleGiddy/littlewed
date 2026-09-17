@@ -29,6 +29,21 @@ interface Draft {
   contactPersonPhone: string;
   masterOfCeremony: string;
   mapUrl: string;
+  guestPageCoverHint: string;
+  guestPageCoverSubtitle: string;
+  guestPageGreetingText: string;
+  guestPageThemeLabel: string;
+  guestPageInvitationCardLabel: string;
+  guestPageReceptionLabel: string;
+  guestPageContactLabel: string;
+  guestPageMocLabel: string;
+  guestPageMapLabel: string;
+  guestPageWishesTitle: string;
+  guestPageWishesHint: string;
+  guestPageDateLabel: string;
+  guestPageTimeLabel: string;
+  guestPageVenueLabel: string;
+  guestPageRsvpHint: string;
 }
 
 const DEFAULTS: Draft = {
@@ -50,6 +65,21 @@ const DEFAULTS: Draft = {
   contactPersonPhone: '',
   masterOfCeremony: '',
   mapUrl: '',
+  guestPageCoverHint: 'Tap anywhere to open',
+  guestPageCoverSubtitle: 'your invitation awaits',
+  guestPageGreetingText: 'we would be honored to have you join us',
+  guestPageThemeLabel: 'Wedding \u00b7 Ceremony Theme',
+  guestPageInvitationCardLabel: 'Your invitation card',
+  guestPageReceptionLabel: 'Reception Notes',
+  guestPageContactLabel: 'Contact Person',
+  guestPageMocLabel: 'Master of Ceremony',
+  guestPageMapLabel: 'Find the Venue',
+  guestPageWishesTitle: 'Wedding Wishes',
+  guestPageWishesHint: 'Leave a little love for the couple',
+  guestPageDateLabel: 'Date',
+  guestPageTimeLabel: 'Time',
+  guestPageVenueLabel: 'Venue',
+  guestPageRsvpHint: 'Kindly RSVP so we can plan for you',
 };
 
 type ColorKey = 'guestPagePrimaryColor' | 'guestPageSecondaryColor' | 'guestPageAccentColor' | 'guestPageThemeColor';
@@ -158,6 +188,21 @@ export default function GuestPageThemeEditor({
           contactPersonPhone: data.contactPersonPhone || local.contactPersonPhone || '',
           masterOfCeremony: data.masterOfCeremony || local.masterOfCeremony || '',
           mapUrl: data.mapUrl || local.mapUrl || '',
+          guestPageCoverHint: data.guestPageCoverHint || local.guestPageCoverHint || 'Tap anywhere to open',
+          guestPageCoverSubtitle: data.guestPageCoverSubtitle || local.guestPageCoverSubtitle || 'your invitation awaits',
+          guestPageGreetingText: data.guestPageGreetingText || local.guestPageGreetingText || 'we would be honored to have you join us',
+          guestPageThemeLabel: data.guestPageThemeLabel || local.guestPageThemeLabel || 'Wedding \u00b7 Ceremony Theme',
+          guestPageInvitationCardLabel: data.guestPageInvitationCardLabel || local.guestPageInvitationCardLabel || 'Your invitation card',
+          guestPageReceptionLabel: data.guestPageReceptionLabel || local.guestPageReceptionLabel || 'Reception Notes',
+          guestPageContactLabel: data.guestPageContactLabel || local.guestPageContactLabel || 'Contact Person',
+          guestPageMocLabel: data.guestPageMocLabel || local.guestPageMocLabel || 'Master of Ceremony',
+          guestPageMapLabel: data.guestPageMapLabel || local.guestPageMapLabel || 'Find the Venue',
+          guestPageWishesTitle: data.guestPageWishesTitle || local.guestPageWishesTitle || 'Wedding Wishes',
+          guestPageWishesHint: data.guestPageWishesHint || local.guestPageWishesHint || 'Leave a little love for the couple',
+          guestPageDateLabel: data.guestPageDateLabel || local.guestPageDateLabel || 'Date',
+          guestPageTimeLabel: data.guestPageTimeLabel || local.guestPageTimeLabel || 'Time',
+          guestPageVenueLabel: data.guestPageVenueLabel || local.guestPageVenueLabel || 'Venue',
+          guestPageRsvpHint: data.guestPageRsvpHint || local.guestPageRsvpHint || 'Kindly RSVP so we can plan for you',
         });
       })
       .catch(() => setDraft(local))
@@ -470,6 +515,181 @@ export default function GuestPageThemeEditor({
             </div>
           </div>
         </div>
+
+        {/* ─── Invitee Page Text ─────────────────────────────────────── */}
+        {(<div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-5">
+            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1">Invitee Page Text</h2>
+            <p className="text-[11px] text-gray-400 mb-4">
+              Leave blank to use your default. Event settings override the tenant-wide defaults.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Opening cover hint
+                </label>
+                <input
+                  value={draft.guestPageCoverHint}
+                  onChange={e => set('guestPageCoverHint', e.target.value)}
+                  placeholder="e.g. Tap anywhere to open"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Opening cover subtitle
+                </label>
+                <input
+                  value={draft.guestPageCoverSubtitle}
+                  onChange={e => set('guestPageCoverSubtitle', e.target.value)}
+                  placeholder="e.g. your invitation awaits"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Greeting above guest name
+                </label>
+                <input
+                  value={draft.guestPageGreetingText}
+                  onChange={e => set('guestPageGreetingText', e.target.value)}
+                  placeholder="e.g. we would be honored to have you join us"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <PaletteIcon size={13} className="text-[#0D4B4B]" /> Theme section label
+                </label>
+                <input
+                  value={draft.guestPageThemeLabel}
+                  onChange={e => set('guestPageThemeLabel', e.target.value)}
+                  placeholder="e.g. Wedding · Ceremony Theme"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <ImageIcon size={13} className="text-[#0D4B4B]" /> Invitation card label
+                </label>
+                <input
+                  value={draft.guestPageInvitationCardLabel}
+                  onChange={e => set('guestPageInvitationCardLabel', e.target.value)}
+                  placeholder="e.g. Your invitation card"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">Date label</label>
+                  <input
+                    value={draft.guestPageDateLabel}
+                    onChange={e => set('guestPageDateLabel', e.target.value)}
+                    placeholder="Date"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">Time label</label>
+                  <input
+                    value={draft.guestPageTimeLabel}
+                    onChange={e => set('guestPageTimeLabel', e.target.value)}
+                    placeholder="Time"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">Venue label</label>
+                  <input
+                    value={draft.guestPageVenueLabel}
+                    onChange={e => set('guestPageVenueLabel', e.target.value)}
+                    placeholder="Venue"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Reception notes label
+                </label>
+                <input
+                  value={draft.guestPageReceptionLabel}
+                  onChange={e => set('guestPageReceptionLabel', e.target.value)}
+                  placeholder="e.g. Reception Notes"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <Phone size={13} className="text-[#0D4B4B]" /> Contact label
+                </label>
+                <input
+                  value={draft.guestPageContactLabel}
+                  onChange={e => set('guestPageContactLabel', e.target.value)}
+                  placeholder="e.g. Contact Person"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <MicVocal size={13} className="text-[#0D4B4B]" /> Master of Ceremony label
+                </label>
+                <input
+                  value={draft.guestPageMocLabel}
+                  onChange={e => set('guestPageMocLabel', e.target.value)}
+                  placeholder="e.g. Master of Ceremony"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <MapPin size={13} className="text-[#0D4B4B]" /> Map button label
+                </label>
+                <input
+                  value={draft.guestPageMapLabel}
+                  onChange={e => set('guestPageMapLabel', e.target.value)}
+                  placeholder="e.g. Find the Venue"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                    <HeartHandshake size={13} className="text-[#0D4B4B]" /> Wishes section title
+                  </label>
+                  <input
+                    value={draft.guestPageWishesTitle}
+                    onChange={e => set('guestPageWishesTitle', e.target.value)}
+                    placeholder="e.g. Wedding Wishes"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                    <HeartHandshake size={13} className="text-[#0D4B4B]" /> Wishes hint text
+                  </label>
+                  <input
+                    value={draft.guestPageWishesHint}
+                    onChange={e => set('guestPageWishesHint', e.target.value)}
+                    placeholder="e.g. Leave a little love for the couple"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> RSVP hint text
+                </label>
+                <input
+                  value={draft.guestPageRsvpHint}
+                  onChange={e => set('guestPageRsvpHint', e.target.value)}
+                  placeholder="e.g. Kindly RSVP so we can plan for you"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                />
+              </div>
+            </div>
+          </div>
+        </div>)}
 
         {/* ─── Photos ────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

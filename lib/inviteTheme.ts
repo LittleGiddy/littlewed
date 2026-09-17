@@ -26,6 +26,21 @@ export interface GuestPageTheme {
   contactPersonPhone: string | null;
   masterOfCeremony: string | null;
   mapUrl: string | null;
+  coverHint: string;
+  coverSubtitle: string;
+  greetingText: string;
+  themeLabel: string;
+  invitationCardLabel: string;
+  receptionLabel: string;
+  contactLabel: string;
+  mocLabel: string;
+  mapLabel: string;
+  wishesTitle: string;
+  wishesHint: string;
+  dateLabel: string;
+  timeLabel: string;
+  venueLabel: string;
+  rsvpHint: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,6 +88,21 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
     contactPersonPhone: pickNullable('contactPersonPhone'),
     masterOfCeremony: pickNullable('masterOfCeremony'),
     mapUrl: pickNullable('mapUrl'),
+    coverHint: pick('guestPageCoverHint', 'Tap anywhere to open'),
+    coverSubtitle: pick('guestPageCoverSubtitle', 'your invitation awaits'),
+    greetingText: pick('guestPageGreetingText', 'we would be honored to have you join us'),
+    themeLabel: pick('guestPageThemeLabel', 'Wedding \u00b7 Ceremony Theme'),
+    invitationCardLabel: pick('guestPageInvitationCardLabel', 'Your invitation card'),
+    receptionLabel: pick('guestPageReceptionLabel', 'Reception Notes'),
+    contactLabel: pick('guestPageContactLabel', 'Contact Person'),
+    mocLabel: pick('guestPageMocLabel', 'Master of Ceremony'),
+    mapLabel: pick('guestPageMapLabel', 'Find the Venue'),
+    wishesTitle: pick('guestPageWishesTitle', 'Wedding Wishes'),
+    wishesHint: pick('guestPageWishesHint', 'Leave a little love for the couple'),
+    dateLabel: pick('guestPageDateLabel', 'Date'),
+    timeLabel: pick('guestPageTimeLabel', 'Time'),
+    venueLabel: pick('guestPageVenueLabel', 'Venue'),
+    rsvpHint: pick('guestPageRsvpHint', 'Kindly RSVP so we can plan for you'),
   };
 }
 

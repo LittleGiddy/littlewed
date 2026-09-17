@@ -125,6 +125,23 @@ model Tenant {
   masterOfCeremony    String?   // Master of Ceremony (MC)
   mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
 
+  // ─── Editable user-facing text (cover + invitee page) ──────────────────
+  guestPageCoverHint            String?  @default("Tap anywhere to open")
+  guestPageCoverSubtitle        String?  @default("your invitation awaits")
+  guestPageGreetingText         String?  @default("we would be honored to have you join us")
+  guestPageThemeLabel           String?  @default("Wedding · Ceremony Theme")
+  guestPageInvitationCardLabel  String?  @default("Your invitation card")
+  guestPageReceptionLabel       String?  @default("Reception Notes")
+  guestPageContactLabel         String?  @default("Contact Person")
+  guestPageMocLabel             String?  @default("Master of Ceremony")
+  guestPageMapLabel             String?  @default("Find the Venue")
+  guestPageWishesTitle          String?  @default("Wedding Wishes")
+  guestPageWishesHint           String?  @default("Leave a little love for the couple")
+  guestPageDateLabel            String?  @default("Date")
+  guestPageTimeLabel            String?  @default("Time")
+  guestPageVenueLabel           String?  @default("Venue")
+  guestPageRsvpHint             String?  @default("Kindly RSVP so we can plan for you")
+
   users              User[]
   events             Event[]
   pendingEvents      PendingEvent[]
@@ -228,6 +245,23 @@ model Event {
   contactPersonPhone  String?   // contact person's phone number
   masterOfCeremony    String?   // Master of Ceremony (MC)
   mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
+
+  // ─── Editable user-facing text (cover + invitee page) ──────────────────
+  guestPageCoverHint            String?  @default("Tap anywhere to open")
+  guestPageCoverSubtitle        String?  @default("your invitation awaits")
+  guestPageGreetingText         String?  @default("we would be honored to have you join us")
+  guestPageThemeLabel           String?  @default("Wedding · Ceremony Theme")
+  guestPageInvitationCardLabel  String?  @default("Your invitation card")
+  guestPageReceptionLabel       String?  @default("Reception Notes")
+  guestPageContactLabel         String?  @default("Contact Person")
+  guestPageMocLabel             String?  @default("Master of Ceremony")
+  guestPageMapLabel             String?  @default("Find the Venue")
+  guestPageWishesTitle          String?  @default("Wedding Wishes")
+  guestPageWishesHint           String?  @default("Leave a little love for the couple")
+  guestPageDateLabel            String?  @default("Date")
+  guestPageTimeLabel            String?  @default("Time")
+  guestPageVenueLabel           String?  @default("Venue")
+  guestPageRsvpHint             String?  @default("Kindly RSVP so we can plan for you")
 
   // Thank you card
   thankYouCardUrl       String?

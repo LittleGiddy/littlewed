@@ -1,34 +1,35 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { Heart, Mail } from 'lucide-react'
 import { GUEST_NAME_SCRIPT_FONT } from '@/lib/inviteTheme'
 import type { GuestPageTheme } from '@/lib/inviteTheme'
 import { fontStack } from '@/lib/fonts'
 
 interface InvitationCoverProps {
+  token: string
   theme: GuestPageTheme
   coupleName: string | null
   eventName: string
   eventDate: string
   guestName: string
-  children: ReactNode
 }
 
 /**
- * Fancy landing cover: an envelope / invitation card sits on top of the
- * landing page. Clicking it opens the envelope and "reveals" the invitation
- * underneath.
+ * Fancy landing cover: an envelope / invitation card splash. Tapping
+ * anywhere opens the envelope then takes the guest straight to their
+ * invitee page.
  */
 export default function InvitationCover({
+  token,
   theme,
   coupleName,
   eventName,
   eventDate,
   guestName,
-  children,
 }: InvitationCoverProps) {
+  const router = useRouter()
   const [opened, setOpened] = useState(false)
   const [gone, setGone] = useState(false)
 
@@ -53,7 +54,10 @@ export default function InvitationCover({
   const handleOpen = () => {
     if (opened) return
     setOpened(true)
-    window.setTimeout(() => setGone(true), 1250)
+    window.setTimeout(() => {
+      setGone(true)
+      router.push(`/invite/${token}/invitation`)
+    }, 950)
   }
 
   return (
@@ -81,22 +85,11 @@ export default function InvitationCover({
         }
       `}</style>
 
-      {/* Invitation content - revealed once the cover is opened */}
-      <div
-        style={{
-          opacity: opened ? 1 : 0,
-          transform: opened ? 'scale(1)' : 'scale(1.04)',
-          transition: 'opacity 0.85s ease 0.15s, transform 0.85s ease 0.15s',
-        }}
-      >
-        {children}
-      </div>
-
       {!gone && (
         <button
           type="button"
           onClick={handleOpen}
-          aria-label="Open your invitation"
+          aria-label={theme.coverHint}
           className="fixed inset-0 z-[80] flex cursor-pointer flex-col items-center justify-center border-0 p-4"
           style={{
             background: coverBg,
@@ -212,11 +205,11 @@ export default function InvitationCover({
               style={{ opacity: 0.9, fontFamily: titleFont }}
             >
               <span className="h-px w-8" style={{ background: 'rgba(255,255,255,0.5)' }} />
-              Tap anywhere to open
+              {theme.coverHint}
               <span className="h-px w-8" style={{ background: 'rgba(255,255,255,0.5)' }} />
             </p>
             <p className="mt-1.5 text-xs" style={{ fontFamily: titleFont, opacity: 0.75 }}>
-              {guestName}, your invitation awaits
+              {guestName}, {theme.coverSubtitle}
             </p>
           </div>
         </button>

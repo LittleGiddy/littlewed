@@ -159,9 +159,19 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         >
           {theme.detailsTitle}
         </h2>
-        <p className="gp-fade-up gp-fade-up-1 text-center text-sm text-gray-400 mb-10">
-          {guestName}, we would be honored to have you join us
+        <p className="gp-fade-up gp-fade-up-1 text-center text-[11px] sm:text-xs uppercase tracking-[3px] sm:tracking-[4px] text-gray-400 mb-3">
+          {theme.greetingText}
         </p>
+
+        {/* Animated fancy guest name - BIG */}
+        <div className="gp-fade-up gp-fade-up-1 text-center mb-10 px-2">
+          <p
+            className="gp-script gp-shimmer text-5xl sm:text-6xl md:text-7xl leading-snug break-words"
+            style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive`, color: primaryColor }}
+          >
+            {guestName}
+          </p>
+        </div>
 
         {/* Event name + host */}
         <div className="gp-fade-up gp-fade-up-2 text-center mb-10">
@@ -174,7 +184,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               {theme.weddingTheme && (
                 <>
                   <p className="text-[10px] font-bold uppercase tracking-[3px] text-gray-400 mb-1.5">
-                    Wedding &middot; Ceremony Theme
+                    {theme.themeLabel}
                   </p>
                   <p
                     className="gp-script text-3xl sm:text-4xl tracking-wide break-words"
@@ -206,7 +216,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         {guest.invitationCard && (
           <div className="gp-fade-up gp-fade-up-2 mb-10 flex flex-col items-center">
             <p className="text-[11px] font-semibold uppercase tracking-[2px] text-gray-400 mb-3">
-              Your invitation card
+              {theme.invitationCardLabel}
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -239,7 +249,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               </svg>
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Date</p>
+              <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.dateLabel}</p>
               <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{formatDate(event.date)}</p>
             </div>
           </div>
@@ -252,7 +262,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 </svg>
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Time</p>
+                <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.timeLabel}</p>
                 <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{event.time}</p>
               </div>
             </div>
@@ -266,7 +276,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               </svg>
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Venue</p>
+              <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.venueLabel}</p>
               <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{event.venue}</p>
               {event.address && <p className="text-xs text-gray-400 m-0 mt-0.5">{event.address}</p>}
             </div>
@@ -278,7 +288,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           <div className="gp-fade-up gp-fade-up-3 mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
-              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Reception Notes</span>
+              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.receptionLabel}</span>
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
             <div className="grid gap-3">
@@ -290,7 +300,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                     </svg>
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Contact Person</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.contactLabel}</p>
                     <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">
                       {theme.contactPerson}
                       {theme.contactPersonPhone && (
@@ -316,7 +326,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                     </svg>
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">Master of Ceremony</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.mocLabel}</p>
                     <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">{theme.masterOfCeremony}</p>
                   </div>
                 </div>
@@ -330,7 +340,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           <div className="gp-fade-up gp-fade-up-3 mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
-              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Find the Venue</span>
+              <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.mapLabel}</span>
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
             <iframe
@@ -366,7 +376,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
             <h3 className="text-2xl font-black text-gray-800 mb-1 break-words" style={{ fontFamily: titleFont, color: primaryColor }}>
               {theme.rsvpTitle}
             </h3>
-            <p className="text-sm text-gray-400">Kindly RSVP so we can plan for you &#10084;</p>
+            <p className="text-sm text-gray-400">{theme.rsvpHint} &#10084;</p>
           </div>
           <RSVPForm guestId={guest.id} currentStatus={guest.attending} primaryColor={primaryColor} secondaryColor={secondaryColor} />
         </div>
@@ -375,10 +385,10 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         <div className="gp-fade-up gp-delay-5 mt-12">
           <div className="flex items-center justify-center gap-2 mb-4">
             <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
-            <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">Wedding Wishes</span>
+            <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.wishesTitle}</span>
             <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
           </div>
-          <p className="text-center text-sm text-gray-400 mb-6">Leave a little love for the couple &#10084;</p>
+          <p className="text-center text-sm text-gray-400 mb-6">{theme.wishesHint} &#10084;</p>
 
           <WishForm guestId={guest.id} primaryColor={primaryColor} secondaryColor={secondaryColor} />
 
