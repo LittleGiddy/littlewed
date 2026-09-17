@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
 import { resolveGuestPageTheme, themeCss, fontImports, initialOf, GUEST_NAME_SCRIPT_FONT } from '@/lib/inviteTheme'
 import { fontStack } from '@/lib/fonts'
+import InvitationCover from './InvitationCover'
 
 function formatDateShort(date: Date) {
   return new Date(date).toLocaleDateString('en-US', {
@@ -47,9 +48,10 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
   const guestName = [guest.title, guest.name].filter(Boolean).join(' ')
 
   return (
-    <div className="min-h-screen">
-      <style>{fontImports(theme)}</style>
-      <style>{themeCss(theme)}</style>
+    <InvitationCover theme={theme} coupleName={couple} eventName={event.name} eventDate={formatDateShort(event.date)} guestName={guestName}>
+      <div className="min-h-screen">
+        <style>{fontImports(theme)}</style>
+        <style>{themeCss(theme)}</style>
 
       {/* ═══════════════════ HERO / LANDING ═══════════════════ */}
       <section
@@ -145,7 +147,7 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
           {/* Animated fancy guest name - BIG */}
           <div className="gp-fade-up gp-fade-up-2 w-full px-2">
             <p
-              className="gp-script gp-shimmer text-6xl sm:text-7xl md:text-8xl leading-tight break-words"
+              className="gp-script gp-shimmer text-5xl sm:text-6xl md:text-7xl leading-snug break-words"
               style={{ fontFamily: `'${GUEST_NAME_SCRIPT_FONT}', cursive` }}
             >
               Dear {guestName}
@@ -230,6 +232,7 @@ export default async function InviteLanding({ params }: { params: Promise<{ toke
           </p>
         </div>
       </section>
-    </div>
+      </div>
+    </InvitationCover>
   )
 }

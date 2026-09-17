@@ -96,16 +96,17 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         {(theme.coupleImage || couple) && (
           <div className="gp-fade-in flex flex-col items-center mb-8">
             <div
-              className="gp-couple-arch gp-float-soft relative w-44 h-56 sm:w-56 sm:h-72 overflow-hidden bg-gradient-to-br p-1.5"
+              className="gp-couple-arch gp-float-soft relative w-64 h-80 sm:w-72 sm:h-96 overflow-hidden bg-gradient-to-br p-1.5"
               style={{
                 borderColor: accentColor,
                 background: `linear-gradient(160deg, ${primaryColor}, ${secondaryColor})`,
                 boxShadow: `0 20px 44px -14px ${primaryColor}99`,
+                borderRadius: '10rem 10rem 1.25rem 1.25rem',
               }}
             >
               <div
                 className="relative w-full h-full overflow-hidden"
-                style={{ borderRadius: '8.5rem 8.5rem 0.9rem 0.9rem' }}
+                style={{ borderRadius: '9.2rem 9.2rem 1rem 1rem' }}
               >
                 {theme.coupleImage ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
@@ -116,7 +117,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                   />
                 ) : (
                   <div
-                    className="w-full h-full flex items-center justify-center text-3xl font-black"
+                    className="w-full h-full flex items-center justify-center text-4xl font-black"
                     style={{ fontFamily: titleFont, color: accentColor }}
                   >
                     {monogram}
@@ -125,7 +126,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 {/* Inner decorative frame */}
                 <div
                   className="pointer-events-none absolute inset-2.5 border"
-                  style={{ borderColor: 'rgba(255,255,255,0.6)', borderRadius: '7.4rem 7.4rem 0.6rem 0.6rem' }}
+                  style={{ borderColor: 'rgba(255,255,255,0.6)', borderRadius: '8.1rem 8.1rem 0.75rem 0.75rem' }}
                 />
               </div>
             </div>
