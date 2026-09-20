@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Navigation, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildDirectionsUrl } from '@/lib/maps';
 
 interface VenueMapProps {
@@ -108,6 +108,31 @@ function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; a
   );
 }
 
+type Leaflet = typeof import('leaflet');
+
+function initMap(container: HTMLElement, lat: number, lng: number, accentColor: string) {
+  return import('leaflet').then((L: Leaflet) => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="position:relative">${pinSvg(accentColor)}</div>`,
+      iconSize: [34, 42],
+      iconAnchor: [17, 42],
+      popupAnchor: [0, -40],
+    });
+
+    const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
+    map.setView([lat, lng], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    L.marker([lat, lng], { icon, title: 'Venue' }).addTo(map);
+    return map;
+  });
+}
+
 export default function VenueMap({
   embedUrl,
   mapUrl,
@@ -119,8 +144,12 @@ export default function VenueMap({
   primaryColor = '#BE185D',
 }: VenueMapProps) {
   const [open, setOpen] = useState(false);
+  const modalMapRef = useRef<HTMLDivElement | null>(null);
 
-  const venue = lat !== undefined && lng !== undefined ? { lat, lng } : null;
+  const venue = useMemo(
+    () => (lat !== undefined && lng !== undefined ? { lat, lng } : null),
+    [lat, lng],
+  );
   const openMapUrl = mapUrl || embedUrl;
 
   const directionsUrl = venue ? buildDirectionsUrl(venue) : null;
@@ -137,6 +166,30 @@ export default function VenueMap({
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  // Interactive map (OSM tiles via Leaflet), initialised only once the modal is open.
+  const mapNode = venue ? modalMapRef : null;
+  useEffect(() => {
+    if (!open || !mapNode || !mapNode.current || !venue) return;
+    const el = mapNode.current;
+
+    let disposed = false;
+    let instance: Awaited<ReturnType<typeof initMap>> | null = null;
+
+    initMap(el, venue.lat, venue.lng, accentColor).then((map) => {
+      if (disposed) {
+        map.remove();
+        return;
+      }
+      instance = map;
+      requestAnimationFrame(() => map.invalidateSize());
+    });
+
+    return () => {
+      disposed = true;
+      if (instance) instance.remove();
+    };
+  }, [open, mapNode, venue, accentColor]);
 
   return (
     <>
@@ -216,15 +269,19 @@ export default function VenueMap({
                 </button>
               </div>
 
-              {/* Interactive map (embeds the tenant's actual venue location) */}
-              <iframe
-                src={embedUrl}
-                className="h-[45vh] min-h-64 w-full border-0"
-                loading="lazy"
-                title="Venue map"
-                allowFullScreen
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+              {/* Interactive map */}
+              {venue ? (
+                <div ref={modalMapRef} aria-label="Venue map" className="h-[45vh] min-h-64 w-full bg-slate-100" />
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  className="h-[45vh] min-h-64 w-full border-0"
+                  loading="lazy"
+                  title="Venue map"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              )}
 
               {/* Actions */}
               <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
