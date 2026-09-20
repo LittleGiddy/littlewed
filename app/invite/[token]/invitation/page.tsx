@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
-import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, googleMapsEmbedUrl, initialOf } from '@/lib/inviteTheme'
+import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, initialOf } from '@/lib/inviteTheme'
+import { getVenueLocation, buildDirectionsUrl } from '@/lib/maps'
 import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
 import WishForm from '@/components/WishForm'
+import VenueMap from '@/components/VenueMap'
 
 function formatDate(date: Date) {
   return new Date(date).toLocaleDateString('en-US', {
@@ -34,7 +36,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const theme = resolveGuestPageTheme(event, event.tenant)
   const { primaryColor, secondaryColor, accentColor } = theme
 
-  const mapEmbedUrl = await googleMapsEmbedUrl(theme.mapUrl)
+  const venueLocation = await getVenueLocation(theme.mapUrl)
 
   const wishes = await prisma.guestWish.findMany({
     where: { eventId: event.id },
@@ -335,7 +337,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           </div>
         )}
 
-        {/* Google Maps */}
+        {/* Venue map */}
         {theme.mapUrl && (
           <div className="gp-fade-up gp-fade-up-3 mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
@@ -343,27 +345,15 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.mapLabel}</span>
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
-            {mapEmbedUrl ? (
-              <>
-                <iframe
-                  src={mapEmbedUrl}
-                  title="Venue location"
-                  className="w-full h-72 rounded-2xl border-0 shadow-sm"
-                  style={{ filter: 'saturate(0.95)' }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-                <a
-                  href={theme.mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-3 text-xs font-bold hover:underline"
-                  style={{ color: secondaryColor }}
-                >
-                  Open in Google Maps &#8599;
-                </a>
-              </>
+            {venueLocation ? (
+              <VenueMap
+                lat={venueLocation.lat}
+                lng={venueLocation.lng}
+                label={venueLocation.label || event.venue || undefined}
+                address={event.address || undefined}
+                accentColor={accentColor}
+                primaryColor={primaryColor}
+              />
             ) : (
               <div className="rounded-2xl border border-gray-100 bg-white px-6 py-8 text-center shadow-sm">
                 <svg className="mx-auto h-8 w-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ color: primaryColor }}>
@@ -372,13 +362,13 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 </svg>
                 <p className="text-sm font-medium text-gray-700 mb-4">{event.venue}</p>
                 <a
-                  href={theme.mapUrl}
+                  href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
                   style={{ backgroundColor: primaryColor }}
                 >
-                  Open venue in Google Maps &#8599;
+                  Get directions in Google Maps &#8599;
                 </a>
               </div>
             )}
