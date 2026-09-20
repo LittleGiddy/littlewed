@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Navigation, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildDirectionsUrl } from '@/lib/maps';
 
 interface VenueMapProps {
@@ -19,6 +19,93 @@ interface VenueMapProps {
   address?: string;
   accentColor?: string;
   primaryColor?: string;
+}
+
+function pinSvg(color: string) {
+  return `<svg width="34" height="42" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg"><path d="M17 0C7.6 0 0 7.6 0 17c0 11.7 17 25 17 25s17-13.3 17-25C34 7.6 26.4 0 17 0z" fill="${color}"/><circle cx="17" cy="17" r="7.5" fill="#fff"/></svg>`;
+}
+
+interface StaticTile {
+  z: number;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+}
+
+/**
+ * A real map *image* for the preview card, rendered directly from OpenStreetMap
+ * tiles (no API key, no iframe). The marker lands dead-centre via a pixel offset.
+ */
+function useStaticPreview(lat: number, lng: number, zoom = 15) {
+  return useMemo(() => {
+    const latRad = (lat * Math.PI) / 180;
+    const n = 2 ** zoom;
+    const xt = ((lng + 180) / 360) * n;
+    const yt = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+    const cx = Math.floor(xt);
+    const cy = Math.floor(yt);
+    const xIn = (xt - cx) * 256;
+    const yIn = (yt - cy) * 256;
+
+    const tiles: StaticTile[] = [];
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        tiles.push({
+          z: zoom,
+          x: (((cx + dx) % n) + n) % n,
+          y: Math.max(0, Math.min(n - 1, cy + dy)),
+          px: (dx + 1) * 256,
+          py: (dy + 1) * 256,
+        });
+      }
+    }
+    return { tiles, xOff: 128 - xIn, yOff: -yIn };
+  }, [lat, lng, zoom]);
+}
+
+function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; accentColor: string }) {
+  const { tiles, xOff, yOff } = useStaticPreview(lat, lng);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden>
+      <div
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '50%',
+          width: 768,
+          height: 768,
+          transform: `translate(calc(-50% + ${xOff}px), calc(-50% + ${yOff}px))`,
+        }}
+      >
+        {tiles.map((t, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={t.x + '-' + t.y}
+            src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
+            alt=""
+            loading={i < 4 ? 'eager' : 'lazy'}
+            draggable={false}
+            referrerPolicy="no-referrer"
+            className="absolute select-none"
+            style={{ left: t.px, top: t.py, width: 256, height: 256 }}
+          />
+        ))}
+      </div>
+      <span
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -100%)',
+          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))',
+        }}
+        dangerouslySetInnerHTML={{ __html: pinSvg(accentColor) }}
+      />
+      <span className="absolute bottom-1 right-2 text-[9px] font-medium text-white/90 drop-shadow">© OpenStreetMap</span>
+    </div>
+  );
 }
 
 export default function VenueMap({
@@ -55,15 +142,21 @@ export default function VenueMap({
     <>
       {/* Preview card — the map itself is the card background (never a blank card) */}
       <div className="relative h-52 overflow-hidden rounded-2xl shadow-sm sm:h-64">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden />
-        <iframe
-          src={embedUrl}
-          className="pointer-events-none absolute inset-0 h-full w-full border-0"
-          loading="eager"
-          title="Venue map preview"
-          tabIndex={-1}
-          aria-hidden
-        />
+        {venue ? (
+          <StaticMapImage lat={venue.lat} lng={venue.lng} accentColor={accentColor} />
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden />
+            <iframe
+              src={embedUrl}
+              className="pointer-events-none absolute inset-0 h-full w-full border-0"
+              loading="eager"
+              title="Venue map preview"
+              tabIndex={-1}
+              aria-hidden
+            />
+          </>
+        )}
         <button
           type="button"
           onClick={() => setOpen(true)}
