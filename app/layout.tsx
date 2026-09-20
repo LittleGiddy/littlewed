@@ -34,26 +34,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <InstallPrompt />
         </AuthProvider>
         <ToasterWithClose
-          position="top-right"
+          position="bottom-center"
+          containerStyle={{
+            bottom: 'max(1rem, env(safe-area-inset-bottom))',
+          }}
           toastOptions={{
-            duration: 2500,
+            duration: 3200,
             style: {
-              borderRadius: '12px',
-              background: '#fff',
-              color: '#1f2937',
-              fontSize: '14px',
-              boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+              background: 'transparent',
+              boxShadow: 'none',
+              border: 'none',
+              borderRadius: '999px',
+              padding: 0,
+              margin: 0,
+              maxWidth: '100%',
             },
-            success: {
-              duration: 1800,
-              iconTheme: { primary: '#0D4B4B', secondary: '#fff' },
-              style: { border: '1px solid #0D4B4B', color: '#0D4B4B' },
-            },
-            error: {
-              duration: 3500,
-              iconTheme: { primary: '#FF6B5C', secondary: '#fff' },
-              style: { border: '1px solid #FF6B5C', color: '#c0392b' },
-            },
+            success: { duration: 2200 },
+            error: { duration: 4200 },
           }}
         />
       </body>

@@ -34,7 +34,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const theme = resolveGuestPageTheme(event, event.tenant)
   const { primaryColor, secondaryColor, accentColor } = theme
 
-  const mapEmbedUrl = googleMapsEmbedUrl(theme.mapUrl)
+  const mapEmbedUrl = await googleMapsEmbedUrl(theme.mapUrl)
 
   const wishes = await prisma.guestWish.findMany({
     where: { eventId: event.id },
@@ -336,32 +336,51 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         )}
 
         {/* Google Maps */}
-        {mapEmbedUrl && (
+        {theme.mapUrl && (
           <div className="gp-fade-up gp-fade-up-3 mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
               <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.mapLabel}</span>
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
-            <iframe
-              src={mapEmbedUrl}
-              title="Venue location"
-              className="w-full h-72 rounded-2xl border-0 shadow-sm"
-              style={{ filter: 'saturate(0.95)' }}
-              loading="lazy"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-            />
-            {theme.mapUrl && (
-              <a
-                href={theme.mapUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-3 text-xs font-bold hover:underline"
-                style={{ color: secondaryColor }}
-              >
-                Open in Google Maps &#8599;
-              </a>
+            {mapEmbedUrl ? (
+              <>
+                <iframe
+                  src={mapEmbedUrl}
+                  title="Venue location"
+                  className="w-full h-72 rounded-2xl border-0 shadow-sm"
+                  style={{ filter: 'saturate(0.95)' }}
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+                <a
+                  href={theme.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-3 text-xs font-bold hover:underline"
+                  style={{ color: secondaryColor }}
+                >
+                  Open in Google Maps &#8599;
+                </a>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-gray-100 bg-white px-6 py-8 text-center shadow-sm">
+                <svg className="mx-auto h-8 w-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ color: primaryColor }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                </svg>
+                <p className="text-sm font-medium text-gray-700 mb-4">{event.venue}</p>
+                <a
+                  href={theme.mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  Open venue in Google Maps &#8599;
+                </a>
+              </div>
             )}
           </div>
         )}

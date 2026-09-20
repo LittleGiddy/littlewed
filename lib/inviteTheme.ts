@@ -106,11 +106,22 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
   };
 }
 
-// Converts a Google Maps URL into a URL that can be embadded in an <iframe>.
-// Short share links (maps.app.goo.gl) cannot be embedded - returns null for those.
-export function googleMapsEmbedUrl(url?: string | null): string | null {
+const IFRAME_SRC_RE = /<iframe[^>]+src=["']([^"']+)["']/i;
+const GOO_GL_HOSTS = new Set(['maps.app.goo.gl', 'goo.gl']);
+
+// Converts a Google Maps URL (short share link, <iframe> snippet, or plain
+// maps URL) into a URL that can be embedded in an <iframe>. Short share links
+// (maps.app.goo.gl, goo.gl) cannot be framed directly, so they are resolved to
+// their real Google Maps URL first (server-side only). Returns null when no
+// embeddable map URL can be produced.
+export async function googleMapsEmbedUrl(url?: string | null): Promise<string | null> {
   if (!url || !url.trim()) return null;
   let raw = url.trim();
+
+  // Accept pasted "Embed a map" <iframe> snippets by pulling out their src.
+  const snippetSrc = raw.match(IFRAME_SRC_RE);
+  if (snippetSrc) raw = snippetSrc[1];
+
   if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`;
 
   let parsed: URL;
@@ -121,11 +132,19 @@ export function googleMapsEmbedUrl(url?: string | null): string | null {
   }
 
   const host = parsed.hostname.toLowerCase();
-  if (host === 'maps.app.goo.gl' || host === 'goo.gl') return null;
+
+  // Short share links can't be embedded — follow the redirect server-side.
+  if (GOO_GL_HOSTS.has(host)) return resolveGoogleMapsShortLink(raw);
+
+  const path = parsed.pathname;
+
+  // Official embed URLs (…/maps/embed?pb=…) are already iframe-ready.
+  if (host.endsWith('.google.com') && path.startsWith('/maps/embed')) {
+    return parsed.toString();
+  }
 
   const isGoogleMaps =
-    (host === 'google.com' || host.endsWith('.google.com')) &&
-    parsed.pathname.startsWith('/maps');
+    (host === 'google.com' || host.endsWith('.google.com')) && path.startsWith('/maps');
 
   if (isGoogleMaps) {
     if (!parsed.searchParams.has('output')) {
@@ -134,7 +153,7 @@ export function googleMapsEmbedUrl(url?: string | null): string | null {
     return parsed.toString();
   }
 
-  // Generic embedded-map style: treat /maps/place/ or ?q= as embeddable.
+  // Generic embedded-map style: /maps/place/, /maps/@lat,lng, and ?q= links.
   if (host.includes('maps.') || parsed.searchParams.has('q')) {
     if (!parsed.searchParams.has('output')) {
       parsed.searchParams.set('output', 'embed');
@@ -143,6 +162,25 @@ export function googleMapsEmbedUrl(url?: string | null): string | null {
   }
 
   return null;
+}
+
+async function resolveGoogleMapsShortLink(url: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'user-agent': 'Mozilla/5.0 (compatible; MapsLink/1.0)' },
+      cache: 'no-store',
+    });
+    clearTimeout(timeout);
+    const finalUrl = res.url || '';
+    if (finalUrl && finalUrl !== url) return googleMapsEmbedUrl(finalUrl);
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function fontImports(theme: GuestPageTheme): string {

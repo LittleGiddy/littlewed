@@ -509,7 +509,7 @@ export default function GuestPageThemeEditor({
                   className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
-                  An embedded map of the venue is shown on the invitee page.
+                  Accepts a Google Maps share link (maps.app.goo.gl), a maps URL, or an &quot;Embed a map&quot; iframe snippet. An embedded map of the venue is shown on the invitee page.
                 </p>
               </div>
             </div>

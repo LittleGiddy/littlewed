@@ -1,59 +1,125 @@
 'use client';
 
-import { X } from 'lucide-react';
-import { Toaster as RHToast, ToastBar, toast } from 'react-hot-toast';
-import type { Toast, DefaultToastOptions, ToastPosition } from 'react-hot-toast';
+import { AlertCircle, CheckCircle2, Info, Loader2, X } from 'lucide-react';
+import type { CSSProperties, ReactNode } from 'react';
+import { Toaster as RHToast, resolveValue, toast } from 'react-hot-toast';
+import type { DefaultToastOptions, Toast, ToastPosition } from 'react-hot-toast';
 
 interface ToasterWithCloseProps {
   position?: ToastPosition;
   toastOptions?: DefaultToastOptions;
   reverseOrder?: boolean;
   gutter?: number;
-  containerStyle?: React.CSSProperties;
+  containerStyle?: CSSProperties;
   containerClassName?: string;
+}
+
+/**
+ * A phone-capped width — near full-width on small screens, capped on desktop.
+ * `min()` keeps toasts comfortable to read and thumb-friendly on any device.
+ */
+const TOAST_WIDTH = 'min(calc(100vw - 2rem), 26rem)';
+
+const TYPE_CONFIG = {
+  success: {
+    Icon: CheckCircle2,
+    badgeStyle: { backgroundColor: '#0D4B4B', color: '#fff' },
+    accentColor: '#0D4B4B',
+  },
+  error: {
+    Icon: AlertCircle,
+    badgeStyle: { backgroundColor: '#FF6B5C', color: '#fff' },
+    accentColor: '#FF6B5C',
+  },
+  loading: {
+    Icon: Loader2,
+    badgeStyle: { backgroundColor: '#2563eb', color: '#fff' },
+    accentColor: '#2563eb',
+  },
+  default: {
+    Icon: Info,
+    badgeStyle: { backgroundColor: '#f1f5f9', color: '#475569' },
+    accentColor: '#94a3b8',
+  },
+} as const;
+
+/** Thin progress bar that drains right-to-left, like a Material SnackBar timeout. */
+function ProgressBar({ t, accent }: { t: Toast; accent: string }) {
+  if (t.type === 'loading' || t.duration === Infinity || !t.visible) return null;
+  return (
+    <span
+      className="toast-progress pointer-events-none absolute inset-x-3 bottom-0 h-[3px] rounded-full"
+      style={{
+        backgroundColor: accent,
+        animationDuration: `${t.duration}ms`,
+        animationDelay: `${-t.pauseDuration}ms`,
+      }}
+    />
+  );
+}
+
+function ToastInner({ t }: { t: Toast }) {
+  type ToastKind = keyof typeof TYPE_CONFIG;
+  const kind: ToastKind = t.type === 'success' || t.type === 'error' || t.type === 'loading' ? t.type : 'default';
+  const { Icon, badgeStyle, accentColor } = TYPE_CONFIG[kind];
+  const message = resolveValue(t.message, t) as ReactNode;
+
+  // Toasts that supply their own chrome (e.g. CheckInWelcomeToast) keep it.
+  const hasCustomChrome = Boolean(t.style?.background && t.style.background !== 'transparent');
+
+  // Custom icons passed via `toast('…', { icon })` are preserved in the badge.
+  const badgeContent = t.icon !== undefined ? t.icon : <Icon size={18} strokeWidth={2.2} className={t.type === 'loading' ? 'animate-spin' : undefined} />;
+
+  if (hasCustomChrome) {
+    return <div className="w-full" style={{ width: TOAST_WIDTH }}>{message}</div>;
+  }
+
+  return (
+    <div
+      role={t.type === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      style={{ width: TOAST_WIDTH }}
+      className="pointer-events-auto relative flex min-h-12 items-center gap-3 overflow-hidden rounded-2xl border border-white/60 bg-white/90 p-3 pr-2.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.28),0_2px_8px_-2px_rgba(0,0,0,0.08)] backdrop-blur-xl"
+    >
+      <span
+        aria-hidden
+        className="absolute bottom-2 left-1.5 top-2 w-1 rounded-full"
+        style={{ backgroundColor: accentColor }}
+      />
+      <span
+        aria-hidden
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+        style={badgeStyle}
+      >
+        {badgeContent}
+      </span>
+      <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-slate-800 sm:text-sm">
+        {message}
+      </span>
+      {t.type !== 'loading' && (
+        <button
+          type="button"
+          onClick={() => toast.dismiss(t.id)}
+          aria-label="Dismiss notification"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-600"
+        >
+          <X size={15} />
+        </button>
+      )}
+      <ProgressBar t={t} accent={accentColor} />
+    </div>
+  );
 }
 
 export default function ToasterWithClose(props: ToasterWithCloseProps) {
   const {
-    position = 'top-right',
+    position = 'bottom-center',
     toastOptions,
     reverseOrder,
     gutter,
     containerStyle,
     containerClassName,
   } = props;
-
-  const renderToast = (t: Toast) => {
-    const typeClass =
-      t.type === 'success'
-        ? 'border-[#0D4B4B] text-[#0D4B4B]'
-        : t.type === 'error'
-          ? 'border-[#FF6B5C] text-[#c0392b]'
-          : 'border-gray-200 text-gray-700';
-
-    return (
-      <div
-        className={`${typeClass} bg-white rounded-2xl shadow-xl border`}
-        style={{ pointerEvents: 'auto', position: 'relative', paddingRight: '34px' }}
-      >
-        <ToastBar toast={t}>
-          {({ icon, message }) => (
-            <>
-              <span className="flex items-center">{icon}</span>
-              <span className="flex-1 text-sm font-medium">{message}</span>
-            </>
-          )}
-        </ToastBar>
-        <button
-          onClick={() => toast.dismiss(t.id)}
-          aria-label="Dismiss"
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-        >
-          <X size={14} />
-        </button>
-      </div>
-    );
-  };
 
   return (
     <RHToast
@@ -64,7 +130,7 @@ export default function ToasterWithClose(props: ToasterWithCloseProps) {
       containerStyle={containerStyle}
       containerClassName={containerClassName}
     >
-      {(t) => renderToast(t as Toast)}
+      {(t) => <ToastInner t={t as Toast} />}
     </RHToast>
   );
 }
