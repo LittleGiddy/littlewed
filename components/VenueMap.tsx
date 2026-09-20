@@ -3,11 +3,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Navigation, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { buildDirectionsUrl, buildMapsUrl } from '@/lib/maps';
+import { buildDirectionsUrl } from '@/lib/maps';
 
 interface VenueMapProps {
   /** Iframe-ready Google Maps embed URL (the real venue the tenant uploaded). */
   embedUrl: string;
+  /** The original map link the tenant uploaded — what invitees should land on. */
+  mapUrl?: string | null;
   /** Venue coordinates, when they could be extracted from the map link. */
   lat?: number;
   lng?: number;
@@ -21,6 +23,7 @@ interface VenueMapProps {
 
 export default function VenueMap({
   embedUrl,
+  mapUrl,
   lat,
   lng,
   label,
@@ -31,12 +34,9 @@ export default function VenueMap({
   const [open, setOpen] = useState(false);
 
   const venue = lat !== undefined && lng !== undefined ? { lat, lng } : null;
-  const venueText = [label, address].filter(Boolean).join(', ').trim();
+  const openMapUrl = mapUrl || embedUrl;
 
-  const directionsUrl = venue ? buildDirectionsUrl(venue) : buildDirectionsUrl(venueText || label || 'the venue');
-  const viewMapUrl = venue
-    ? buildMapsUrl(venue)
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(venueText || label || 'the venue')}`;
+  const directionsUrl = venue ? buildDirectionsUrl(venue) : null;
 
   useEffect(() => {
     if (!open) return;
@@ -135,22 +135,29 @@ export default function VenueMap({
 
               {/* Actions */}
               <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {directionsUrl && (
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <Navigation size={16} /> Get Directions
+                  </a>
+                )}
                 <a
-                  href={directionsUrl}
+                  href={openMapUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
-                  style={{ backgroundColor: primaryColor }}
+                  className={
+                    directionsUrl
+                      ? 'mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50'
+                      : 'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]'
+                  }
+                  style={!directionsUrl ? { backgroundColor: primaryColor } : undefined}
                 >
-                  <Navigation size={16} /> Get Directions
-                </a>
-                <a
-                  href={viewMapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  <MapPin size={16} style={{ color: accentColor }} /> Navigate to the venue
+                  <MapPin size={16} style={{ color: directionsUrl ? accentColor : undefined }} /> Navigate to the venue
                 </a>
               </div>
             </motion.div>

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
 import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, initialOf } from '@/lib/inviteTheme'
-import { getVenueLocation, buildDirectionsUrl, googleMapsEmbedUrl } from '@/lib/maps'
+import { getVenueLocation, buildDirectionsUrl, googleMapsEmbedUrl, resolveMapUrl, normalizeMapInput } from '@/lib/maps'
 import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
@@ -38,6 +38,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
 
   const venueLocation = await getVenueLocation(theme.mapUrl)
   const venueEmbedUrl = await googleMapsEmbedUrl(theme.mapUrl)
+  const venueMapUrl = (await resolveMapUrl(theme.mapUrl)) || normalizeMapInput(theme.mapUrl)
 
   const wishes = await prisma.guestWish.findMany({
     where: { eventId: event.id },
@@ -349,6 +350,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
             {venueEmbedUrl ? (
               <VenueMap
                 embedUrl={venueEmbedUrl}
+                mapUrl={venueMapUrl}
                 lat={venueLocation?.lat}
                 lng={venueLocation?.lng}
                 label={venueLocation?.label || event.venue || undefined}
@@ -364,7 +366,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 </svg>
                 <p className="text-sm font-medium text-gray-700 mb-4">{event.venue}</p>
                 <a
-                  href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
+                  href={venueMapUrl || buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
