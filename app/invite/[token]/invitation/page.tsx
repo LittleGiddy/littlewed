@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
 import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, initialOf } from '@/lib/inviteTheme'
-import { getVenueLocation, buildDirectionsUrl } from '@/lib/maps'
+import { getVenueLocation, buildDirectionsUrl, buildWazeUrl } from '@/lib/maps'
 import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
@@ -361,15 +361,25 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
                 <p className="text-sm font-medium text-gray-700 mb-4">{event.venue}</p>
-                <a
-                  href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
-                  style={{ backgroundColor: primaryColor }}
-                >
-                  Get directions in Google Maps &#8599;
-                </a>
+                <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
+                  <a
+                    href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    Directions in Google Maps &#8599;
+                  </a>
+                  <a
+                    href={buildWazeUrl([event.venue, event.address].filter(Boolean).join(', '))}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#0a9de0]/40 bg-[#0a9de0]/10 px-5 py-2 text-sm font-bold text-[#0a7dcc] hover:bg-[#0a9de0]/20"
+                  >
+                    Navigate with Waze
+                  </a>
+                </div>
               </div>
             )}
           </div>

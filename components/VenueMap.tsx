@@ -2,7 +2,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Navigation, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { buildWazeUrl } from '@/lib/maps';
 
 interface VenueMapProps {
   lat: number;
@@ -21,7 +22,7 @@ function pinSvg(color: string) {
 
 type Leaflet = typeof import('leaflet');
 
-function initMap(container: HTMLElement, lat: number, lng: number, accentColor: string, scrollZoom = false) {
+function initMap(container: HTMLElement, lat: number, lng: number, accentColor: string) {
   return import('leaflet').then((L: Leaflet) => {
     const icon = L.divIcon({
       className: '',
@@ -31,7 +32,7 @@ function initMap(container: HTMLElement, lat: number, lng: number, accentColor: 
       popupAnchor: [0, -40],
     });
 
-    const map = L.map(container, { zoomControl: true, scrollWheelZoom: scrollZoom });
+    const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
     map.setView([lat, lng], 15);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -44,35 +45,99 @@ function initMap(container: HTMLElement, lat: number, lng: number, accentColor: 
   });
 }
 
+interface StaticTile {
+  z: number;
+  x: number;
+  y: number;
+  px: number;
+  py: number;
+}
+
+/**
+ * A real map *picture* rendered directly from OpenStreetMap tiles (no API key,
+ * no interactive JS) — the marker ends up dead-centre via a pixel offset.
+ */
+function useStaticPreview(lat: number, lng: number, zoom = 15) {
+  return useMemo(() => {
+    const latRad = (lat * Math.PI) / 180;
+    const n = 2 ** zoom;
+    const xt = ((lng + 180) / 360) * n;
+    const yt = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+    const cx = Math.floor(xt);
+    const cy = Math.floor(yt);
+    const xIn = (xt - cx) * 256;
+    const yIn = (yt - cy) * 256;
+
+    const tiles: StaticTile[] = [];
+    for (let dx = -1; dx <= 1; dx += 1) {
+      for (let dy = -1; dy <= 1; dy += 1) {
+        tiles.push({
+          z: zoom,
+          x: (((cx + dx) % n) + n) % n,
+          y: Math.max(0, Math.min(n - 1, cy + dy)),
+          px: (dx + 1) * 256,
+          py: (dy + 1) * 256,
+        });
+      }
+    }
+    // Offset the 3x3 grid so the marker's tile-pixel lands at the container centre.
+    return { tiles, xOff: 128 - xIn, yOff: -yIn };
+  }, [lat, lng, zoom]);
+}
+
+function StaticMapPreview({ lat, lng, accentColor }: { lat: number; lng: number; accentColor: string }) {
+  const { tiles, xOff, yOff } = useStaticPreview(lat, lng);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-2xl bg-slate-200" aria-hidden>
+      <div
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '50%',
+          width: 768,
+          height: 768,
+          transform: `translate(calc(-50% + ${xOff}px), calc(-50% + ${yOff}px))`,
+        }}
+      >
+        {tiles.map((t, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={t.x + '-' + t.y}
+            src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
+            alt=""
+            loading={i < 4 ? 'eager' : 'lazy'}
+            draggable={false}
+            className="absolute select-none"
+            style={{ left: t.px, top: t.py, width: 256, height: 256 }}
+          />
+        ))}
+      </div>
+      <span
+        className="absolute"
+        style={{
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -100%)',
+          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))',
+        }}
+        dangerouslySetInnerHTML={{ __html: pinSvg(accentColor) }}
+      />
+      <span className="absolute bottom-1 right-2 text-[9px] font-medium text-white/90 drop-shadow">
+        © OpenStreetMap
+      </span>
+    </div>
+  );
+}
+
 export default function VenueMap({ lat, lng, label, address, accentColor = '#BE185D', primaryColor = '#BE185D' }: VenueMapProps) {
-  const previewRef = useRef<HTMLDivElement | null>(null);
   const modalMapRef = useRef<HTMLDivElement | null>(null);
 
   const [open, setOpen] = useState(false);
 
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=MY_LOCATION&destination=${lat},${lng}&travelmode=driving`;
   const viewMapUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-
-  // ── Preview map (interactive, clickable card) ────────────────────────────
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    let disposed = false;
-    let instance: Awaited<ReturnType<typeof initMap>> | null = null;
-
-    initMap(el, lat, lng, accentColor).then((map) => {
-      if (disposed) {
-        map.remove();
-        return;
-      }
-      instance = map;
-    });
-
-    return () => {
-      disposed = true;
-      if (instance) instance.remove();
-    };
-  }, [lat, lng, accentColor]);
+  const wazeUrl = buildWazeUrl({ lat, lng });
 
   // ── Modal map (initialised only once the modal is open) ──────────────────
   useEffect(() => {
@@ -83,7 +148,7 @@ export default function VenueMap({ lat, lng, label, address, accentColor = '#BE1
     let disposed = false;
     let instance: Awaited<ReturnType<typeof initMap>> | null = null;
 
-    initMap(el, lat, lng, accentColor, true).then((map) => {
+    initMap(el, lat, lng, accentColor).then((map) => {
       if (disposed) {
         map.remove();
         return;
@@ -108,9 +173,9 @@ export default function VenueMap({ lat, lng, label, address, accentColor = '#BE1
 
   return (
     <>
-      {/* Preview card — a real, visible map picture */}
-      <div className="relative overflow-hidden rounded-2xl border-0 shadow-sm">
-        <div ref={previewRef} className="h-56 w-full sm:h-64" />
+      {/* Preview card — an always-visible map picture */}
+      <div className="relative h-52 overflow-hidden rounded-2xl shadow-sm sm:h-64">
+        <StaticMapPreview lat={lat} lng={lng} accentColor={accentColor} />
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -174,24 +239,34 @@ export default function VenueMap({ lat, lng, label, address, accentColor = '#BE1
               <div ref={modalMapRef} className="h-[45vh] min-h-64 w-full" />
 
               {/* Actions */}
-              <div className="flex gap-3 border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <a
                   href={directionsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
                   style={{ backgroundColor: primaryColor }}
                 >
                   <Navigation size={16} /> Get Directions
                 </a>
-                <a
-                  href={viewMapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
-                >
-                  <MapPin size={16} style={{ color: accentColor }} /> Open in Maps
-                </a>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <a
+                    href={wazeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[#0a9de0]/10 px-4 py-3 text-sm font-bold text-[#0a7dcc] transition-colors hover:bg-[#0a9de0]/20"
+                  >
+                    <Navigation size={16} /> Waze
+                  </a>
+                  <a
+                    href={viewMapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    <MapPin size={16} style={{ color: accentColor }} /> Google Maps
+                  </a>
+                </div>
               </div>
             </motion.div>
           </motion.div>
