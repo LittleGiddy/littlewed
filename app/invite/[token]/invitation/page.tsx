@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getGuestFromToken } from '@/lib/inviteGuest'
 import { resolveGuestPageTheme, themeCss, fontImports, GUEST_NAME_SCRIPT_FONT, initialOf } from '@/lib/inviteTheme'
-import { getVenueLocation, buildDirectionsUrl, buildWazeUrl } from '@/lib/maps'
+import { getVenueLocation, buildDirectionsUrl, googleMapsEmbedUrl } from '@/lib/maps'
 import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
@@ -37,6 +37,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const { primaryColor, secondaryColor, accentColor } = theme
 
   const venueLocation = await getVenueLocation(theme.mapUrl)
+  const venueEmbedUrl = await googleMapsEmbedUrl(theme.mapUrl)
 
   const wishes = await prisma.guestWish.findMany({
     where: { eventId: event.id },
@@ -345,41 +346,32 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               <span className="text-[11px] font-bold uppercase tracking-[3px] text-gray-500">{theme.mapLabel}</span>
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
-            {venueLocation ? (
+            {venueEmbedUrl ? (
               <VenueMap
-                lat={venueLocation.lat}
-                lng={venueLocation.lng}
-                label={venueLocation.label || event.venue || undefined}
+                embedUrl={venueEmbedUrl}
+                lat={venueLocation?.lat}
+                lng={venueLocation?.lng}
+                label={venueLocation?.label || event.venue || undefined}
                 address={event.address || undefined}
                 accentColor={accentColor}
                 primaryColor={primaryColor}
               />
             ) : (
-              <div className="rounded-2xl border border-gray-100 bg-white px-6 py-8 text-center shadow-sm">
+              <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-200 px-6 py-8 text-center shadow-sm">
                 <svg className="mx-auto h-8 w-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ color: primaryColor }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
                 <p className="text-sm font-medium text-gray-700 mb-4">{event.venue}</p>
-                <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
-                  <a
-                    href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
-                    style={{ backgroundColor: primaryColor }}
-                  >
-                    Directions in Google Maps &#8599;
-                  </a>
-                  <a
-                    href={buildWazeUrl([event.venue, event.address].filter(Boolean).join(', '))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#0a9de0]/40 bg-[#0a9de0]/10 px-5 py-2 text-sm font-bold text-[#0a7dcc] hover:bg-[#0a9de0]/20"
-                  >
-                    Navigate with Waze
-                  </a>
-                </div>
+                <a
+                  href={buildDirectionsUrl([event.venue, event.address].filter(Boolean).join(', '))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-sm font-bold text-white"
+                  style={{ backgroundColor: primaryColor }}
+                >
+                  Navigate to the venue &#8599;
+                </a>
               </div>
             )}
           </div>

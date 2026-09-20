@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             bottom: 'max(1rem, env(safe-area-inset-bottom))',
           }}
           toastOptions={{
-            duration: 3200,
+            duration: 3000,
             style: {
               background: 'transparent',
               boxShadow: 'none',
@@ -49,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               margin: 0,
               maxWidth: '100%',
             },
-            success: { duration: 2200 },
+            success: { duration: 3000 },
             error: { duration: 4200 },
           }}
         />

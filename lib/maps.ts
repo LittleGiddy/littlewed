@@ -161,14 +161,6 @@ export function buildMapsUrl(venue: VenueLocation | { lat: number; lng: number }
   return `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`;
 }
 
-/** Hands off to Waze for turn-by-turn navigation to the venue. */
-export function buildWazeUrl(venue: VenueLocation | { lat: number; lng: number } | string): string {
-  if (typeof venue === 'string') {
-    return `https://waze.com/ul?q=${encodeURIComponent(venue)}&navigate=yes`;
-  }
-  return `https://waze.com/ul?ll=${venue.lat},${venue.lng}&navigate=yes`;
-}
-
 /** Convert a real Google Maps URL into an iframe-friendly embed URL. */
 export function buildGoogleMapsEmbedUrl(rawUrl: string): string | null {
   let parsed: URL;
