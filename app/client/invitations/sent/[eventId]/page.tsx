@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { RefreshCw, Phone, MessageCircle, CheckCircle2, Lock, Copy, Check } from 'lucide-react';
+import { RefreshCw, Phone, MessageCircle, CheckCircle2, Lock, Copy, Check, Coins } from 'lucide-react';
 import {
   SendGuest,
   SendResult,
@@ -55,6 +55,8 @@ export default function SentInvitationsPage() {
   const [sendingAll, setSendingAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [waUsed, setWaUsed] = useState(0);
+  const [credits, setCredits] = useState<number | null>(null);
+  const RESEND_COST = 1; // extra credits charged per resend for standard tenants
   const [waLimit] = useState(() => {
     if (!id) return 250;
     try {
@@ -79,13 +81,26 @@ export default function SentInvitationsPage() {
     })();
   }, [id]);
 
+  // ─── Load tenant credit balance (for standard resend charging) ──────
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/tenant/billing', { credentials: 'include' });
+        const data = await res.json();
+        if (data?.tenant && typeof data.tenant.credits === 'number') setCredits(data.tenant.credits);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
   const list = useMemo(() => (tab === 'whatsapp' ? whatsappSent : smsSent), [tab, whatsappSent, smsSent]);
 
   async function handleResend(guest: SendGuest, channel: 'whatsapp' | 'sms') {
     setSendingId(guest.id);
     try {
       const route = channel === 'whatsapp' ? '/api/invitations/send-whatsapp' : '/api/invitations/send-sms';
-      const body: Record<string, unknown> = { guestId: guest.id, eventId: id };
+      const body: Record<string, unknown> = { guestId: guest.id, eventId: id, resend: true };
       if (channel === 'sms') body.message = readSmsTemplateDraft(id);
       const res = await fetch(route, {
         method: 'POST',
@@ -95,11 +110,13 @@ export default function SentInvitationsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        if (typeof data.remainingCredits === 'number') setCredits(data.remainingCredits);
         toast.success(`Resent to ${getFullName(guest)} via ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}`, {
           duration: 4500,
         });
         await reload();
       } else {
+        if (typeof data.creditsAvailable === 'number') setCredits(data.creditsAvailable);
         toast.error(data.error || 'Resend failed', { duration: 6000 });
       }
     } catch {
@@ -110,7 +127,15 @@ export default function SentInvitationsPage() {
   }
 
   async function handleResendAll() {
-    if (!bypassPayment || list.length === 0 || sendingAll) return;
+    if (list.length === 0 || sendingAll) return;
+    // Standard tenants need enough extra credits to cover every resend.
+    if (!bypassPayment && credits !== null && credits < list.length * RESEND_COST) {
+      toast.error(
+        `Insufficient credits. Resending ${list.length} guests needs ${list.length * RESEND_COST} credit${list.length * RESEND_COST === 1 ? '' : 's'}, but you have ${credits}. Request more credits from the admin.`,
+        { duration: 6000 }
+      );
+      return;
+    }
     const ids = list.map(g => g.id);
     setSendingAll(true);
     toast.loading(`Resending ${ids.length} ${tab === 'whatsapp' ? 'WhatsApp' : 'SMS'} invitation${ids.length === 1 ? '' : 's'}…`, {
@@ -118,7 +143,7 @@ export default function SentInvitationsPage() {
       duration: Infinity,
     });
     try {
-      const body: Record<string, unknown> = { eventId: id, guestIds: ids, forceChannel: tab };
+      const body: Record<string, unknown> = { eventId: id, guestIds: ids, forceChannel: tab, resend: true };
       if (tab === 'sms') {
         body.smsTemplate = readSmsTemplateDraft(id);
       } else {
@@ -139,10 +164,12 @@ export default function SentInvitationsPage() {
       const data = await res.json();
       toast.dismiss('resend-all-toast');
       if (!res.ok) {
+        if (typeof data.creditsAvailable === 'number') setCredits(data.creditsAvailable);
         toast.error(data.error || 'Resend failed. Please try again.', { duration: 6000 });
         setSendingAll(false);
         return;
       }
+      if (typeof data.remainingCredits === 'number') setCredits(data.remainingCredits);
       if (data.successCount > 0) {
         toast.success(
           `Resent ${data.successCount} ${tab === 'whatsapp' ? 'WhatsApp' : 'SMS'} invitation${data.successCount === 1 ? '' : 's'}`,
@@ -211,9 +238,10 @@ export default function SentInvitationsPage() {
         <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-[#0D4B4B]/10 bg-[#0D4B4B]/[0.03] px-4 py-3">
           <Lock size={15} className="text-[#0D4B4B] flex-shrink-0 mt-0.5" />
           <p className="text-xs text-gray-600 leading-relaxed">
-            <span className="font-semibold text-gray-800">Your plan: one invitation per guest per channel.</span>{' '}
-            Guests who already received a message can&apos;t be re-sent from here. To retry a failed send, go back to
-            the channel&apos;s send screen — only the failed ones are listed there.
+            <span className="font-semibold text-gray-800">Your plan includes one invitation per guest per channel.</span>{' '}
+            Re-sending an already-delivered invitation costs{' '}
+            <span className="font-semibold text-gray-800">{RESEND_COST} extra credit{RESEND_COST === 1 ? '' : 's'} per guest</span>,
+            charged from your credit balance. Guests who never went out stay free to retry from the channel&apos;s send screen.
           </p>
         </div>
       )}
@@ -240,15 +268,20 @@ export default function SentInvitationsPage() {
             <Phone size={12} className="text-gray-500" /> SMS · {smsSent.length}
           </button>
         </div>
-        {bypassPayment && list.length > 0 && (
+        {list.length > 0 && (
           <button
             type="button"
             onClick={handleResendAll}
-            disabled={sendingAll}
+            disabled={sendingAll || (!bypassPayment && credits !== null && credits < list.length * RESEND_COST)}
             className="flex-shrink-0 px-3.5 py-2 bg-[#0D4B4B] text-white rounded-xl text-xs font-semibold hover:bg-[#0A3939] transition disabled:opacity-40 flex items-center gap-1.5"
+            title={
+              bypassPayment
+                ? 'Resend all guests on this channel'
+                : `Costs ${list.length * RESEND_COST} credit${list.length * RESEND_COST === 1 ? '' : 's'} from your balance`
+            }
           >
             <RefreshCw size={13} className={sendingAll ? 'animate-spin' : ''} />
-            {sendingAll ? 'Resending…' : 'Resend all'}
+            {sendingAll ? 'Resending…' : `Resend all${!bypassPayment ? ` · ${list.length * RESEND_COST} cr` : ''}`}
           </button>
         )}
       </div>
@@ -286,24 +319,21 @@ export default function SentInvitationsPage() {
                 >
                   {copiedId === guest.id ? <Check size={15} className="text-[#1A7A4A]" /> : <Copy size={15} />}
                 </button>
-                {bypassPayment ? (
-                  <button
-                    type="button"
-                    onClick={() => handleResend(guest, tab)}
-                    disabled={sendingId === guest.id}
-                    className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#0D4B4B] text-white flex items-center justify-center hover:bg-[#0A3939] transition disabled:opacity-40"
-                    title="Resend invitation"
-                  >
-                    <RefreshCw size={15} className={sendingId === guest.id ? 'animate-spin' : ''} />
-                  </button>
-                ) : (
-                  <span
-                    className="flex-shrink-0 w-9 h-9 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center"
-                    title="One invitation per guest per channel on your plan"
-                  >
-                    <Lock size={14} />
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => handleResend(guest, tab)}
+                  disabled={sendingId === guest.id || (!bypassPayment && credits !== null && credits < RESEND_COST)}
+                  className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#0D4B4B] text-white flex items-center justify-center hover:bg-[#0A3939] transition disabled:opacity-40"
+                  title={
+                    bypassPayment
+                      ? 'Resend invitation (unlimited)'
+                      : credits !== null && credits < RESEND_COST
+                        ? `Need ${RESEND_COST} extra credit to resend — balance is ${credits}`
+                        : `Resend invitation (${RESEND_COST} extra credit)`
+                  }
+                >
+                  <RefreshCw size={15} className={sendingId === guest.id ? 'animate-spin' : ''} />
+                </button>
               </div>
               {guest.lastSendStatus === 'FAILED' && (
                 <p className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
@@ -313,7 +343,7 @@ export default function SentInvitationsPage() {
               )}
               {!bypassPayment && (
                 <p className="mt-2 text-[10px] text-gray-400">
-                  Invitation already delivered — resend is locked on your plan to avoid duplicates.
+                  Already delivered — resending costs {RESEND_COST} extra credit{RESEND_COST === 1 ? '' : 's'} from your balance.
                 </p>
               )}
             </div>
@@ -321,11 +351,24 @@ export default function SentInvitationsPage() {
         </div>
       )}
 
-      {bypassPayment && (
+      {bypassPayment ? (
         <div className="mt-5 rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 px-4 py-3">
           <p className="text-[11px] text-gray-600 text-center leading-relaxed">
             You&apos;re on <span className="font-semibold text-[#0D4B4B]">unlimited-resend mode</span>, so you can
-            resend any guest (individually or all at once).{tab === 'whatsapp' ? ` Today: ${waUsed} of ${waLimit} WhatsApp sends used.` : ''}
+            resend any guest for free (individually or all at once).{tab === 'whatsapp' ? ` Today: ${waUsed} of ${waLimit} WhatsApp sends used.` : ''}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl bg-amber-50/70 border border-amber-200 px-4 py-3">
+          <p className="text-[11px] text-gray-700 text-center leading-relaxed flex items-center justify-center gap-1.5 flex-wrap">
+            <Coins size={13} className="text-amber-600" />
+            <span>
+              Resends cost <span className="font-semibold">{RESEND_COST} credit{RESEND_COST === 1 ? '' : 's'} each</span>.
+              Your balance: <span className="font-semibold">{credits ?? '—'}</span> credit{credits === 1 ? '' : 's'}.
+            </span>
+            <Link href="/client/billing" className="text-[#0D4B4B] font-semibold hover:underline ml-0.5">
+              Get more credits →
+            </Link>
           </p>
         </div>
       )}

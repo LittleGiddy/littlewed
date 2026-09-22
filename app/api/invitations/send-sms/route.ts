@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { guestTypeLabel } from '@/lib/guestTypes';
+import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tenantId = (session.user as any).tenantId;
-    const { guestId, eventId, message } = await req.json();
+    const { guestId, eventId, message, resend } = await req.json();
 
     if (!guestId || !eventId) {
       return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
@@ -43,12 +44,26 @@ export async function POST(req: NextRequest) {
 
     // ─── Once-per-channel guard (non-bypassed tenants) ───────────────────
     // Failed attempts never set smsSentAt, so failed invites can always be
-    // retried. Bypassed tenants may resend freely.
+    // retried. Bypassed tenants may resend freely. Standard tenants may
+    // resend an already-delivered invitation only via `resend: true`, which
+    // checks and consumes extra credits below.
     const isBypassed = guest.event?.tenant?.bypassPayment === true;
-    if (!isBypassed && guest.smsSentAt) {
+    const isResend = resend === true;
+    if (!isBypassed && guest.smsSentAt && !isResend) {
       return NextResponse.json({
         error: 'This guest has already received their SMS invitation (one invitation per guest per channel on your plan).',
       }, { status: 400 });
+    }
+
+    // ─── Extra-credit check for resends (standard tenants only) ──────────
+    // Bypassed tenants resend for free and skip every check.
+    let resendCreditInfo: ResendCreditCheck | undefined;
+    if (!isBypassed && isResend && guest.smsSentAt) {
+      const check = await checkAndChargeResendCredits(tenantId, eventId, 'sms', 1);
+      if (!check.allowed) {
+        return NextResponse.json(check, { status: 400 });
+      }
+      resendCreditInfo = check;
     }
 
     // ─── Build guest full name ──────────────────────────────────────────
@@ -143,6 +158,7 @@ Ahsante.`;
         message: 'SMS sent successfully!',
         data: result.data,
         messageId: result.messageId,
+        remainingCredits: resendCreditInfo?.creditsAvailable,
       });
     } else {
       // ─── Log the failure ──────────────────────────────────────────────

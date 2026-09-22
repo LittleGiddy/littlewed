@@ -17,6 +17,10 @@ import ModernColorPicker from '@/app/components/ModernColorPicker';
 const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
+// Photoshop-style neutral gutter (px) shown all around the card on the stage
+// so the uploaded card/image never swallows the whole canvas area.
+const STAGE_GUTTER = 30;
+
 // ─── Generate unique IDs ────────────────────────────────────────────────
 const generateId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -126,41 +130,55 @@ export default function InvitationDesigner() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasScale, setCanvasScale] = useState(0.5);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 600 });
+  const fitScaleRef = useRef(0.5);
+
+  // Fit the card into the panel with a Photoshop-style gutter around it, so
+  // the uploaded card/image floats on the neutral stage instead of filling
+  // every pixel of the canvas area.
+  const computeCanvasSize = useCallback(() => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    if (containerWidth <= 0) return;
+
+    const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
+    const maxHeight = window.innerHeight * 0.65;
+
+    let stageWidth = containerWidth;
+    let stageHeight = stageWidth * aspectRatio;
+    if (stageHeight > maxHeight) {
+      stageHeight = maxHeight;
+      stageWidth = stageHeight / aspectRatio;
+    }
+
+    const scale = Math.min(
+      (stageWidth - STAGE_GUTTER * 2) / DESIGNER_WIDTH,
+      (stageHeight - STAGE_GUTTER * 2) / DESIGNER_HEIGHT,
+      0.8
+    );
+    const clamped = Math.max(0.12, scale);
+    fitScaleRef.current = clamped;
+    setContainerSize({ width: stageWidth, height: stageHeight });
+    setCanvasScale(clamped);
+  }, []);
 
   useEffect(() => {
     const container = canvasContainerRef.current;
     if (!container) return;
 
-    const computeSize = () => {
-      const containerWidth = container.clientWidth;
-      if (containerWidth <= 0) return;
-      
-      const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
-      const maxHeight = window.innerHeight * 0.65;
-      const maxWidth = containerWidth;
-      
-      let finalWidth = maxWidth;
-      let finalHeight = finalWidth * aspectRatio;
-      
-      if (finalHeight > maxHeight) {
-        finalHeight = maxHeight;
-        finalWidth = finalHeight / aspectRatio;
-      }
-      
-      const scale = Math.min(finalWidth / DESIGNER_WIDTH, finalHeight / DESIGNER_HEIGHT, 0.8);
-      
-      setContainerSize({ width: finalWidth, height: finalHeight });
-      setCanvasScale(scale);
-    };
-
-    computeSize();
-    const ro = new ResizeObserver(computeSize);
+    computeCanvasSize();
+    const ro = new ResizeObserver(computeCanvasSize);
     ro.observe(container);
-    window.addEventListener('resize', computeSize);
+    window.addEventListener('resize', computeCanvasSize);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', computeSize);
+      window.removeEventListener('resize', computeCanvasSize);
     };
+  }, [computeCanvasSize]);
+
+  // ─── Photoshop-style zoom control ───────────────────────────────────
+  const zoomBy = useCallback((factor: number) => {
+    setCanvasScale(prev => Math.min(1.6, Math.max(0.12, Math.round(prev * factor * 100) / 100)));
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1083,11 +1101,13 @@ export default function InvitationDesigner() {
 
             <div 
               ref={canvasContainerRef}
-              className="mx-auto bg-gray-100 rounded-xl overflow-hidden relative"
+              className="mx-auto bg-[#E7E9EB] rounded-xl overflow-hidden relative shadow-inner"
               style={{ 
                 width: containerSize.width || '100%',
                 height: containerSize.height || 500,
                 maxWidth: '100%',
+                backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(0,0,0,0.07) 1px, transparent 1px)',
+                backgroundSize: '18px 18px',
               }}
               onMouseUp={endCanvas}
               onMouseLeave={endCanvas}
@@ -1098,12 +1118,14 @@ export default function InvitationDesigner() {
             >
               <div
                 ref={canvasRef}
-                className="absolute top-1/2 left-1/2 origin-center"
+                className="absolute top-1/2 left-1/2 origin-center bg-white"
                 style={{
                   width: DESIGNER_WIDTH,
                   height: DESIGNER_HEIGHT,
                   transform: `translate(-50%, -50%) scale(${canvasScale})`,
                   transformOrigin: 'center center',
+                  boxShadow: '0 18px 45px rgba(13,75,75,0.2), 0 2px 8px rgba(0,0,0,0.12)',
+                  border: '1px solid rgba(0,0,0,0.18)',
                 }}
               >
                 {templateUrl ? (
@@ -1170,11 +1192,39 @@ export default function InvitationDesigner() {
               </div>
             </div>
 
-            <p className="text-[10px] sm:text-xs text-gray-400 text-center mt-2 sm:mt-3 flex items-center justify-center gap-2">
-              <span>Click a layer to edit</span>
-              <span className="w-px h-3 bg-gray-300"></span>
-              <span><kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[8px]">↑↓←→</kbd> to nudge</span>
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-2">
+                <span>Click a layer to edit</span>
+                <span className="hidden sm:inline w-px h-3 bg-gray-300"></span>
+                <span className="hidden sm:inline"><kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-[8px]">↑↓←→</kbd> to nudge</span>
+              </p>
+              <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1 / 1.15)}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-200 hover:text-[#0D4B4B] transition"
+                  title="Zoom out"
+                >
+                  <Minus size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={computeCanvasSize}
+                  className="w-11 h-7 rounded-md text-[10px] font-semibold tabular-nums text-gray-600 hover:bg-gray-200 hover:text-[#0D4B4B] transition"
+                  title="Reset to fit"
+                >
+                  {Math.round(canvasScale * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1.15)}
+                  className="w-7 h-7 rounded-md flex items-center justify-center text-gray-600 hover:bg-gray-200 hover:text-[#0D4B4B] transition"
+                  title="Zoom in"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

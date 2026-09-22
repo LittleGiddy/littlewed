@@ -9,6 +9,7 @@ import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
 import { logSystemEvent } from '@/lib/systemLog';
 import { guestTypeLabel } from '@/lib/guestTypes';
+import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credits';
 
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       dailyLimit,
       eventType,
       forceChannel,
+      resend,
     } = await req.json();
 
     if (!eventId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
@@ -87,6 +89,36 @@ export async function POST(req: NextRequest) {
         })
       : 0;
     const waLimitReached = () => limit !== null && waUsed >= limit;
+
+    // ─── Extra-credit charge for "Resend all" (standard tenants only) ────
+    // With `resend: true` every guest that already received the invitation on
+    // the requested channel is re-delivered, and each re-delivery costs one
+    // credit. Bypassed tenants resend for free. The charge is computed and
+    // reserved up-front, matching the send-reminders behaviour.
+    const resendAll = resend === true;
+    const resendableCount = resendAll
+      ? guests.filter((guest) => {
+          if (guest.event?.tenant?.bypassPayment === true) return false;
+          const chan =
+            forceChannel === 'whatsapp' || forceChannel === 'sms'
+              ? forceChannel
+              : guest.routingChannel;
+          return chan === 'whatsapp' ? !!guest.whatsappSentAt : !!guest.smsSentAt;
+        }).length
+      : 0;
+    let resendCreditInfo: ResendCreditCheck | undefined;
+    if (resendableCount > 0) {
+      const check = await checkAndChargeResendCredits(
+        tenantId,
+        eventId,
+        (forceChannel === 'whatsapp' ? 'whatsapp' : 'sms') as 'whatsapp' | 'sms',
+        resendableCount
+      );
+      if (!check.allowed) {
+        return NextResponse.json(check, { status: 400 });
+      }
+      resendCreditInfo = check;
+    }
 
     // ─── Process in batches ────────────────────────────────────────────
     // Cache generated card URLs per card group within this request, so both
@@ -182,11 +214,13 @@ export async function POST(req: NextRequest) {
           // receive at most one successful invitation per channel. This stops
           // duplicate sends (and wasted spend). Failed attempts never set the
           // per-channel timestamp, so failed invitations remain retryable.
-          // Bypassed tenants keep the unlimited "free" resend behaviour.
+          // Bypassed tenants keep the unlimited "free" resend behaviour, and
+          // `resend: true` explicitly re-delivers already-sent guests (paid
+          // with extra credits for standard tenants).
           const isBypassed = guest.event?.tenant?.bypassPayment === true;
           const alreadyOnChannel =
             channel === 'whatsapp' ? !!guest.whatsappSentAt : !!guest.smsSentAt;
-          if (!isBypassed && alreadyOnChannel) {
+          if (!isBypassed && alreadyOnChannel && !resendAll) {
             alreadySentCount++;
             results.push({
               guestId: guest.id,
@@ -550,6 +584,9 @@ export async function POST(req: NextRequest) {
       waLimit: limit,
       waUsed: waUsed,
       waLimitReached: waLimitReached(),
+      resendAll: resendAll,
+      creditsCharged: resendCreditInfo?.creditsNeeded ?? 0,
+      remainingCredits: resendCreditInfo?.creditsAvailable,
       results,
     });
 

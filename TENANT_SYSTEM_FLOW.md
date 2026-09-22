@@ -80,10 +80,11 @@ Event lifecycle — automated sweep (`lib/jobs/check-events.ts`, cron)
 | Import guests | **1 credit each** (deducted for `result.count`) | `app/api/guests/import/route.ts` |
 | Send reminder SMS | First reminder per guest **free**; each subsequent reminder **50 credits** | `app/api/events/[eventId]/send-reminders/route.ts` |
 | Send thank-you card | **300 credits** per WhatsApp guest | `app/api/events/[eventId]/thanks-card/send/route.ts` |
-| Send invitations (batch / single) | **FREE — no credit check** | §4 |
+| Send invitations (first time) | **FREE — no credit check** | §4 |
+| **Resend an already-delivered invitation** | **1 credit per guest** (per channel), standard tenants only; bypassed = free | `app/api/invitations/send-batch/route.ts`, `app/api/invitations/send-sms/route.ts`, `app/api/invitations/send-whatsapp/route.ts`, `lib/credits.ts` |
 | Event check-in | Free | `app/api/check-in/route.ts` |
 
-All deductions are skipped when `bypassPayment` and are always blocked when `creditsEnabled === false`. Every deduction writes a `UsageRecord` (`channel`, `cost`) so the ledger is auditable — except invitation sends and check-in, which never create usage records.
+All deductions are skipped when `bypassPayment` and are always blocked when `creditsEnabled === false`. Every deduction writes a `UsageRecord` (`channel`, `cost`) so the ledger is auditable — except first-time invitation sends and check-in, which never create usage records (paid invitation **resends** do write `{whatsapp|sms}_resend` records).
 
 Insufficient-balance behavior: guest add/import, reminders (2nd+), and thank-you cards return a `400` with `needsCredits` / `creditsDisabled` / available balance — the request is rejected before sending.
 
@@ -105,7 +106,7 @@ Insufficient-balance behavior: guest add/import, reminders (2nd+), and thank-you
 | `app/api/invitations/send-whatsapp/route.ts` | WhatsApp | CLIENT | Requires `routingChannel === 'whatsapp'`. **No credit check.** |
 | `app/api/invitations/broadcast/route.ts` | SMS | CLIENT, SUPER_ADMIN | Custom message to selected guests, 300ms delay, appends `(Card: NNNNN)`. `type: 'thanks'` sets `thanksSentAt`. **No credit check, no usage record.** |
 
-**Finding:** sending invitations is **not billed** in credits at the route level. If "1 credit per invitation" is intended, it is not implemented — only guest-creation is charged. Optionally also note the dedicated thanks-card route should be used for thank-you sends; `broadcast` with `type: 'thanks'` bypasses the WhatsApp-only and 300-credit logic entirely.
+**Resends:** first-time invitation sends are free, but **re-delivering an already-delivered invitation costs 1 credit per guest** for standard tenants (`RESEND_COST_PER_INVITATION` in `lib/credits.ts`). The `send-sms` / `send-whatsapp` / `send-batch` routes accept `resend: true`, which skips the once-per-channel guard and calls `checkAndChargeResendCredits(...)` (deducts credits, writes a `{channel}_resend` UsageRecord) before sending. Bypassed tenants resend for free and skip every check. Failed first-time attempts remain free to retry (the per-channel timestamp is only set on success).
 
 ### 4.2 Reminders — SMS (`app/api/events/[eventId]/send-reminders/route.ts`)
 
@@ -138,7 +139,7 @@ Insufficient-balance behavior: guest add/import, reminders (2nd+), and thank-you
 ## 5. Audit findings (controls that may not be "properly configured")
 
 1. **`maxGuests` (default 200) is not enforced.** Guest add and import both state "credits are now the only limit" — a tenant can add/import as many guests as credits allow. `maxGuests` is only set at signup (200), editable in admin settings, and used to scale report charts — never as a hard cap on guest add/import. The UI "limit" bar in the event page is `event.guestCount` (the count declared when the event was created), not `tenant.maxGuests` (`app/api/events/[eventId]/guests/count/route.ts`).
-2. **Invitation sends are free.** `send-batch`, `send-sms`, `send-whatsapp`, and `broadcast` perform no credit check and write no `UsageRecord`. Only guest-creation consumes credits in the "invite" flow.
+2. **First-time invitation sends are free.** `send-batch`, `send-sms`, `send-whatsapp`, and `broadcast` perform no credit check and write no `UsageRecord` for a guest's **first** delivery. Only guest-creation and invitation **resends** (1 credit per re-delivered guest) consume credits in the invite flow.
 3. **Credit pricing mismatch:** ClickPesa self-purchase = **300 TZS/credit** (`events/prepare/route.ts`) vs credit-request pricing = **500 TZS/credit** (`credits/request/route.ts`, `CreditRequest.amountTZS`).
 4. **`subscriptionStatus` does not gate anything.** It is set to `active` at signup/subscribe/admin-status but no client API route checks it before allowing events/credits/sends. The only real kill-switches are `creditsEnabled` (and per-route `bypassPayment`).
 5. **`testMode` / `simpleEventMode` are inert** with respect to these flows (used only as stored flags).
@@ -154,7 +155,8 @@ Insufficient-balance behavior: guest add/import, reminders (2nd+), and thank-you
 | Create event | CLIENT | no (free) | no | no |
 | Add guest | CLIENT | yes (≥1) | 1 | yes |
 | Import guests | CLIENT | yes (≥ count) | 1 each | yes |
-| Send invitation (batch/sms/whatsapp/broadcast) | CLIENT/(+) | **no** | no | no |
+| Send invitation (first time: batch/sms/whatsapp/broadcast) | CLIENT/(+) | **no** | no | no |
+| Resend invitation (`resend: true`, already delivered) | CLIENT | yes | 1/guest | yes |
 | Send reminder SMS | CLIENT | yes (after free-first) | 50/guest (2nd+) | yes |
 | Send thank-you card | CLIENT | yes | 300/guest | yes |
 | Check-in | STAFF/CLIENT | no | no | no |

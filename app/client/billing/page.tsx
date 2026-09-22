@@ -32,8 +32,20 @@ export default function BillingPage() {
   useEffect(() => { loadData(); }, []);
 
   const totalSpent = usage.reduce((sum: number, u: any) => sum + (u.cost || 0), 0);
-  const whatsappCount = usage.filter((u: any) => u.channel === 'whatsapp').length;
-  const smsCount = usage.filter((u: any) => u.channel === 'sms').length;
+  // Channel stats count both first-time sends and paid resends (`*_resend`).
+  const whatsappCount = usage.filter((u: any) => (u.channel || '').startsWith('whatsapp')).length;
+  const smsCount = usage.filter((u: any) => (u.channel || '').startsWith('sms')).length;
+
+  // Present the raw DB channel value (e.g. `whatsapp_resend`, `guest_refund`)
+  // as a human label: base channel + a suffix tag for the non-original types.
+  const channelLabel = (channel: string) => {
+    const isResend = channel.endsWith('_resend');
+    const base = channel.replace('_resend', '');
+    if (base === 'whatsapp') return { text: isResend ? 'WhatsApp resend' : 'WhatsApp', isWhatsApp: true };
+    if (base === 'sms') return { text: isResend ? 'SMS resend' : 'SMS', isWhatsApp: false };
+    if (channel === 'guest_refund') return { text: 'Credit refund', isWhatsApp: false };
+    return { text: channel || '—', isWhatsApp: false };
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 animate-[fadeUp_0.5s_cubic-bezier(0.16,1,0.3,1)_both]">
@@ -190,16 +202,19 @@ export default function BillingPage() {
                       </td>
                       <td className="px-3.5 py-3 font-bold text-gray-800">{u.event?.name || '-'}</td>
                       <td className="px-3.5 py-3">
-                        <span className={`inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-[3px] rounded-full ${
-                          u.channel === 'whatsapp'
-                            ? 'text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10'
-                            : 'text-amber-600 bg-amber-50 border border-amber-100'
-                        }`}>
-                          {u.channel === 'whatsapp'
-                            ? <><MessageCircle size={11} /> WhatsApp</>
-                            : <><Phone size={11} /> SMS</>
-                          }
-                        </span>
+                        {(() => {
+                          const label = channelLabel(u.channel || '');
+                          return (
+                            <span className={`inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-[3px] rounded-full ${
+                              label.isWhatsApp
+                                ? 'text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10'
+                                : 'text-amber-600 bg-amber-50 border border-amber-100'
+                            }`}>
+                              {label.isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
+                              {label.text}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-3.5 py-3 text-right font-bold text-gray-800">{(u.cost || 0).toLocaleString()}</td>
                     </tr>
