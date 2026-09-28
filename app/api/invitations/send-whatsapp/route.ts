@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     const tenantId = (session.user as any).tenantId;
     const { guestId, eventId, resend } = await req.json();
 
-    if (!guestId || !eventId) {
-      return NextResponse.json({ error: 'Guest ID and Event ID are required' }, { status: 400 });
+    if (!guestId) {
+      return NextResponse.json({ error: 'Guest ID is required' }, { status: 400 });
     }
 
     // ─── Fetch guest with event ──────────────────────────────────────────
@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
     if (!guest.phone) {
       return NextResponse.json({ error: 'Guest has no phone number' }, { status: 400 });
     }
+
+    // The guest is already scoped to the tenant above, so its own event is
+    // authoritative. Never trust a client-supplied eventId for the usage
+    // ledger - it could point at another tenant's event.
+    const resolvedEventId = guest.eventId || eventId;
 
     // ─── Routing guard (relaxed for resends) ─────────────────────────────
     // A guest routed to SMS can still be re-delivered over WhatsApp when the
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest) {
     // Bypassed tenants resend for free and skip every check.
     let resendCreditInfo: ResendCreditCheck | undefined;
     if (!isBypassed && isResend && guest.whatsappSentAt) {
-      const check = await checkAndChargeResendCredits(tenantId, eventId, 'whatsapp', 1);
+      const check = await checkAndChargeResendCredits(tenantId, resolvedEventId, 'whatsapp', 1);
       if (!check.allowed) {
         return NextResponse.json(check, { status: 400 });
       }

@@ -90,15 +90,16 @@ export default function GuestsPage() {
     });
     if (!ok) return;
 
+    const targets = ids.map(id => guests.find(g => g.id === id)).filter((g): g is Guest => !!g);
     setResending(new Set(ids));
     let success = 0;
     let failed = 0;
-    for (const id of ids) {
+    for (const guest of targets) {
       try {
         const res = await fetch('/api/invitations/send-whatsapp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestId: id }),
+          body: JSON.stringify({ guestId: guest.id, eventId: guest.event.id }),
           credentials: 'include',
         });
         if (res.ok) success++;
@@ -150,15 +151,15 @@ export default function GuestsPage() {
     }
   };
 
-  const resendInvitation = async (guestId: string) => {
+  const resendInvitation = async (guest: Guest) => {
     const ok = await confirmToast({ title: 'Resend invitation to this guest?', confirmText: 'Resend' });
     if (!ok) return;
-    setResending(new Set([guestId]));
+    setResending(new Set([guest.id]));
     try {
       const res = await fetch('/api/invitations/send-whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestId }),
+        body: JSON.stringify({ guestId: guest.id, eventId: guest.event.id }),
         credentials: 'include',
       });
       if (res.ok) {
@@ -320,7 +321,7 @@ export default function GuestsPage() {
           <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between gap-2">
             <button
               className="action-btn flex-1 sm:flex-none"
-              onClick={() => resendInvitation(guest.id)}
+              onClick={() => resendInvitation(guest)}
               disabled={isResending(guest.id)}
             >
               {isResending(guest.id) ? 'Sending...' : (guest.invitationSentAt ? 'Resend Invitation' : 'Send Invitation')}
@@ -425,7 +426,7 @@ export default function GuestsPage() {
               <button onClick={() => deleteGuest(guest.id)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50" title="Delete guest"><Trash2 size={15} /></button>
               <button
                 className="inv-resend-btn ml-1.5"
-                onClick={() => resendInvitation(guest.id)}
+                onClick={() => resendInvitation(guest)}
                 disabled={isResending(guest.id)}
               >
                 {isResending(guest.id) ? 'Sending...' : (guest.invitationSentAt ? 'Resend' : 'Send Now')}
