@@ -22,7 +22,7 @@ Configurable per tenant by the admin; these shape every limit below.
 | `maxGuests` | `200` | ⚠️ **Not enforced** — set/edited only (see §5 finding 1). |
 | `subscriptionStatus` | `inactive` | Set `active` on signup / subscribe / admin status. ⚠️ Not read by any credit-funded API route. |
 | `testMode` / `simpleEventMode` | `false` | Stored, not used to gate any of the flows below. |
-| `whatsappTemplate` / `whatsappAccount` | `event_invitation` / `TANZANIATIP` | WhatsApp invitation template config. |
+| `whatsappTemplate` / `whatsappAccount` | `event_invitation` / `LittleWed by Mahiri` | WhatsApp invitation template config. `whatsappAccount` is the NexSMS account name; an invalid value makes the provider reject sends with HTTP 422, so send routes now surface it instead of silently falling back to SMS. |
 
 Sources: `prisma/schema.prisma`, `app/api/admin/tenants/[id]/settings/route.ts`, `lib/credits.ts`.
 

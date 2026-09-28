@@ -34,6 +34,10 @@ export interface SendResult {
   reason?: string;
   error?: string;
   channel?: string;
+  /** Channel that was asked for - differs from `channel` after an SMS fallback. */
+  requestedChannel?: string;
+  /** Why the WhatsApp send failed when the invitation fell back to SMS. */
+  whatsappError?: string;
 }
 
 // ─── SMS: exactly 3 per-guest variables (Guest Name, Card No, Card Type) ─

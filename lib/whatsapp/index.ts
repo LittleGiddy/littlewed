@@ -1,12 +1,19 @@
 // lib/whatsapp/index.ts
 
 const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN!;
-const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT! || 'LittleWed by Mahiri Global Limited';
+const DEFAULT_NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT || '';
 const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
 
 export interface SendWhatsAppTemplateOptions {
   to: string | string[];
   template: string;
+  /**
+   * NexSMS `account` - the name of the WhatsApp Business account the template
+   * is registered under. This is per-tenant (Tenant.whatsappAccount); the env
+   * var is only a last-resort fallback. The provider rejects the whole request
+   * with HTTP 422 "Account name does not exist or not active" when it is wrong.
+   */
+  account?: string;
   personalisation?: Record<string, string>[];
   header?: {
     image?: { file: string; name?: string };
@@ -31,6 +38,7 @@ export interface SendWhatsAppResult {
 export async function sendWhatsAppTemplate({
   to,
   template,
+  account,
   personalisation,
   header,
   button,
@@ -39,12 +47,23 @@ export async function sendWhatsAppTemplate({
     return { success: false, error: 'NEXTSMS_TOKEN is not set' };
   }
 
+  // Prefer the caller's (tenant's) account, then the env fallback. Never send an
+  // empty account: the provider answers 422 and every send silently fails.
+  const nexSmsAccount = account?.trim() || DEFAULT_NEXTSMS_ACCOUNT;
+  if (!nexSmsAccount) {
+    return {
+      success: false,
+      error:
+        'WhatsApp account is not configured. Set the tenant WhatsApp account (admin → tenant settings) or NEXTSMS_ACCOUNT.',
+    };
+  }
+
   const toArray = Array.isArray(to) ? to : [to];
   const cleanTo = toArray.map(phone => parseInt(phone.replace(/^\+/, '').replace(/\D/g, '')));
 
   const body: any = {
     to: cleanTo,
-    account: NEXTSMS_ACCOUNT,
+    account: nexSmsAccount,
     template: template,
   };
 
@@ -62,7 +81,7 @@ export async function sendWhatsAppTemplate({
 
   console.log('[WhatsApp] ====== SENDING MESSAGE ======');
   console.log('[WhatsApp] Template:', template);
-  console.log('[WhatsApp] Account:', NEXTSMS_ACCOUNT);
+  console.log('[WhatsApp] Account:', nexSmsAccount);
   console.log('[WhatsApp] To:', cleanTo);
   console.log('[WhatsApp] Payload:', JSON.stringify(body, null, 2));
 
@@ -77,29 +96,53 @@ export async function sendWhatsAppTemplate({
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    // ─── Guard against non-JSON bodies (proxy/gateway HTML error pages) ────
+    // A thrown JSON parse error would be reported as a generic network error
+    // and silently trigger the SMS fallback, hiding the real cause.
+    const contentType = response.headers.get('content-type') || '';
+    const rawBody = await response.text();
+    let data: any = null;
+    if (rawBody.trim() && contentType.includes('json')) {
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        data = null;
+      }
+    }
 
     console.log('[WhatsApp] Response Status:', response.status);
-    console.log('[WhatsApp] Response Data:', JSON.stringify(data, null, 2));
+    console.log('[WhatsApp] Response Data:', rawBody.substring(0, 2000));
 
     if (!response.ok) {
-      let errorMsg = data.message || data.error || `HTTP ${response.status}`;
-      
-      if (response.status === 400) {
-        console.error('[WhatsApp] ❌ Bad Request - Check template name and variables');
-        console.error('[WhatsApp] Template:', template);
-        console.error('[WhatsApp] Variables:', JSON.stringify(personalisation, null, 2));
-        
-        if (data.errors) {
-          console.error('[WhatsApp] Error Details:', JSON.stringify(data.errors, null, 2));
-          if (Array.isArray(data.errors)) {
-            errorMsg = data.errors.map((e: any) => e.message || e).join(', ');
-          } else if (typeof data.errors === 'object') {
-            errorMsg = JSON.stringify(data.errors);
-          } else {
-            errorMsg = String(data.errors);
+      let errorMsg = data?.message || data?.error || `HTTP ${response.status}`;
+
+      // The provider returns per-field errors, e.g.
+      //   { errors: { account: ["Account name does not exist or not active"],
+      //               template: ["Template name does not exist ..."] } }
+      // on HTTP 422. Flatten them so the actionable reason is never lost.
+      const fieldErrors: string[] = [];
+      if (data?.errors) {
+        if (Array.isArray(data.errors)) {
+          fieldErrors.push(data.errors.map((e: any) => e.message || e).join(', '));
+        } else if (typeof data.errors === 'object') {
+          for (const [field, msgs] of Object.entries(data.errors as Record<string, unknown>)) {
+            fieldErrors.push(`${field}: ${Array.isArray(msgs) ? msgs.join(' ') : String(msgs)}`);
           }
+        } else {
+          fieldErrors.push(String(data.errors));
         }
+      }
+      if (fieldErrors.length > 0) {
+        errorMsg = fieldErrors.join(' | ');
+      }
+
+      if (response.status === 400 || response.status === 422) {
+        console.error(
+          `[WhatsApp] ❌ Template/account rejected (HTTP ${response.status}) - account="${nexSmsAccount}" template="${template}"`
+        );
+        // Name the account and template in the surfaced error: a wrong
+        // `account` is the single most common cause and must be visible.
+        errorMsg = `WhatsApp rejected the send (HTTP ${response.status}) - ${errorMsg} [account="${nexSmsAccount}", template="${template}"]`;
       } else if (response.status === 401) {
         console.error('[WhatsApp] ❌ Authentication failed - Check NEXTSMS_TOKEN');
         errorMsg = 'Authentication failed. Please check your API token.';
@@ -110,15 +153,29 @@ export async function sendWhatsAppTemplate({
         console.error('[WhatsApp] ❌ Forbidden - Template might not be approved');
         errorMsg = 'Template not approved or account restricted.';
       }
-      
+
+      if (!rawBody.trim()) {
+        errorMsg = `WhatsApp send failed with an empty response body (HTTP ${response.status}) [account="${nexSmsAccount}"]`;
+      }
+
       return { success: false, error: errorMsg, data };
     }
 
+    if (!data) {
+      return {
+        success: false,
+        error: `WhatsApp send returned a non-JSON response (HTTP ${response.status}) [account="${nexSmsAccount}"]`,
+        data: { text: rawBody.substring(0, 500) },
+      };
+    }
+
     console.log('[WhatsApp] ✅ Message accepted by NexSMS');
-    
+
     const messageId = data.messages?.[0]?.messageId || data.data?.messageId || data.messageId || data.id;
 
-    return { success: true, messageId: String(messageId), data };
+    // Never hand back the string "undefined" - callers use a falsy messageId to
+    // synthesise a local id, and "undefined" would create unmatchable logs.
+    return { success: true, messageId: messageId ? String(messageId) : undefined, data };
   } catch (error: any) {
     console.error('[WhatsApp] ❌ Error sending template:', error.message);
     return { success: false, error: error.message || 'Unknown error' };
@@ -144,6 +201,7 @@ export async function sendWeddingInvitation(
     templateName?: string; // e.g. 'Mwalikotemp' | 'Mwalikosecond' | 'MwalikoForth'
     contact?: string;     // {var10} for Mwalikosecond, {var11} for MwalikoForth
     eventType?: string;   // {var3} event type for MwalikoForth (e.g. 'harusi')
+    account?: string;     // tenant's NexSMS account name
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION ======');
@@ -226,6 +284,7 @@ export async function sendWeddingInvitation(
   return sendWhatsAppTemplate({
     to: phone,
     template: templateName,
+    account: data.account,
     personalisation: [personalisation],
     header,
     button,
@@ -254,6 +313,7 @@ export async function sendWeddingInvitationPlus(
     contact2: string;      // {var12} second contact
     imageUrl?: string;
     inviteLink?: string;
+    account?: string;
   }
 ): Promise<SendWhatsAppResult> {
   console.log('[WhatsApp] ====== SENDING WEDDING INVITATION (PLUS) ======');
@@ -302,6 +362,7 @@ export async function sendWeddingInvitationPlus(
   return sendWhatsAppTemplate({
     to: phone,
     template: 'Mwaliko Sixth',
+    account: data.account,
     personalisation: [personalisation],
     header,
     button,

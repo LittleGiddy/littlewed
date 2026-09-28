@@ -3,7 +3,11 @@
 // ─── NexSMS Configuration ──────────────────────────────────────────────
 const NEXTSMS_API_URL = 'https://messaging-service.co.tz/api/whatsapp/v2/text/single';
 const NEXTSMS_TOKEN = process.env.NEXTSMS_TOKEN;
-const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT || 'TANZANIATIP';
+// No hardcoded account fallback: a wrong account name makes the provider reject
+// every send with HTTP 422, which previously failed silently. Callers pass the
+// tenant's account, then we fall back to the env value, and error if neither
+// is configured.
+const NEXTSMS_ACCOUNT = process.env.NEXTSMS_ACCOUNT;
 const isMock = process.env.MOCK_SMS === 'true';
 
 export interface SendMessageParams {
@@ -14,6 +18,7 @@ export interface SendMessageParams {
   templateParams?: string[];
   imageUrl?: string;
   buttonUrl?: string;
+  account?: string; // tenant's NexSMS account name
 }
 
 // ─── Helper: Send WhatsApp via NexSMS ──────────────────────────────────
@@ -26,12 +31,21 @@ async function sendWhatsAppViaNexSMS(params: {
     document?: { file: string; name?: string };
   };
   button?: { url: string };
+  account?: string;
 }) {
   const { to, template, personalisation, header, button } = params;
 
+  // Prefer the caller's (tenant's) account, then the env fallback.
+  const account = params.account?.trim() || NEXTSMS_ACCOUNT;
+  if (!account) {
+    throw new Error(
+      'WhatsApp account is not configured. Set the tenant WhatsApp account (admin → tenant settings) or NEXTSMS_ACCOUNT.'
+    );
+  }
+
   const body: any = {
     to: [to],
-    account: NEXTSMS_ACCOUNT,
+    account,
     template: template,
   };
 
@@ -57,10 +71,51 @@ async function sendWhatsAppViaNexSMS(params: {
     body: JSON.stringify(body),
   });
 
-  const data = await response.json();
+  // Guard against non-JSON bodies so a proxy/gateway error page is not
+  // reported as a generic parse failure.
+  const contentType = response.headers.get('content-type') || '';
+  const rawBody = await response.text();
+  let data: any = null;
+  if (rawBody.trim() && contentType.includes('json')) {
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = null;
+    }
+  }
 
   if (!response.ok) {
-    throw new Error(data.message || 'Failed to send WhatsApp message');
+    let errorMsg = data?.message || data?.error || `HTTP ${response.status}`;
+
+    // The provider returns per-field errors, e.g.
+    //   { errors: { account: ["Account name does not exist or not active"] } }
+    // on HTTP 422. Flatten them so an invalid account is never lost.
+    const fieldErrors: string[] = [];
+    if (data?.errors) {
+      if (Array.isArray(data.errors)) {
+        fieldErrors.push(data.errors.map((e: any) => e.message || e).join(', '));
+      } else if (typeof data.errors === 'object') {
+        for (const [field, msgs] of Object.entries(data.errors as Record<string, unknown>)) {
+          fieldErrors.push(`${field}: ${Array.isArray(msgs) ? msgs.join(' ') : String(msgs)}`);
+        }
+      } else {
+        fieldErrors.push(String(data.errors));
+      }
+    }
+    if (fieldErrors.length > 0) {
+      errorMsg = fieldErrors.join(' | ');
+    }
+    if (!rawBody.trim()) {
+      errorMsg = `WhatsApp send failed with an empty response body (HTTP ${response.status}) [account="${account}"]`;
+    }
+    // Name the account and template: a wrong `account` is the most common cause.
+    throw new Error(`${errorMsg} [account="${account}", template="${template}"]`);
+  }
+
+  if (!data) {
+    throw new Error(
+      `WhatsApp send returned a non-JSON response (HTTP ${response.status}) [account="${account}"]`
+    );
   }
 
   return data;
@@ -68,7 +123,7 @@ async function sendWhatsAppViaNexSMS(params: {
 
 // ─── Main Send Function ─────────────────────────────────────────────────
 export async function sendWhatsAppMessage(params: SendMessageParams) {
-  const { to, type, text, templateName, templateParams, imageUrl, buttonUrl } = params;
+  const { to, type, text, templateName, templateParams, imageUrl, buttonUrl, account } = params;
 
   if (!to) {
     return { success: false, error: 'Phone number is required' };
@@ -137,6 +192,7 @@ export async function sendWhatsAppMessage(params: SendMessageParams) {
         personalisation,
         header,
         button,
+        account,
       });
 
       return { success: true, data: result };
@@ -170,6 +226,7 @@ export async function sendInvitationTemplate(
   customParams?: {
     imageUrl?: string;
     buttonUrl?: string;
+    account?: string; // tenant's NexSMS account name
   }
 ) {
   if (!guest.phone) {
@@ -216,6 +273,7 @@ export async function sendInvitationTemplate(
     templateParams: params,
     imageUrl: imageUrl,
     buttonUrl: inviteLink,
+    account: customParams?.account,
   });
 }
 

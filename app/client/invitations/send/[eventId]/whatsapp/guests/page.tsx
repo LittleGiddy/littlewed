@@ -141,10 +141,27 @@ export default function WhatsappGuestsPage() {
       const failedResults = (data.results || []).filter(
         (r: SendResult) => !r.success && r.reason !== 'already_sent' && r.reason !== 'limit'
       );
-      if (data.successCount > 0) {
+
+      // Invitations that WhatsApp rejected and that were delivered over SMS
+      // instead. They are NOT WhatsApp deliveries and must never be counted or
+      // announced as such - that is what made a broken WhatsApp setup look
+      // like it was working.
+      const fellBack = (data.results || []).filter(
+        (r: SendResult) => r.success && r.requestedChannel === 'whatsapp' && r.channel === 'sms'
+      );
+      const waSent = (data.successCount || 0) - fellBack.length;
+
+      if (waSent > 0) {
         toast.success(
-          `Sent ${data.successCount} WhatsApp invitation${data.successCount === 1 ? '' : 's'}`,
+          `Sent ${waSent} WhatsApp invitation${waSent === 1 ? '' : 's'}`,
           { duration: 5000 }
+        );
+      }
+      if (fellBack.length > 0) {
+        const reason = (data.whatsappErrors || [])[0]?.error;
+        toast.error(
+          `WhatsApp failed for ${fellBack.length} guest${fellBack.length === 1 ? '' : 's'} — those invitations were sent by SMS instead.${reason ? ` Reason: ${reason}` : ''}`,
+          { duration: 12000 }
         );
       }
       if (data.waLimitReached) {

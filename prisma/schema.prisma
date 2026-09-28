@@ -101,7 +101,7 @@ model Tenant {
   testMode           Boolean  @default(false)
   thanksCardUrl      String?
   whatsappTemplate      String?  @default("event_invitation")
-  whatsappAccount       String?  @default("TANZANIATIP")
+  whatsappAccount       String?  @default("LittleWed by Mahiri")
 
   // ─── Guest invitation page (the /invite/<passCode> page) ───────────────
   guestPagePrimaryColor   String?  @default("#BE185D")

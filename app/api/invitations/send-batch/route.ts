@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       include: {
         event: {
           include: {
-            tenant: { select: { bypassPayment: true } },
+            tenant: { select: { bypassPayment: true, whatsappAccount: true } },
           },
         },
       },
@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
     let failCount = 0;
     let skippedCount = 0;
     let alreadySentCount = 0;
+    let smsFallbackCount = 0;
+    const whatsappErrors = new Map<string, number>();
 
     // ─── Daily WhatsApp limit enforcement ───────────────────────────────
     // The WhatsApp API has a daily cap (a newly-registered number starts low,
@@ -298,6 +300,7 @@ export async function POST(req: NextRequest) {
                 contact2: whatsappContact2 || '',
                 imageUrl: cardImageUrl || undefined,
                 inviteLink: inviteLink,
+                account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
             } else {
               result = await sendWeddingInvitation(guest.phone!, {
@@ -315,6 +318,7 @@ export async function POST(req: NextRequest) {
                 templateName: whatsappTemplate,
                 contact: whatsappContact,
                 eventType: eventType,
+                account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
             }
 
@@ -324,6 +328,11 @@ export async function POST(req: NextRequest) {
             // guest's routing so they now appear on the SMS side.
             if (!result.success) {
               console.log(`[Batch] WhatsApp failed for ${guest.name}, falling back to SMS`);
+              // Remember WHY WhatsApp failed so the response can explain the
+              // channel swap instead of silently reporting a WhatsApp success.
+              if (result.error) {
+                whatsappErrors.set(result.error, (whatsappErrors.get(result.error) || 0) + 1);
+              }
 
               const fallbackVars = smsVariables || {};
               const cardNumber = guest.cardNumber || fallbackVars.cardNumber || '';
@@ -383,9 +392,13 @@ export async function POST(req: NextRequest) {
                     data: { routingChannel: 'sms', onWhatsApp: false, invitationSentAt: new Date() },
                   }).catch(() => {});
 
+                  smsFallbackCount++;
                   result = {
                     success: true,
                     error: undefined,
+                    // Keep the WhatsApp failure visible to the caller so a
+                    // misconfigured account is never disguised as a success.
+                    whatsappError: result.error,
                     data: { ...(smsFallback.data || {}), fellBackFromWhatsapp: true },
                     messageId: smsFallback.messageId,
                   };
@@ -474,13 +487,18 @@ export async function POST(req: NextRequest) {
           }
 
           // ─── Handle result ─────────────────────────────────────────────
+          // The channel the guest was actually reached on. It differs from the
+          // requested `channel` when WhatsApp failed and we fell back to SMS -
+          // the response must never claim a WhatsApp delivery that didn't
+          // happen.
+          let sentChannel = channel;
           if (result.success) {
             successCount++;
 
             // A successful send that went out over the WhatsApp API (i.e.
             // NOT an SMS fallback) consumes one unit of the daily cap.
             const fellBackFromWhatsApp = !!(result.data as any)?.fellBackFromWhatsapp;
-            const sentChannel = fellBackFromWhatsApp ? 'sms' : channel;
+            sentChannel = fellBackFromWhatsApp ? 'sms' : channel;
             if (!fellBackFromWhatsApp && channel === 'whatsapp') {
               waUsed++;
             }
@@ -544,7 +562,11 @@ export async function POST(req: NextRequest) {
             skipped: !!(result as any).skipped,
             reason: (result as any).reason,
             error: result.error,
-            channel,
+            // Channel actually used. Differs from `requestedChannel` when
+            // WhatsApp failed and the invitation went out over SMS instead.
+            channel: sentChannel,
+            requestedChannel: channel,
+            whatsappError: (result as any).whatsappError,
           });
 
         } catch (error: any) {
@@ -581,6 +603,11 @@ export async function POST(req: NextRequest) {
       failCount,
       skippedCount,
       alreadySentCount,
+      // Invitations that were requested on WhatsApp but actually went out over
+      // SMS because the WhatsApp send failed. Surfaced so the UI can tell the
+      // truth instead of reporting a WhatsApp success.
+      smsFallbackCount,
+      whatsappErrors: Array.from(whatsappErrors.entries()).map(([error, count]) => ({ error, count })),
       waLimit: limit,
       waUsed: waUsed,
       waLimitReached: waLimitReached(),

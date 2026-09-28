@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       include: {
         event: {
           include: {
-            tenant: { select: { bypassPayment: true } },
+            tenant: { select: { bypassPayment: true, whatsappAccount: true } },
           },
         },
       },
@@ -109,6 +109,9 @@ export async function POST(req: NextRequest) {
       cardType: guestTypeLabel(guest.guestType, guest.guestCount),
       imageUrl: cardImageUrl || undefined,  // ✅ Card image rendered in WhatsApp (omitted if none)
       // No inviteLink - removed!
+      // Use the tenant's NexSMS account; a wrong/blank account makes the
+      // provider reject every send with HTTP 422.
+      account: guest.event?.tenant?.whatsappAccount ?? undefined,
     });
 
     if (result.success) {

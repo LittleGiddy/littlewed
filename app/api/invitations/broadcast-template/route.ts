@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const event = await prisma.event.findFirst({
       where: { id: eventId, tenantId },
       include: {
+        tenant: { select: { whatsappAccount: true } },
         guests: {
           where: {
             routingChannel: 'whatsapp',
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
             person1: event.person1 || undefined,
             person2: event.person2 || undefined,
             imageUrl: event.imageUrl || undefined,
+          },
+          {
+            // Without the tenant's account this falls back to NEXTSMS_ACCOUNT.
+            account: event.tenant?.whatsappAccount ?? undefined,
           }
         );
 
