@@ -1,26 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X,
-  MessageCircle, Phone, Info, Gift, Bell, MessageSquare,
-  FileText, Hash, Coins, ShieldCheck,
-  ImageUp, AlignLeft, AlignCenter, AlignRight, Trash2, Palette
+  ArrowLeft, ArrowRight, Send, Loader2, Users, CheckSquare, Square,
+  MessageCircle, Phone, Info, Gift, Bell, Search,
+  Hash, Coins, ShieldCheck, Save, Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import SmsCounter from '@/components/SmsCounter';
 import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
-import ModernColorPicker from '@/app/components/ModernColorPicker';
-
-const REMINDER_FONTS = [
-  'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
-  'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
-  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
-  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
-];
+import ReminderCardDesigner, {
+  DEFAULT_REMINDER_DESIGN,
+  type ReminderDesign,
+} from './ReminderCardDesigner';
 
 interface Guest {
   id: string;
@@ -29,7 +24,6 @@ interface Guest {
   phone: string | null;
   reminderCount: number;
   routingChannel: string;
-  checkedIn?: boolean;
   cardNumber?: string | null;
 }
 
@@ -48,20 +42,8 @@ interface EventData {
 
 type Channel = 'whatsapp' | 'sms';
 
-interface GuestCard {
-  url: string;
-  width?: number;
-  height?: number;
-}
-
-interface CardDesign {
-  x: number;
-  y: number;
-  size: number;
-  color: string;
-  align: 'left' | 'center' | 'right';
-  font: string;
-}
+const FREE_REMINDERS_PER_GUEST = 2;
+const REMINDER_COST = 50;
 
 export default function RemindGuestsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -74,22 +56,16 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState<number | null>(null);
   const [bypassPayment, setBypassPayment] = useState(false);
-  const [channel, setChannel] = useState<Channel>('sms');
-
-  // Reminder card mini-designer state
-  const [card, setCard] = useState<GuestCard | null>(null);
-  const [cardDesign, setCardDesign] = useState<CardDesign>({
-    x: 50,
-    y: 40,
-    size: 34,
-    color: '#ffffff',
-    align: 'center',
-    font: 'Playfair Display',
-  });
-  const [uploadingCard, setUploadingCard] = useState(false);
+  const [channel, setChannel] = useState<Channel>('whatsapp');
+  const [step, setStep] = useState(0);
+  const [search, setSearch] = useState('');
   const [savingDesign, setSavingDesign] = useState(false);
 
-  const fetchEvent = async (id: string) => {
+  // Reminder card + name placement
+  const [cardUrl, setCardUrl] = useState<string | null>(null);
+  const [design, setDesign] = useState<ReminderDesign>(DEFAULT_REMINDER_DESIGN);
+
+  const fetchEvent = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load event');
@@ -98,15 +74,16 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       setGuests(data.guests || []);
       setBypassPayment(!!data.bypassPayment);
       if (data.event?.reminderCardUrl) {
-        setCard({ url: data.event.reminderCardUrl });
-        setCardDesign({
+        setCardUrl(data.event.reminderCardUrl);
+        setDesign({
           x: data.event.reminderCardNameX ?? 50,
-          y: data.event.reminderCardNameY ?? 40,
+          y: data.event.reminderCardNameY ?? 42,
           size: data.event.reminderCardNameSize ?? 34,
           color: data.event.reminderCardNameColor ?? '#ffffff',
-          align: data.event.reminderCardNameAlign === 'left' || data.event.reminderCardNameAlign === 'right'
-            ? data.event.reminderCardNameAlign
-            : 'center',
+          align:
+            data.event.reminderCardNameAlign === 'left' || data.event.reminderCardNameAlign === 'right'
+              ? data.event.reminderCardNameAlign
+              : 'center',
           font: data.event.reminderCardNameFont ?? 'Playfair Display',
         });
       }
@@ -115,153 +92,132 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchCredits = async () => {
-    try {
-      const res = await fetch('/api/tenant/billing', { credentials: 'include' });
-      const data = await res.json();
-      setCredits(data.tenant?.credits ?? 0);
-    } catch {
-      // silent
-    }
-  };
+  }, []);
 
   useEffect(() => {
     params.then(({ id }) => {
       setEventId(id);
       fetchEvent(id);
-      fetchCredits();
+      fetch('/api/tenant/billing', { credentials: 'include' })
+        .then((r) => r.json())
+        .then((d) => setCredits(d.tenant?.credits ?? 0))
+        .catch(() => {});
     });
-  }, [params]);
+  }, [params, fetchEvent]);
 
-  // All guests for the active channel (both checked-in and pending can be reminded)
-  const channelGuests = guests.filter(g => g.routingChannel === channel);
-  const whatsappGuests = guests.filter(g => g.routingChannel === 'whatsapp');
-  const smsGuests = guests.filter(g => g.routingChannel === 'sms');
+  const whatsappGuests = useMemo(() => guests.filter((g) => g.routingChannel === 'whatsapp'), [guests]);
+  const smsGuests = useMemo(() => guests.filter((g) => g.routingChannel === 'sms'), [guests]);
+  const channelGuests = channel === 'whatsapp' ? whatsappGuests : smsGuests;
 
-  const toggleSelectAll = () => {
-    if (selectedGuests.size === channelGuests.length) {
-      setSelectedGuests(new Set());
-    } else {
-      setSelectedGuests(new Set(channelGuests.map(g => g.id)));
-    }
-  };
+  const filteredGuests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return channelGuests;
+    return channelGuests.filter(
+      (g) => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q)
+    );
+  }, [channelGuests, search]);
 
-  const toggleSelectGuest = (id: string) => {
-    const newSet = new Set(selectedGuests);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setSelectedGuests(newSet);
-  };
+  // Once-per-event lock: non-bypassed tenants can use the manual reminder once.
+  const alreadyUsed = !bypassPayment && !!event?.manualReminderSent;
+
+  const selected = useMemo(
+    () => channelGuests.filter((g) => selectedGuests.has(g.id)),
+    [channelGuests, selectedGuests]
+  );
+
+  // Cost: first 2 reminders per guest are free, then 50 credits each.
+  const totalCost = useMemo(
+    () => selected.reduce((sum, g) => sum + (g.reminderCount < FREE_REMINDERS_PER_GUEST ? 0 : REMINDER_COST), 0),
+    [selected]
+  );
+  const insufficientCredits = totalCost > 0 && credits !== null && credits < totalCost;
+
+  // A representative name so the canvas previews the real result, not a token.
+  const sampleName = useMemo(() => {
+    const first = selected[0];
+    if (!first) return 'John Doe';
+    return first.title ? `${first.title} ${first.name}` : first.name;
+  }, [selected]);
+
+  // ─── Step model ────────────────────────────────────────────────────────
+  // WhatsApp: 0 pick card · 1 place name · 2 pick guests
+  // SMS:      0 write message · 1 pick guests
+  const stepLabels = channel === 'whatsapp'
+    ? ['Card', 'Name', 'Guests']
+    : ['Message', 'Guests'];
+  const lastStep = stepLabels.length - 1;
 
   const selectChannel = (c: Channel) => {
     setChannel(c);
     setSelectedGuests(new Set());
+    setSearch('');
+    setStep(0);
   };
 
-  const handleCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file || !eventId) return;
-
-    const valid = ['image/jpeg', 'image/jpg', 'image/png'].includes(file.type);
-    if (!valid) {
-      toast.error('Please upload a JPEG, JPG or PNG image.');
-      return;
-    }
-    if (file.size > 1 * 1024 * 1024) {
-      toast.error('Image is too large. Maximum size is 1MB.');
-      return;
-    }
-
-    setUploadingCard(true);
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('eventId', eventId);
-    try {
-      const res = await fetch('/api/events/upload-reminder-card', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setCard({ url: data.url });
-      toast.success('Card uploaded. Adjust the highlight below, then save.');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Upload failed. Please try again.');
-    } finally {
-      setUploadingCard(false);
-    }
+  // A WhatsApp reminder without a card can't show a name, so block step 1
+  // until one is chosen.
+  const canOpenStep = (index: number) => {
+    if (channel === 'whatsapp' && index >= 1 && !cardUrl) return false;
+    return true;
   };
 
-  const saveCardDesign = async () => {
-    if (!eventId) return;
+  const toggleSelectAll = () => {
+    if (selectedGuests.size === channelGuests.length) setSelectedGuests(new Set());
+    else setSelectedGuests(new Set(channelGuests.map((g) => g.id)));
+  };
+
+  const toggleSelectGuest = (id: string) => {
+    setSelectedGuests((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // ─── Persist the design before it can be used to send ─────────────────
+  const persistDesign = useCallback(async (): Promise<boolean> => {
+    if (!eventId || channel !== 'whatsapp') return true;
     setSavingDesign(true);
     try {
       const res = await fetch(`/api/events/${eventId}/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reminderCardUrl: card?.url ?? null,
-          reminderCardNameX: cardDesign.x,
-          reminderCardNameY: cardDesign.y,
-          reminderCardNameSize: cardDesign.size,
-          reminderCardNameColor: cardDesign.color,
-          reminderCardNameAlign: cardDesign.align,
-          reminderCardNameFont: cardDesign.font,
+          reminderCardUrl: cardUrl,
+          reminderCardNameX: design.x,
+          reminderCardNameY: design.y,
+          reminderCardNameSize: design.size,
+          reminderCardNameColor: design.color,
+          reminderCardNameAlign: design.align,
+          reminderCardNameFont: design.font,
         }),
         credentials: 'include',
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to save');
-      toast.success('Reminder card saved.');
+      if (!res.ok) throw new Error('Could not save the card design');
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save design.');
+      toast.error(error instanceof Error ? error.message : 'Could not save the card design.');
+      return false;
     } finally {
       setSavingDesign(false);
     }
-  };
+  }, [eventId, channel, cardUrl, design]);
 
-  const removeCard = async () => {
-    if (!eventId) return;
-    setCard(null);
-    setCardDesign({ x: 50, y: 40, size: 34, color: '#ffffff', align: 'center', font: 'Playfair Display' });
-    try {
-      await fetch(`/api/events/${eventId}/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reminderCardUrl: null,
-          reminderCardNameX: 50,
-          reminderCardNameY: 40,
-          reminderCardNameSize: 34,
-          reminderCardNameColor: '#ffffff',
-          reminderCardNameAlign: 'center',
-          reminderCardNameFont: 'Playfair Display',
-        }),
-        credentials: 'include',
-      });
-    } catch {
-      // ignore — the local reset is enough
+  const goNext = async () => {
+    if (step === 0 && channel === 'whatsapp') {
+      const ok = await persistDesign();
+      if (!ok) return;
     }
+    setStep((s) => Math.min(lastStep, s + 1));
   };
-
-  const selectedCount = selectedGuests.size;
-  // Once-per-event lock: non-bypassed tenants can use the manual reminder once (per channel).
-  const alreadyUsed = !bypassPayment && !!event?.manualReminderSent;
-  // Cost in credits: first 2 reminders per guest free, then 50 credits each
-  const totalCost = channelGuests
-    .filter(g => selectedGuests.has(g.id))
-    .reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
 
   const sendReminders = async () => {
     if (alreadyUsed) {
       toast.error('Reminder messages have already been sent for this event.');
       return;
     }
-    if (selectedCount === 0) {
+    if (selectedGuests.size === 0) {
       toast.error('Please select at least one guest.');
       return;
     }
@@ -269,13 +225,22 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       toast.error('Please enter a message.');
       return;
     }
-    if (totalCost > 0 && credits !== null && credits < totalCost) {
-      toast.error(`Insufficient credits. Need ${totalCost} credits, you have ${credits} credits.`);
+    if (channel === 'whatsapp' && !cardUrl) {
+      toast.error('Choose or upload a reminder card first.');
+      setStep(0);
       return;
     }
+    if (insufficientCredits) {
+      toast.error(`Insufficient credits. Need ${totalCost}, you have ${credits}.`);
+      return;
+    }
+
+    // The card must be saved before we start rendering per-guest cards.
+    if (channel === 'whatsapp' && !(await persistDesign())) return;
+
     const costText = totalCost === 0 ? 'Free' : `${totalCost} credits`;
     const ok = await confirmToast({
-      title: `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}?`,
+      title: `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} reminder to ${selectedGuests.size} guest${selectedGuests.size > 1 ? 's' : ''}?`,
       message: `Cost: ${costText}.`,
       confirmText: 'Send',
     });
@@ -286,36 +251,36 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       const res = await fetch(`/api/events/${eventId}/send-reminders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          guestIds: Array.from(selectedGuests),
-          message,
-          channel,
-        }),
+        body: JSON.stringify({ guestIds: Array.from(selectedGuests), message, channel }),
         credentials: 'include',
       });
       const data = await res.json();
-      if (res.ok) {
-        if (data.successCount === selectedCount) {
-          toast.success(`Reminder sent to ${data.successCount} guest${data.successCount > 1 ? 's' : ''}.`);
-        } else {
-          toast.success(`Reminder sent to ${data.successCount}/${selectedCount} guest${selectedCount > 1 ? 's' : ''}.`);
-          if (data.errors && data.errors.length > 0) {
-            console.error('Reminder errors:', data.errors);
-            toast.error('Some messages did not send. Please try again or contact support.');
-          }
-        }
-        if (typeof data.remainingCredits === 'number') setCredits(data.remainingCredits);
-        if (data.channel === 'whatsapp' && data.successCount > 0) {
-          toast.success('WhatsApp reminders sent with the guest name filled in automatically.');
-        }
-        fetchEvent(eventId!);
-        router.push(`/client/events/${eventId}`);
-      } else {
-        console.error('Reminder API error:', data.error);
-        toast.error(data.error || 'Failed to send reminders. Please try again.');
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to send reminders.');
+        return;
       }
-    } catch (error) {
-      console.error('Network error:', error);
+
+      const sent = data.successCount ?? 0;
+      const total = selectedGuests.size;
+      if (sent === total) toast.success(`Reminder sent to ${sent} guest${sent > 1 ? 's' : ''}.`);
+      else toast.success(`Reminder sent to ${sent}/${total} guests.`);
+
+      // Tell the user when a failed send gave credits back, so the balance on
+      // screen is never a surprise.
+      if (data.creditsRefunded > 0) {
+        toast.success(
+          `${data.creditsRefunded} credits refunded for ${data.refundedCount} failed send${data.refundedCount > 1 ? 's' : ''}.`
+        );
+      }
+      if (data.errors?.length) {
+        console.error('Reminder errors:', data.errors);
+        toast.error('Some messages did not send. Check the guest list and try again.');
+      }
+      if (typeof data.remainingCredits === 'number') setCredits(data.remainingCredits);
+
+      await fetchEvent(eventId!);
+      router.push(`/client/events/${eventId}`);
+    } catch {
       toast.error('Network error. Please try again.');
     } finally {
       setSending(false);
@@ -324,7 +289,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh] bg-gray-50">
+      <div className="flex justify-center items-center min-h-[60vh] bg-[#F5F6F7]">
         <Loader2 className="w-8 h-8 animate-spin text-[#0D4B4B]" />
       </div>
     );
@@ -332,8 +297,10 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-center px-6">
-        <AlertGlyph />
+      <div className="min-h-screen bg-[#F5F6F7] flex flex-col items-center justify-center text-center px-6">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+          <Bell size={28} className="text-gray-400" />
+        </div>
         <p className="text-gray-500 mt-3">Event not found.</p>
         <Link href="/client/dashboard" className="text-[#0D4B4B] underline mt-2 inline-block">
           Go back
@@ -342,346 +309,179 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     );
   }
 
+  const canSend =
+    !alreadyUsed &&
+    selectedGuests.size > 0 &&
+    !insufficientCredits &&
+    (channel === 'whatsapp' ? !!cardUrl : !!message.trim());
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="max-w-lg mx-auto px-4 py-6 sm:px-6">
-        {/* ─── Header ─── */}
-        <div className="flex items-center gap-3 mb-6">
+    <div className="min-h-screen bg-[#F5F6F7] flex flex-col">
+      {/* ─── App bar ─── */}
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200/70">
+        <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 h-14 flex items-center gap-2 sm:gap-3">
           <Link
             href={`/client/events/${eventId}`}
-            className="flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
+            className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center text-gray-600 active:scale-95 transition shrink-0"
           >
             <ArrowLeft size={17} />
           </Link>
-          <div className="min-w-0">
-            <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate leading-tight">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-semibold text-sm sm:text-base text-gray-900 truncate leading-tight">
               Remind guests
             </h1>
-            <p className="text-xs sm:text-sm text-gray-500 truncate">{event.name}</p>
+            <p className="text-[11px] text-gray-500 truncate">{event.name}</p>
           </div>
+          {!bypassPayment && credits !== null && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1 shrink-0">
+              <Coins size={11} />
+              {credits.toLocaleString()}
+            </span>
+          )}
+          {bypassPayment && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-1 shrink-0">
+              <ShieldCheck size={11} /> Pro
+            </span>
+          )}
         </div>
+      </header>
 
-        {alreadyUsed ? (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
-            <Bell size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-amber-800">Reminder already sent</p>
-              <p className="text-sm text-amber-700 mt-0.5">
-                Reminders can only be sent once per event. If you need to reach guests again, please contact support.
+      <main className="flex-1 pb-28">
+        <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 space-y-4">
+          {alreadyUsed && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-start gap-2.5">
+              <Bell size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800">
+                <span className="font-semibold">Already sent.</span> Reminders can only be sent once per event.
               </p>
             </div>
-          </div>
-        ) : bypassPayment ? (
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
-            <ShieldCheck size={18} className="text-green-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-green-800">Unlimited reminders</p>
-              <p className="text-sm text-green-700 mt-0.5">
-                Your account is set to bypass usage limits, so you can send reminders as many times as you need.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4 mb-4">
-            <div className="flex items-center gap-2">
-              <Coins size={18} className="text-amber-600" />
-              <span className="text-sm text-gray-600">Available credits:</span>
-              <span className="font-bold text-gray-900">{credits !== null ? credits.toLocaleString() : '—'}</span>
-            </div>
-            <Link href="/client/billing" className="text-xs font-semibold text-[#0D4B4B] hover:underline">
-              Buy / request
-            </Link>
-          </div>
-        )}
+          )}
 
-        {/* ─── Channel selection ─── */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <button
-            type="button"
-            onClick={() => selectChannel('sms')}
-            className={`rounded-2xl border p-4 text-left transition ${
-              channel === 'sms'
-                ? 'border-[#0D4B4B] bg-[#0D4B4B]/[0.04] ring-2 ring-[#0D4B4B]/10'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <Phone size={16} className="text-gray-600" />
-              <span className="font-semibold text-gray-900 text-sm">SMS</span>
-            </div>
-            <p className="text-xs text-gray-500">{smsGuests.length} guests</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => selectChannel('whatsapp')}
-            className={`rounded-2xl border p-4 text-left transition ${
-              channel === 'whatsapp'
-                ? 'border-[#25D366] bg-[#25D366]/[0.05] ring-2 ring-[#25D366]/15'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <MessageCircle size={16} className="text-[#15803d]" />
-              <span className="font-semibold text-gray-900 text-sm">WhatsApp</span>
-            </div>
-            <p className="text-xs text-gray-500">{whatsappGuests.length} guests</p>
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          {/* ─── Header row ─── */}
-          <div className="p-5 border-b border-gray-100">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
+          {/* ─── Channel switch ─── */}
+          <div className="bg-gray-200/60 rounded-2xl p-1 grid grid-cols-2 gap-1">
+            {([
+              { key: 'whatsapp' as const, label: 'WhatsApp', icon: MessageCircle, count: whatsappGuests.length, on: 'bg-[#25D366]' },
+              { key: 'sms' as const, label: 'SMS', icon: Phone, count: smsGuests.length, on: 'bg-[#0D4B4B]' },
+            ]).map((c) => {
+              const active = channel === c.key;
+              return (
                 <button
-                  onClick={toggleSelectAll}
-                  disabled={alreadyUsed || channelGuests.length === 0}
-                  className="text-sm text-gray-600 hover:text-[#0D4B4B] flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                  key={c.key}
+                  type="button"
+                  onClick={() => selectChannel(c.key)}
+                  className={`h-11 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+                    active ? `${c.on} text-white shadow-sm` : 'text-gray-600'
+                  }`}
                 >
-                  {selectedGuests.size === channelGuests.length && channelGuests.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
-                  {selectedGuests.size === channelGuests.length && channelGuests.length > 0 ? 'Deselect All' : 'Select All'}
-                </button>
-                <span className="text-sm text-gray-500">
-                  {selectedCount} selected · {channelGuests.length} {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests
-                </span>
-              </div>
-              <div className="text-sm">
-                <span className="font-medium">
-                  Cost: {totalCost === 0 ? 'Free' : `${totalCost} credits`}
-                  <span className="text-xs text-gray-400 block">
-                    <Info size={10} className="inline mr-0.5" />
-                    First 2 reminders per guest are free
+                  <c.icon size={15} />
+                  {c.label}
+                  <span className={`text-[11px] font-normal ${active ? 'text-white/80' : 'text-gray-400'}`}>
+                    {c.count}
                   </span>
-                </span>
-              </div>
-            </div>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="p-5">
-            {channel === 'whatsapp' ? (
-              /* ─── WhatsApp reminder card designer ─── */
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <MessageCircle size={16} className="text-[#15803d]" />
-                  <h2 className="font-semibold text-gray-800">Reminder card</h2>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">
-                  Upload a card image (JPEG, JPG or PNG) and use the {'{GuestName}'} overlay. Each selected
-                  guest receives this card with their own name highlighted — no typing needed.
-                </p>
+          {/* ─── Step rail ─── */}
+          <div className="flex items-center gap-1.5">
+            {stepLabels.map((label, i) => {
+              const active = step === i;
+              const done = step > i;
+              const reachable = canOpenStep(i);
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  disabled={!reachable || alreadyUsed}
+                  onClick={() => setStep(i)}
+                  className={`flex-1 flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold transition ${
+                    active
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : done
+                        ? 'text-[#0D4B4B]'
+                        : 'text-gray-400'
+                  } disabled:opacity-40`}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-full grid place-items-center text-[9px] shrink-0 ${
+                      active ? 'bg-[#0D4B4B] text-white' : done ? 'bg-[#0D4B4B]/15 text-[#0D4B4B]' : 'bg-gray-200 text-gray-400'
+                    }`}
+                  >
+                    {done ? <Check size={9} /> : i + 1}
+                  </span>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-                {!card ? (
-                  /* ─── Upload zone ─── */
-                  <label className="block cursor-pointer">
-                    <input
-                      type="file"
-                      accept=".jpeg,.jpg,.png,image/jpeg,image/jpg,image/png"
-                      className="hidden"
-                      onChange={handleCardUpload}
-                    />
-                    <div className="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center hover:border-[#0D4B4B] hover:bg-[#0D4B4B]/[0.02] transition">
-                      {uploadingCard ? (
-                        <>
-                          <Loader2 size={28} className="text-[#0D4B4B] animate-spin mb-2" />
-                          <p className="text-sm font-medium text-gray-600">Uploading…</p>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-12 h-12 rounded-full bg-[#0D4B4B]/[0.06] flex items-center justify-center mb-2">
-                            <ImageUp size={22} className="text-[#0D4B4B]" />
-                          </div>
-                          <p className="text-sm font-semibold text-gray-700">Upload a reminder card</p>
-                          <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
-                            JPEG, JPG or PNG · up to 1MB
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </label>
-                ) : (
-                  /* ─── Preview + controls ─── */
-                  <div className="space-y-4">
-                    <div className="mx-auto max-w-[260px]">
-                      <div
-                        className="relative rounded-2xl overflow-hidden"
-                        style={{ containerType: 'inline-size' }}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={card.url}
-                          alt="Reminder card"
-                          className="w-full h-auto block"
-                        />
-                        <div
-                          className="absolute"
-                          style={{
-                            width: '100%',
-                            top: `${cardDesign.y}%`,
-                            left: cardDesign.align === 'center'
-                              ? `${cardDesign.x}%`
-                              : cardDesign.align === 'right'
-                                ? `${100 - cardDesign.x}%`
-                                : `${cardDesign.x}%`,
-                            transform: cardDesign.align === 'center'
-                              ? 'translate(-50%, -50%)'
-                              : cardDesign.align === 'right'
-                                ? 'translate(0, -50%)'
-                                : 'none',
-                          }}
-                        >
-                          <span
-                            className="inline-block font-bold whitespace-nowrap leading-tight text-center"
-                            style={{
-                              fontSize: `calc(${cardDesign.size || 34} / 8 * 1cqw)`,
-                              color: cardDesign.color || '#ffffff',
-                              fontFamily: `'${cardDesign.font}', Georgia, serif`,
-                            }}
-                          >
-                            {'{GuestName}'}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-center text-gray-400 mt-1.5">
-                        Live preview — each guest sees their own name here.
-                      </p>
-                    </div>
+          {/* ─── Step body ─── */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4">
+            {channel === 'whatsapp' && step === 0 && (
+              <>
+                <StepTitle
+                  title="Choose a card"
+                  hint="Pick an approved card or upload your own. The guest name is added automatically."
+                />
+                <ReminderCardDesigner
+                  eventId={eventId!}
+                  cardUrl={cardUrl}
+                  design={design}
+                  sampleName={sampleName}
+                  onChange={({ cardUrl: url, design: d }) => {
+                    setCardUrl(url);
+                    setDesign(d);
+                    if (url) setStep(1);
+                  }}
+                />
+              </>
+            )}
 
-                    {/* Controls */}
-                    <div className="space-y-3.5 bg-gray-50 rounded-2xl p-4">
-                      {/* Font */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Font</label>
-                        <select
-                          value={cardDesign.font}
-                          onChange={(e) => setCardDesign({ ...cardDesign, font: e.target.value })}
-                          className="w-full p-2 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
-                        >
-                          {REMINDER_FONTS.map(f => (
-                            <option key={f} value={f} style={{ fontFamily: `'${f}', Georgia, serif` }}>
-                              {f}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+            {channel === 'whatsapp' && step === 1 && (
+              <>
+                <StepTitle title="Place the guest name" hint="Drag it onto the card and style it." />
+                <ReminderCardDesigner
+                  eventId={eventId!}
+                  cardUrl={cardUrl}
+                  design={design}
+                  sampleName={sampleName}
+                  onChange={({ cardUrl: url, design: d }) => {
+                    setCardUrl(url);
+                    setDesign(d);
+                    // Removing the card from the "place the name" step would
+                    // otherwise leave an empty screen behind.
+                    if (!url) setStep(0);
+                  }}
+                />
+              </>
+            )}
 
-                      {/* Size */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1">
-                          Text size · {cardDesign.size}px
-                        </label>
-                        <input
-                          type="range"
-                          min={14}
-                          max={90}
-                          value={cardDesign.size}
-                          onChange={(e) => setCardDesign({ ...cardDesign, size: Number(e.target.value) })}
-                          className="w-full accent-[#0D4B4B]"
-                        />
-                      </div>
-
-                      {/* Alignment */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1">
-                          Alignment
-                        </label>
-                        <div className="flex gap-1">
-                          {(['left', 'center', 'right'] as const).map((a) => {
-                            const Icon = a === 'left' ? AlignLeft : a === 'center' ? AlignCenter : AlignRight;
-                            return (
-                              <button
-                                key={a}
-                                type="button"
-                                onClick={() => setCardDesign({ ...cardDesign, align: a })}
-                                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1 capitalize ${
-                                  cardDesign.align === a
-                                    ? 'bg-[#0D4B4B] text-white'
-                                    : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
-                                }`}
-                              >
-                                <Icon size={13} /> {a}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* X & Y position */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1">Horizontal · {cardDesign.x}%</label>
-                          <input
-                            type="range"
-                            min={5}
-                            max={95}
-                            value={cardDesign.x}
-                            onChange={(e) => setCardDesign({ ...cardDesign, x: Number(e.target.value) })}
-                            className="w-full accent-[#0D4B4B]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-gray-500 mb-1">Vertical · {cardDesign.y}%</label>
-                          <input
-                            type="range"
-                            min={5}
-                            max={95}
-                            value={cardDesign.y}
-                            onChange={(e) => setCardDesign({ ...cardDesign, y: Number(e.target.value) })}
-                            className="w-full accent-[#0D4B4B]"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Color */}
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1 flex items-center gap-1">
-                          <Palette size={12} /> Text color
-                        </label>
-                        <ModernColorPicker
-                          value={cardDesign.color}
-                          onChange={(c) => setCardDesign({ ...cardDesign, color: c })}
-                        />
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          onClick={saveCardDesign}
-                          disabled={savingDesign}
-                          className="flex-1 bg-[#0D4B4B] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                          {savingDesign ? <Loader2 size={15} className="animate-spin" /> : <Palette size={15} />}
-                          Save design
-                        </button>
-                        <button
-                          onClick={removeCard}
-                          className="px-4 border border-gray-200 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-200 transition flex items-center justify-center"
-                          title="Remove card"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* ─── SMS message ─── */
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
-                  <FileText size={15} />
-                  SMS Message
-                  <span className="text-gray-400 text-xs font-normal ml-1">(use {'{name}'} for guest name)</span>
-                </label>
+            {channel === 'sms' && step === 0 && (
+              <>
+                <StepTitle title="Write your reminder" hint="Use {name} and {event} to personalise it." />
                 <textarea
-                  rows={4}
+                  rows={7}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none"
-                  placeholder="e.g. Habari {name}, tunakumbusha kuhusu mchango wako kwa {event}. Asante."
+                  placeholder="Habari {name}, tunakumbusha kuhusu mchango wako kwa {event}. Asante."
+                  className="w-full p-3 border border-gray-200 rounded-2xl text-[15px] focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none bg-gray-50/40"
                 />
-                <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-gray-400">
-                  <span>
-                    Preview counts with a typical guest name (actual count changes with each guest&apos;s name length).
-                  </span>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMessage((m) => `${m} {name}`)}
+                    className="text-[11px] font-semibold text-[#0D4B4B] bg-[#0D4B4B]/[0.07] rounded-lg px-2.5 py-1.5"
+                  >
+                    + {'{name}'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMessage((m) => `${m} {event}`)}
+                    className="text-[11px] font-semibold text-[#0D4B4B] bg-[#0D4B4B]/[0.07] rounded-lg px-2.5 py-1.5"
+                  >
+                    + {'{event}'}
+                  </button>
                   <SmsCounter
                     text={message
                       .replace(/\{name\}/g, 'Mr John Doe')
@@ -689,91 +489,163 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                     maxParts={bypassPayment ? null : MAX_SMS_PARTS_PER_GUEST}
                   />
                 </div>
-              </div>
+              </>
             )}
 
-            {/* ─── Guest list ─── */}
-            {channelGuests.length === 0 ? (
-              <div className="text-center py-10 bg-gray-50 rounded-xl">
-                <Users size={28} className="text-gray-300 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">
-                  No {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests to remind.
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {channel === 'whatsapp'
-                    ? 'Switch to SMS to see the other channel.'
-                    : 'Switch to WhatsApp to see the other channel.'}
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
-                {channelGuests.map((guest) => (
-                  <div
-                    key={guest.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
+            {step === lastStep && (
+              <>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <StepTitle title={`Pick guests`} hint="" />
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    disabled={alreadyUsed || channelGuests.length === 0}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-[#0D4B4B] disabled:opacity-40 shrink-0"
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedGuests.has(guest.id)}
-                      onChange={() => toggleSelectGuest(guest.id)}
-                      disabled={alreadyUsed}
-                      className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B] disabled:opacity-40"
-                    />
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">{guest.name}</p>
-                      <p className="text-xs text-gray-500">{guest.phone}</p>
-                    </div>
-                    <div className="text-xs text-gray-400 flex flex-col items-end gap-0.5">
-                      {guest.reminderCount < 2 ? (
-                        <span className="text-[#0D4B4B] flex items-center gap-0.5">
-                          <Gift size={10} /> Free
-                        </span>
-                      ) : (
-                        <span>50 credits</span>
-                      )}
-                      <span className="bg-gray-100 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                        <Hash size={9} />
-                        {guest.reminderCount} sent
-                      </span>
-                    </div>
+                    {selectedGuests.size === channelGuests.length && channelGuests.length > 0 ? (
+                      <CheckSquare size={15} />
+                    ) : (
+                      <Square size={15} />
+                    )}
+                    {selectedGuests.size === channelGuests.length && channelGuests.length > 0 ? 'None' : 'All'}
+                  </button>
+                </div>
+
+                <div className="relative mb-2">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search name or number"
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                  />
+                </div>
+
+                {channelGuests.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Users size={26} className="text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No {channel} guests yet.</p>
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <ul className="divide-y divide-gray-100 max-h-[52vh] overflow-y-auto -mx-3 sm:-mx-4 px-3 sm:px-4">
+                    {filteredGuests.map((guest) => {
+                      const on = selectedGuests.has(guest.id);
+                      const free = guest.reminderCount < FREE_REMINDERS_PER_GUEST;
+                      return (
+                        <li key={guest.id}>
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectGuest(guest.id)}
+                            disabled={alreadyUsed}
+                            className="w-full flex items-center gap-3 py-2.5 text-left active:bg-gray-50 disabled:opacity-50"
+                          >
+                            <span
+                              className={`w-5 h-5 rounded-md grid place-items-center shrink-0 border transition ${
+                                on ? 'bg-[#0D4B4B] border-[#0D4B4B]' : 'border-gray-300'
+                              }`}
+                            >
+                              {on && <Check size={12} className="text-white" />}
+                            </span>
+                            <span className="w-8 h-8 rounded-full bg-[#0D4B4B]/[0.08] text-[#0D4B4B] grid place-items-center text-[11px] font-bold shrink-0">
+                              {guest.name.trim().charAt(0).toUpperCase()}
+                            </span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-sm font-medium text-gray-800 truncate">
+                                {guest.title ? `${guest.title} ${guest.name}` : guest.name}
+                              </span>
+                              <span className="block text-[11px] text-gray-400 truncate">{guest.phone}</span>
+                            </span>
+                            <span className="text-[10px] text-right shrink-0 flex flex-col items-end gap-0.5">
+                              {free ? (
+                                <span className="text-[#0D4B4B] flex items-center gap-0.5 font-semibold">
+                                  <Gift size={9} /> Free
+                                </span>
+                              ) : (
+                                <span className="text-gray-500 font-semibold">{REMINDER_COST}</span>
+                              )}
+                              <span className="text-gray-400 flex items-center gap-0.5">
+                                <Hash size={8} /> {guest.reminderCount}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+
+                {insufficientCredits && (
+                  <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-2.5 flex items-center gap-2">
+                    <Info size={14} className="text-red-500 shrink-0" />
+                    <p className="text-[11px] text-red-700">
+                      Need {totalCost} credits, you have {credits}.
+                    </p>
+                    <Link href="/client/billing" className="ml-auto text-[11px] font-semibold text-red-700 underline shrink-0">
+                      Get credits
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
-
-            <p className="text-xs text-gray-400 mt-3 flex items-center gap-1">
-              <MessageSquare size={12} />
-              All guests are shown — send a reminder to anyone who hasn&apos;t been reminded yet.
-            </p>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={sendReminders}
-                disabled={sending || alreadyUsed || selectedCount === 0 || (channel === 'sms' && !message.trim()) || (totalCost > 0 && credits !== null && credits < totalCost)}
-                className="flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send size={18} />}
-                {sending ? 'Sending...' : `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} Reminder${selectedCount > 1 ? 's' : ''}`}
-              </button>
-              <button
-                onClick={() => router.push(`/client/events/${eventId}`)}
-                className="px-6 border border-gray-300 rounded-xl py-2.5 font-medium hover:bg-gray-50 transition flex items-center gap-1.5"
-              >
-                <X size={16} />
-                Cancel
-              </button>
-            </div>
           </div>
+        </div>
+      </main>
+
+      {/* ─── Sticky action bar ─── */}
+      <div className="fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-2.5 flex items-center gap-3">
+          {step > 0 && (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s - 1)}
+              className="h-12 px-4 rounded-2xl border border-gray-200 text-gray-600 font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition shrink-0"
+            >
+              <ArrowRight size={15} className="rotate-180" /> Back
+            </button>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] text-gray-400 leading-tight">
+              {selectedGuests.size} guest{selectedGuests.size === 1 ? '' : 's'} selected
+            </p>
+            <p className="text-sm font-bold text-gray-900 leading-tight">
+              {bypassPayment || totalCost === 0 ? 'Free' : `${totalCost} credits`}
+            </p>
+          </div>
+
+          {step < lastStep ? (
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={savingDesign || !canOpenStep(step + 1)}
+              className="h-12 px-5 rounded-2xl bg-[#0D4B4B] text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
+            >
+              {savingDesign ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} className="sm:hidden" />}
+              Continue
+              <ArrowRight size={15} className="hidden sm:block" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={sendReminders}
+              disabled={sending || !canSend}
+              className="h-12 px-5 rounded-2xl bg-[#0D4B4B] text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
+            >
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              {sending ? 'Sending' : 'Send'}
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function AlertGlyph() {
+function StepTitle({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-      <Bell size={28} className="text-gray-400" />
+    <div className="mb-3">
+      <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+      {hint && <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{hint}</p>}
     </div>
   );
 }

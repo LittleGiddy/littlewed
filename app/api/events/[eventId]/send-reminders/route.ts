@@ -8,8 +8,15 @@ import { sendWhatsAppReminder, getReminderWhatsAppTemplate } from '@/lib/whatsap
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateReminderCardForGuest } from '@/lib/image-storage';
 import { sendPushToTenantRole } from '@/lib/push';
+import { isCreditsDisabled, CREDITS_DISABLED_MESSAGE } from '@/lib/credits';
 
 const REMINDER_COST = 50; // credits per reminder for the 3rd+ reminder
+const FREE_REMINDERS_PER_GUEST = 2;
+
+/** A guest is only billable once they've used up their free reminders. */
+function isBillable(reminderCount: number): boolean {
+  return reminderCount >= FREE_REMINDERS_PER_GUEST;
+}
 
 export async function POST(
   req: NextRequest,
@@ -69,59 +76,72 @@ export async function POST(
     }, { status: 400 });
   }
 
-  // Calculate cost in credits: first 2 reminders per guest free, then 50 credits each
-  let totalCost = 0;
-  for (const g of channelGuests) {
-    totalCost += g.reminderCount < 2 ? 0 : REMINDER_COST;
-  }
+  // ─── Cost calculation ────────────────────────────────────────────────
+  // First 2 reminders per guest are free; from the 3rd on it costs 50 credits.
+  // Bypassed tenants and tenants with credits disabled are never charged here
+  // (the disabled case is rejected just below).
+  const willCharge = !event.tenant.bypassPayment && !isCreditsDisabled(event.tenant);
+  const billableGuestIds = new Set(
+    willCharge ? channelGuests.filter(g => isBillable(g.reminderCount)).map(g => g.id) : []
+  );
+  const totalCost = billableGuestIds.size * REMINDER_COST;
 
-  const creditsDisabled = event.tenant.creditsEnabled === false;
+  const creditsDisabled = isCreditsDisabled(event.tenant);
 
-  if (totalCost > 0 && (!event.tenant.bypassPayment || creditsDisabled)) {
-    const available = creditsDisabled ? 0 : (event.tenant.credits ?? 0);
-    if (available < totalCost) {
-      return NextResponse.json({
-        error: creditsDisabled
-          ? "Your account's credits have been disabled by the admin. Please contact support to re-enable them."
-          : `Insufficient credits. Need ${totalCost} credits, you have ${event.tenant.credits}. Request more credits from the admin.`,
-        creditsNeeded: totalCost,
-        creditsAvailable: available,
-        creditsDisabled,
-      }, { status: 400 });
-    }
+  // Credits disabled overrides bypass-payment mode, so this rejects even for
+  // tenants that would otherwise send for free.
+  if (creditsDisabled && channelGuests.length > 0) {
+    return NextResponse.json({
+      error: CREDITS_DISABLED_MESSAGE,
+      creditsNeeded: totalCost,
+      creditsAvailable: 0,
+      creditsDisabled: true,
+    }, { status: 400 });
   }
 
   // ─── Hard cap on SMS parts (standard tenants only) ─────────────────────
-  // Reject before deducting credits, so a too-long SMS never consumes them.
-  // Bypassed tenants skip this check and may send any length.
+  // Validated BEFORE any credits move, so an over-long SMS is rejected without
+  // ever touching the balance. Bypassed tenants may send any length.
   if (chan === 'sms' && !event.tenant.bypassPayment) {
     const sampleMessage = message
       .replace(/\{name\}/g, 'Mr John Doe')
       .replace(/\{event\}/g, event.name);
     const sampleParts = smsPartCount(sampleMessage);
     if (sampleParts > MAX_SMS_PARTS_PER_GUEST) {
+      return NextResponse.json({ error: smsPartsError(sampleParts) }, { status: 400 });
+    }
+  }
+
+  if (willCharge && totalCost > 0) {
+    // Reserve the full cost with ONE conditional update. Checking the balance
+    // first and then decrementing separately lets two concurrent requests both
+    // pass the check and overdraw the balance.
+    const reserved = await prisma.tenant.updateMany({
+      where: { id: tenantId, creditsEnabled: { not: false }, credits: { gte: totalCost } },
+      data: { credits: { decrement: totalCost } },
+    });
+
+    if (reserved.count !== 1) {
+      // Re-read so the message reflects the real balance.
+      const fresh = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { credits: true },
+      });
       return NextResponse.json({
-        error: smsPartsError(sampleParts),
+        error: `Insufficient credits. Need ${totalCost} credits, you have ${fresh?.credits ?? 0}. Request more credits from the admin.`,
+        creditsNeeded: totalCost,
+        creditsAvailable: fresh?.credits ?? 0,
+        creditsDisabled: false,
       }, { status: 400 });
     }
   }
 
-  // Deduct credits (skip if bypassPayment)
-  if (totalCost > 0 && !event.tenant.bypassPayment && event.tenant.creditsEnabled !== false) {
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: { credits: { decrement: totalCost } },
-    });
-  }
-
-  const remainingCredits = event.tenant.bypassPayment
-    ? event.tenant.credits
-    : (event.tenant.credits ?? 0) - totalCost;
-
   // ─── Send via chosen channel ─────────────────────────────────────────
   const whatsappTemplateName = getReminderWhatsAppTemplate();
-  const results = [];
+  const results: Array<{ guestId: string; success: boolean; error?: string; charged: boolean }> = [];
   for (const guest of channelGuests) {
+    // Charged up front for every billable guest; refunded below if this fails.
+    const charged = billableGuestIds.has(guest.id);
     try {
       const phone = guest.phone as string;
       let sendResult: { success: boolean; error?: string };
@@ -143,7 +163,7 @@ export async function POST(
           templateName: whatsappTemplateName,
           cardUrl,
         });
-} else {
+      } else {
         const personalized = message
           .replace(/\{name\}/g, () => guest.name)
           .replace(/\{event\}/g, () => event.name);
@@ -160,22 +180,66 @@ export async function POST(
           where: { id: guest.id },
           data: { reminderCount: { increment: 1 } },
         });
-        results.push({ guestId: guest.id, success: true });
+        results.push({ guestId: guest.id, success: true, charged });
       } else {
         results.push({
           guestId: guest.id,
           success: false,
           error: sendResult.error || (chan === 'whatsapp' ? 'WhatsApp sending failed' : 'SMS sending failed'),
+          charged,
         });
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
-      results.push({ guestId: guest.id, success: false, error: msg });
+      results.push({ guestId: guest.id, success: false, error: msg, charged });
     }
   }
 
   const successCount = results.filter(r => r.success).length;
   const errors = results.filter(r => !r.success).map(r => ({ guestId: r.guestId, error: r.error }));
+
+  // ─── Refund guests that were charged but never delivered ──────────────
+  // Credits are reserved before sending, so a provider failure must give the
+  // money back. Otherwise a tenant pays for messages nobody received.
+  const refundedCount = results.filter(r => !r.success && r.charged).length;
+  const refundAmount = refundedCount * REMINDER_COST;
+
+  if (refundAmount > 0) {
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { credits: { increment: refundAmount } },
+    });
+    await prisma.usageRecord.createMany({
+      data: Array.from({ length: refundedCount }, () => ({
+        tenantId,
+        eventId,
+        channel: `${chan}_reminder_refund`,
+        cost: -REMINDER_COST,
+      })),
+    });
+    console.warn(`[Reminders] Refunded ${refundAmount} credits for ${refundedCount} failed send(s)`);
+  }
+
+  // Record what was actually charged, so the usage ledger matches the balance.
+  const chargedCount = results.filter(r => r.success && r.charged).length;
+  if (chargedCount > 0) {
+    await prisma.usageRecord.createMany({
+      data: Array.from({ length: chargedCount }, () => ({
+        tenantId,
+        eventId,
+        channel: `${chan}_reminder`,
+        cost: REMINDER_COST,
+      })),
+    });
+  }
+
+  // Read the true balance back rather than deriving it, so the UI can never
+  // show a number that disagrees with the database.
+  const freshTenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { credits: true },
+  });
+  const remainingCredits = freshTenant?.credits ?? 0;
 
   if (successCount > 0) {
     await prisma.event.update({
@@ -195,7 +259,11 @@ export async function POST(
   return NextResponse.json({
     success: true,
     successCount,
-    totalCost,
+    // What was actually taken, after refunds - not the pre-send estimate.
+    totalCost: totalCost - refundAmount,
+    chargedCount,
+    refundedCount,
+    creditsRefunded: refundAmount,
     channel: chan,
     remainingCredits,
     errors: errors.length > 0 ? errors : undefined,
