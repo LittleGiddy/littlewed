@@ -93,36 +93,36 @@ export default function RequestCreditsModal({
         {/* Header */}
         <div className="sticky top-0 bg-white z-10 flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0D4B4B]/5 flex items-center justify-center text-[#0D4B4B]">
+            <div className="w-10 h-10 rounded-card bg-brandbg flex items-center justify-center text-brandtext">
               <Coins size={20} />
             </div>
             <div>
-              <h2 className="font-serif text-lg font-bold text-gray-900">Request Credits</h2>
+              <h2 className="font-display text-lg font-bold text-gray-900">Request Credits</h2>
               <p className="text-xs text-gray-400">1 credit = {CREDIT_COST_TZS.toLocaleString()} TZS</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-tap hover:bg-gray-100 text-gray-400 transition-colors">
             <X size={18} />
           </button>
         </div>
 
         <div className="p-6">
           {hasPending && (
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
-              <Clock size={18} className="text-amber-600 shrink-0" />
+            <div className="flex items-center gap-3 bg-warn-soft border border-warn-border rounded-card p-4 mb-5">
+              <Clock size={18} className="text-warn shrink-0" />
               <div>
                 <p className="text-sm font-bold text-amber-800">Request pending</p>
-                <p className="text-xs text-amber-600 mt-0.5">You already have a credit request being reviewed by the admin. Need it sooner? WhatsApp +255702529514.</p>
+                <p className="text-xs text-warn mt-0.5">You already have a credit request being reviewed by the admin. Need it sooner? WhatsApp +255702529514.</p>
               </div>
             </div>
           )}
 
           {requiredCredits > 0 && (
-            <div className="flex items-start gap-2.5 bg-[#0D4B4B]/[0.06] border border-[#0D4B4B]/15 rounded-2xl p-4 mb-5">
+            <div className="flex items-start gap-2.5 bg-brandbg/[0.06] border border-brandborder rounded-card p-4 mb-5">
               <AlertCircle size={18} className="text-[#C07A20] shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-bold text-[#0A3939]">You need {requiredCredits} more credit{requiredCredits !== 1 ? 's' : ''}</p>
-                <p className="text-xs text-[#0D4B4B]/80 mt-0.5">
+                <p className="text-sm font-bold text-brand-deeptext">You need {requiredCredits} more credit{requiredCredits !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-brandtext mt-0.5">
                   The amount below is pre-selected to cover your shortfall. Request it to continue importing.
                 </p>
               </div>
@@ -139,20 +139,20 @@ export default function RequestCreditsModal({
                   key={p.credits}
                   onClick={() => { setSelectedCredits(p.credits); setCustomMode(false); }}
                   disabled={hasPending}
-                  className={`relative rounded-2xl p-4 border-[1.5px] bg-white cursor-pointer text-center transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`relative rounded-card p-4 border-[1.5px] bg-white cursor-pointer text-center transition-all hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
                     isSelected
-                      ? 'border-[#0D4B4B] bg-[#0D4B4B]/[0.04] shadow-[0_0_0_4px_rgba(13,75,75,0.08)]'
+                      ? 'border-brandborder bg-brandbg/[0.04] shadow-[0_0_0_4px_rgba(13,75,75,0.08)]'
                       : 'border-gray-200'
                   }`}
                 >
                   {p.badge && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[8.5px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded-full whitespace-nowrap bg-[#FF6B5C] text-white">
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[8.5px] font-extrabold tracking-wider uppercase px-2 py-0.5 rounded-full whitespace-nowrap bg-coralbg text-white">
                       {p.badge}
                     </span>
                   )}
-                  <div className="font-serif text-[22px] font-black text-gray-900 leading-none">{p.credits}</div>
+                  <div className="font-display text-[22px] font-black text-gray-900 leading-none">{p.credits}</div>
                   <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mt-0.5 mb-2">credits</div>
-                  <div className="text-[11.5px] font-bold text-[#0D4B4B]">{(p.credits * CREDIT_COST_TZS).toLocaleString()} TZS</div>
+                  <div className="text-[11.5px] font-bold text-brandtext">{(p.credits * CREDIT_COST_TZS).toLocaleString()} TZS</div>
                 </button>
               );
             })}
@@ -162,8 +162,8 @@ export default function RequestCreditsModal({
           <button
             onClick={() => setCustomMode((m) => !m)}
             disabled={hasPending}
-            className={`flex items-center justify-between w-full px-4 py-3 border-[1.5px] rounded-2xl cursor-pointer bg-white transition-all mb-3 disabled:opacity-50 ${
-              customMode ? 'border-[#0D4B4B] bg-[#0D4B4B]/[0.02]' : 'border-gray-200 hover:border-[#0D4B4B]/30'
+            className={`flex items-center justify-between w-full px-4 py-3 border-[1.5px] rounded-card cursor-pointer bg-white transition-all mb-3 disabled:opacity-50 ${
+              customMode ? 'border-brandborder bg-brandbg/[0.02]' : 'border-gray-200 hover:border-brandborder'
             }`}
           >
             <span className="text-[13.5px] font-semibold text-gray-500">Custom amount</span>
@@ -172,16 +172,16 @@ export default function RequestCreditsModal({
 
           {/* Custom Input */}
           {customMode && (
-            <div className="flex items-center gap-2.5 px-3.5 py-3 border-[1.5px] border-[#0D4B4B] rounded-2xl bg-[#0D4B4B]/[0.02] mb-3 shadow-[0_0_0_4px_rgba(13,75,75,0.06)]">
+            <div className="flex items-center gap-2.5 px-3.5 py-3 border-[1.5px] border-brandborder rounded-card bg-brandbg/[0.02] mb-3 shadow-[0_0_0_4px_rgba(13,75,75,0.06)]">
               <button
                 onClick={() => setCustomCredits((c) => String(Math.max(1, (parseInt(c || '0') || 0) - 1)))}
-                className="w-[30px] h-[30px] rounded-lg border border-gray-200 bg-white cursor-pointer flex items-center justify-center text-[#0D4B4B]"
+                className="w-[30px] h-[30px] rounded-lg border border-gray-200 bg-white cursor-pointer flex items-center justify-center text-brandtext"
               >
                 <Minus size={13} />
               </button>
               <input
                 type="number"
-                className="flex-1 text-center border-none outline-none bg-transparent text-xl font-black text-gray-900 font-serif"
+                className="flex-1 text-center border-none outline-none bg-transparent text-xl font-black text-gray-900 font-display"
                 value={customCredits}
                 onChange={(e) => setCustomCredits(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="0"
@@ -190,7 +190,7 @@ export default function RequestCreditsModal({
               <span className="text-xs font-bold text-gray-400">credits</span>
               <button
                 onClick={() => setCustomCredits((c) => String((parseInt(c || '0') || 0) + 1))}
-                className="w-[30px] h-[30px] rounded-lg border border-gray-200 bg-white cursor-pointer flex items-center justify-center text-[#0D4B4B]"
+                className="w-[30px] h-[30px] rounded-lg border border-gray-200 bg-white cursor-pointer flex items-center justify-center text-brandtext"
               >
                 <Plus size={13} />
               </button>
@@ -198,15 +198,15 @@ export default function RequestCreditsModal({
           )}
 
           {/* Summary */}
-          <div className="flex items-center gap-3 bg-[#0D4B4B]/[0.06] border border-[#0D4B4B]/10 rounded-2xl px-4 py-3 mb-4">
+          <div className="flex items-center gap-3 bg-brandbg/[0.06] border border-brandborder rounded-card px-4 py-3 mb-4">
             <div className="flex-1">
               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider m-0">Credits</p>
-              <div className="font-serif text-xl font-black text-[#0D4B4B] leading-tight">{activeCredits}</div>
+              <div className="font-display text-xl font-black text-brandtext leading-tight">{activeCredits}</div>
             </div>
-            <div className="w-px h-8 bg-[#0D4B4B]/20" />
+            <div className="w-px h-8 bg-brandbg" />
             <div className="flex-1">
               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider m-0">Total cost</p>
-              <div className="font-serif text-xl font-black text-gray-900 leading-tight">{totalTZS.toLocaleString()} TZS</div>
+              <div className="font-display text-xl font-black text-gray-900 leading-tight">{totalTZS.toLocaleString()} TZS</div>
             </div>
           </div>
 
@@ -215,7 +215,7 @@ export default function RequestCreditsModal({
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Reason (optional)</label>
             <input
               type="text"
-              className="w-full px-4 py-3 border-[1.5px] border-gray-200 rounded-2xl text-sm font-medium text-gray-700 outline-none focus:border-[#0D4B4B] transition-colors"
+              className="w-full px-4 py-3 border-[1.5px] border-gray-200 rounded-card text-sm font-medium text-gray-700 outline-none focus:border-brandborder transition-colors"
               placeholder="e.g. Need credits for upcoming wedding..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -226,7 +226,7 @@ export default function RequestCreditsModal({
           <button
             onClick={handleRequest}
             disabled={loading || hasPending || activeCredits < 1}
-            className="w-full flex items-center justify-center gap-2 px-7 py-3.5 border-none rounded-2xl bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] text-white text-[15px] font-bold cursor-pointer shadow-md shadow-[#0D4B4B]/35 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-55 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-7 py-3.5 border-none rounded-card bg-gradient-to-br from-brandfrom to-brand-deepto text-white text-[15px] font-bold cursor-pointer shadow-md shadow-brandshadow transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-55 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>

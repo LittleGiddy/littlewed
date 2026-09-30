@@ -126,7 +126,7 @@ const EventCountdown = React.memo(({ targetDate }: { targetDate: string }) => {
 
   if (status === 'LIVE') {
     return (
-      <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+      <div className="flex items-center gap-1.5 text-success bg-success-soft px-2.5 py-1 rounded-full border border-success-border">
         <AlarmClock size={13} className="animate-pulse" />
         <span className="font-bold text-xs">Happening now</span>
       </div>
@@ -135,7 +135,7 @@ const EventCountdown = React.memo(({ targetDate }: { targetDate: string }) => {
 
   if (status === 'REMINDER') {
     return (
-      <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+      <div className="flex items-center gap-1.5 text-warn bg-warn-soft px-2.5 py-1 rounded-full border border-warn-border">
         <Timer size={13} />
         <span className="font-bold text-xs">{formattedTime}</span>
       </div>
@@ -143,7 +143,7 @@ const EventCountdown = React.memo(({ targetDate }: { targetDate: string }) => {
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2.5 py-1 rounded-full border border-[rgba(13,75,75,0.15)]">
+    <div className="flex items-center gap-1.5 text-brand bg-brand/10 px-2.5 py-1 rounded-full border border-brand/20">
       <CalendarClock size={13} />
       <span className="font-bold text-xs">{formattedTime}</span>
     </div>
@@ -195,6 +195,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [showManageMenu, setShowManageMenu] = useState(false);
   const [showGuestPageEditor, setShowGuestPageEditor] = useState(false);
   const manageMenuRef = useRef<HTMLDivElement | null>(null);
+  const manageMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{
     total: number;
     completed: number;
@@ -205,20 +206,76 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (sessionStatus === 'loading') return;
     if (!session) { router.push('/login'); return; }
-    const role = (session.user as any)?.role;
+    const role = session.user?.role;
     if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') { router.push('/login'); return; }
   }, [session, sessionStatus, router]);
 
-  // ─── Close manage menu on outside click ─────────────────────────────
+  // ─── Close manage menu on outside click or Escape ──────────────────
   useEffect(() => {
+    if (!showManageMenu) return;
     const onClick = (e: MouseEvent) => {
       if (manageMenuRef.current && !manageMenuRef.current.contains(e.target as Node)) {
         setShowManageMenu(false);
       }
     };
-    if (showManageMenu) document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowManageMenu(false);
+        manageMenuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [showManageMenu]);
+
+  // ─── Escape closes the topmost open dialog ───────────────────────────
+  // One listener for the real dialogs, checked in z-order so Escape always
+  // dismisses the sheet the user is actually looking at. showGuestPageEditor
+  // is deliberately absent: that is an inline accordion, not a dialog.
+  useEffect(() => {
+    const anyOpen =
+      showCardModal || showEditGuestModal ||
+      showKumbushaModal || showThanksModal || showBackupModal || showEditModal;
+    if (!anyOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showCardModal) setShowCardModal(false);
+      else if (showEditGuestModal) setShowEditGuestModal(false);
+      else if (showKumbushaModal) setShowKumbushaModal(false);
+      else if (showThanksModal) setShowThanksModal(false);
+      else if (showBackupModal) setShowBackupModal(false);
+      else if (showEditModal) setShowEditModal(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [
+    showCardModal, showEditGuestModal, showKumbushaModal,
+    showThanksModal, showBackupModal, showEditModal,
+  ]);
+
+  // ─── Lock background scroll while any dialog is open ─────────────────
+  // Compensating for the removed scrollbar width stops the page shifting
+  // sideways when a dialog opens on desktop.
+  const anyDialogOpen =
+    showCardModal || showEditGuestModal ||
+    showKumbushaModal || showThanksModal || showBackupModal || showEditModal;
+  useEffect(() => {
+    if (!anyDialogOpen) return;
+    const { body } = document;
+    const prevOverflow = body.style.overflow;
+    const prevPadding = body.style.paddingRight;
+    const gap = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = 'hidden';
+    if (gap > 0) body.style.paddingRight = `${gap}px`;
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPadding;
+    };
+  }, [anyDialogOpen]);
 
   // ─── Resume Event ────────────────────────────────────────────────────
   const handleResumeEvent = async () => {
@@ -254,8 +311,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setRsvps(Array.isArray(data.rsvps) ? data.rsvps : []);
       setWishes(Array.isArray(data.wishes) ? data.wishes : []);
       setCurrentPage(1);
-    } catch (err: any) {
-      const msg = err?.message ?? 'Unknown error';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       setFetchError(msg);
       toast.error(`Could not load event: ${msg}`);
     } finally { setLoading(false); }
@@ -537,14 +594,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const getStatusBadge = () => {
     if (isArchived) return { icon: <AlarmClockOff size={13} />, label: 'Archived', className: 'bg-gray-100 text-gray-600 border-gray-200' };
     if (isExpired) {
-      if (canResume) return { icon: <Timer size={13} />, label: `Paused (${daysRemainingToResume.toFixed(0)}d left)`, className: 'bg-amber-50 text-amber-700 border-amber-200' };
-      return { icon: <AlarmClockOff size={13} />, label: 'Expired', className: 'bg-red-50 text-red-700 border-red-200' };
+      if (canResume) return { icon: <Timer size={13} />, label: `Paused (${daysRemainingToResume.toFixed(0)}d left)`, className: 'bg-warn-soft text-warn border-warn-border' };
+      return { icon: <AlarmClockOff size={13} />, label: 'Expired', className: 'bg-danger-soft text-danger border-danger-border' };
     }
-    if (isLive) return { icon: <AlarmClock size={13} className="animate-pulse" />, label: 'Live Now!', className: 'bg-green-50 text-green-700 border-green-200' };
+    if (isLive) return { icon: <AlarmClock size={13} className="animate-pulse" />, label: 'Live Now!', className: 'bg-success-soft text-success border-success-border' };
     if (isActive) {
       const hoursUntil = differenceInHours(new Date(event!.date), new Date());
-      if (hoursUntil <= 24 && hoursUntil > 0) return { icon: <Timer size={13} className="animate-pulse" />, label: 'In 24 hours', className: 'bg-amber-50 text-amber-700 border-amber-200' };
-      return { icon: <CalendarClock size={13} />, label: formatDistanceToNow(new Date(event!.date), { addSuffix: true }), className: 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B] border-[rgba(13,75,75,0.15)]' };
+      if (hoursUntil <= 24 && hoursUntil > 0) return { icon: <Timer size={13} className="animate-pulse" />, label: 'In 24 hours', className: 'bg-warn-soft text-warn border-warn-border' };
+      return { icon: <CalendarClock size={13} />, label: formatDistanceToNow(new Date(event!.date), { addSuffix: true }), className: 'bg-brand/10 text-brand border-brand/20' };
     }
     if (isDraft) return { icon: <AlertCircle size={13} />, label: 'Draft', className: 'bg-gray-100 text-gray-500 border-gray-200' };
     return { icon: <AlertCircle size={13} />, label: event?.status || 'Unknown', className: 'bg-gray-100 text-gray-500 border-gray-200' };
@@ -611,12 +668,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             className={`${t.visible ? 'animate-enter' : 'animate-leave'
               } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
           >
-            <div className="p-4 bg-[#0D4B4B]">
+            <div className="p-4 bg-brand">
               <h3 className="text-white font-semibold text-base">Generate Invitation Cards</h3>
             </div>
             <div className="p-4">
               <p className="text-gray-700 text-sm mb-1">
-                <span className="font-bold text-[#0D4B4B]">{pendingGuests.length}</span> guests need cards
+                <span className="font-bold text-brand">{pendingGuests.length}</span> guests need cards
               </p>
               <p className="text-gray-500 text-xs mb-4">
                 {guests.filter((g) => g.invitationCard).length} guests already have cards
@@ -627,7 +684,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     toast.dismiss(t.id);
                     resolve(true);
                   }}
-                  className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition"
+                  className="flex-1 bg-brand text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-deep transition"
                 >
                   Generate {pendingGuests.length} Cards
                 </button>
@@ -657,7 +714,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       failed: 0,
     });
 
-    let currentToast = toast.loading(`Generating ${pendingGuests.length} cards...`);
+    const currentToast = toast.loading(`Generating ${pendingGuests.length} cards...`);
 
     try {
       const BATCH_SIZE = 10;
@@ -707,7 +764,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       } else if (completed > 0 && failed > 0) {
         toast(`${completed} generated, ${failed} failed. ${skipped} already had cards.`, {
           id: currentToast,
-          icon: <AlertTriangle size={18} className="text-amber-500" />,
+          icon: <AlertTriangle size={18} className="text-warn" />,
         });
       } else {
         toast.error('Failed to generate any cards.', { id: currentToast });
@@ -723,7 +780,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               className={`${t.visible ? 'animate-enter' : 'animate-leave'
                 } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex flex-col overflow-hidden border border-gray-200`}
             >
-              <div className="p-4 bg-[#0D4B4B]">
+              <div className="p-4 bg-brand">
                 <h3 className="text-white font-semibold text-base flex items-center gap-2">
                   <Send size={18} />
                   Cards Ready!
@@ -739,7 +796,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       toast.dismiss(t.id);
                       goToStep('send');
                     }}
-                    className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition flex items-center justify-center gap-2"
+                    className="flex-1 bg-brand text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-deep transition flex items-center justify-center gap-2"
                   >
                     <Send size={16} />
                     Send Invitations
@@ -790,7 +847,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       } else {
         toast.error(data.error || `Failed to regenerate card for ${guest.name}`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Network error');
     }
   };
@@ -809,7 +866,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div
         key={guest.id}
-        className={`bg-white rounded-xl border transition-all hover:shadow-md ${isSelected ? 'border-[#0D4B4B] shadow-md' : 'border-gray-100'
+        className={`bg-white rounded-tap border transition-all hover:shadow-md ${isSelected ? 'border-brand shadow-md' : 'border-gray-100'
           }`}
       >
         <div className="flex items-center p-3 gap-3">
@@ -817,9 +874,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             type="checkbox"
             checked={isSelected}
             onChange={() => toggleSelectGuest(guest.id)}
-            className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B] flex-shrink-0"
+            className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand flex-shrink-0"
           />
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand to-brand-deep flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             {guest.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -832,19 +889,19 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
               {guest.cardGroupId && (
                 <span
-                  className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-warn bg-warn-soft px-2 py-0.5 rounded-full"
                   title="Shared 2-person card"
                 >
                   <Users size={10} /> 2ppl
                 </span>
               )}
               {isCheckedIn && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success-soft px-2 py-0.5 rounded-full">
                   <CheckCircle size={12} /> Checked In
                 </span>
               )}
               {hasThanks && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-[#FF6B5C] bg-[#FFF0ED] px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-coral bg-coral/10 px-2 py-0.5 rounded-full">
                   <Heart size={12} /> Thanks
                 </span>
               )}
@@ -861,7 +918,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
               <span
                 className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${isWhatsApp
-                    ? 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]'
+                    ? 'bg-brand/10 text-brand'
                     : 'bg-gray-100 text-gray-600'
                   }`}
               >
@@ -870,7 +927,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </span>
               {guest.phone && <span className="text-xs text-gray-400 font-mono truncate">{guest.phone}</span>}
               {reminderCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-warn bg-warn-soft px-2 py-0.5 rounded-full">
                   <Clock size={11} /> {reminderCount} reminder{reminderCount > 1 ? 's' : ''}
                 </span>
               )}
@@ -896,14 +953,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             )}
             <button
               onClick={() => deleteGuest(guest.id)}
-              className="p-1.5 text-gray-400 hover:text-red-500 transition rounded"
+              className="p-1.5 text-gray-400 hover:text-danger transition rounded"
               title="Delete guest"
             >
               <Trash2 size={15} />
             </button>
             <button
               onClick={() => openEditGuestModal(guest)}
-              className="p-1.5 text-gray-400 hover:text-[#0D4B4B] transition rounded"
+              className="p-1.5 text-gray-400 hover:text-brand transition rounded"
               title="Edit guest"
             >
               <Edit2 size={15} />
@@ -911,7 +968,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {guest.invitationCard && (
               <button
                 onClick={() => regenerateGuestCard(guest)}
-                className="p-1.5 text-gray-400 hover:text-amber-600 transition rounded"
+                className="p-1.5 text-gray-400 hover:text-warn transition rounded"
                 title="Regenerate card"
               >
                 <RotateCw size={13} />
@@ -929,7 +986,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div
         key={guest.id}
-        className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition group"
+        className="bg-white rounded-tap border border-gray-100 overflow-hidden hover:shadow-md transition group"
       >
         <div
           className="relative aspect-[3/4] bg-gray-50 cursor-pointer"
@@ -989,11 +1046,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
             {guest.cardGroupId && (
-              <span className="text-[10px] font-medium bg-amber-500 text-white px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-medium bg-warn text-white px-2 py-0.5 rounded-full">
                 2ppl
               </span>
             )}
-            <span className="text-xs font-medium bg-[#0D4B4B] text-white px-2 py-0.5 rounded-full">
+            <span className="text-xs font-medium bg-brand text-white px-2 py-0.5 rounded-full">
               #{guest.cardNumber || guest.id.slice(0, 6)}
             </span>
           </div>
@@ -1009,14 +1066,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="flex items-center gap-1">
               <span
                 className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${guest.routingChannel === 'whatsapp'
-                    ? 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]'
+                    ? 'bg-brand/10 text-brand'
                     : 'bg-gray-100 text-gray-600'
                   }`}
               >
                 {guest.routingChannel === 'whatsapp' ? 'WA' : 'SMS'}
               </span>
               {guest.checkedIn && (
-                <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] font-medium text-success bg-success-soft px-1.5 py-0.5 rounded-full">
                   ✓
                 </span>
               )}
@@ -1031,7 +1088,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
+        <Loader2 size={32} className="animate-spin text-brand" />
         <p className="text-sm text-gray-400">Loading event...</p>
       </div>
     );
@@ -1040,9 +1097,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   if (fetchError || !event) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-          <h1 className="font-serif text-2xl font-bold text-gray-800 mb-2">
+        <div className="bg-white rounded-card shadow-lg p-8 max-w-md text-center">
+          <AlertCircle className="w-12 h-12 text-danger mx-auto mb-3" />
+          <h1 className="font-display text-2xl font-bold text-gray-800 mb-2">
             {fetchError ? 'Failed to Load Event' : 'Event Not Found'}
           </h1>
           <p className="text-gray-500 text-sm mb-5">
@@ -1052,14 +1109,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             {fetchError && eventId && (
               <button
                 onClick={() => fetchData(eventId)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white text-sm font-bold rounded-xl hover:shadow-md transition"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-brand to-brand-deep text-white text-sm font-bold rounded-tap hover:shadow-md transition"
               >
                 <ArrowLeft size={14} /> Retry
               </button>
             )}
             <Link
               href="/client/dashboard"
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 text-gray-700 text-sm font-bold rounded-tap hover:bg-gray-50 transition"
             >
               <ArrowLeft size={14} /> Dashboard
             </Link>
@@ -1073,52 +1130,70 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <style>{`
+        /* On phones these read as bottom sheets; from sm up they become centred
+           dialogs. Only CSS changes, so the modal JSX and state stay as they are. */
         .modal-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
-          display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+          display: flex; align-items: flex-end; justify-content: center; z-index: 50; padding: 0;
           animation: fadeIn 0.2s ease both;
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content {
-          background: white; border-radius: 24px; width: 100%; max-width: 460px; max-height: 90vh;
-          overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.2);
-          animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
+          background: white; border-radius: 24px 24px 0 0; width: 100%; max-width: 100%;
+          max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain;
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          box-shadow: 0 -8px 40px rgba(0,0,0,0.24);
+          animation: sheetUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
         }
+        @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(24px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @media (min-width: 640px) {
+          .modal-overlay { align-items: center; padding: 16px; }
+          .modal-content {
+            max-width: 460px; border-radius: 24px; max-height: 90vh; padding-bottom: 0;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+            animation: slideUp 0.3s cubic-bezier(0.16,1,0.3,1) both;
+          }
+        }
         .modal-header {
+          position: sticky; top: 0; z-index: 1; background: white;
           display: flex; align-items: flex-start; justify-content: space-between;
-          padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;
+          padding: 18px 18px 14px; border-bottom: 1px solid var(--color-gray-200);
         }
-        .modal-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 900; color: #0D1B1B; }
-        .modal-title span { color: #FF6B5C; }
-        .modal-body { padding: 20px 24px 24px; }
+        @media (min-width: 640px) { .modal-header { padding: 20px 24px 16px; } }
+        .modal-title { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 900; color: var(--color-gray-900); }
+        .modal-title span { color: var(--color-coral); }
+        .modal-body { padding: 18px 18px 24px; }
+        @media (min-width: 640px) { .modal-body { padding: 20px 24px 24px; } }
         .modal-close {
-          width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #E2EAF0;
+          width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--color-gray-200);
           background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
-          color: #9BAAB8; transition: border-color 0.15s, color 0.15s;
+          flex-shrink: 0; color: var(--color-gray-400);
+          transition: border-color 0.15s, color 0.15s;
         }
-        .modal-close:hover { border-color: #C0392B; color: #C0392B; }
-        .field-label { display: block; font-size: 13px; font-weight: 600; color: #4A6072; margin-bottom: 5px; }
+        .modal-close:hover { border-color: var(--color-danger); color: var(--color-danger); }
+        .modal-close:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+        .field-label { display: block; font-size: 13px; font-weight: 600; color: var(--color-gray-600); margin-bottom: 5px; }
         .field-input {
-          width: 100%; padding: 12px 14px; border: 1.5px solid #E2EAF0; border-radius: 11px;
-          font-size: 14px; outline: none; color: #0D1B1B; background: white; font-weight: 500;
+          width: 100%; padding: 12px 14px; border: 1.5px solid var(--color-gray-200); border-radius: 11px;
+          font-size: 14px; outline: none; color: var(--color-gray-900); background: white; font-weight: 500;
           transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .field-input:focus { border-color: #0D4B4B; box-shadow: 0 0 0 4px rgba(13,75,75,0.08); }
+        .field-input:focus { border-color: var(--color-brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand) 8%, transparent); }
         .btn-primary {
-          background: linear-gradient(135deg, #0D4B4B, #0A3939); color: white;
+          background: linear-gradient(135deg, var(--color-brand), var(--color-brand-deep)); color: white;
           padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
           border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-          box-shadow: 0 4px 14px rgba(13,75,75,0.32); transition: transform 0.15s, box-shadow 0.15s;
+          box-shadow: 0 4px 14px color-mix(in srgb, var(--color-brand) 32%, transparent); transition: transform 0.15s, box-shadow 0.15s;
         }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13,75,75,0.4); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px color-mix(in srgb, var(--color-brand) 40%, transparent); }
         .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
         .btn-secondary {
           padding: 13px 20px; border-radius: 13px; font-weight: 700; font-size: 14px;
-          border: 1.5px solid #E2EAF0; background: white; color: #4A6072;
+          border: 1.5px solid var(--color-gray-200); background: white; color: var(--color-gray-600);
           cursor: pointer; transition: border-color 0.15s, color 0.15s;
         }
-        .btn-secondary:hover { border-color: #0D4B4B; color: #0D4B4B; }
+        .btn-secondary:hover { border-color: var(--color-brand); color: var(--color-brand); }
         .card-modal-overlay {
           position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
           display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px;
@@ -1138,101 +1213,114 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
         }
         .step-circle {
           width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-          font-weight: 700; font-size: 13px; transition: all 0.2s; border: 2px solid #E2EAF0;
-          background: white; color: #9BAAB8;
+          font-weight: 700; font-size: 13px; transition: all 0.2s; border: 2px solid var(--color-gray-200);
+          background: white; color: var(--color-gray-400);
         }
-        .step-pill.done .step-circle { background: #0D4B4B; border-color: #0D4B4B; color: white; }
+        .step-pill.done .step-circle { background: var(--color-brand); border-color: var(--color-brand); color: white; }
         .step-pill.active .step-circle {
-          background: #0D4B4B; border-color: #0D4B4B; color: white; box-shadow: 0 0 0 4px rgba(13,75,75,0.15);
+          background: var(--color-brand); border-color: var(--color-brand); color: white; box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand) 15%, transparent);
         }
-        .step-label { font-size: 11px; font-weight: 600; color: #9BAAB8; }
-        .step-pill.active .step-label, .step-pill.done .step-label { color: #0D4B4B; }
-        .step-count { font-size: 9.5px; font-weight: 700; color: #B0BEC8; }
-        .step-pill.done .step-count { color: #0D4B4B; }
-        .step-pill.active .step-count { color: #FF6B5C; }
-        .step-line { position: absolute; top: 17px; left: 50%; width: 100%; height: 2px; background: #E2EAF0; z-index: -1; }
-        .step-pill.done .step-line { background: #0D4B4B; }
+        .step-label { font-size: 11px; font-weight: 600; color: var(--color-gray-400); }
+        .step-pill.active .step-label, .step-pill.done .step-label { color: var(--color-brand); }
+        .step-count { font-size: 9.5px; font-weight: 700; color: var(--color-gray-400); }
+        .step-pill.done .step-count { color: var(--color-brand); }
+        .step-pill.active .step-count { color: var(--color-coral); }
+        .step-line { position: absolute; top: 17px; left: 50%; width: 100%; height: 2px; background: var(--color-gray-200); z-index: -1; }
+        .step-pill.done .step-line { background: var(--color-brand); }
         .step-pill:first-child .step-line { display: none; }
         .action-tile {
           display: flex; align-items: center; gap: 12px; background: white;
-          border: 1.5px solid #E9EEF0; border-radius: 16px; padding: 16px;
+          border: 1.5px solid var(--color-gray-200); border-radius: 16px; padding: 16px;
           transition: all 0.15s; text-align: left; width: 100%;
         }
-        .action-tile:hover { border-color: #0D4B4B; box-shadow: 0 4px 14px rgba(13,75,75,0.1); transform: translateY(-1px); }
+        .action-tile:hover { border-color: var(--color-brand); box-shadow: 0 4px 14px color-mix(in srgb, var(--color-brand) 10%, transparent); transform: translateY(-1px); }
         .action-tile-icon {
           width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
         }
       `}</style>
 
-      <div className="min-h-screen bg-gray-50 pb-24">
+      <div>
         <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4">
           {/* ─── Top Navigation ─── */}
           <div className="flex items-center justify-between mb-4">
             <Link
               href="/client/dashboard"
-              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)]"
+              className="inline-flex items-center gap-1.5 text-sm font-bold text-brand bg-white border border-brand/20 rounded-tap px-3.5 py-1.5 transition hover:bg-brand/10"
             >
               <ArrowLeft size={14} /> Back
             </Link>
 
             <div className="relative" ref={manageMenuRef}>
               <button
+                ref={manageMenuButtonRef}
                 onClick={() => setShowManageMenu((v) => !v)}
-                className="p-2 text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+                aria-haspopup="menu"
+                aria-expanded={showManageMenu}
+                aria-label="Manage event"
+                className="w-11 h-11 grid place-items-center text-gray-500 bg-white border border-gray-200 rounded-tap hover:bg-gray-50 active:bg-gray-100 transition"
                 title="Manage"
               >
                 <MoreVertical size={18} />
               </button>
               {showManageMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden z-20">
-                  <p className="px-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <div
+                  role="menu"
+                  aria-label="Manage event"
+                  className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-card shadow-elev-3 overflow-hidden z-20 animate-enter"
+                >
+                  <p className="px-4 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">
                     Manage event
                   </p>
                   {!isArchived && (
                     <button
+                      role="menuitem"
                       onClick={openEditModal}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 transition"
                     >
                       <Pencil size={15} className="text-gray-400" /> Edit event details
                     </button>
                   )}
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowManageMenu(false);
                       router.push(`/client/check-in?event=${event.id}`);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 transition"
                   >
                     <QrCode size={15} className="text-gray-400" /> Check-in guests
                   </button>
                   <button
+                    role="menuitem"
                     onClick={() => {
                       setShowManageMenu(false);
                       router.push(`/client/events/${event.id}/remind`);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 transition"
                   >
                     <Bell size={15} className="text-gray-400" /> Remind guests{' '}
                     {guests.length > 0 && (
-                      <span className="ml-auto text-xs text-amber-600 font-bold">{guests.length}</span>
+                      <span className="ml-auto text-xs text-warn font-bold">{guests.length}</span>
                     )}
                   </button>
                   {checkedInCount > 0 && (
                     <button
+                      role="menuitem"
                       onClick={openThanksModal}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 transition"
                     >
                       <Heart size={15} className="text-gray-400" /> Send thank-you
                     </button>
                   )}
                   {isEventDisabled && canResume && (
                     <button
+                      role="menuitem"
                       onClick={() => {
                         setShowManageMenu(false);
                         handleResumeEvent();
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-green-700 hover:bg-green-50 transition"
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-success hover:bg-success-soft transition"
                     >
                       <RotateCw size={15} /> Resume event
                     </button>
@@ -1264,7 +1352,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         toast.error('Network error. Please try again.');
                       }
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition"
+                    role="menuitem"
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-danger hover:bg-danger-soft transition"
                   >
                     <Trash2 size={15} /> Delete event
                   </button>
@@ -1274,11 +1363,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* ─── Event Header ─── */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 mb-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-serif text-lg sm:text-xl font-black text-gray-900 truncate">
+                  <h1 className="font-display text-xl sm:text-2xl font-black text-gray-900 truncate">
                     {event.name}
                   </h1>
                   <span
@@ -1290,11 +1379,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
                   <span className="flex items-center gap-1">
-                    <Calendar size={12} className="text-[#0D4B4B]" />
+                    <Calendar size={12} className="text-brand" />
                     {format(new Date(event.date), 'PPP')}
                   </span>
                   <span className="flex items-center gap-1">
-                    <MapPin size={12} className="text-[#0D4B4B]" />
+                    <MapPin size={12} className="text-brand" />
                     {event.venue}
                   </span>
                 </div>
@@ -1305,9 +1394,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {isExpired && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                <p className="text-xs font-bold text-red-700 flex items-center gap-2">
-                  <AlertCircle size={14} />
+              <div className="mt-3 bg-danger-soft border border-danger-border rounded-tap px-3 py-2">
+                <p className="text-xs font-semibold text-danger flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0" />
                   {canResume
                     ? `Paused - ${daysRemainingToResume.toFixed(0)} days left to resume.`
                     : 'Archived and cannot be resumed.'}
@@ -1315,29 +1404,30 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
-            {/* Quick glance stats */}
-            <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-50">
-              <div className="text-center">
-                <p className="text-base font-bold text-gray-900">{guests.length}</p>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Guests</p>
+            {/* Quick glance stats. dt precedes dd in the DOM for screen readers
+                ("Guests, 42"); flex-col-reverse puts the number on top visually. */}
+            <dl className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-100">
+              <div className="flex flex-col-reverse items-center">
+                <dt className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Guests</dt>
+                <dd className="font-display text-lg font-black text-gray-900">{guests.length}</dd>
               </div>
-              <div className="text-center">
-                <p className="text-base font-bold text-[#0D4B4B]">{guestsWithCards.length}</p>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Cards</p>
+              <div className="flex flex-col-reverse items-center">
+                <dt className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Cards</dt>
+                <dd className="font-display text-lg font-black text-brand">{guestsWithCards.length}</dd>
               </div>
-              <div className="text-center">
-                <p className="text-base font-bold text-blue-600">{sentCount}</p>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Sent</p>
+              <div className="flex flex-col-reverse items-center">
+                <dt className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Sent</dt>
+                <dd className="font-display text-lg font-black text-gray-900">{sentCount}</dd>
               </div>
-              <div className="text-center">
-                <p className="text-base font-bold text-green-600">{checkedInAll}</p>
-                <p className="text-[9px] font-medium text-gray-400 uppercase tracking-wide">Checked In</p>
+              <div className="flex flex-col-reverse items-center">
+                <dt className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">Checked In</dt>
+                <dd className="font-display text-lg font-black text-success">{checkedInAll}</dd>
               </div>
-            </div>
+            </dl>
           </div>
 
           {isEventDisabled ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
+            <div className="bg-gray-50 border border-gray-200 rounded-card p-6 text-center">
               <AlertCircle size={24} className="text-gray-400 mx-auto mb-2" />
               <p className="text-gray-500 font-medium text-sm">
                 This event is {event.status === 'ARCHIVED' ? 'archived' : 'paused'}, so the setup flow is disabled.
@@ -1354,12 +1444,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98 }}
                         transition={{ duration: 0.35, ease: 'easeOut' }}
-                        className="bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] rounded-2xl shadow-sm border border-[#0D4B4B]/10 overflow-hidden mb-4"
+                        className="bg-gradient-to-br from-brand to-brand-deep rounded-card shadow-sm border border-brand/15 overflow-hidden mb-4"
                       >
                         <div className="px-5 py-4 text-white">
                           <div className="flex items-center gap-2 mb-1.5">
-                            <Compass size={16} className="text-[#FFD9D2]" />
-                            <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#FFD9D2]/90">Your invitation journey</p>
+                            <Compass size={16} className="text-coral" />
+                            <p className="text-[11px] font-bold tracking-[1.5px] uppercase text-coral/70">Your invitation journey</p>
                             <button
                               onClick={() => setShowJourneyIntro(false)}
                               className="ml-auto p-1 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition"
@@ -1379,11 +1469,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.15 + i * 0.12, duration: 0.35, ease: 'easeOut' }}
-                                className={`rounded-xl px-3 py-2.5 flex items-center gap-2 min-w-0 ${
+                                className={`rounded-tap px-3 py-2.5 flex items-center gap-2 min-w-0 ${
                                   activeStep === s.id ? 'bg-white/15 ring-1 ring-white/25' : 'bg-white/5'
                                 }`}
                               >
-                                <span className={`shrink-0 ${activeStep === s.id ? 'text-[#FFD9D2]' : 'text-white/50'}`}>
+                                <span className={`shrink-0 ${activeStep === s.id ? 'text-coral' : 'text-white/50'}`}>
                                   {s.icon}
                                 </span>
                                 <span className={`min-w-0 ${activeStep === s.id ? 'text-white' : 'text-white/55'}`}>
@@ -1401,7 +1491,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
               {/* ─── Generation Progress ─── */}
               {generationProgress && (
-                <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 shadow-sm">
+                <div className="bg-white rounded-tap border border-gray-200 p-4 mb-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Generating cards...</span>
                     <span className="text-sm text-gray-500">
@@ -1410,7 +1500,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                   <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[#0D4B4B] rounded-full transition-all duration-300"
+                      className="h-full bg-brand rounded-full transition-all duration-300"
                       style={{
                         width: `${((generationProgress.completed + generationProgress.failed) /
                             generationProgress.total) *
@@ -1420,7 +1510,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     />
                   </div>
                   {generationProgress.failed > 0 && (
-                    <p className="mt-1 text-xs text-red-500">
+                    <p className="mt-1 text-xs text-danger">
                       {generationProgress.failed} failed
                     </p>
                   )}
@@ -1467,7 +1557,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     href={`/client/events/${event.id}/remind`}
                     className="action-tile"
                   >
-                    <div className="action-tile-icon bg-[#25D366]/10 text-[#15803d]">
+                    <div className="action-tile-icon bg-whatsapp/10 text-success">
                       <Bell size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1481,7 +1571,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Link href={`/client/guests/import/${event.id}`} className="action-tile">
-                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
+                      <div className="action-tile-icon bg-brand/10 text-brand">
                         <Upload size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1491,7 +1581,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />
                     </Link>
                     <Link href={`/client/guests/add/${event.id}`} className="action-tile">
-                      <div className="action-tile-icon bg-amber-50 text-amber-600">
+                      <div className="action-tile-icon bg-warn-soft text-warn">
                         <Plus size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1504,7 +1594,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     </Link>
                   </div>
 
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
                     <div className="flex flex-wrap items-center gap-2 p-3 border-b border-gray-100">
                       <div className="flex-1 min-w-[120px] relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1516,13 +1606,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                             setCurrentPage(1);
                           }}
                           placeholder="Search guests..."
-                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent"
                         />
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={toggleSelectAll}
-                          className="p-2 text-gray-500 hover:text-[#0D4B4B] rounded-lg hover:bg-gray-50 transition"
+                          className="p-2 text-gray-500 hover:text-brand rounded-lg hover:bg-gray-50 transition"
                           title="Select All"
                         >
                           {selectedGuests.size === guests.length && guests.length > 0 ? (
@@ -1535,7 +1625,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           <button
                             onClick={deleteSelected}
                             disabled={deleting}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                            className="p-2 text-danger hover:bg-danger-soft rounded-lg transition disabled:opacity-50"
                             title="Delete Selected"
                           >
                             {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
@@ -1543,7 +1633,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         )}
                         <button
                           onClick={openBackupModal}
-                          className="p-2 text-[#0D4B4B] hover:bg-[rgba(13,75,75,0.08)] rounded-lg transition"
+                          className="p-2 text-brand hover:bg-brand/10 rounded-lg transition"
                           title="View All Guests"
                         >
                           <Download size={16} />
@@ -1554,7 +1644,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     {guests.length === 0 ? (
                       <div className="py-12 text-center">
                         <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
+                        <h3 className="font-display text-lg font-bold text-gray-800 mb-1">No guests yet</h3>
                         <p className="text-sm text-gray-400">
                           Import a guest list or add guests manually to get started.
                         </p>
@@ -1600,7 +1690,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         {showBackToTop && (
                           <button
                             onClick={scrollToTop}
-                            className="fixed bottom-24 right-6 bg-[#0D4B4B] text-white p-3 rounded-full shadow-lg hover:bg-[#0A3939] transition z-10"
+                            className="fixed bottom-[calc(var(--app-nav-h)+1rem)] lg:bottom-24 right-4 sm:right-6 bg-brand text-white p-3 rounded-full shadow-brand-sm hover:bg-brand-800 transition z-10"
                           >
                             <ArrowUp size={20} />
                           </button>
@@ -1616,7 +1706,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <Link href={`/client/invitations/design/${event.id}`} className="action-tile">
-                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
+                      <div className="action-tile-icon bg-brand/10 text-brand">
                         <Palette size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1630,9 +1720,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 <button
                       type="button"
                       onClick={() => setShowGuestPageEditor(v => !v)}
-                      className={`action-tile ${showGuestPageEditor ? 'border-[#0D4B4B]' : ''}`}
+                      className={`action-tile ${showGuestPageEditor ? 'border-brand' : ''}`}
                     >
-                      <div className="action-tile-icon bg-[rgba(13,75,75,0.08)] text-[#0D4B4B]">
+                      <div className="action-tile-icon bg-brand/10 text-brand">
                         <QrCode size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1658,7 +1748,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     />
                   )}
 
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center">
+                  <div className="bg-white rounded-card shadow-sm border border-gray-100 p-5 text-center">
                     <PenTool size={28} className="text-gray-300 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">
                       Design one invitation template - it gets used to generate a personalized card for every
@@ -1671,7 +1761,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {/* ─── Step 3: Generate ─── */}
               {activeStep === 'generate' && (
                 <div className="space-y-4">
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="bg-white rounded-card shadow-sm border border-gray-100 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-bold text-sm text-gray-800">
@@ -1682,7 +1772,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={handleGenerateCards}
                         disabled={generatingCards || guests.length === 0}
-                        className="bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center gap-2"
+                        className="bg-brand text-white px-4 py-2.5 rounded-tap text-sm font-bold hover:bg-brand-deep transition disabled:opacity-50 flex items-center gap-2"
                       >
                         {generatingCards ? (
                           <Loader2 size={16} className="animate-spin" />
@@ -1703,7 +1793,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={() => setCardView('grid')}
                         className={`p-2 rounded-lg transition ${cardView === 'grid'
-                            ? 'bg-[#0D4B4B] text-white'
+                            ? 'bg-brand text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                           }`}
                         title="Grid View"
@@ -1713,7 +1803,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={() => setCardView('list')}
                         className={`p-2 rounded-lg transition ${cardView === 'list'
-                            ? 'bg-[#0D4B4B] text-white'
+                            ? 'bg-brand text-white'
                             : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
                           }`}
                         title="List View"
@@ -1724,9 +1814,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   )}
 
                   {guestsWithCards.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center">
+                    <div className="bg-white rounded-card border border-gray-100 p-10 text-center">
                       <ImageIcon size={40} className="text-gray-300 mx-auto mb-3" />
-                      <h3 className="font-serif text-base font-bold text-gray-800 mb-1">No cards yet</h3>
+                      <h3 className="font-display text-base font-bold text-gray-800 mb-1">No cards yet</h3>
                       <p className="text-sm text-gray-400">
                         Generate personalized invitation cards for your guests.
                       </p>
@@ -1734,7 +1824,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   ) : cardView === 'grid' ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{guestsWithCards.map(renderCardItem)}</div>
                   ) : (
-                    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="bg-white rounded-card border border-gray-100 overflow-hidden">
                       <div className="divide-y divide-gray-100">
                         {guestsWithCards.map((guest) => (
                           <div
@@ -1789,7 +1879,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                                   e.stopPropagation();
                                   regenerateGuestCard(guest);
                                 }}
-                                className="p-2 text-gray-400 hover:text-amber-600 rounded-lg transition"
+                                className="p-2 text-gray-400 hover:text-warn rounded-lg transition"
                                 title="Regenerate Card"
                               >
                                 <RotateCw size={14} />
@@ -1806,41 +1896,41 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               {/* ─── Step 4: Send ─── */}
               {activeStep === 'send' && (
                 <div className="space-y-4">
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                  <div className="bg-white rounded-card shadow-sm border border-gray-100 p-4">
                     <div className="grid grid-cols-3 gap-2 mb-4">
-                      <div className="text-center bg-gray-50 rounded-xl py-3">
+                      <div className="text-center bg-gray-50 rounded-tap py-3">
                         <p className="text-lg font-bold text-gray-900">{guests.length}</p>
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Guests</p>
                       </div>
-                      <div className="text-center bg-gray-50 rounded-xl py-3">
-                        <p className="text-lg font-bold text-[#0D4B4B]">{whatsappCount}</p>
+                      <div className="text-center bg-gray-50 rounded-tap py-3">
+                        <p className="text-lg font-bold text-brand">{whatsappCount}</p>
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">WhatsApp</p>
                       </div>
-                      <div className="text-center bg-gray-50 rounded-xl py-3">
+                      <div className="text-center bg-gray-50 rounded-tap py-3">
                         <p className="text-lg font-bold text-gray-600">{smsCount}</p>
                         <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">SMS</p>
                       </div>
                     </div>
                     {guestsWithoutCards.length > 0 && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2">
-                        <AlertCircle size={14} className="text-amber-600 flex-shrink-0" />
-                        <p className="text-xs font-medium text-amber-700">
+                      <div className="bg-warn-soft border border-warn-border rounded-tap px-3 py-2 mb-4 flex items-center gap-2">
+                        <AlertCircle size={14} className="text-warn flex-shrink-0" />
+                        <p className="text-xs font-medium text-warn">
                           {guestsWithoutCards.length} guest{guestsWithoutCards.length !== 1 ? 's' : ''} still
-                          don't have a card generated.
+                          don&apos;t have a card generated.
                         </p>
                       </div>
                     )}
                     <Link
                       href={`/client/invitations/send/${event.id}`}
-                      className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white text-center py-3.5 rounded-xl font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
+                      className="w-full bg-gradient-to-r from-brand to-brand-deep text-white text-center py-3.5 rounded-tap font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 text-sm"
                     >
                       <Send size={16} /> {sentCount > 0 ? 'Continue sending' : 'Send invitations'}
                     </Link>
                   </div>
 
                   {sentCount > 0 && (
-                    <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-green-600 flex-shrink-0">
+                    <div className="bg-white rounded-card border border-gray-100 p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-success-soft flex items-center justify-center text-success flex-shrink-0">
                         <CheckCircle size={18} />
                       </div>
                       <div>
@@ -1848,7 +1938,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           {sentCount} of {guests.length} invitations sent
                         </p>
                         <p className="text-xs text-gray-400">
-                          You can resend to anyone who hasn't received theirs yet.
+                          You can resend to anyone who hasn&apos;t received theirs yet.
                         </p>
                       </div>
                     </div>
@@ -1857,12 +1947,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
 
               {/* ─── Bottom Sticky Step Navigation (animated) ─── */}
-              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-3 sm:px-6 py-3 z-30">
+              {/* Sits above the mobile tab bar via --app-nav-h. */}
+              <div className="fixed bottom-[var(--app-nav-h)] left-0 right-0 bg-white/95 backdrop-blur border-t border-gray-200 px-3 sm:px-6 py-3 z-30">
                 <div className="max-w-3xl mx-auto flex items-center gap-3">
                   <button
                     onClick={() => stepIndex > 0 && goToStep(STEPS[stepIndex - 1].id)}
                     disabled={stepIndex === 0}
-                    className="btn-secondary flex-shrink-0 disabled:opacity-40"
+                    aria-label={
+                      stepIndex === 0
+                        ? 'Already at the first step'
+                        : `Back to step ${stepIndex}: ${STEPS[stepIndex - 1].label}`
+                    }
+                    className="btn-secondary !px-3 flex-shrink-0 disabled:opacity-40"
                   >
                     <ArrowLeft size={16} />
                   </button>
@@ -1874,22 +1970,26 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.22, ease: 'easeOut' }}
+                        aria-live="polite"
                         className="text-center min-w-0"
                       >
                         <p className="text-xs font-semibold text-gray-800 truncate flex items-center justify-center gap-1.5">
                           <span className="text-gray-400 font-medium">
                             Step {stepIndex + 1} of {STEPS.length}
                           </span>
-                          <span className="inline-flex items-center text-[#0D4B4B]">{STEPS[stepIndex].icon}</span>
-                          <span>{STEPS[stepIndex].label}</span>
+                          <span className="inline-flex items-center text-brand">{STEPS[stepIndex].icon}</span>
+                          <span className="truncate">{STEPS[stepIndex].label}</span>
                         </p>
                         <p className="text-[11px] text-gray-400 truncate mt-0.5">{nextUp}</p>
                       </motion.div>
                     </AnimatePresence>
                   </div>
                   {stepIndex < STEPS.length - 1 ? (
-                    <button onClick={goNextStep} className="btn-primary flex-shrink-0">
-                      Continue to {STEPS[stepIndex + 1].label} <ArrowRight size={16} />
+                    <button onClick={goNextStep} className="btn-primary flex-shrink-0 max-w-[52%]">
+                      <span className="truncate">
+                        Continue to {STEPS[stepIndex + 1].label}
+                      </span>
+                      <ArrowRight size={16} className="shrink-0" />
                     </button>
                   ) : (
                     <button
@@ -1908,7 +2008,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* ─── Card Detail Modal ─── */}
       {showCardModal && selectedCardGuest && (
-        <div className="card-modal-overlay" onClick={() => setShowCardModal(false)}>
+        <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Card preview"
+        className="card-modal-overlay"
+        onClick={() => setShowCardModal(false)}
+      >
           <div className="card-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="relative">
               <button
@@ -1920,9 +2026,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               <img
                 src={selectedCardGuest.invitationCard!}
                 alt={`${selectedCardGuest.name}'s invitation card`}
-                className="w-full h-auto max-h-[85vh] object-contain rounded-xl"
+                className="w-full h-auto max-h-[85vh] object-contain rounded-tap"
               />
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 bg-black/60 backdrop-blur-sm p-2 rounded-xl">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-3 bg-black/60 backdrop-blur-sm p-2 rounded-tap">
                 <button
                   onClick={() => {
                     if (navigator.share) {
@@ -1970,9 +2076,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* ─── Kumbusha Modal ─── */}
-      {showKumbushaModal && (
-        <div
-          className="modal-overlay"
+  {showKumbushaModal && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Kumbusha guests"
+    className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowKumbushaModal(false);
           }}
@@ -1987,8 +2096,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </button>
             </div>
             <div className="modal-body">
-              <div className="bg-gray-50 rounded-xl p-4 mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[rgba(13,75,75,0.1)] flex items-center justify-center text-[#0D4B4B]">
+              <div className="bg-gray-50 rounded-tap p-4 mb-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
                   <Users size={18} />
                 </div>
                 <div>
@@ -1997,14 +2106,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
               <div
-                className={`rounded-xl p-4 mb-4 flex items-center gap-3 ${isFree ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'
+                className={`rounded-tap p-4 mb-4 flex items-center gap-3 ${isFree ? 'bg-success-soft border border-success-border' : 'bg-warn-soft border border-warn-border'
                   }`}
               >
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl">
                   {isFree ? (
-                    <Check size={20} className="text-green-600" />
+                    <Check size={20} className="text-success" />
                   ) : (
-                    <Coins size={20} className="text-amber-600" />
+                    <Coins size={20} className="text-warn" />
                   )}
                 </div>
                 <div>
@@ -2016,7 +2125,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               <label className="field-label">Ujumbe wa kukumbusha</label>
               <textarea
-                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none text-sm"
+                className="w-full p-3 border border-gray-200 rounded-tap focus:ring-2 focus:ring-brand focus:border-transparent resize-none text-sm"
                 rows={3}
                 value={kumbushaMessage}
                 onChange={(e) => setKumbushaMessage(e.target.value)}
@@ -2058,9 +2167,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       />
 
       {/* ─── Edit Event Modal ─── */}
-      {showEditModal && (
-        <div
-          className="modal-overlay"
+  {showEditModal && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Edit event details"
+    className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowEditModal(false);
           }}
@@ -2121,7 +2233,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     required
                   />
                   {checkedInAll > 0 && (
-                    <p className="mt-1.5 text-[11px] leading-snug text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                    <p className="mt-1.5 text-[11px] leading-snug text-warn bg-warn-soft border border-warn-border rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
                       <Lock size={12} />
                       Date/time is locked because {checkedInAll} guest{checkedInAll > 1 ? 's have' : ' has'} already checked in.
                     </p>
@@ -2143,9 +2255,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* ─── Edit Guest Modal ─── */}
-      {showEditGuestModal && editingGuest && (
-        <div
-          className="modal-overlay"
+  {showEditGuestModal && editingGuest && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Edit guest"
+    className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowEditGuestModal(false);
           }}
@@ -2207,9 +2322,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       )}
 
       {/* ─── Backup Modal ─── */}
-      {showBackupModal && (
-        <div
-          className="modal-overlay"
+  {showBackupModal && (
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Backup guests"
+    className="modal-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowBackupModal(false);
           }}
@@ -2226,7 +2344,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             <div className="modal-body">
               {backupLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 size={24} className="animate-spin text-[#0D4B4B]" />
+                  <Loader2 size={24} className="animate-spin text-brand" />
                 </div>
               ) : (
                 <>
@@ -2240,7 +2358,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         setBackupPage(1);
                       }}
                       placeholder="Search all guests..."
-                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent"
                     />
                   </div>
 
@@ -2253,7 +2371,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
                       {backupPaginated.map((g) => (
                         <div key={g.id} className="py-2.5 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#0D4B4B]/10 flex items-center justify-center text-[#0D4B4B] font-bold text-sm flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-brand-soft flex items-center justify-center text-brand font-bold text-sm flex-shrink-0">
                             {g.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -2264,7 +2382,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                               <span className="truncate">{g.phone || 'No phone'}</span>
                               <span>•</span>
                               <span
-                                className={`inline-flex items-center gap-1 ${g.checkedIn ? 'text-green-600' : 'text-amber-600'
+                                className={`inline-flex items-center gap-1 ${g.checkedIn ? 'text-success' : 'text-warn'
                                   }`}
                               >
                                 {g.checkedIn ? <CheckCircle size={12} /> : <Clock size={12} />}

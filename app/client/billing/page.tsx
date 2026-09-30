@@ -59,19 +59,19 @@ export default function BillingPage() {
       {/* ─── Page Header ─── */}
       <div className="flex items-start justify-between mb-7 gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">
-            <span className="w-[5px] h-[5px] rounded-full bg-[#FF6B5C]" />
+          <div className="flex items-center gap-2 text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1.5">
+            <span className="w-[5px] h-[5px] rounded-full bg-coralbg" />
             Billing
           </div>
-          <h1 className="font-serif text-[30px] font-black text-gray-900 leading-tight tracking-tight m-0 mb-1.5">
-            Credits &amp; <span className="text-[#FF6B5C]">Billing</span>
+          <h1 className="font-display text-[30px] font-black text-gray-900 leading-tight tracking-tight m-0 mb-1.5">
+            Credits &amp; <span className="text-coraltext">Billing</span>
           </h1>
           <p className="text-sm text-gray-400 m-0">Request credits from admin to send invitations via WhatsApp or SMS.</p>
         </div>
         <button
           onClick={loadData}
           disabled={loadingData}
-          className={`flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-gray-500 text-[13px] font-bold font-sans cursor-pointer shrink-0 transition-all hover:border-[#0D4B4B] hover:text-[#0D4B4B] ${loadingData ? '[&_svg]:animate-spin' : ''}`}
+          className={`flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-tap bg-white text-gray-500 text-[13px] font-bold font-sans cursor-pointer shrink-0 transition-all hover:border-brandborder hover:text-brandtext ${loadingData ? '[&_svg]:animate-spin' : ''}`}
         >
           <RefreshCw size={14} /> Refresh
         </button>
@@ -79,7 +79,7 @@ export default function BillingPage() {
 
       {/* ─── Balance Card ─── */}
       <div className="bg-white border border-gray-200 rounded-[22px] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)] mb-5">
-        <div className="h-1 bg-gradient-to-r from-[#0D4B4B] to-pink-400" />
+        <div className="h-1 bg-gradient-to-r from-brandfrom to-pink-400" />
         <div className="p-6 sm:p-7">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
@@ -87,24 +87,24 @@ export default function BillingPage() {
               {loadingData ? (
                 <div className="w-[140px] h-[52px] bg-gray-100 rounded-[10px] mt-1 animate-pulse" />
               ) : (
-                <div className="font-serif text-[52px] font-black text-[#0D4B4B] leading-none tracking-tight mt-1">
+                <div className="font-display text-[52px] font-black text-brandtext leading-none tracking-tight mt-1">
                   {balance?.toLocaleString() ?? 0}
                   <span className="text-lg text-gray-400 font-semibold ml-1.5 font-sans">credits</span>
                 </div>
               )}
             </div>
-            <div className="w-[72px] h-[72px] rounded-[20px] shrink-0 bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 flex items-center justify-center text-[#0D4B4B]">
+            <div className="w-[72px] h-[72px] rounded-[20px] shrink-0 bg-brandbg border border-brandborder flex items-center justify-center text-brandtext">
               <Coins size={32} />
             </div>
           </div>
 
           <div className="flex gap-4 mt-4 flex-wrap">
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold text-gray-500">
-              <MessageCircle size={13} className="text-[#0D4B4B]" />
+              <MessageCircle size={13} className="text-brandtext" />
               WhatsApp: <strong className="text-gray-900 ml-0.5">{whatsappCount}</strong>
             </div>
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold text-gray-500">
-              <Phone size={13} className="text-amber-600" />
+              <Phone size={13} className="text-warn" />
               SMS: <strong className="text-gray-900 ml-0.5">{smsCount}</strong>
             </div>
             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-[10px] px-3.5 py-2 text-[12.5px] font-semibold text-gray-500">
@@ -117,28 +117,28 @@ export default function BillingPage() {
 
       {/* ─── Request Credits Card ─── */}
       <div className="bg-white border border-gray-200 rounded-[22px] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)] mb-5">
-        <div className="h-1 bg-gradient-to-r from-[#0D4B4B] to-pink-400" />
+        <div className="h-1 bg-gradient-to-r from-brandfrom to-pink-400" />
         <div className="p-6 sm:p-7">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-serif text-[17px] font-extrabold text-gray-800 tracking-tight m-0">Request Credits</h2>
+            <h2 className="font-display text-[17px] font-extrabold text-gray-800 tracking-tight m-0">Request Credits</h2>
             {hasPending && (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-warn bg-warn-soft border border-warn-border px-2.5 py-1 rounded-full">
                 <Clock size={11} /> Pending
               </span>
             )}
           </div>
 
           {hasPending ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center mb-4">
-              <Clock size={28} className="text-amber-500 mx-auto mb-2" />
+            <div className="bg-warn-soft border border-warn-border rounded-card p-5 text-center mb-4">
+              <Clock size={28} className="text-warn mx-auto mb-2" />
               <p className="text-sm font-bold text-amber-800">Request Under Review</p>
-              <p className="text-xs text-amber-600 mt-1">Your credit request is being reviewed by the admin. You&apos;ll be notified when it&apos;s approved. Need it sooner? WhatsApp +255702529514.</p>
+              <p className="text-xs text-warn mt-1">Your credit request is being reviewed by the admin. You&apos;ll be notified when it&apos;s approved. Need it sooner? WhatsApp +255702529514.</p>
             </div>
           ) : (
-            <div className="bg-[#0D4B4B]/5/50 border border-[#0D4B4B]/10 rounded-2xl p-5 text-center mb-4">
-              <Send size={28} className="text-[#0D4B4B] mx-auto mb-2" />
-              <p className="text-sm font-bold text-[#0A3939]">Need more credits?</p>
-              <p className="text-xs text-[#0D4B4B] mt-1">Send a request to the admin with your desired amount. Each credit costs 500 TZS.</p>
+            <div className="bg-brandbg/50 border border-brandborder rounded-card p-5 text-center mb-4">
+              <Send size={28} className="text-brandtext mx-auto mb-2" />
+              <p className="text-sm font-bold text-brand-deeptext">Need more credits?</p>
+              <p className="text-xs text-brandtext mt-1">Send a request to the admin with your desired amount. Each credit costs 500 TZS.</p>
             </div>
           )}
 
@@ -154,12 +154,12 @@ export default function BillingPage() {
 
       {/* ─── Usage Card ─── */}
       <div className="bg-white border border-gray-200 rounded-[22px] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]">
-        <div className="h-1 bg-gradient-to-r from-green-600 to-[#0D4B4B]/70" />
+        <div className="h-1 bg-gradient-to-r from-green-600 to-brandto" />
         <div className="p-6 sm:p-7">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2.5">
-            <h2 className="font-serif text-[17px] font-extrabold text-gray-800 tracking-tight m-0">Recent Usage</h2>
+            <h2 className="font-display text-[17px] font-extrabold text-gray-800 tracking-tight m-0">Recent Usage</h2>
             {usage.length > 0 && (
-              <span className="text-[11px] font-bold text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 px-2.5 py-1 rounded-full">
+              <span className="text-[11px] font-bold text-brandtext bg-brandbg border border-brandborder px-2.5 py-1 rounded-full">
                 {usage.length} record{usage.length !== 1 ? 's' : ''}
               </span>
             )}
@@ -177,10 +177,10 @@ export default function BillingPage() {
             </div>
           ) : usage.length === 0 ? (
             <div className="py-12 text-center">
-              <div className="w-[52px] h-[52px] rounded-[15px] mx-auto mb-3.5 bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 flex items-center justify-center text-[#0D4B4B]">
+              <div className="w-[52px] h-[52px] rounded-[15px] mx-auto mb-3.5 bg-brandbg border border-brandborder flex items-center justify-center text-brandtext">
                 <TrendingUp size={22} />
               </div>
-              <h3 className="font-serif text-base font-extrabold text-gray-800 mb-1">No usage yet</h3>
+              <h3 className="font-display text-base font-extrabold text-gray-800 mb-1">No usage yet</h3>
               <p className="text-[13px] text-gray-400">Send invitations to see usage records here.</p>
             </div>
           ) : (
@@ -207,8 +207,8 @@ export default function BillingPage() {
                           return (
                             <span className={`inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-[3px] rounded-full ${
                               label.isWhatsApp
-                                ? 'text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10'
-                                : 'text-amber-600 bg-amber-50 border border-amber-100'
+                                ? 'text-brandtext bg-brandbg border border-brandborder'
+                                : 'text-warn bg-warn-soft border border-amber-100'
                             }`}>
                               {label.isWhatsApp ? <MessageCircle size={11} /> : <Phone size={11} />}
                               {label.text}

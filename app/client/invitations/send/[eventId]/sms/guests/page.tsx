@@ -185,7 +185,7 @@ export default function SmsGuestsPage() {
             type="button"
             onClick={handleSend}
             disabled={selected.size === 0 || sending}
-            className="px-5 py-2.5 bg-[#0D4B4B] text-white rounded-xl font-semibold text-sm hover:bg-[#0A3939] transition disabled:opacity-40 flex items-center gap-2"
+            className="px-5 py-2.5 bg-brandbg text-white rounded-tap font-semibold text-sm hover:bg-brand-deepbg transition disabled:opacity-40 flex items-center gap-2"
           >
             {sending ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
             {sending ? 'Sending…' : 'Send'}
@@ -220,10 +220,10 @@ export default function SmsGuestsPage() {
           type="button"
           onClick={() => setView('failed')}
           className={`px-4 py-1.5 rounded-full text-xs font-semibold transition flex items-center gap-1.5 ${
-            view === 'failed' ? 'bg-amber-500/15 text-amber-700' : 'text-gray-500'
+            view === 'failed' ? 'bg-warn-soft0/15 text-warn' : 'text-gray-500'
           }`}
         >
-          <AlertTriangle size={12} className={view === 'failed' ? 'text-amber-600' : ''} />
+          <AlertTriangle size={12} className={view === 'failed' ? 'text-warn' : ''} />
           Retry {failed.length}
         </button>
       </div>
@@ -238,11 +238,11 @@ export default function SmsGuestsPage() {
             className="space-y-3"
           >
             {failed.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 px-6 py-10 text-center">
+              <div className="bg-white rounded-card border border-gray-200 px-6 py-10 text-center">
                 <CheckCircle2 size={30} className="text-[#1A7A4A] mx-auto mb-3" />
                 <p className="font-semibold text-gray-900">Everything went through</p>
                 <p className="text-sm text-gray-500 mt-1">No failed SMS. You&apos;re all caught up.</p>
-                <div className="flex items-center justify-center gap-3 mt-5 text-sm font-semibold text-[#0D4B4B]">
+                <div className="flex items-center justify-center gap-3 mt-5 text-sm font-semibold text-brandtext">
                   <Link href={`/client/invitations/sent/${id}`} className="hover:underline">
                     View sent invitations →
                   </Link>
@@ -250,7 +250,7 @@ export default function SmsGuestsPage() {
               </div>
             ) : (
               <>
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="rounded-card border border-warn-border bg-warn-soft px-4 py-3 flex items-center justify-between gap-3">
                   <p className="text-xs font-semibold text-amber-800">
                     {failed.length} guest{failed.length === 1 ? '' : 's'} didn&apos;t get their SMS yet.
                   </p>
@@ -269,21 +269,21 @@ export default function SmsGuestsPage() {
                     const guest = smsPending.find(g => g.id === f.guestId);
                     if (!guest) return null;
                     return (
-                      <div key={f.guestId} className="bg-white rounded-2xl border border-gray-200 p-4">
+                      <div key={f.guestId} className="bg-white rounded-card border border-gray-200 p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-amber-100 text-warn flex items-center justify-center font-bold text-sm flex-shrink-0">
                             {getFullName(guest).slice(0, 1)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-gray-900 text-sm truncate">{getFullName(guest)}</p>
                             <p className="text-xs text-gray-500 truncate">{guest.phone}</p>
-                            <p className="text-[11px] text-amber-700 mt-0.5">{f.error || 'Send failed'}</p>
+                            <p className="text-[11px] text-warn mt-0.5">{f.error || 'Send failed'}</p>
                           </div>
                           <button
                             type="button"
                             onClick={() => handleRetryOne(guest)}
                             disabled={sending}
-                            className="flex-shrink-0 w-9 h-9 rounded-full bg-[#0D4B4B] text-white flex items-center justify-center hover:bg-[#0A3939] transition disabled:opacity-40"
+                            className="flex-shrink-0 w-9 h-9 rounded-full bg-brandbg text-white flex items-center justify-center hover:bg-brand-deepbg transition disabled:opacity-40"
                             title="Retry this guest"
                           >
                             <RefreshCw size={15} />
@@ -302,8 +302,8 @@ export default function SmsGuestsPage() {
           <motion.div key="pending" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {/* ─── Plan transparency note ─── */}
             {!bypassPayment && pendingPool.length > 0 && (
-              <div className="mb-4 rounded-2xl border border-[#0D4B4B]/10 bg-[#0D4B4B]/[0.03] px-4 py-3 flex items-start gap-2.5">
-                <ShieldCheck size={15} className="text-[#0D4B4B] flex-shrink-0 mt-0.5" />
+              <div className="mb-4 rounded-card border border-brandborder bg-brandbg/[0.03] px-4 py-3 flex items-start gap-2.5">
+                <ShieldCheck size={15} className="text-brandtext flex-shrink-0 mt-0.5" />
                 <p className="text-[11px] text-gray-600 leading-relaxed">
                   One SMS per guest on your plan — guests who already received theirs are counted as sent and won&apos;t
                   appear here. Only failed ones stay for retry, so nobody is ever messaged twice by accident.
@@ -320,13 +320,13 @@ export default function SmsGuestsPage() {
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder="Search guests..."
-                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={toggleAll}
-                  className="text-xs font-semibold text-[#0D4B4B] flex-shrink-0"
+                  className="text-xs font-semibold text-brandtext flex-shrink-0"
                 >
                   {allSelected ? 'Clear' : 'Select all'}
                 </button>
@@ -334,18 +334,18 @@ export default function SmsGuestsPage() {
             )}
 
             {pendingPool.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 px-6 py-10 text-center">
+              <div className="bg-white rounded-card border border-gray-200 px-6 py-10 text-center">
                 <Inbox size={30} className="text-gray-300 mx-auto mb-3" />
                 <p className="font-semibold text-gray-900">All SMS invitations are sent</p>
                 <p className="text-sm text-gray-500 mt-1">Every guest with a card already received their SMS.</p>
-                <div className="mt-5 text-sm font-semibold text-[#0D4B4B]">
+                <div className="mt-5 text-sm font-semibold text-brandtext">
                   <Link href={`/client/invitations/sent/${id}`} className="hover:underline">
                     View sent invitations →
                   </Link>
                 </div>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 px-6 py-10 text-center">
+              <div className="bg-white rounded-card border border-gray-200 px-6 py-10 text-center">
                 <Search size={26} className="text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-600">No guests match &quot;{query}&quot;</p>
               </div>
@@ -357,7 +357,7 @@ export default function SmsGuestsPage() {
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                    className="bg-white rounded-2xl border border-gray-200 p-4"
+                    className="bg-white rounded-card border border-gray-200 p-4"
                   >
                     <div className="flex items-center gap-3">
                       <button
@@ -366,13 +366,13 @@ export default function SmsGuestsPage() {
                         aria-label={`Select ${getFullName(guest)}`}
                         className={`w-6 h-6 rounded-lg border-2 shrink-0 grid place-items-center transition ${
                           selected.has(guest.id)
-                            ? 'bg-[#0D4B4B] border-[#0D4B4B] text-white'
+                            ? 'bg-brandbg border-brandborder text-white'
                             : 'border-gray-300 text-transparent'
                         }`}
                       >
                         ✓
                       </button>
-                      <div className="w-10 h-10 rounded-full bg-[#0D4B4B]/10 text-[#0D4B4B] flex items-center justify-center font-bold text-sm flex-shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-brandbg text-brandtext flex items-center justify-center font-bold text-sm flex-shrink-0">
                         {getFullName(guest).slice(0, 1)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -388,7 +388,7 @@ export default function SmsGuestsPage() {
             )}
 
             {cardless.length > 0 && view === 'pending' && (
-              <div className="mt-4 bg-white rounded-2xl border border-dashed border-gray-300 px-4 py-3 flex items-start gap-3">
+              <div className="mt-4 bg-white rounded-card border border-dashed border-gray-300 px-4 py-3 flex items-start gap-3">
                 <Users size={16} className="text-gray-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-semibold text-gray-700">

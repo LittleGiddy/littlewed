@@ -92,15 +92,15 @@ export default function EventDetailClient({ event }: { event: Event }) {
               </div>
               <div className="space-y-3">
                 {event.guests.map(guest => (
-                  <div key={guest.id} className="bg-white rounded-xl shadow-sm p-4 flex justify-between items-center">
+                  <div key={guest.id} className="bg-white rounded-tap shadow-sm p-4 flex justify-between items-center">
                     <div>
                       <p className="font-medium">{guest.name}</p>
                       <p className="text-sm text-gray-500">{guest.phone}</p>
                       <p className="text-xs text-gray-400">{guest.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS'}</p>
                     </div>
                     <div className="text-right">
-                      <p className={`text-sm ${guest.checkedIn ? 'text-green-600' : 'text-gray-400'}`}>
-                        {guest.checkedIn ? <CheckCircle className="w-5 h-5 text-green-600" /> : 'Pending'}
+                      <p className={`text-sm ${guest.checkedIn ? 'text-success' : 'text-gray-400'}`}>
+                        {guest.checkedIn ? <CheckCircle className="w-5 h-5 text-success" /> : 'Pending'}
                       </p>
                     </div>
                   </div>
@@ -114,13 +114,13 @@ export default function EventDetailClient({ event }: { event: Event }) {
 
           {activeTab === 'invitations' && (
             <div className="space-y-4">
-              <Link href={`/client/invitations/design/${event.id}`} className="block bg-purple-600 text-white text-center py-2 rounded-xl">
+              <Link href={`/client/invitations/design/${event.id}`} className="block bg-purple-600 text-white text-center py-2 rounded-tap">
                 Design Invitation Card
               </Link>
-              <Link href={`/client/invitations/send/${event.id}`} className="block bg-green-600 text-white text-center py-2 rounded-xl">
+              <Link href={`/client/invitations/send/${event.id}`} className="block bg-green-600 text-white text-center py-2 rounded-tap">
                 Send Invitations
               </Link>
-              <button onClick={copyInviteLink} className="block w-full bg-indigo-100 text-indigo-700 text-center py-2 rounded-xl">
+              <button onClick={copyInviteLink} className="block w-full bg-indigo-100 text-indigo-700 text-center py-2 rounded-tap">
                 Copy Public Invite Link
               </button>
               <p className="text-sm text-gray-500 text-center">WhatsApp: {whatsappCount} guests | SMS: {smsCount} guests</p>
@@ -129,14 +129,14 @@ export default function EventDetailClient({ event }: { event: Event }) {
 
           {activeTab === 'checkin' && (
             <div className="text-center">
-              <Link href={`/client/check-in?event=${event.id}`} className="bg-blue-600 text-white px-4 py-2 rounded-xl inline-block">
+              <Link href={`/client/check-in?event=${event.id}`} className="bg-blue-600 text-white px-4 py-2 rounded-tap inline-block">
                 Open Check-in Scanner
               </Link>
             </div>
           )}
 
           {activeTab === 'stats' && (
-            <div className="bg-white rounded-xl shadow-sm p-5 space-y-2">
+            <div className="bg-white rounded-tap shadow-sm p-5 space-y-2">
               <p>Total guests: {event.guests.length}</p>
               <p>Checked in: {checkedInCount}</p>
               <p>WhatsApp guests: {whatsappCount}</p>

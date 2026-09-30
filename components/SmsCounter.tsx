@@ -21,7 +21,7 @@ export default function SmsCounter({
   const over = maxParts != null && parts > maxParts;
   return (
     <span
-      className={`${className} ${over ? 'text-amber-600 font-semibold' : ''}`}
+      className={`${className} ${over ? 'text-warn font-semibold' : ''}`}
       title={`NextSMS counts ${SMS_MAX_CHARS_PER_PART} characters per SMS${
         maxParts != null ? ` - max ${maxParts} SMS per guest on your plan` : ''
       }`}

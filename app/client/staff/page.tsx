@@ -82,7 +82,7 @@ export default function StaffPage() {
       {/* Back link */}
       <Link
         href="/client/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 rounded-xl px-3.5 py-1.5 transition hover:bg-[#0D4B4B]/10 mb-6"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-brandbg border border-brandborder rounded-tap px-3.5 py-1.5 transition hover:bg-brandbg mb-6"
       >
         <ArrowLeft size={14} /> Back to Dashboard
       </Link>
@@ -90,14 +90,14 @@ export default function StaffPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <div className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#0D4B4B] mb-1">Management</div>
-          <h1 className="font-serif text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">
-            Staff <span className="text-[#FF6B5C]">Members</span>
+          <div className="text-[11px] font-bold tracking-[1.5px] uppercase text-brandtext mb-1">Management</div>
+          <h1 className="font-display text-3xl md:text-4xl font-black text-gray-900 leading-tight tracking-tight">
+            Staff <span className="text-coraltext">Members</span>
           </h1>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md shadow-[#0D4B4B]/25 hover:shadow-lg hover:shadow-[#0D4B4B]/30 transition-all flex items-center gap-2"
+          className="bg-gradient-to-r from-brandfrom to-brand-deepto text-white px-4 py-2 rounded-tap font-bold text-sm shadow-md shadow-brandshadow hover:shadow-lg hover:shadow-brandshadow transition-all flex items-center gap-2"
         >
           <UserPlus size={16} /> Add Staff
         </button>
@@ -105,9 +105,9 @@ export default function StaffPage() {
 
       {/* Error banner */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl flex items-center justify-between mb-6 text-sm">
+        <div className="bg-danger-soft border border-danger-border text-danger p-3 rounded-tap flex items-center justify-between mb-6 text-sm">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="text-red-500 hover:text-red-700 bg-transparent border-none cursor-pointer text-lg leading-none">&times;</button>
+          <button onClick={() => setError('')} className="text-danger hover:text-danger bg-transparent border-none cursor-pointer text-lg leading-none">&times;</button>
         </div>
       )}
 
@@ -118,7 +118,7 @@ export default function StaffPage() {
           onClick={() => setShowForm(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-[modalIn_0.2s_cubic-bezier(0.16,1,0.3,1)_both]"
+            className="bg-white rounded-card shadow-xl w-full max-w-md overflow-hidden animate-[modalIn_0.2s_cubic-bezier(0.16,1,0.3,1)_both]"
             onClick={e => e.stopPropagation()}
           >
             <style>{`
@@ -128,7 +128,7 @@ export default function StaffPage() {
               }
             `}</style>
             <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-              <h2 className="font-serif text-xl font-extrabold text-gray-800">Add Staff Member</h2>
+              <h2 className="font-display text-xl font-extrabold text-gray-800">Add Staff Member</h2>
             </div>
             <form onSubmit={addStaff} className="p-6 space-y-4">
               <div>
@@ -138,7 +138,7 @@ export default function StaffPage() {
                   required
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -148,7 +148,7 @@ export default function StaffPage() {
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -159,7 +159,7 @@ export default function StaffPage() {
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all pr-10"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all pr-10"
                   />
                   <button
                     type="button"
@@ -174,7 +174,7 @@ export default function StaffPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-[#0D4B4B]/25 hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-2.5 rounded-tap font-semibold text-sm shadow-md shadow-brandshadow hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
                   {submitting ? 'Creating...' : 'Create Staff'}
@@ -182,7 +182,7 @@ export default function StaffPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 transition bg-white cursor-pointer"
+                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-tap font-semibold text-sm hover:bg-gray-50 transition bg-white cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -193,21 +193,21 @@ export default function StaffPage() {
       )}
 
       {/* Staff List Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
-          <h2 className="font-serif text-lg font-extrabold text-gray-800">Team Members</h2>
-          <span className="text-[11px] font-bold text-[#0D4B4B] bg-[#0D4B4B]/5 border border-[#0D4B4B]/10 px-2.5 py-1 rounded-full">
+          <h2 className="font-display text-lg font-extrabold text-gray-800">Team Members</h2>
+          <span className="text-[11px] font-bold text-brandtext bg-brandbg border border-brandborder px-2.5 py-1 rounded-full">
             {staff.length} staff
           </span>
         </div>
         {loading ? (
           <div className="flex justify-center py-12">
-            <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-gray-200 border-t-brand rounded-full animate-spin" />
           </div>
         ) : staff.length === 0 ? (
           <div className="py-12 text-center">
             <div className="flex justify-center text-gray-400 mb-3"><Users size={40} /></div>
-            <h3 className="font-serif text-lg font-bold text-gray-800 mb-1">No staff members yet</h3>
+            <h3 className="font-display text-lg font-bold text-gray-800 mb-1">No staff members yet</h3>
             <p className="text-sm text-gray-400">Add your first team member to get started.</p>
           </div>
         ) : (
@@ -230,7 +230,7 @@ export default function StaffPage() {
                     <td className="px-5 py-3 text-right">
                       <button
                         onClick={() => deleteStaff(s.id)}
-                        className="text-red-400 hover:text-red-600 transition bg-transparent border-none cursor-pointer p-1"
+                        className="text-red-400 hover:text-danger transition bg-transparent border-none cursor-pointer p-1"
                       >
                         <Trash2 size={16} />
                       </button>

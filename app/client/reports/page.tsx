@@ -160,18 +160,18 @@ export default function ReportsPage() {
   };
 
   const statCards = [
-    { label: 'Total Events', value: summary.totalEvents, icon: Calendar, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
+    { label: 'Total Events', value: summary.totalEvents, icon: Calendar, color: 'text-brandtext', bg: 'bg-brandbg' },
     { label: 'Total Guests', value: summary.totalGuests, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Checked In', value: summary.totalCheckedIn, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Checked In', value: summary.totalCheckedIn, icon: CheckCircle, color: 'text-success', bg: 'bg-success-soft' },
     { label: 'Invitations Sent', value: summary.totalInvitationsSent, icon: Send, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Credits Used', value: summary.totalCreditsUsed, icon: Coins, color: 'text-[#FF6B5C]', bg: 'bg-[#FF6B5C]/10' },
+    { label: 'Credits Used', value: summary.totalCreditsUsed, icon: Coins, color: 'text-coraltext', bg: 'bg-coralbg' },
   ];
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-gray-200 border-t-brand rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm text-gray-500 font-medium">Loading reports...</p>
         </div>
       </div>
@@ -181,11 +181,11 @@ export default function ReportsPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full shadow-sm border border-gray-100">
+        <div className="bg-white rounded-card p-8 text-center max-w-sm w-full shadow-sm border border-gray-100">
           <AlertCircle size={40} className="text-red-400 mx-auto mb-3" />
           <p className="text-gray-700 font-semibold mb-1">Failed to load reports</p>
           <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <button onClick={() => { setLoading(true); setError(null); window.location.reload(); }} className="px-5 py-2 bg-[#0D4B4B] text-white rounded-xl text-sm font-semibold hover:bg-[#0A3939] transition">
+          <button onClick={() => { setLoading(true); setError(null); window.location.reload(); }} className="px-5 py-2 bg-brandbg text-white rounded-tap text-sm font-semibold hover:bg-brand-deepbg transition">
             Retry
           </button>
         </div>
@@ -199,17 +199,17 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <div className="flex items-center gap-2 text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1">
+            <div className="flex items-center gap-2 text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1">
               <BarChart3 size={14} /> Analytics
             </div>
-            <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900">Monthly Report</h1>
+            <h1 className="font-display text-2xl sm:text-3xl font-black text-gray-900">Monthly Report</h1>
             <p className="text-sm text-gray-500 mt-1">{data?.tenant?.name} - {data?.tenant?.plan} Plan</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
-                className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] appearance-none cursor-pointer">
+                className="pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-tap text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brandring focus:border-brandborder appearance-none cursor-pointer">
                 <option value="all">All Months</option>
                 {data?.months?.map((m) => <option key={m.month} value={m.month}>{m.month}</option>)}
               </select>
@@ -221,11 +221,11 @@ export default function ReportsPage() {
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           {statCards.map((card) => (
-            <div key={card.label} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-              <div className={`w-9 h-9 rounded-xl ${card.bg} flex items-center justify-center mb-2.5`}>
+            <div key={card.label} className="bg-white rounded-card p-4 border border-gray-100 shadow-sm">
+              <div className={`w-9 h-9 rounded-tap ${card.bg} flex items-center justify-center mb-2.5`}>
                 <card.icon size={17} className={card.color} />
               </div>
-              <p className="font-serif text-2xl font-black text-gray-900">{card.value.toLocaleString()}</p>
+              <p className="font-display text-2xl font-black text-gray-900">{card.value.toLocaleString()}</p>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mt-0.5">{card.label}</p>
             </div>
           ))}
@@ -235,11 +235,11 @@ export default function ReportsPage() {
         <div className="flex items-center gap-2 mb-4">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mr-1">Export:</span>
           <button onClick={handleExportPDF} disabled={!!exporting}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-semibold hover:bg-red-100 transition disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-danger-soft text-danger rounded-lg text-xs font-semibold hover:bg-red-100 transition disabled:opacity-50">
             {exporting === 'pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF
           </button>
           <button onClick={handleExportExcel} disabled={!!exporting}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-semibold hover:bg-green-100 transition disabled:opacity-50">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-success-soft text-success rounded-lg text-xs font-semibold hover:bg-green-100 transition disabled:opacity-50">
             {exporting === 'excel' ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />} Excel
           </button>
           <button onClick={handleExportWord} disabled={!!exporting}
@@ -249,18 +249,18 @@ export default function ReportsPage() {
         </div>
 
         {/* Report Content (captured for PDF) */}
-        <div ref={reportRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div ref={reportRef} className="bg-white rounded-card border border-gray-100 shadow-sm overflow-hidden">
           {/* Bar Chart */}
           <div className="p-5 border-b border-gray-50">
             <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-              <TrendingUp size={15} className="text-[#0D4B4B]" /> Guest Activity by Month
+              <TrendingUp size={15} className="text-brandtext" /> Guest Activity by Month
             </h3>
             <div className="flex items-end gap-1.5 h-40">
               {filteredMonths.map((m) => (
                 <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full flex flex-col items-center justify-end h-32">
                     <div
-                      className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-[#0D4B4B] to-[#0D4B4B]/70 transition-all duration-500"
+                      className="w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-brandfrom to-brandto transition-all duration-500"
                       style={{ height: `${(m.guests / maxGuests) * 100}%`, minHeight: m.guests > 0 ? '4px' : '0' }}
                       title={`${m.guests} guests`}
                     />
@@ -288,22 +288,22 @@ export default function ReportsPage() {
                     <td className="px-4 py-3 text-gray-600">{m.events}</td>
                     <td className="px-4 py-3 text-gray-600">{m.guests}</td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 text-green-600 font-medium">
+                      <span className="inline-flex items-center gap-1 text-success font-medium">
                         <CheckCircle size={12} /> {m.checkedIn}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">{m.invitationsSent}</td>
-                    <td className="px-4 py-3 text-[#FF6B5C] font-semibold">{m.creditsUsed}</td>
+                    <td className="px-4 py-3 text-coraltext font-semibold">{m.creditsUsed}</td>
                   </tr>
                 ))}
                 {/* Totals Row */}
-                <tr className="bg-[#0D4B4B]/5 font-bold">
-                  <td className="px-4 py-3 text-[#0D4B4B]">Total</td>
-                  <td className="px-4 py-3 text-[#0D4B4B]">{summary.totalEvents}</td>
-                  <td className="px-4 py-3 text-[#0D4B4B]">{summary.totalGuests}</td>
-                  <td className="px-4 py-3 text-[#0D4B4B]">{summary.totalCheckedIn}</td>
-                  <td className="px-4 py-3 text-[#0D4B4B]">{summary.totalInvitationsSent}</td>
-                  <td className="px-4 py-3 text-[#FF6B5C] font-black">{summary.totalCreditsUsed}</td>
+                <tr className="bg-brandbg font-bold">
+                  <td className="px-4 py-3 text-brandtext">Total</td>
+                  <td className="px-4 py-3 text-brandtext">{summary.totalEvents}</td>
+                  <td className="px-4 py-3 text-brandtext">{summary.totalGuests}</td>
+                  <td className="px-4 py-3 text-brandtext">{summary.totalCheckedIn}</td>
+                  <td className="px-4 py-3 text-brandtext">{summary.totalInvitationsSent}</td>
+                  <td className="px-4 py-3 text-coraltext font-black">{summary.totalCreditsUsed}</td>
                 </tr>
               </tbody>
             </table>

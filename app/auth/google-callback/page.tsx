@@ -250,7 +250,7 @@ function GoogleCallbackInner() {
               padding: 14,
               border: 'none',
               borderRadius: 13,
-              background: 'linear-gradient(135deg, #0D4B4B, #0A3939)',
+              background: 'linear-gradient(135deg, var(--color-brand), #0A3939)',
               color: 'white',
               fontSize: 14,
               fontWeight: 700,

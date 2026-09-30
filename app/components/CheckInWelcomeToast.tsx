@@ -37,11 +37,11 @@ function WelcomeContent({ name, subtitle, onClose }: ContentProps) {
         transition={{ type: 'spring', stiffness: 260, damping: 16 }}
         className="mx-auto mb-3 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-100 flex items-center justify-center"
       >
-        <CheckCircle size={40} className="text-green-600" strokeWidth={2.5} />
+        <CheckCircle size={40} className="text-success" strokeWidth={2.5} />
       </motion.div>
 
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 mb-1">Welcome</p>
-      <p className="font-serif text-2xl sm:text-3xl font-black text-gray-900 leading-tight">{name}</p>
+      <p className="font-display text-2xl sm:text-3xl font-black text-gray-900 leading-tight">{name}</p>
       {subtitle && <p className="text-sm font-medium text-gray-500 mt-1">{subtitle}</p>}
 
       <div className="mt-4 flex justify-center">

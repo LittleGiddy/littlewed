@@ -286,7 +286,7 @@ export default function ModernColorPicker({
           e.stopPropagation();
           toggle();
         }}
-        className={`flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:border-[#0D4B4B]/50 transition p-1 pr-2 h-8 w-full ${className}`}
+        className={`flex items-center gap-2 rounded-lg border border-gray-200 bg-white hover:border-brandborder transition p-1 pr-2 h-8 w-full ${className}`}
       >
         <span
           className="w-5 h-5 rounded-md border border-gray-300 shrink-0 relative overflow-hidden"
@@ -302,7 +302,7 @@ export default function ModernColorPicker({
         </span>
         <span className="text-[10px] font-mono text-gray-600 truncate flex-1">{currentLabel}</span>
         <span
-          className="text-[#0D4B4B] text-xs transition-transform"
+          className="text-brandtext text-xs transition-transform"
           style={{ transform: open ? 'rotate(180deg)' : 'none' }}
         >
           ▾
@@ -315,7 +315,7 @@ export default function ModernColorPicker({
               ref={popRef}
               role="dialog"
               aria-label="Color picker"
-              className="fixed z-[100] rounded-xl bg-white shadow-2xl border border-gray-200 p-3"
+              className="fixed z-[100] rounded-tap bg-white shadow-2xl border border-gray-200 p-3"
               style={{ top: pos.top, left: pos.left, width: 272, maxHeight: 'min(430px, 92vh)' }}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -336,7 +336,7 @@ export default function ModernColorPicker({
                   <button
                     type="button"
                     onClick={pickFromScreen}
-                    className="p-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-[#0D4B4B] hover:text-white transition"
+                    className="p-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-brandbg hover:text-white transition"
                     title="Pick color from screen"
                   >
                     <Pipette size={14} />
@@ -468,7 +468,7 @@ export default function ModernColorPicker({
                     onChange={(e) => onHexChange(e.target.value)}
                     onFocus={() => setHexDraft('')}
                     onBlur={() => setHexDraft(null)}
-                    className="w-full pl-1 py-1 border border-gray-200 rounded-md text-[10px] font-mono focus:ring-1 focus:ring-[#0D4B4B] focus:border-transparent"
+                    className="w-full pl-1 py-1 border border-gray-200 rounded-md text-[10px] font-mono focus:ring-1 focus:ring-brandring focus:border-transparent"
                     spellCheck={false}
                   />
                 </label>
@@ -501,7 +501,7 @@ export default function ModernColorPicker({
                         type="button"
                         title={c}
                         onClick={() => apply(rgbToHsv(parseColor(c)), true)}
-                        className={`h-5 rounded border ${active ? 'border-[#0D4B4B] ring-1 ring-[#0D4B4B] scale-110' : 'border-gray-200 hover:border-gray-400'}`}
+                        className={`h-5 rounded border ${active ? 'border-brandborder ring-1 ring-brandring scale-110' : 'border-gray-200 hover:border-gray-400'}`}
                         style={{ backgroundColor: c }}
                       >
                         {active && <Check size={10} className="m-auto text-white mix-blend-difference" />}
@@ -523,7 +523,7 @@ export default function ModernColorPicker({
                         onClick={() => apply(rgbToHsv(parseColor(c)))}
                         className={`h-5 rounded border ${
                           c.toLowerCase() === currentLabel.toLowerCase()
-                            ? 'border-[#0D4B4B] ring-1 ring-[#0D4B4B]'
+                            ? 'border-brandborder ring-1 ring-brandring'
                             : 'border-gray-200 hover:border-gray-400'
                         }`}
                         style={c.startsWith('rgba') ? { ...CHECKER } : { backgroundColor: c }}

@@ -235,8 +235,8 @@ export default function SentInvitationsPage() {
       </div>
 
       {!bypassPayment && (
-        <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-[#0D4B4B]/10 bg-[#0D4B4B]/[0.03] px-4 py-3">
-          <Lock size={15} className="text-[#0D4B4B] flex-shrink-0 mt-0.5" />
+        <div className="mb-5 flex items-start gap-2.5 rounded-card border border-brandborder bg-brandbg/[0.03] px-4 py-3">
+          <Lock size={15} className="text-brandtext flex-shrink-0 mt-0.5" />
           <p className="text-xs text-gray-600 leading-relaxed">
             <span className="font-semibold text-gray-800">Your plan includes one invitation per guest per channel.</span>{' '}
             Re-sending an already-delivered invitation costs{' '}
@@ -256,7 +256,7 @@ export default function SentInvitationsPage() {
               tab === 'whatsapp' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'
             }`}
           >
-            <MessageCircle size={12} className="text-[#15803d]" /> WhatsApp · {whatsappSent.length}
+            <MessageCircle size={12} className="text-successtext" /> WhatsApp · {whatsappSent.length}
           </button>
           <button
             type="button"
@@ -273,7 +273,7 @@ export default function SentInvitationsPage() {
             type="button"
             onClick={handleResendAll}
             disabled={sendingAll || (!bypassPayment && credits !== null && credits < list.length * RESEND_COST)}
-            className="flex-shrink-0 px-3.5 py-2 bg-[#0D4B4B] text-white rounded-xl text-xs font-semibold hover:bg-[#0A3939] transition disabled:opacity-40 flex items-center gap-1.5"
+            className="flex-shrink-0 px-3.5 py-2 bg-brandbg text-white rounded-tap text-xs font-semibold hover:bg-brand-deepbg transition disabled:opacity-40 flex items-center gap-1.5"
             title={
               bypassPayment
                 ? 'Resend all guests on this channel'
@@ -287,11 +287,11 @@ export default function SentInvitationsPage() {
       </div>
 
       {list.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 px-6 py-10 text-center">
+        <div className="bg-white rounded-card border border-gray-200 px-6 py-10 text-center">
           <CheckCircle2 size={30} className="text-gray-300 mx-auto mb-3" />
           <p className="font-semibold text-gray-900">No {tab} invitations sent yet</p>
           <p className="text-sm text-gray-500 mt-1">
-            <Link href={`/client/invitations/send/${id}/${tab}`} className="text-[#0D4B4B] font-semibold hover:underline">
+            <Link href={`/client/invitations/send/${id}/${tab}`} className="text-brandtext font-semibold hover:underline">
               Go send some →
             </Link>
           </p>
@@ -299,9 +299,9 @@ export default function SentInvitationsPage() {
       ) : (
         <div className="space-y-2">
           {list.map(guest => (
-            <div key={guest.id} className="bg-white rounded-2xl border border-gray-200 p-4">
+            <div key={guest.id} className="bg-white rounded-card border border-gray-200 p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#0D4B4B]/10 text-[#0D4B4B] flex items-center justify-center font-bold text-sm flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-brandbg text-brandtext flex items-center justify-center font-bold text-sm flex-shrink-0">
                   {getFullName(guest).slice(0, 1)}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -314,7 +314,7 @@ export default function SentInvitationsPage() {
                 <button
                   type="button"
                   onClick={() => copyCard(guest)}
-                  className="flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 text-gray-500 flex items-center justify-center hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
+                  className="flex-shrink-0 w-9 h-9 rounded-tap border border-gray-200 text-gray-500 flex items-center justify-center hover:text-brandtext hover:border-brandborder transition"
                   title="Copy card details"
                 >
                   {copiedId === guest.id ? <Check size={15} className="text-[#1A7A4A]" /> : <Copy size={15} />}
@@ -323,7 +323,7 @@ export default function SentInvitationsPage() {
                   type="button"
                   onClick={() => handleResend(guest, tab)}
                   disabled={sendingId === guest.id || (!bypassPayment && credits !== null && credits < RESEND_COST)}
-                  className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#0D4B4B] text-white flex items-center justify-center hover:bg-[#0A3939] transition disabled:opacity-40"
+                  className="flex-shrink-0 w-9 h-9 rounded-tap bg-brandbg text-white flex items-center justify-center hover:bg-brand-deepbg transition disabled:opacity-40"
                   title={
                     bypassPayment
                       ? 'Resend invitation (unlimited)'
@@ -336,7 +336,7 @@ export default function SentInvitationsPage() {
                 </button>
               </div>
               {guest.lastSendStatus === 'FAILED' && (
-                <p className="mt-2 text-[11px] text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
+                <p className="mt-2 text-[11px] text-warn bg-warn-soft rounded-lg px-3 py-1.5">
                   Last send failed: {guest.lastSendError || 'unknown error'} · sent:{' '}
                   {tab === 'whatsapp' ? formatDate(guest.whatsappSentAt) : formatDate(guest.smsSentAt)}
                 </p>
@@ -352,21 +352,21 @@ export default function SentInvitationsPage() {
       )}
 
       {bypassPayment ? (
-        <div className="mt-5 rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 px-4 py-3">
+        <div className="mt-5 rounded-card bg-brandbg/[0.04] border border-brandborder px-4 py-3">
           <p className="text-[11px] text-gray-600 text-center leading-relaxed">
-            You&apos;re on <span className="font-semibold text-[#0D4B4B]">unlimited-resend mode</span>, so you can
+            You&apos;re on <span className="font-semibold text-brandtext">unlimited-resend mode</span>, so you can
             resend any guest for free (individually or all at once).{tab === 'whatsapp' ? ` Today: ${waUsed} of ${waLimit} WhatsApp sends used.` : ''}
           </p>
         </div>
       ) : (
-        <div className="mt-5 rounded-2xl bg-amber-50/70 border border-amber-200 px-4 py-3">
+        <div className="mt-5 rounded-card bg-warn-soft/70 border border-warn-border px-4 py-3">
           <p className="text-[11px] text-gray-700 text-center leading-relaxed flex items-center justify-center gap-1.5 flex-wrap">
-            <Coins size={13} className="text-amber-600" />
+            <Coins size={13} className="text-warn" />
             <span>
               Resends cost <span className="font-semibold">{RESEND_COST} credit{RESEND_COST === 1 ? '' : 's'} each</span>.
               Your balance: <span className="font-semibold">{credits ?? '—'}</span> credit{credits === 1 ? '' : 's'}.
             </span>
-            <Link href="/client/billing" className="text-[#0D4B4B] font-semibold hover:underline ml-0.5">
+            <Link href="/client/billing" className="text-brandtext font-semibold hover:underline ml-0.5">
               Get more credits →
             </Link>
           </p>

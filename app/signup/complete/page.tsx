@@ -63,7 +63,7 @@ export default function SignupCompletePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA]">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-[#0D4B4B] animate-spin mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 text-brandtext animate-spin mx-auto mb-4" />
           <p className="text-gray-600">Completing sign up...</p>
         </div>
       </div>
@@ -73,10 +73,10 @@ export default function SignupCompletePage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA] px-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8">
-        <div className="w-14 h-14 rounded-2xl bg-[#0D4B4B]/5 flex items-center justify-center text-[#0D4B4B] mx-auto mb-4">
+        <div className="w-14 h-14 rounded-card bg-brandbg flex items-center justify-center text-brandtext mx-auto mb-4">
           {submitting ? <Loader2 className="w-7 h-7 animate-spin" /> : <Phone className="w-7 h-7" />}
         </div>
-        <h1 className="font-serif text-2xl font-bold text-gray-900 text-center">Almost there</h1>
+        <h1 className="font-display text-2xl font-bold text-gray-900 text-center">Almost there</h1>
         <p className="text-sm text-gray-500 text-center mt-1 mb-6">
           One last step: add your phone number so we can reach you about your account.
         </p>
@@ -96,12 +96,12 @@ export default function SignupCompletePage() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="e.g., +255 700 000 000"
-            className="w-full p-3 text-center text-base border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+            className="w-full p-3 text-center text-base border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-gray-50"
           />
           <button
             type="submit"
             disabled={submitting || !phone.trim()}
-            className="w-full py-3 bg-[#0D4B4B] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 bg-brandbg text-white rounded-tap font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? <Loader2 size={18} className="animate-spin" /> : 'Finish Creating My Organization'}
           </button>

@@ -119,7 +119,7 @@ export default function NewEventPage() {
           gap: 6px;
           font-size: 13px;
           font-weight: 700;
-          color: #0D4B4B;
+          color: var(--color-brand);
           text-decoration: none;
           margin-bottom: 24px;
           padding: 7px 14px;
@@ -137,7 +137,7 @@ export default function NewEventPage() {
           font-weight: 700;
           letter-spacing: 1.5px;
           text-transform: uppercase;
-          color: #0D4B4B;
+          color: var(--color-brand);
           margin-bottom: 6px;
         }
 
@@ -152,7 +152,7 @@ export default function NewEventPage() {
         }
 
         .page-title span {
-          color: #FF6B5C;
+          color: var(--color-coral);
         }
 
         .page-sub {
@@ -203,7 +203,7 @@ export default function NewEventPage() {
         .field-label.up {
           top: 0;
           font-size: 11px;
-          color: #0D4B4B;
+          color: var(--color-brand);
           font-weight: 700;
           letter-spacing: 0.2px;
         }
@@ -227,7 +227,7 @@ export default function NewEventPage() {
 
         .field-input:focus,
         .field-textarea:focus {
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
           box-shadow: 0 0 0 4px rgba(13, 79, 79, 0.08);
         }
 
@@ -295,7 +295,7 @@ export default function NewEventPage() {
           font-family: 'Playfair Display', serif;
           font-size: 28px;
           font-weight: 900;
-          color: #0D4B4B;
+          color: var(--color-brand);
         }
 
         .total-hint {
@@ -343,7 +343,7 @@ export default function NewEventPage() {
 
         .credits-value {
           font-weight: 700;
-          color: #0D4B4B;
+          color: var(--color-brand);
         }
 
         .submit-btn {
@@ -355,7 +355,7 @@ export default function NewEventPage() {
           padding: 16px;
           border: none;
           border-radius: 14px;
-          background: linear-gradient(135deg, #0D4B4B, #0A3939);
+          background: linear-gradient(135deg, var(--color-brand), #0A3939);
           color: white;
           font-size: 15px;
           font-weight: 700;
@@ -447,14 +447,14 @@ export default function NewEventPage() {
             <button
               type="button"
               onClick={() => setShowRequestModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0D4B4B] text-white text-xs font-bold rounded-lg hover:bg-[#0A3939] transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brandbg text-white text-xs font-bold rounded-lg hover:bg-brand-deepbg transition-colors"
             >
               <Send size={12} /> Request
             </button>
           </div>
 
           {hasPending && (
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-4 text-xs font-semibold text-amber-700">
+            <div className="flex items-center gap-2 bg-warn-soft border border-warn-border rounded-tap px-3 py-2 mb-4 text-xs font-semibold text-warn">
               <Clock size={14} /> You have a pending credit request under review.
             </div>
           )}

@@ -85,8 +85,8 @@ const getGuestTypeLabel = (type: string | null, count?: number | null) => {
 const getCheckInStatus = (guest: Guest) => {
   const max = guestTypeMaxScans(guest.guestType, guest.guestCount);
   const count = guest.checkInCount || 0;
-  if (count >= max) return { label: 'Fully Checked In', color: 'text-green-600 bg-green-50', icon: CheckCheck };
-  if (count > 0) return { label: `Partial (${count}/${max})`, color: 'text-amber-600 bg-amber-50', icon: UserCheck };
+  if (count >= max) return { label: 'Fully Checked In', color: 'text-success bg-success-soft', icon: CheckCheck };
+  if (count > 0) return { label: `Partial (${count}/${max})`, color: 'text-warn bg-warn-soft', icon: UserCheck };
   return { label: 'Not Scanned', color: 'text-gray-400 bg-gray-50', icon: User };
 };
 
@@ -386,7 +386,7 @@ export default function StaffDashboard() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-[#0D4B4B]" />
+        <Loader2 size={28} className="animate-spin text-brandtext" />
       </div>
     );
   }
@@ -404,32 +404,32 @@ export default function StaffDashboard() {
       `}</style>
 
       <div className="max-w-lg mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)] mb-3 sm:mb-4">
+        <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-white border border-brand/20 rounded-tap px-3 py-1.5 transition hover:bg-brand/10 mb-3 sm:mb-4">
           <ArrowLeft size={14} /> Back
         </Link>
 
         {/* ─── Header ─── */}
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div>
-            <div className="text-[11px] font-bold tracking-[1.5px] uppercase text-[#0D4B4B] mb-0.5">Staff Portal</div>
-            <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900">Staff <span className="text-[#FF6B5C]">Check-in</span></h1>
+            <div className="text-[11px] font-bold tracking-[1.5px] uppercase text-brandtext mb-0.5">Staff Portal</div>
+            <h1 className="font-display text-2xl sm:text-3xl font-black text-gray-900">Staff <span className="text-coraltext">Check-in</span></h1>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-full px-3 py-1.5">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-brandtext bg-white border border-brand/20 rounded-full px-3 py-1.5">
               <Users size={13} /> {fullyCheckedIn}/{totalGuests} in
             </span>
           </div>
         </div>
 
         {/* ─── Event selector ─── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 shadow-sm">
-          <label className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase text-[#0D4B4B] mb-1.5">
+        <div className="bg-white rounded-tap border border-gray-200 p-3 mb-3 shadow-sm">
+          <label className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide uppercase text-brandtext mb-1.5">
             <Calendar size={13} /> Select Event
           </label>
           <select
             value={selectedEventId}
             onChange={e => loadGuests(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent outline-none bg-white"
+            className="w-full px-3 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent outline-none bg-white"
           >
             <option value="">- Choose an event -</option>
             {events.map(e => (
@@ -452,9 +452,9 @@ export default function StaffDashboard() {
           <>
             {/* ─── Event info + tabs ─── */}
             {selectedEvent && (
-              <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 shadow-sm">
+              <div className="bg-white rounded-tap border border-gray-200 p-3 mb-3 shadow-sm">
                 <div className="flex items-center gap-2 text-sm">
-                  <Calendar size={14} className="text-[#FF6B5C] flex-shrink-0" />
+                  <Calendar size={14} className="text-coraltext flex-shrink-0" />
                   <span className="font-semibold text-gray-800 truncate">{selectedEvent.name}</span>
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5">
@@ -463,16 +463,16 @@ export default function StaffDashboard() {
               </div>
             )}
 
-            <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-3 shadow-sm">
+            <div className="flex gap-1 bg-white rounded-tap border border-gray-200 p-1 mb-3 shadow-sm">
               <button
                 onClick={() => setActiveTab('scan')}
-                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'scan' ? 'bg-[#0D4B4B] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'scan' ? 'bg-brandbg text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
               >
                 <Scan size={16} /> Scan
               </button>
               <button
                 onClick={() => setActiveTab('data')}
-                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'data' ? 'bg-[#0D4B4B] text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${activeTab === 'data' ? 'bg-brandbg text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
               >
                 <Users size={16} /> Data
               </button>
@@ -481,8 +481,8 @@ export default function StaffDashboard() {
             {/* ─── Scan tab ─── */}
             {activeTab === 'scan' && (
               <>
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
-                  <div className="relative rounded-xl overflow-hidden bg-black aspect-square qr-scanner-container">
+                <div className="bg-white rounded-card shadow-lg border border-gray-100 p-3 sm:p-4">
+                  <div className="relative rounded-tap overflow-hidden bg-black aspect-square qr-scanner-container">
                     <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
                     <canvas ref={canvasRef} className="hidden" />
                     {!scanning && !loadingCheckin && (
@@ -497,10 +497,10 @@ export default function StaffDashboard() {
                     )}
                     <div className="absolute inset-0 pointer-events-none">
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 sm:w-48 h-40 sm:h-48 border-2 border-white/50 rounded-lg">
-                        <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-[#FF6B5C] rounded-tl" />
-                        <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-[#FF6B5C] rounded-tr" />
-                        <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-[#FF6B5C] rounded-bl" />
-                        <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-[#FF6B5C] rounded-br" />
+                        <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-coralborder rounded-tl" />
+                        <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-coralborder rounded-tr" />
+                        <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-coralborder rounded-bl" />
+                        <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-coralborder rounded-br" />
                       </div>
                     </div>
                   </div>
@@ -510,9 +510,9 @@ export default function StaffDashboard() {
                 </div>
 
                 {/* Manual entry */}
-                <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
+                <div className="mt-3 sm:mt-4 bg-white rounded-card shadow-lg border border-gray-100 p-3 sm:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Key size={16} className="text-[#0D4B4B] flex-shrink-0" />
+                    <Key size={16} className="text-brandtext flex-shrink-0" />
                     <span className="font-medium text-sm text-gray-700">Manual Entry</span>
                   </div>
                   <form onSubmit={handleManualCheckIn} className="space-y-3">
@@ -523,7 +523,7 @@ export default function StaffDashboard() {
                       pattern="[0-9]*"
                       value={cardNumber}
                       onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                      className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+                      className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-gray-50"
                       placeholder="00000"
                       maxLength={5}
                       autoComplete="off"
@@ -531,7 +531,7 @@ export default function StaffDashboard() {
                     <button
                       type="submit"
                       disabled={loadingCheckin || cardNumber.length !== 5}
-                      className="w-full py-3 bg-[#0D4B4B] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                      className="w-full py-3 bg-brandbg text-white rounded-tap font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
                     >
                       {loadingCheckin ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
                       Check In
@@ -541,7 +541,7 @@ export default function StaffDashboard() {
 
                 {/* Blocked (event not started) */}
                 {blockedMessage && (
-                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-center text-sm">
+                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 rounded-card bg-warn-soft border border-warn-border text-amber-800 text-center text-sm">
                     <div className="flex items-center justify-center gap-1.5 font-medium">
                       <Info size={15} /> Check-in not available yet
                     </div>
@@ -551,16 +551,16 @@ export default function StaffDashboard() {
 
                 {/* Message / success */}
                 {message && !blockedMessage && (
-                  <div className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl text-center font-medium transition-all text-sm ${showSuccess ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}>
+                  <div className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-card text-center font-medium transition-all text-sm ${showSuccess ? 'bg-success-soft border border-success-border text-green-800' : 'bg-danger-soft border border-danger-border text-red-800'}`}>
                     {message}
                   </div>
                 )}
 
                 {scannedGuest && showSuccess && (
-                  <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-green-200 p-3 sm:p-4 animate-fadeInUp">
+                  <div className="mt-3 sm:mt-4 bg-white rounded-card shadow-lg border border-success-border p-3 sm:p-4 animate-fadeInUp">
                     <div className="flex items-center gap-3">
                       <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                        <CheckCircle size={16} className="text-green-600 sm:text-2xl" />
+                        <CheckCircle size={16} className="text-success sm:text-2xl" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-gray-800 text-sm sm:text-base truncate">{getFullName(scannedGuest)}</p>
@@ -575,7 +575,7 @@ export default function StaffDashboard() {
                         </div>
                       </div>
                       <div className="text-right text-xs flex-shrink-0">
-                        <span className="text-green-600 font-medium">
+                        <span className="text-success font-medium">
                           {scannedGuest.checkInCount || 1}/{guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount)}
                         </span>
                       </div>
@@ -589,19 +589,19 @@ export default function StaffDashboard() {
             {activeTab === 'data' && (
               <>
                 <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-                  <button onClick={() => setStatusFilter('all')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'all' ? 'bg-[#0D4B4B] border-[#0D4B4B]' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <button onClick={() => setStatusFilter('all')} className={`rounded-tap border p-2 text-center shadow-sm transition ${statusFilter === 'all' ? 'bg-brandbg border-brandborder' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                     <p className={`text-base sm:text-lg font-bold ${statusFilter === 'all' ? 'text-white' : 'text-gray-800'}`}>{totalGuests}</p>
                     <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'all' ? 'text-white/80' : 'text-gray-400'}`}>All</p>
                   </button>
-                  <button onClick={() => setStatusFilter(statusFilter === 'fully' ? 'all' : 'fully')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'fully' ? 'bg-green-600 border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'fully' ? 'text-white' : 'text-green-600'}`}>{fullyCheckedIn}</p>
+                  <button onClick={() => setStatusFilter(statusFilter === 'fully' ? 'all' : 'fully')} className={`rounded-tap border p-2 text-center shadow-sm transition ${statusFilter === 'fully' ? 'bg-green-600 border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'fully' ? 'text-white' : 'text-success'}`}>{fullyCheckedIn}</p>
                     <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'fully' ? 'text-white/80' : 'text-gray-400'}`}>Fully In</p>
                   </button>
-                  <button onClick={() => setStatusFilter(statusFilter === 'partial' ? 'all' : 'partial')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'partial' ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'partial' ? 'text-white' : 'text-amber-500'}`}>{partiallyCheckedIn}</p>
+                  <button onClick={() => setStatusFilter(statusFilter === 'partial' ? 'all' : 'partial')} className={`rounded-tap border p-2 text-center shadow-sm transition ${statusFilter === 'partial' ? 'bg-warn-soft0 border-amber-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                    <p className={`text-base sm:text-lg font-bold ${statusFilter === 'partial' ? 'text-white' : 'text-warn'}`}>{partiallyCheckedIn}</p>
                     <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'partial' ? 'text-white/80' : 'text-gray-400'}`}>Partial</p>
                   </button>
-                  <button onClick={() => setStatusFilter(statusFilter === 'not' ? 'all' : 'not')} className={`rounded-xl border p-2 text-center shadow-sm transition ${statusFilter === 'not' ? 'bg-gray-500 border-gray-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
+                  <button onClick={() => setStatusFilter(statusFilter === 'not' ? 'all' : 'not')} className={`rounded-tap border p-2 text-center shadow-sm transition ${statusFilter === 'not' ? 'bg-gray-500 border-gray-500' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
                     <p className={`text-base sm:text-lg font-bold ${statusFilter === 'not' ? 'text-white' : 'text-gray-400'}`}>{notCheckedIn}</p>
                     <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'not' ? 'text-white/80' : 'text-gray-400'}`}>Not In</p>
                   </button>
@@ -614,7 +614,7 @@ export default function StaffDashboard() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search by name, card number, or phone..."
-                    className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
+                    className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent text-sm sm:text-base"
                   />
                   {searchTerm && (
                     <button onClick={() => setSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
@@ -629,15 +629,15 @@ export default function StaffDashboard() {
                       {statusFilter === 'fully' ? 'Fully checked in' : statusFilter === 'partial' ? 'Partially checked in' : 'Not checked in'}
                       {filteredGuests.length > 0 && <span className="text-gray-400"> · {filteredGuests.length}</span>}
                     </span>
-                    <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-[#0D4B4B] hover:underline">
+                    <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-brandtext hover:underline">
                       Show all ({totalGuests})
                     </button>
                   </div>
                 )}
 
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-tap border border-gray-200 shadow-sm overflow-hidden">
                   {loadingGuests ? (
-                    <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-[#0D4B4B]" /></div>
+                    <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-brandtext" /></div>
                   ) : filteredGuests.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                       <Users size={32} className="mx-auto mb-2 text-gray-300" />
@@ -653,9 +653,9 @@ export default function StaffDashboard() {
                         const count = guest.checkInCount || 0;
                         const isFully = count >= max;
                         return (
-                          <div key={guest.id} onClick={() => setSelectedGuest(guest)} className={`px-3 py-2.5 hover:bg-gray-50 transition cursor-pointer ${isFully ? 'bg-green-50/30' : ''}`}>
+                          <div key={guest.id} onClick={() => setSelectedGuest(guest)} className={`px-3 py-2.5 hover:bg-gray-50 transition cursor-pointer ${isFully ? 'bg-success-soft/30' : ''}`}>
                             <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                              <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-brandfrom to-brand-deepto flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                                 {guest.name.charAt(0).toUpperCase()}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -669,7 +669,7 @@ export default function StaffDashboard() {
                                     {getGuestTypeLabel(guest.guestType, guest.guestCount)}
                                   </span>
                                   {guest.routingChannel === 'whatsapp' && (
-                                    <span className="text-[9px] sm:text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">WA</span>
+                                    <span className="text-[9px] sm:text-[10px] bg-green-100 text-success px-1.5 py-0.5 rounded">WA</span>
                                   )}
                                   <StatusIcon size={11} className={status.color.split(' ')[0]} />
                                 </div>
@@ -691,14 +691,14 @@ export default function StaffDashboard() {
       {/* ─── Guest Detail Modal ─── */}
       {selectedGuest && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedGuest(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden mx-2" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-card shadow-xl w-full max-w-sm overflow-hidden mx-2" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-800 text-sm sm:text-base">Guest Details</h3>
               <button onClick={() => setSelectedGuest(null)} className="text-gray-400 hover:text-gray-600 p-1"><XCircle size={20} /></button>
             </div>
             <div className="p-4 sm:p-5 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-brandfrom to-brand-deepto flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
                   {selectedGuest.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -733,10 +733,10 @@ export default function StaffDashboard() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button onClick={() => { setForceCheckinGuest(selectedGuest); setSelectedGuest(null); }} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5">
+                <button onClick={() => { setForceCheckinGuest(selectedGuest); setSelectedGuest(null); }} className="flex-1 py-2 bg-warn text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5">
                   <UserCheck size={14} /> Force
                 </button>
-                <button onClick={() => { setShowDeleteConfirm(true); setSelectedGuest(null); }} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5">
+                <button onClick={() => { setShowDeleteConfirm(true); setSelectedGuest(null); }} className="flex-1 py-2 bg-danger-soft0 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5">
                   <Trash2 size={14} /> Delete
                 </button>
               </div>
@@ -753,9 +753,9 @@ export default function StaffDashboard() {
         })();
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+            <div className="bg-white rounded-card shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
               <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-amber-600" /></div>
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-warn" /></div>
                 <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
                 <p className="text-sm text-gray-500 mt-1">
                   Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
@@ -768,10 +768,10 @@ export default function StaffDashboard() {
                       This card has {groupCount} guests
                     </p>
                     <div className="flex flex-col gap-2">
-                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }} className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">
+                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }} className="w-full py-2.5 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">
                         Force all {groupCount} guests
                       </button>
-                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-amber-50 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition text-sm">
+                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-warn-soft text-warn rounded-lg font-medium hover:bg-amber-100 transition text-sm">
                         Force just {getFullName(forceCheckinGuest)}
                       </button>
                       <button onClick={() => setForceCheckinGuest(null)} className="w-full py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">
@@ -782,7 +782,7 @@ export default function StaffDashboard() {
                 ) : (
                   <div className="flex gap-3 mt-4">
                     <button onClick={() => setForceCheckinGuest(null)} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
-                    <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">Confirm</button>
+                    <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="flex-1 py-2 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">Confirm</button>
                   </div>
                 )}
               </div>
@@ -794,17 +794,17 @@ export default function StaffDashboard() {
       {/* ─── Delete Confirm ─── */}
       {showDeleteConfirm && selectedGuest && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+          <div className="bg-white rounded-card shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
             <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><Trash2 size={24} className="text-red-600" /></div>
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><Trash2 size={24} className="text-danger" /></div>
               <h3 className="font-bold text-gray-800 text-sm sm:text-base">Delete Guest?</h3>
               <p className="text-sm text-gray-500 mt-1">
                 Are you sure you want to delete <span className="font-semibold">{getFullName(selectedGuest)}</span>?
-                <br /><span className="text-xs text-red-500">This action cannot be undone.</span>
+                <br /><span className="text-xs text-danger">This action cannot be undone.</span>
               </p>
               <div className="flex gap-3 mt-4">
                 <button onClick={() => { setShowDeleteConfirm(false); setSelectedGuest(null); }} className="flex-1 py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">Cancel</button>
-                <button onClick={() => handleDeleteGuest(selectedGuest)} className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm">Delete</button>
+                <button onClick={() => handleDeleteGuest(selectedGuest)} className="flex-1 py-2 bg-danger-soft0 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm">Delete</button>
               </div>
             </div>
           </div>

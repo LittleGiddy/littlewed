@@ -118,8 +118,8 @@ export default function InstallPrompt() {
   return (
     <>
       {/* Desktop: floating pill bottom-right - shows current installable state */}
-      <div className="hidden sm:flex fixed bottom-4 right-4 z-[9999] items-center gap-3 bg-white rounded-2xl shadow-2xl border border-gray-100 pl-4 pr-2 py-2 max-w-sm">
-        <div className="w-9 h-9 rounded-xl bg-[rgba(13,75,75,0.08)] flex items-center justify-center flex-shrink-0 text-[#0D4B4B]">
+      <div className="hidden sm:flex fixed bottom-4 right-4 z-[9999] items-center gap-3 bg-white rounded-card shadow-2xl border border-gray-100 pl-4 pr-2 py-2 max-w-sm">
+        <div className="w-9 h-9 rounded-tap bg-brand/10 flex items-center justify-center flex-shrink-0 text-brandtext">
           <Download size={18} />
         </div>
         <div className="flex-1 min-w-0 py-0.5">{body}</div>
@@ -127,7 +127,7 @@ export default function InstallPrompt() {
           <button
             onClick={install}
             disabled={installing}
-            className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-[#0A3939] transition disabled:opacity-60 flex-shrink-0"
+            className="inline-flex items-center gap-1.5 bg-brandbg text-white text-xs font-bold px-3.5 py-2 rounded-tap hover:bg-brand-deepbg transition disabled:opacity-60 flex-shrink-0"
           >
             <ArrowDownToLine size={13} />
             {installing ? 'Installing…' : 'Install'}
@@ -140,14 +140,14 @@ export default function InstallPrompt() {
 
       {/* Mobile: bottom sheet banner */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-gray-100 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] flex items-center gap-3 px-4 py-3.5">
-        <div className="w-10 h-10 rounded-xl bg-[rgba(13,75,75,0.08)] flex items-center justify-center flex-shrink-0 text-[#0D4B4B]">
+        <div className="w-10 h-10 rounded-tap bg-brand/10 flex items-center justify-center flex-shrink-0 text-brandtext">
           <Download size={18} />
         </div>
         <div className="flex-1 min-w-0">{body}</div>
         <button
           onClick={install}
           disabled={installing}
-          className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white text-xs font-bold px-3.5 py-2 rounded-xl hover:bg-[#0A3939] transition disabled:opacity-60 flex-shrink-0"
+          className="inline-flex items-center gap-1.5 bg-brandbg text-white text-xs font-bold px-3.5 py-2 rounded-tap hover:bg-brand-deepbg transition disabled:opacity-60 flex-shrink-0"
         >
           {ios ? <Smartphone size={13} /> : <ArrowDownToLine size={13} />}
           {installing ? 'Installing…' : ios ? 'How' : 'Install'}

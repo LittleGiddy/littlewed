@@ -236,7 +236,7 @@ export default function GuestsPage() {
 
   const getStatus = (guest: Guest) => {
     if (guest.checkedIn) return { label: 'Checked In', icon: <CheckCircle size={16} className="text-[#1A7A4A]" /> };
-    if (guest.invitationSentAt) return { label: 'Sent', icon: <Send size={16} className="text-[#0D4B4B]" /> };
+    if (guest.invitationSentAt) return { label: 'Sent', icon: <Send size={16} className="text-brandtext" /> };
     return { label: 'Pending', icon: <Clock size={16} className="text-[#C07A20]" /> };
   };
 
@@ -265,7 +265,7 @@ export default function GuestsPage() {
               type="checkbox"
               checked={isSelected}
               onChange={() => toggleSelect(guest.id)}
-              className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
+              className="w-4 h-4 rounded border-gray-300 text-brandtext focus:ring-brandring"
             />
             <div className="flex-1 min-w-0">
               <div>
@@ -275,11 +275,11 @@ export default function GuestsPage() {
                       type="text"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                       autoFocus
                     />
-                    <button onClick={() => saveEdit(guest)} className="text-green-600 hover:text-green-800"><Check size={16} /></button>
-                    <button onClick={cancelEdit} className="text-red-500 hover:text-red-700"><X size={16} /></button>
+                    <button onClick={() => saveEdit(guest)} className="text-success hover:text-green-800"><Check size={16} /></button>
+                    <button onClick={cancelEdit} className="text-danger hover:text-danger"><X size={16} /></button>
                   </div>
                 ) : (
                   <span className="guest-name">{guest.name}</span>
@@ -290,11 +290,11 @@ export default function GuestsPage() {
                       type="text"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                       autoFocus
                     />
-                    <button onClick={() => saveEdit(guest)} className="text-green-600 hover:text-green-800"><Check size={16} /></button>
-                    <button onClick={cancelEdit} className="text-red-500 hover:text-red-700"><X size={16} /></button>
+                    <button onClick={() => saveEdit(guest)} className="text-success hover:text-green-800"><Check size={16} /></button>
+                    <button onClick={cancelEdit} className="text-danger hover:text-danger"><X size={16} /></button>
                   </div>
                 ) : (
                   <div className="guest-phone">{guest.phone}</div>
@@ -359,7 +359,7 @@ export default function GuestsPage() {
               type="checkbox"
               checked={isSelected}
               onChange={() => toggleSelect(guest.id)}
-              className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
+              className="w-4 h-4 rounded border-gray-300 text-brandtext focus:ring-brandring"
             />
           </td>
           <td className="px-4 py-3">
@@ -369,11 +369,11 @@ export default function GuestsPage() {
                   type="text"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                   autoFocus
                 />
-                <button onClick={() => saveEdit(guest)} className="text-green-600 hover:text-green-800"><Check size={16} /></button>
-                <button onClick={cancelEdit} className="text-red-500 hover:text-red-700"><X size={16} /></button>
+                <button onClick={() => saveEdit(guest)} className="text-success hover:text-green-800"><Check size={16} /></button>
+                <button onClick={cancelEdit} className="text-danger hover:text-danger"><X size={16} /></button>
               </div>
             ) : (
               <div>
@@ -384,11 +384,11 @@ export default function GuestsPage() {
                       type="text"
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                      className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                       autoFocus
                     />
-                    <button onClick={() => saveEdit(guest)} className="text-green-600 hover:text-green-800"><Check size={16} /></button>
-                    <button onClick={cancelEdit} className="text-red-500 hover:text-red-700"><X size={16} /></button>
+                    <button onClick={() => saveEdit(guest)} className="text-success hover:text-green-800"><Check size={16} /></button>
+                    <button onClick={cancelEdit} className="text-danger hover:text-danger"><X size={16} /></button>
                   </div>
                 ) : (
                   <div className="text-xs text-gray-500 font-mono">{guest.phone}</div>
@@ -402,7 +402,7 @@ export default function GuestsPage() {
           </td>
           <td className="px-4 py-3">
             {guest.routingChannel === 'whatsapp' ? (
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2 py-0.5 rounded-full">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-brandtext bg-brand/10 px-2 py-0.5 rounded-full">
                 <MessageCircle size={12} /> WhatsApp
               </span>
             ) : (
@@ -415,15 +415,15 @@ export default function GuestsPage() {
             {guest.invitationSentAt ? new Date(guest.invitationSentAt).toLocaleString() : '-'}
           </td>
           <td className="px-4 py-3">
-            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass === 'status-checked' ? 'bg-green-50 text-green-700' : statusClass === 'status-sent' ? 'bg-blue-50 text-[#0D4B4B]' : 'bg-amber-50 text-amber-700'}`}>
+            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass === 'status-checked' ? 'bg-success-soft text-success' : statusClass === 'status-sent' ? 'bg-blue-50 text-brandtext' : 'bg-warn-soft text-warn'}`}>
               {status.icon} {status.label}
             </span>
           </td>
           <td className="px-4 py-3 text-right">
             <div className="flex items-center justify-end gap-1.5">
-              <button onClick={() => startEditing(guest, 'name')} className="p-1.5 rounded-lg text-[#0D4B4B] hover:bg-[#0D4B4B]/5" title="Edit name"><Edit2 size={15} /></button>
-              <button onClick={() => startEditing(guest, 'phone')} className="p-1.5 rounded-lg text-[#0D4B4B] hover:bg-[#0D4B4B]/5" title="Edit phone"><Edit2 size={15} /></button>
-              <button onClick={() => deleteGuest(guest.id)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50" title="Delete guest"><Trash2 size={15} /></button>
+              <button onClick={() => startEditing(guest, 'name')} className="p-1.5 rounded-lg text-brandtext hover:bg-brandbg" title="Edit name"><Edit2 size={15} /></button>
+              <button onClick={() => startEditing(guest, 'phone')} className="p-1.5 rounded-lg text-brandtext hover:bg-brandbg" title="Edit phone"><Edit2 size={15} /></button>
+              <button onClick={() => deleteGuest(guest.id)} className="p-1.5 rounded-lg text-danger hover:bg-danger-soft" title="Delete guest"><Trash2 size={15} /></button>
               <button
                 className="inv-resend-btn ml-1.5"
                 onClick={() => resendInvitation(guest)}
@@ -457,7 +457,7 @@ export default function GuestsPage() {
           font-weight: 700;
           letter-spacing: 1.5px;
           text-transform: uppercase;
-          color: #0D4B4B;
+          color: var(--color-brand);
           margin-bottom: 6px;
         }
 
@@ -470,7 +470,7 @@ export default function GuestsPage() {
           letter-spacing: -0.5px;
         }
 
-        .page-title span { color: #FF6B5C; }
+        .page-title span { color: var(--color-coral); }
 
         .page-sub {
           color: #7A8FA6;
@@ -524,7 +524,7 @@ export default function GuestsPage() {
           transition: border-color 0.15s;
         }
         .filter-select:focus {
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
 
         .refresh-btn {
@@ -542,8 +542,8 @@ export default function GuestsPage() {
           transition: border-color 0.15s, color 0.15s;
         }
         .refresh-btn:hover {
-          border-color: #0D4B4B;
-          color: #0D4B4B;
+          border-color: var(--color-brand);
+          color: var(--color-brand);
         }
 
         .table-wrap {
@@ -563,13 +563,13 @@ export default function GuestsPage() {
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          color: #0D4B4B;
+          color: var(--color-brand);
           transition: background 0.15s, border-color 0.15s;
           white-space: nowrap;
         }
         .inv-resend-btn:hover {
           background: rgba(13,75,75,0.06);
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
         .inv-resend-btn:disabled {
           opacity: 0.5;
@@ -595,7 +595,7 @@ export default function GuestsPage() {
           transition: border-color 0.15s;
         }
         .guest-card:hover {
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
         .guest-card .guest-name {
           font-weight: 700;
@@ -627,7 +627,7 @@ export default function GuestsPage() {
         }
         .guest-card .channel-whatsapp {
           background: rgba(13,75,75,0.08);
-          color: #0D4B4B;
+          color: var(--color-brand);
         }
         .guest-card .channel-sms {
           background: #F0F4F8;
@@ -643,7 +643,7 @@ export default function GuestsPage() {
           border-radius: 20px;
         }
         .guest-card .status-pending { background: #FFF3E0; color: #C07A20; }
-        .guest-card .status-sent { background: #E3F2FD; color: #0D4B4B; }
+        .guest-card .status-sent { background: #E3F2FD; color: var(--color-brand); }
         .guest-card .status-checked { background: #E8F5E9; color: #1A7A4A; }
         .guest-card .sent-date {
           font-size: 11px;
@@ -658,13 +658,13 @@ export default function GuestsPage() {
           font-weight: 600;
           font-family: inherit;
           cursor: pointer;
-          color: #0D4B4B;
+          color: var(--color-brand);
           transition: background 0.15s, border-color 0.15s;
           white-space: nowrap;
         }
         .guest-card .action-btn:hover {
           background: rgba(13,75,75,0.06);
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
         .guest-card .action-btn:disabled {
           opacity: 0.5;
@@ -679,12 +679,12 @@ export default function GuestsPage() {
           border-radius: 10px;
           border: 1.5px solid #E2EAF0;
           background: white;
-          color: #0D4B4B;
+          color: var(--color-brand);
           transition: background 0.15s, border-color 0.15s;
         }
         .guest-card .mobile-icon-btn:hover {
           background: rgba(13,75,75,0.06);
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
         .guest-card .mobile-icon-danger {
           color: #C0392B;
@@ -727,13 +727,13 @@ export default function GuestsPage() {
           white-space: nowrap;
         }
         .bulk-bar button:hover {
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
           background: rgba(13,75,75,0.04);
         }
         .bulk-bar .send-btn {
-          background: #0D4B4B;
+          background: var(--color-brand);
           color: white;
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
         }
         .bulk-bar .send-btn:hover {
           background: #0A3939;
@@ -843,7 +843,7 @@ export default function GuestsPage() {
                         type="checkbox"
                         checked={selected.size === guests.length && guests.length > 0}
                         onChange={toggleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
+                        className="w-4 h-4 rounded border-gray-300 text-brandtext focus:ring-brandring"
                       />
                     </th>
                     <th className="px-4 py-2 text-left whitespace-nowrap">Guest</th>

@@ -273,11 +273,11 @@ export default function ThanksCardModal({
 
       <div className="relative w-full sm:max-w-md bg-[#F5F5F7] sm:rounded-[2rem] rounded-t-[2rem] shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 pt-7 pb-4 bg-gradient-to-b from-[#0D4B4B] to-[#0A3939] text-white shrink-0">
+        <div className="px-6 pt-7 pb-4 bg-gradient-to-b from-brandfrom to-brand-deepto text-white shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-widest text-white/60 font-medium">Thank you</p>
-              <h2 className="font-serif font-bold text-2xl leading-tight">Thanks Card</h2>
+              <h2 className="font-display font-bold text-2xl leading-tight">Thanks Card</h2>
               <p className="text-[12px] text-white/70 mt-0.5">{event?.name}</p>
             </div>
             <button
@@ -296,7 +296,7 @@ export default function ThanksCardModal({
               onClick={() => setChannel('whatsapp')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[9px] text-sm font-semibold transition-all ${
                 channel === 'whatsapp'
-                  ? 'bg-white text-[#0D4B4B] shadow-sm'
+                  ? 'bg-white text-brandtext shadow-sm'
                   : 'text-gray-500'
               }`}
             >
@@ -307,11 +307,11 @@ export default function ThanksCardModal({
               onClick={() => setChannel('sms')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[9px] text-sm font-semibold transition-all ${
                 channel === 'sms'
-                  ? 'bg-white text-[#0D4B4B] shadow-sm'
+                  ? 'bg-white text-brandtext shadow-sm'
                   : 'text-gray-500'
               }`}
             >
-              <MessageSquareText size={16} className={channel === 'sms' ? 'text-[#0D4B4B]' : 'text-gray-400'} />
+              <MessageSquareText size={16} className={channel === 'sms' ? 'text-brandtext' : 'text-gray-400'} />
               SMS
             </button>
           </div>
@@ -320,14 +320,14 @@ export default function ThanksCardModal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {/* Recipients summary */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+          <div className="bg-white rounded-card p-4 shadow-sm mb-4">
             <div className="flex items-center gap-2 mb-1">
-              <Users size={15} className="text-[#0D4B4B]" />
+              <Users size={15} className="text-brandtext" />
               <span className="text-sm font-semibold text-gray-800">
                 {pending.length} guest{pending.length !== 1 ? 's' : ''}
               </span>
               {isBypassed ? (
-                <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-600">
+                <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-success-soft text-success">
                   Unlimited
                 </span>
               ) : (
@@ -342,11 +342,11 @@ export default function ThanksCardModal({
             {/* Toggle: include all guests */}
             <button
               onClick={() => setIncludeAll((v) => !v)}
-              className="mt-3 w-full flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 px-3 py-2.5"
+              className="mt-3 w-full flex items-center justify-between rounded-tap bg-gray-50 border border-gray-100 px-3 py-2.5"
             >
               <span className="text-[13px] text-gray-700 font-medium">Include all guests</span>
               <span
-                className={`relative w-11 h-6 rounded-full transition-colors ${includeAll ? 'bg-[#0D4B4B]' : 'bg-gray-300'}`}
+                className={`relative w-11 h-6 rounded-full transition-colors ${includeAll ? 'bg-brandbg' : 'bg-gray-300'}`}
               >
                 <span
                   className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -364,7 +364,7 @@ export default function ThanksCardModal({
 
           {/* ─── Sending progress ─── */}
           {sending && (
-            <div className="mb-4 rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 p-4">
+            <div className="mb-4 rounded-card bg-brandbg/[0.04] border border-brandborder p-4">
               <div className="flex items-center justify-between gap-3 text-xs font-semibold text-gray-800">
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={13} className="animate-spin" style={{ color: accent }} />
@@ -393,7 +393,7 @@ export default function ThanksCardModal({
             /* ─── WhatsApp: card upload ─── */
             <div className="space-y-3">
               {cardPreview || cardUrl ? (
-                <div className="relative rounded-2xl overflow-hidden shadow-sm bg-white">
+                <div className="relative rounded-card overflow-hidden shadow-sm bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={cardPreview || cardUrl || ''}
@@ -410,9 +410,9 @@ export default function ThanksCardModal({
               ) : (
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-[#0D4B4B]/30 bg-white flex flex-col items-center justify-center gap-2 text-[#0D4B4B] hover:bg-[#0D4B4B]/5 transition"
+                  className="w-full aspect-[4/3] rounded-card border-2 border-dashed border-brandborder bg-white flex flex-col items-center justify-center gap-2 text-brandtext hover:bg-brandbg transition"
                 >
-                  <div className="w-14 h-14 rounded-2xl bg-[#0D4B4B]/10 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-card bg-brandbg flex items-center justify-center">
                     <Upload size={22} />
                   </div>
                   <span className="text-sm font-semibold">Upload thanks card</span>
@@ -432,7 +432,7 @@ export default function ThanksCardModal({
             </div>
           ) : (
             /* ─── SMS: editable message with guestName variable ─── */
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="bg-white rounded-card p-4 shadow-sm">
               <label className="block text-sm font-semibold text-gray-800 mb-1">
                 Message
               </label>
@@ -443,7 +443,7 @@ export default function ThanksCardModal({
               <button
                 type="button"
                 onClick={insertGuestName}
-                className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#0D4B4B]/10 text-[#0D4B4B] text-xs font-semibold px-3 py-1.5 hover:bg-[#0D4B4B]/20 transition"
+                className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-brandbg text-brandtext text-xs font-semibold px-3 py-1.5 hover:bg-brandbg transition"
               >
                 + <span className="font-mono">{`{guestName}`}</span>
               </button>
@@ -453,7 +453,7 @@ export default function ThanksCardModal({
                 value={smsMessage}
                 onChange={(e) => setSmsMessage(e.target.value)}
                 placeholder="Write your thanks message..."
-                className="w-full p-4 border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent min-h-[160px] resize-y"
+                className="w-full p-4 border border-gray-200 rounded-card text-sm focus:ring-2 focus:ring-brandring focus:border-transparent min-h-[160px] resize-y"
               />
               <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
                 <span>
@@ -462,7 +462,7 @@ export default function ThanksCardModal({
                 <SmsCounter text={previewMessage} maxParts={isBypassed ? null : MAX_SMS_PARTS_PER_GUEST} />
               </div>
 
-              <div className="mt-3 p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+              <div className="mt-3 p-3.5 bg-gray-50 rounded-card border border-gray-100">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Preview</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{previewMessage}</p>
               </div>
@@ -470,12 +470,12 @@ export default function ThanksCardModal({
           )}
 
           {results.length > 0 && !sending && (
-            <div className={`mb-3 rounded-2xl px-4 py-3 flex items-center gap-3 border ${
+            <div className={`mb-3 rounded-card px-4 py-3 flex items-center gap-3 border ${
               results.every((r) => r.success)
-                ? 'bg-green-50 border-green-200'
-                : 'bg-amber-50 border-amber-200'
+                ? 'bg-success-soft border-success-border'
+                : 'bg-warn-soft border-warn-border'
             }`}>
-              <span className={results.every((r) => r.success) ? 'text-green-600' : 'text-amber-600'}>
+              <span className={results.every((r) => r.success) ? 'text-success' : 'text-warn'}>
                 <CheckCircle2 size={18} />
               </span>
               <div>
@@ -492,7 +492,7 @@ export default function ThanksCardModal({
           )}
 
           {results.length > 0 && (
-            <div className="mt-4 bg-white rounded-2xl shadow-sm divide-y divide-gray-50 max-h-44 overflow-y-auto">
+            <div className="mt-4 bg-white rounded-card shadow-sm divide-y divide-gray-50 max-h-44 overflow-y-auto">
               {results.map((r, i) => (
                 <div key={i} className="flex items-center gap-2.5 px-4 py-2.5">
                   <span className={r.success ? 'text-green-500' : 'text-red-400'}>
@@ -502,7 +502,7 @@ export default function ThanksCardModal({
                   {r.success ? (
                     <span className="text-[10px] text-gray-400 ml-auto uppercase tracking-wide">{r.channel}</span>
                   ) : (
-                    <span className="text-[10px] text-red-500 ml-auto truncate max-w-[50%]">{r.error}</span>
+                    <span className="text-[10px] text-danger ml-auto truncate max-w-[50%]">{r.error}</span>
                   )}
                 </div>
               ))}
@@ -521,7 +521,7 @@ export default function ThanksCardModal({
           <button
             onClick={handleSend}
             disabled={sending || uploading}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#0D4B4B] text-white font-bold text-sm shadow-lg shadow-[#0D4B4B]/20 active:scale-[0.99] transition disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-card bg-brandbg text-white font-bold text-sm shadow-lg shadow-brandshadow active:scale-[0.99] transition disabled:opacity-50"
           >
             {sending || uploading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             {uploading ? 'Uploading...' : sending ? 'Sending...' : `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} thanks`}

@@ -20,8 +20,8 @@ export default function RequestCreditsButton({ compact = false, hasPending = fal
           title={hasPending ? 'Request pending' : 'Request Credits'}
           className={`inline-flex items-center justify-center gap-1 w-7 h-7 rounded-full font-semibold transition border ${
             hasPending
-              ? 'bg-amber-50 text-amber-600 border-amber-200'
-              : 'bg-[rgba(13,75,75,0.08)] text-[#0D4B4B] border-[rgba(13,75,75,0.18)] hover:bg-[rgba(13,75,75,0.16)] hover:border-[rgba(13,75,75,0.32)]'
+              ? 'bg-warn-soft text-warn border-warn-border'
+              : 'bg-brand/10 text-brandtext border-[rgba(13,75,75,0.18)] hover:bg-[rgba(13,75,75,0.16)] hover:border-[rgba(13,75,75,0.32)]'
           }`}
         >
           <Plus size={14} />
@@ -29,10 +29,10 @@ export default function RequestCreditsButton({ compact = false, hasPending = fal
       ) : (
         <button
           onClick={() => setModalOpen(true)}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition ${
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-tap font-semibold shadow-md transition ${
             hasPending
-              ? 'bg-amber-500 text-white hover:bg-amber-600'
-              : 'bg-[#0D4B4B] text-white hover:shadow-lg'
+              ? 'bg-warn text-white hover:bg-amber-600'
+              : 'bg-brandbg text-white hover:shadow-lg'
           }`}
         >
           <Plus size={16} /> {hasPending ? 'Request Pending' : 'Request Credits'}

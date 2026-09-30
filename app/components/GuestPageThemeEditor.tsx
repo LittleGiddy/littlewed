@@ -297,7 +297,7 @@ export default function GuestPageThemeEditor({
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-brand rounded-full animate-spin" />
       </div>
     );
   }
@@ -309,13 +309,13 @@ export default function GuestPageThemeEditor({
         <div className="flex items-center gap-3 mb-7">
           <Link
             href={backHref}
-            className="w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
+            className="w-9 h-9 rounded-tap border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-brandtext hover:border-brandborder transition"
           >
             <ArrowLeft size={17} />
           </Link>
           <div>
-            <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Appearance</p>
-            <h1 className="font-serif text-3xl font-black text-gray-900 leading-tight">{title}</h1>
+            <p className="text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1.5">Appearance</p>
+            <h1 className="font-display text-3xl font-black text-gray-900 leading-tight">{title}</h1>
             <p className="text-sm text-gray-400 mt-1">{description}</p>
           </div>
         </div>
@@ -323,7 +323,7 @@ export default function GuestPageThemeEditor({
 
       {/* ─── Event selector ─────────────────────────────────────────── */}
       {enableEventSelect && (
-        <div className="bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] rounded-2xl p-5 mb-5 shadow-md shadow-[#0D4B4B]/20">
+        <div className="bg-gradient-to-r from-brandfrom to-brand-deepto rounded-card p-5 mb-5 shadow-md shadow-brandshadow">
           <label className="flex items-center gap-2 text-white text-xs font-bold uppercase tracking-[2px] mb-2.5">
             <HeartHandshake size={14} /> Customize for a specific event
           </label>
@@ -334,7 +334,7 @@ export default function GuestPageThemeEditor({
                 setLoading(true);
                 setSelectedEventId(e.target.value);
               }}
-              className="flex-1 px-3.5 py-2.5 bg-white border border-white/20 rounded-xl text-sm focus:ring-2 focus:ring-white/30 outline-none transition-all appearance-none"
+              className="flex-1 px-3.5 py-2.5 bg-white border border-white/20 rounded-tap text-sm focus:ring-2 focus:ring-white/30 outline-none transition-all appearance-none"
             >
               <option value="__tenant__">Default — applies to all events</option>
               {events.map(ev => (
@@ -356,9 +356,9 @@ export default function GuestPageThemeEditor({
 
       <div className="space-y-5">
         {/* ─── Theme Colors ──────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Wedding Colors</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Wedding Colors</h2>
             <div className="space-y-4">
               {COLOR_FIELDS.map(f => (
                 <div key={f.key} className="flex items-center justify-between gap-4">
@@ -381,13 +381,13 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Font ──────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Title Font</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Title Font</h2>
             <select
               value={draft.guestPageFontFamily}
               onChange={e => set('guestPageFontFamily', e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+              className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
             >
               {FONTS.map(f => (
                 <option key={f} value={f} style={{ fontFamily: FONT_STACKS[f] }}>{f}</option>
@@ -400,10 +400,10 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Wedding Theme & Colors ─────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1 flex items-center gap-2">
-              <PaletteIcon size={17} className="text-[#0D4B4B]" /> Wedding Theme
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-1 flex items-center gap-2">
+              <PaletteIcon size={17} className="text-brandtext" /> Wedding Theme
             </h2>
             <p className="text-xs text-gray-400 mb-4">
               Give the celebration a name and a palette. Guests will see the words and matching color circles under Date &amp; Venue.
@@ -416,7 +416,7 @@ export default function GuestPageThemeEditor({
                   value={draft.weddingTheme}
                   onChange={e => set('weddingTheme', e.target.value)}
                   placeholder="e.g. Brown & Lavender"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
 
@@ -434,7 +434,7 @@ export default function GuestPageThemeEditor({
                         <button
                           type="button"
                           onClick={() => removeThemeColor(idx)}
-                          className="absolute -top-1 -right-1 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                          className="absolute -top-1 -right-1 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-danger-soft0 text-white flex items-center justify-center hover:bg-red-600 transition"
                           title="Remove color"
                         >
                           <X size={10} />
@@ -447,7 +447,7 @@ export default function GuestPageThemeEditor({
                     <button
                       type="button"
                       onClick={addThemeColor}
-                      className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 text-gray-400 flex items-center justify-center hover:border-[#0D4B4B] hover:text-[#0D4B4B] transition"
+                      className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 text-gray-400 flex items-center justify-center hover:border-brandborder hover:text-brandtext transition"
                       title="Add theme color"
                     >
                       <Plus size={16} />
@@ -460,53 +460,53 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Event Contacts & Map ──────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Event Contacts &amp; Location</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Event Contacts &amp; Location</h2>
             <div className="space-y-4">
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <Phone size={13} className="text-[#0D4B4B]" /> Contact person
+                  <Phone size={13} className="text-brandtext" /> Contact person
                 </label>
                 <input
                   value={draft.contactPerson}
                   onChange={e => set('contactPerson', e.target.value)}
                   placeholder="e.g. Aunt Mary, +255 712 000 000"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">Who can guests call with questions (with phone number).</p>
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <Phone size={13} className="text-[#0D4B4B]" /> Contact phone number
+                  <Phone size={13} className="text-brandtext" /> Contact phone number
                 </label>
                 <input
                   value={draft.contactPersonPhone}
                   onChange={e => set('contactPersonPhone', e.target.value)}
                   placeholder="e.g. +255 712 000 000"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <MicVocal size={13} className="text-[#0D4B4B]" /> Master of Ceremony (MC)
+                  <MicVocal size={13} className="text-brandtext" /> Master of Ceremony (MC)
                 </label>
                 <input
                   value={draft.masterOfCeremony}
                   onChange={e => set('masterOfCeremony', e.target.value)}
                   placeholder="e.g. MC John Doe"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <MapPin size={13} className="text-[#0D4B4B]" /> Google Maps URL
+                  <MapPin size={13} className="text-brandtext" /> Google Maps URL
                 </label>
                 <input
                   value={draft.mapUrl}
                   onChange={e => set('mapUrl', e.target.value)}
                   placeholder="https://maps.app.goo.gl/...  or  https://www.google.com/maps/..."
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
                   Accepts a Google Maps share link (maps.app.goo.gl), a maps URL, or an &quot;Embed a map&quot; iframe snippet. An embedded map of the venue is shown on the invitee page.
@@ -517,66 +517,66 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Invitee Page Text ─────────────────────────────────────── */}
-        {(<div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        {(<div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1">Invitee Page Text</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-1">Invitee Page Text</h2>
             <p className="text-[11px] text-gray-400 mb-4">
               Leave blank to use your default. Event settings override the tenant-wide defaults.
             </p>
             <div className="space-y-3">
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Opening cover hint
+                  <HeartHandshake size={13} className="text-brandtext" /> Opening cover hint
                 </label>
                 <input
                   value={draft.guestPageCoverHint}
                   onChange={e => set('guestPageCoverHint', e.target.value)}
                   placeholder="e.g. Tap anywhere to open"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Opening cover subtitle
+                  <HeartHandshake size={13} className="text-brandtext" /> Opening cover subtitle
                 </label>
                 <input
                   value={draft.guestPageCoverSubtitle}
                   onChange={e => set('guestPageCoverSubtitle', e.target.value)}
                   placeholder="e.g. your invitation awaits"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Greeting above guest name
+                  <HeartHandshake size={13} className="text-brandtext" /> Greeting above guest name
                 </label>
                 <input
                   value={draft.guestPageGreetingText}
                   onChange={e => set('guestPageGreetingText', e.target.value)}
                   placeholder="e.g. we would be honored to have you join us"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <PaletteIcon size={13} className="text-[#0D4B4B]" /> Theme section label
+                  <PaletteIcon size={13} className="text-brandtext" /> Theme section label
                 </label>
                 <input
                   value={draft.guestPageThemeLabel}
                   onChange={e => set('guestPageThemeLabel', e.target.value)}
                   placeholder="e.g. Wedding · Ceremony Theme"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <ImageIcon size={13} className="text-[#0D4B4B]" /> Invitation card label
+                  <ImageIcon size={13} className="text-brandtext" /> Invitation card label
                 </label>
                 <input
                   value={draft.guestPageInvitationCardLabel}
                   onChange={e => set('guestPageInvitationCardLabel', e.target.value)}
                   placeholder="e.g. Your invitation card"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -586,7 +586,7 @@ export default function GuestPageThemeEditor({
                     value={draft.guestPageDateLabel}
                     onChange={e => set('guestPageDateLabel', e.target.value)}
                     placeholder="Date"
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -595,7 +595,7 @@ export default function GuestPageThemeEditor({
                     value={draft.guestPageTimeLabel}
                     onChange={e => set('guestPageTimeLabel', e.target.value)}
                     placeholder="Time"
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                   />
                 </div>
                 <div>
@@ -604,87 +604,87 @@ export default function GuestPageThemeEditor({
                     value={draft.guestPageVenueLabel}
                     onChange={e => set('guestPageVenueLabel', e.target.value)}
                     placeholder="Venue"
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                   />
                 </div>
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> Reception notes label
+                  <HeartHandshake size={13} className="text-brandtext" /> Reception notes label
                 </label>
                 <input
                   value={draft.guestPageReceptionLabel}
                   onChange={e => set('guestPageReceptionLabel', e.target.value)}
                   placeholder="e.g. Reception Notes"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <Phone size={13} className="text-[#0D4B4B]" /> Contact label
+                  <Phone size={13} className="text-brandtext" /> Contact label
                 </label>
                 <input
                   value={draft.guestPageContactLabel}
                   onChange={e => set('guestPageContactLabel', e.target.value)}
                   placeholder="e.g. Contact Person"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <MicVocal size={13} className="text-[#0D4B4B]" /> Master of Ceremony label
+                  <MicVocal size={13} className="text-brandtext" /> Master of Ceremony label
                 </label>
                 <input
                   value={draft.guestPageMocLabel}
                   onChange={e => set('guestPageMocLabel', e.target.value)}
                   placeholder="e.g. Master of Ceremony"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <MapPin size={13} className="text-[#0D4B4B]" /> Map button label
+                  <MapPin size={13} className="text-brandtext" /> Map button label
                 </label>
                 <input
                   value={draft.guestPageMapLabel}
                   onChange={e => set('guestPageMapLabel', e.target.value)}
                   placeholder="e.g. Find the Venue"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                    <HeartHandshake size={13} className="text-[#0D4B4B]" /> Wishes section title
+                    <HeartHandshake size={13} className="text-brandtext" /> Wishes section title
                   </label>
                   <input
                     value={draft.guestPageWishesTitle}
                     onChange={e => set('guestPageWishesTitle', e.target.value)}
                     placeholder="e.g. Wedding Wishes"
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                   />
                 </div>
                 <div>
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                    <HeartHandshake size={13} className="text-[#0D4B4B]" /> Wishes hint text
+                    <HeartHandshake size={13} className="text-brandtext" /> Wishes hint text
                   </label>
                   <input
                     value={draft.guestPageWishesHint}
                     onChange={e => set('guestPageWishesHint', e.target.value)}
                     placeholder="e.g. Leave a little love for the couple"
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                   />
                 </div>
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
-                  <HeartHandshake size={13} className="text-[#0D4B4B]" /> RSVP hint text
+                  <HeartHandshake size={13} className="text-brandtext" /> RSVP hint text
                 </label>
                 <input
                   value={draft.guestPageRsvpHint}
                   onChange={e => set('guestPageRsvpHint', e.target.value)}
                   placeholder="e.g. Kindly RSVP so we can plan for you"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
             </div>
@@ -692,9 +692,9 @@ export default function GuestPageThemeEditor({
         </div>)}
 
         {/* ─── Photos ────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Photos</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Photos</h2>
 
             {/* Header background */}
             <p className="text-xs text-gray-400 mb-1.5">
@@ -707,7 +707,7 @@ export default function GuestPageThemeEditor({
                 <img
                   src={draft.guestPageHeaderImage}
                   alt="Header background"
-                  className="w-full h-32 object-cover rounded-xl"
+                  className="w-full h-32 object-cover rounded-tap"
                 />
                 <button
                   type="button"
@@ -729,7 +729,7 @@ export default function GuestPageThemeEditor({
               type="button"
               onClick={() => headerInputRef.current?.click()}
               disabled={uploading !== null}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-[#0D4B4B]/40 hover:bg-[#0D4B4B]/[0.03] transition disabled:opacity-50 mb-5"
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-tap text-sm font-semibold text-gray-700 hover:border-brandborder hover:bg-brandbg/[0.03] transition disabled:opacity-50 mb-5"
             >
               {uploading === 'header' ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {uploading === 'header' ? 'Uploading...' : 'Upload background'}
@@ -768,7 +768,7 @@ export default function GuestPageThemeEditor({
               type="button"
               onClick={() => coupleInputRef.current?.click()}
               disabled={uploading !== null}
-              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:border-[#0D4B4B]/40 hover:bg-[#0D4B4B]/[0.03] transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-tap text-sm font-semibold text-gray-700 hover:border-brandborder hover:bg-brandbg/[0.03] transition disabled:opacity-50"
             >
               {uploading === 'couple' ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {uploading === 'couple' ? 'Uploading...' : (draft.guestPageCoupleImage ? 'Change photo' : 'Upload bride & groom photo')}
@@ -777,9 +777,9 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Custom Text ───────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Custom Text</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Custom Text</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-semibold text-gray-800">Hero Title</label>
@@ -790,7 +790,7 @@ export default function GuestPageThemeEditor({
                   value={draft.guestPageTitle}
                   onChange={e => set('guestPageTitle', e.target.value)}
                   placeholder="e.g. J & J Night"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -802,7 +802,7 @@ export default function GuestPageThemeEditor({
                   value={draft.guestPageSubtitle}
                   onChange={e => set('guestPageSubtitle', e.target.value)}
                   placeholder="e.g. Together with their families"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -814,7 +814,7 @@ export default function GuestPageThemeEditor({
                   value={draft.guestPageDetailsTitle}
                   onChange={e => set('guestPageDetailsTitle', e.target.value)}
                   placeholder="e.g. The Invitation"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -826,7 +826,7 @@ export default function GuestPageThemeEditor({
                   value={draft.guestPageRsvpTitle}
                   onChange={e => set('guestPageRsvpTitle', e.target.value)}
                   placeholder="e.g. Will You Attend?"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
               <div>
@@ -838,7 +838,7 @@ export default function GuestPageThemeEditor({
                   value={draft.guestPageFooterNote}
                   onChange={e => set('guestPageFooterNote', e.target.value)}
                   placeholder="e.g. With love"
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
               </div>
             </div>
@@ -846,14 +846,14 @@ export default function GuestPageThemeEditor({
         </div>
 
         {/* ─── Live Mini Preview ─────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-serif text-lg font-extrabold text-gray-800 m-0">Preview</h2>
+              <h2 className="font-display text-lg font-extrabold text-gray-800 m-0">Preview</h2>
               <button
                 type="button"
                 onClick={() => setShowPreview(!showPreview)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-[#0D4B4B] bg-[#0D4B4B]/[0.06] px-3 py-1.5 rounded-lg hover:bg-[#0D4B4B]/[0.1] transition"
+                className="flex items-center gap-1.5 text-xs font-semibold text-brandtext bg-brandbg/[0.06] px-3 py-1.5 rounded-lg hover:bg-brandbg/[0.1] transition"
               >
                 <Eye size={13} />
                 {showPreview ? 'Hide' : 'Show'} full page
@@ -862,7 +862,7 @@ export default function GuestPageThemeEditor({
 
             {/* Hero mini preview */}
             <div
-              className="rounded-2xl overflow-hidden text-center py-10 px-6 relative"
+              className="rounded-card overflow-hidden text-center py-10 px-6 relative"
               style={{
                 background: draft.guestPageHeaderImage
                   ? `url(${draft.guestPageHeaderImage}) center/cover, linear-gradient(135deg, ${draft.guestPagePrimaryColor}, ${draft.guestPageSecondaryColor})`
@@ -945,7 +945,7 @@ export default function GuestPageThemeEditor({
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-4 overflow-hidden"
               >
-                <div className="rounded-xl border border-gray-100 p-5 bg-gray-50/50 space-y-3 text-sm text-gray-600">
+                <div className="rounded-tap border border-gray-100 p-5 bg-gray-50/50 space-y-3 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPagePrimaryColor + '18', color: draft.guestPagePrimaryColor }}>📅</span>
                     <span>Saturday, 3rd September 2026</span>
@@ -971,7 +971,7 @@ export default function GuestPageThemeEditor({
                     </div>
                   )}
                   <div
-                    className="mt-2 h-40 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-300 text-xs font-medium"
+                    className="mt-2 h-40 rounded-tap bg-white border border-gray-200 flex items-center justify-center text-gray-300 text-xs font-medium"
                   >
                     Guest&apos;s invitation card
                   </div>
@@ -981,7 +981,7 @@ export default function GuestPageThemeEditor({
                     </p>
                     <p className="text-xs text-gray-400 -mt-0.5">We would be honored to have you join us</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+                  <div className="bg-white rounded-tap border border-gray-200 p-3 text-center">
                     <p className="font-semibold text-gray-700" style={{ fontFamily: fontClass }}>
                       {draft.guestPageRsvpTitle || 'Will You Attend?'}
                     </p>
@@ -1006,7 +1006,7 @@ export default function GuestPageThemeEditor({
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-2xl font-semibold text-sm shadow-md shadow-[#0D4B4B]/25 hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-3 rounded-card font-semibold text-sm shadow-md shadow-brandshadow hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {saving ? (
             <><Loader2 size={16} className="animate-spin" /> Saving...</>

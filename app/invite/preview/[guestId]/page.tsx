@@ -42,7 +42,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="relative max-w-md w-full">
         {/* Card */}
-        <div className="relative rounded-2xl overflow-hidden shadow-lg bg-white border border-gray-200">
+        <div className="relative rounded-card overflow-hidden shadow-lg bg-white border border-gray-200">
           {templateUrl ? (
             <div className="relative">
               <img src={templateUrl} alt="Invitation" className="w-full h-auto" />
@@ -84,7 +84,7 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
 
           {/* Status badge */}
           {checkedIn && (
-            <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+            <div className="absolute top-4 right-4 bg-success-soft0 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
               <CheckCircle size={14} /> Checked In
             </div>
           )}
@@ -93,21 +93,21 @@ export default async function PreviewPage({ params }: { params: Promise<{ guestI
         {/* Footer with test controls */}
         <div className="mt-4 text-center">
           {isTestMode ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <p className="inline-flex items-center gap-1.5 text-xs text-amber-700 font-medium mb-2"><FlaskConical size={14} /> Test Mode - Preview Only</p>
+            <div className="bg-warn-soft border border-warn-border rounded-tap p-3">
+              <p className="inline-flex items-center gap-1.5 text-xs text-warn font-medium mb-2"><FlaskConical size={14} /> Test Mode - Preview Only</p>
               {checkedIn ? (
-                <span className="inline-flex items-center gap-1.5 text-sm text-green-700 font-semibold"><CheckCircle size={16} /> Guest is checked in</span>
+                <span className="inline-flex items-center gap-1.5 text-sm text-success font-semibold"><CheckCircle size={16} /> Guest is checked in</span>
               ) : (
                 <form action={`/api/check-in?guestId=${guest.id}`} method="POST">
                   <button
                     type="submit"
-                    className="inline-flex items-center gap-2 bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-bold hover:bg-[#0A3939] transition"
+                    className="inline-flex items-center gap-2 bg-brandbg text-white px-6 py-2 rounded-lg font-bold hover:bg-brand-deepbg transition"
                   >
                     <Target size={15} /> Test Check-In
                   </button>
                 </form>
               )}
-              <p className="text-[10px] text-amber-600 mt-2">This guest will be marked as checked in (simulated)</p>
+              <p className="text-[10px] text-warn mt-2">This guest will be marked as checked in (simulated)</p>
             </div>
           ) : (
             <p className="text-xs text-gray-400">Scan this QR code at the venue to check in.</p>

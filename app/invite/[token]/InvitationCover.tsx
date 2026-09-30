@@ -116,12 +116,12 @@ export default function InvitationCover({
             <div className="lw-float-env relative" style={{ width: 'min(20rem, 88vw)', height: '13.5rem', animation: 'lwFloat 6s ease-in-out 0.6s infinite' }}>
               {/* right fold (back triangle) */}
               <div
-                className="pointer-events-none absolute inset-0 rounded-2xl"
+                className="pointer-events-none absolute inset-0 rounded-card"
                 style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)', background: '#F0E7D6' }}
               />
               {/* left fold (back triangle) */}
               <div
-                className="pointer-events-none absolute inset-0 rounded-2xl"
+                className="pointer-events-none absolute inset-0 rounded-card"
                 style={{ clipPath: 'polygon(0 0, 0 100%, 100% 0)', background: '#F8F1E6' }}
               />
 

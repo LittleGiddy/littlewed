@@ -67,7 +67,7 @@ export default function ComposeSmsPage() {
 
       <Card className="p-5">
         <div className="flex items-center gap-2 mb-1">
-          <FileText size={17} className="text-[#0D4B4B]" />
+          <FileText size={17} className="text-brandtext" />
           <h2 className="font-semibold text-gray-800">Write your invitation</h2>
         </div>
         <p className="text-xs text-gray-500 mb-4 leading-relaxed">
@@ -79,7 +79,7 @@ export default function ComposeSmsPage() {
         <button
           type="button"
           onClick={() => setShowVariables(v => !v)}
-          className="text-xs font-medium text-[#0D4B4B] hover:text-[#0A3939] mb-2 flex items-center gap-1"
+          className="text-xs font-medium text-brandtext hover:text-brand-deeptext mb-2 flex items-center gap-1"
         >
           <Info size={13} />
           {showVariables ? 'Hide variables' : 'Show variables'}
@@ -96,7 +96,7 @@ export default function ComposeSmsPage() {
           id="sms-template-editor"
           value={smsTemplate}
           onChange={e => setSmsTemplate(e.target.value)}
-          className="w-full p-4 border border-gray-200 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent min-h-[220px] resize-y"
+          className="w-full p-4 border border-gray-200 rounded-card text-sm font-mono focus:ring-2 focus:ring-brandring focus:border-transparent min-h-[220px] resize-y"
           placeholder="Write your SMS invitation here..."
         />
         <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
@@ -117,12 +117,12 @@ export default function ComposeSmsPage() {
             {showPreview ? 'Hide preview' : 'Show preview'}
           </button>
           {showPreview && (
-            <div className="mt-2 p-4 bg-gray-50 rounded-2xl border border-gray-200">
+            <div className="mt-2 p-4 bg-gray-50 rounded-card border border-gray-200">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
                 Example · for Mr John Doe
               </p>
               <div
-                className="bg-white rounded-xl border border-gray-100 p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap max-h-56 overflow-y-auto"
+                className="bg-white rounded-tap border border-gray-100 p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap max-h-56 overflow-y-auto"
                 style={{ lineHeight: '1.6' }}
               >
                 {preview}
@@ -143,7 +143,7 @@ export default function ComposeSmsPage() {
           type="button"
           onClick={() => router.push(continueUrl)}
           disabled={!smsTemplate.trim()}
-          className="w-full py-3.5 bg-[#0D4B4B] text-white rounded-2xl font-semibold text-sm hover:bg-[#0A3939] transition disabled:opacity-40 flex items-center justify-center gap-2"
+          className="w-full py-3.5 bg-brandbg text-white rounded-card font-semibold text-sm hover:bg-brand-deepbg transition disabled:opacity-40 flex items-center justify-center gap-2"
         >
           <Send size={16} />
           Choose guests

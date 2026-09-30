@@ -20,26 +20,31 @@ interface ToasterWithCloseProps {
  */
 const TOAST_WIDTH = 'min(calc(100vw - 2rem), 26rem)';
 
+/**
+ * Semantic colours only: green means it worked, red means it failed, teal is
+ * just "working on it", grey is informational. Read from CSS custom properties
+ * so the palette stays in one place.
+ */
 const TYPE_CONFIG = {
   success: {
     Icon: CheckCircle2,
-    badgeStyle: { backgroundColor: '#0D4B4B', color: '#fff' },
-    accentColor: '#0D4B4B',
+    badgeStyle: { backgroundColor: 'var(--color-success)', color: '#fff' },
+    accentColor: 'var(--color-success)',
   },
   error: {
     Icon: AlertCircle,
-    badgeStyle: { backgroundColor: '#FF6B5C', color: '#fff' },
-    accentColor: '#FF6B5C',
+    badgeStyle: { backgroundColor: 'var(--color-danger)', color: '#fff' },
+    accentColor: 'var(--color-danger)',
   },
   loading: {
     Icon: Loader2,
-    badgeStyle: { backgroundColor: '#2563eb', color: '#fff' },
-    accentColor: '#2563eb',
+    badgeStyle: { backgroundColor: 'var(--color-brand)', color: '#fff' },
+    accentColor: 'var(--color-brand)',
   },
   default: {
     Icon: Info,
-    badgeStyle: { backgroundColor: '#f1f5f9', color: '#475569' },
-    accentColor: '#94a3b8',
+    badgeStyle: { backgroundColor: 'var(--color-gray-100)', color: 'var(--color-gray-700)' },
+    accentColor: 'var(--color-gray-400)',
   },
 } as const;
 
@@ -79,7 +84,7 @@ function ToastInner({ t }: { t: Toast }) {
       role={t.type === 'error' ? 'alert' : 'status'}
       aria-live="polite"
       style={{ width: TOAST_WIDTH }}
-      className="pointer-events-auto relative flex min-h-12 items-center gap-3 overflow-hidden rounded-2xl border border-white/60 bg-white/90 p-3 pr-2.5 shadow-[0_16px_40px_-12px_rgba(0,0,0,0.28),0_2px_8px_-2px_rgba(0,0,0,0.08)] backdrop-blur-xl"
+      className="pointer-events-auto relative flex min-h-12 items-center gap-3 overflow-hidden rounded-card border border-white/60 bg-white/90 p-3 pr-2.5 shadow-elev-3 backdrop-blur-xl"
     >
       <span
         aria-hidden
@@ -93,7 +98,7 @@ function ToastInner({ t }: { t: Toast }) {
       >
         {badgeContent}
       </span>
-      <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-slate-800 sm:text-sm">
+      <span className="min-w-0 flex-1 text-[13px] font-medium leading-snug text-gray-800 sm:text-sm">
         {message}
       </span>
       {t.type !== 'loading' && (
@@ -101,7 +106,7 @@ function ToastInner({ t }: { t: Toast }) {
           type="button"
           onClick={() => toast.dismiss(t.id)}
           aria-label="Dismiss notification"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200/70 hover:text-slate-600"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-200/70 hover:text-gray-700"
         >
           <X size={15} />
         </button>

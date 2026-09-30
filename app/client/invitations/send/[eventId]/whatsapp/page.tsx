@@ -157,7 +157,7 @@ export default function ComposeWhatsappPage() {
       {/* ─── Template picker ─── */}
       <Card className="p-5 mb-4">
         <div className="flex items-center gap-2 mb-1">
-          <MessageCircle size={17} className="text-[#15803d]" />
+          <MessageCircle size={17} className="text-successtext" />
           <h2 className="font-semibold text-gray-800">Choose a template</h2>
         </div>
         <p className="text-xs text-gray-500 mb-4">
@@ -169,7 +169,7 @@ export default function ComposeWhatsappPage() {
               key={key}
               type="button"
               onClick={() => setTemplate(key)}
-              className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition ${
+              className={`w-full flex items-center gap-3 p-3.5 rounded-card border text-left transition ${
                 template === key
                   ? 'border-[#25D366] bg-[#25D366]/5'
                   : 'border-gray-200 hover:border-gray-300'
@@ -202,7 +202,7 @@ export default function ComposeWhatsappPage() {
       {/* ─── Variables ─── */}
       <Card className="p-5 mb-4">
         <div className="flex items-center gap-2 mb-1">
-          <Languages size={17} className="text-[#0D4B4B]" />
+          <Languages size={17} className="text-brandtext" />
           <h2 className="font-semibold text-gray-800">Message details</h2>
         </div>
         <p className="text-xs text-gray-500 mb-4">
@@ -217,7 +217,7 @@ export default function ComposeWhatsappPage() {
                 value={effectiveVars[f.key] || ''}
                 onChange={e => setVars(v => ({ ...v, [f.key]: e.target.value }))}
                 placeholder={f.placeholder}
-                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
               />
             </div>
           ))}
@@ -229,7 +229,7 @@ export default function ComposeWhatsappPage() {
                 value={effectiveVars.area || ''}
                 onChange={e => setVars(v => ({ ...v, area: e.target.value }))}
                 placeholder="e.g. Tabata Kimanga - Dar es salaam"
-                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
               />
             </div>
           )}
@@ -241,7 +241,7 @@ export default function ComposeWhatsappPage() {
                 value={eventType}
                 onChange={e => setEventType(e.target.value)}
                 placeholder="e.g. SendOff ya Binti yao mpendwa"
-                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
               />
             </div>
           )}
@@ -253,7 +253,7 @@ export default function ComposeWhatsappPage() {
                 value={contact}
                 onChange={e => setContact(e.target.value)}
                 placeholder="e.g. John Pambalu: 0769999902"
-                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
               />
             </div>
           )}
@@ -265,7 +265,7 @@ export default function ComposeWhatsappPage() {
                 value={contact2}
                 onChange={e => setContact2(e.target.value)}
                 placeholder="e.g. Hamza Pambalu: 0655552033"
-                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="mt-1 w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-transparent"
               />
             </div>
           )}
@@ -278,7 +278,7 @@ export default function ComposeWhatsappPage() {
           <ImageIcon size={17} className="text-gray-400" />
           <h2 className="font-semibold text-gray-800">Preview</h2>
         </div>
-        <div className="mt-2 p-4 bg-[#e7f7ec] rounded-2xl">
+        <div className="mt-2 p-4 bg-[#e7f7ec] rounded-card">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center">
               <MessageCircle size={16} />
@@ -289,7 +289,7 @@ export default function ComposeWhatsappPage() {
             </div>
           </div>
           <div
-            className="bg-white rounded-xl p-3.5 text-[13px] text-gray-700 whitespace-pre-wrap"
+            className="bg-white rounded-tap p-3.5 text-[13px] text-gray-700 whitespace-pre-wrap"
             style={{ lineHeight: '1.55' }}
           >
             {preview}
@@ -305,7 +305,7 @@ export default function ComposeWhatsappPage() {
         <button
           type="button"
           onClick={() => router.push(continueUrl)}
-          className="w-full py-3.5 bg-[#25D366] text-white rounded-2xl font-semibold text-sm hover:bg-[#1db356] transition flex items-center justify-center gap-2"
+          className="w-full py-3.5 bg-[#25D366] text-white rounded-card font-semibold text-sm hover:bg-[#1db356] transition flex items-center justify-center gap-2"
         >
           <Send size={16} />
           Choose guests

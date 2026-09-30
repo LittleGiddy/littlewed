@@ -19,12 +19,12 @@ interface Notification {
 }
 
 const TYPE_STYLE: Record<string, { icon: 'success' | 'warning' | 'alert' | 'info'; cls: string; bg: string }> = {
-  success: { icon: 'success', cls: 'text-green-600', bg: 'bg-green-50' },
-  warning: { icon: 'warning', cls: 'text-amber-600', bg: 'bg-amber-50' },
-  alert: { icon: 'alert', cls: 'text-red-600', bg: 'bg-red-50' },
-  CREDIT_GRANTED: { icon: 'success', cls: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
-  CREDIT_REQUEST: { icon: 'warning', cls: 'text-amber-600', bg: 'bg-amber-50' },
-  CREDIT_REJECTED: { icon: 'alert', cls: 'text-red-600', bg: 'bg-red-50' },
+  success: { icon: 'success', cls: 'text-success', bg: 'bg-success-soft' },
+  warning: { icon: 'warning', cls: 'text-warn', bg: 'bg-warn-soft' },
+  alert: { icon: 'alert', cls: 'text-danger', bg: 'bg-danger-soft' },
+  CREDIT_GRANTED: { icon: 'success', cls: 'text-brandtext', bg: 'bg-brandbg' },
+  CREDIT_REQUEST: { icon: 'warning', cls: 'text-warn', bg: 'bg-warn-soft' },
+  CREDIT_REJECTED: { icon: 'alert', cls: 'text-danger', bg: 'bg-danger-soft' },
   info: { icon: 'info', cls: 'text-blue-600', bg: 'bg-blue-50' },
 };
 
@@ -110,21 +110,21 @@ export default function NotificationsPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
         <div>
-          <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Inbox</p>
+          <p className="text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1.5">Inbox</p>
           <h1 className="text-2xl sm:text-[26px] font-black text-gray-900 leading-tight">Notifications</h1>
           <p className="text-sm text-gray-400 mt-1">All your updates in one place.</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={fetchData}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 bg-white hover:border-[#0D4B4B] hover:text-[#0D4B4B] transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-tap border border-gray-200 text-xs font-semibold text-gray-600 bg-white hover:border-brandborder hover:text-brandtext transition"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
           {unread.length > 0 && (
             <button
               onClick={markAllRead}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-[#0D4B4B] bg-white hover:bg-[#0D4B4B]/5 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-tap border border-gray-200 text-xs font-semibold text-brandtext bg-white hover:bg-brandbg transition"
             >
               <CheckCheck size={13} /> Mark all read
             </button>
@@ -132,7 +132,7 @@ export default function NotificationsPage() {
           {all.some((n) => n.isRead) && (
             <button
               onClick={clearRead}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-xs font-semibold text-red-600 bg-white hover:bg-red-50 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-tap border border-danger-border text-xs font-semibold text-danger bg-white hover:bg-danger-soft transition"
             >
               <Trash2 size={13} /> Clear read
             </button>
@@ -147,7 +147,7 @@ export default function NotificationsPage() {
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${
-              tab === t.key ? 'bg-[#0D4B4B] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-[#0D4B4B]/40'
+              tab === t.key ? 'bg-brandbg text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-brandborder'
             }`}
           >
             {t.label}
@@ -159,12 +159,12 @@ export default function NotificationsPage() {
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+      <div className="bg-white rounded-card border border-gray-200 overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
         {loading ? (
           <div className="p-10 text-center text-sm text-gray-400">Loading notifications...</div>
         ) : list.length === 0 ? (
           <div className="p-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+            <div className="w-14 h-14 rounded-card bg-gray-50 flex items-center justify-center mx-auto mb-4">
               <BellOff size={26} className="text-gray-300" />
             </div>
             <p className="text-sm font-semibold text-gray-800">All caught up</p>
@@ -182,13 +182,13 @@ export default function NotificationsPage() {
                     n.isRead ? 'bg-gray-50/30 hover:bg-gray-50' : 'bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <span className={`w-9 h-9 rounded-xl ${st.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ${st.cls}`}>
+                  <span className={`w-9 h-9 rounded-tap ${st.bg} flex items-center justify-center flex-shrink-0 mt-0.5 ${st.cls}`}>
                     <TypeIcon type={n.type} />
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className={`text-sm ${n.isRead ? 'text-gray-600 font-medium' : 'text-gray-900 font-bold'}`}>{n.title}</p>
-                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-[#0D4B4B] flex-shrink-0 mt-1.5" />}
+                      {!n.isRead && <span className="w-2 h-2 rounded-full bg-brandbg flex-shrink-0 mt-1.5" />}
                     </div>
                     {n.message && <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.message}</p>}
                     <p className="text-[11px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</p>

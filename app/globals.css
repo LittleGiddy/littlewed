@@ -1,50 +1,179 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
-/* Custom CSS variables */
+/* ==========================================================================
+   LittleWed design tokens
+   Tailwind v4 is CSS-first, so the theme lives here (no tailwind.config).
+   Brand teal #0D4B4B was previously hard-coded ~1000 times; these tokens give
+   it a name. Existing arbitrary values like `bg-[#0D4B4B]` keep working, and
+   new code should prefer `bg-brand` / `text-brand` / `border-brand/20`.
+   ========================================================================== */
+@theme {
+  /* ── Brand: teal ── */
+  --color-brand: #0d4b4b;
+  --color-brand-dark: #0a3939;
+  --color-brand-deep: #082d2d;
+  --color-brand-600: #15605f;
+  --color-brand-500: #1c7573;
+  --color-brand-300: #7fb5b4;
+  --color-brand-200: #b9d8d7;
+  --color-brand-100: #dceceb;
+  --color-brand-50: #f0f7f7;
+  /* Soft teal for selected states / tinted tiles */
+  --color-brand-soft: #eef5f5;
+
+  /* ── Semantic ── */
+  --color-success: #1a7a4a;
+  --color-success-soft: #ecf7f1;
+  --color-success-border: #bfe3d0;
+  --color-warn: #b45309;
+  --color-warn-soft: #fdf6e7;
+  --color-warn-border: #f0dcb4;
+  --color-danger: #d93025;
+  --color-danger-soft: #fdecea;
+  --color-danger-border: #f5c6c2;
+  /* Coral is already established by the toast renderer */
+  --color-coral: #ff6b5c;
+  --color-whatsapp: #25d366;
+
+  /* ── Surfaces ── */
+  --color-canvas: #f5f6f7;
+  --color-ink: #1a1d1f;
+  --color-muted: #6b7280;
+
+  /* ── Typography ──
+     DM Sans is loaded in app/layout.tsx via @fontsource. Declaring it here
+     makes `font-sans` (and the body default) resolve to DM Sans instead of
+     Tailwind's system stack, which is what actually happens today. */
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --default-font-family: var(--font-sans);
+  --font-display: "Playfair Display", ui-serif, Georgia, Cambria, serif;
+
+  /* ── Radii: one consistent scale instead of ad-hoc rounded-[13px] ── */
+  --radius-tap: 0.75rem; /* 12px - buttons, inputs, chips */
+  --radius-card: 1rem; /* 16px - cards */
+  --radius-sheet: 1.5rem; /* 24px - bottom sheets */
+  --radius-blob: 1.75rem; /* 28px - hero tiles */
+
+  /* ── Soft elevation (no heavy shadows) ── */
+  --shadow-elev-1: 0 1px 2px rgb(13 20 26 / 0.04), 0 1px 3px rgb(13 20 26 / 0.06);
+  --shadow-elev-2: 0 2px 6px rgb(13 20 26 / 0.05), 0 6px 16px rgb(13 20 26 / 0.06);
+  --shadow-elev-3: 0 8px 24px rgb(13 20 26 / 0.1), 0 2px 6px rgb(13 20 26 / 0.05);
+  --shadow-brand: 0 6px 18px -6px rgb(13 75 75 / 0.35);
+  --shadow-brand-sm: 0 3px 10px -4px rgb(13 75 75 / 0.3);
+
+  /* ── Motion: 150-250ms, soft ease-out ── */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-rise: fade-rise 0.22s var(--ease-soft) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+  --animate-sheet-in: sheet-in 0.28s var(--ease-soft) both;
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Entry/exit classes. These were referenced by lib/confirmToast.tsx and three
+   other pages but never actually defined, so they emitted no CSS. */
+.animate-enter {
+  animation: fade-rise 0.22s var(--ease-soft) both;
+}
+.animate-leave {
+  animation: fade-in 0.15s ease-in reverse both;
+}
+
+/* ==========================================================================
+   Reduced motion: honoured globally for both CSS and Framer Motion consumers
+   (see lib/motion.ts for the JS side).
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
 :root {
-  --primary: 79, 70, 229;      /* indigo-600 */
-  --primary-dark: 67, 56, 202; /* indigo-700 */
-  --danger: 220, 38, 38;       /* red-600 */
-  --success: 22, 163, 74;      /* green-600 */
+  /* Height reserved at the bottom of the viewport for the mobile tab bar.
+     Static rather than state-driven: the bar is always present below the lg
+     breakpoint, so pages with their own sticky action bar can offset by this
+     and stay correct without coordinating with the shell. */
+  --app-nav-h: 0px;
+  --app-nav-safe: 0px;
 }
 
-/* Custom component classes */
-@layer components {
-  .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors;
-  }
-  
-  .btn-primary {
-    @apply bg-indigo-600 text-white hover:bg-indigo-700;
-  }
-  
-  .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
-  }
-  
-  .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
-  }
-  
-  .btn-outline {
-    @apply border border-gray-300 bg-white hover:bg-gray-50;
-  }
-  
-  .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
-  }
-  
-  .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent;
-  }
-  
-  .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+@media (min-width: 1024px) {
+  :root {
+    --app-nav-h: 0px;
   }
 }
 
-/* Custom range slider styling */
+@media (max-width: 1023px) {
+  :root {
+    /* The bar is 60px tall *plus* its own safe-area padding, so anything
+       offsetting itself above the bar has to clear both. */
+    --app-nav-safe: env(safe-area-inset-bottom, 0px);
+    --app-nav-h: calc(60px + var(--app-nav-safe));
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+/* Visible focus for keyboard users on every interactive element. Components
+   opt into a subtler ring, so this is the floor rather than a double ring. */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Range sliders: teal thumb, larger hit area for touch. */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -55,28 +184,71 @@ input[type="range"] {
 input[type="range"]:focus {
   outline: none;
 }
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(13 75 75 / 0.18);
+}
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
-  background: #4f46e5;
+  width: 20px;
+  height: 20px;
+  background: var(--color-brand);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  transition: transform 0.15s var(--ease-soft);
+}
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.15);
 }
 input[type="range"]::-moz-range-thumb {
   width: 18px;
   height: 18px;
-  background: #4f46e5;
+  background: var(--color-brand);
+  border: 2px solid #fff;
   border-radius: 50%;
   cursor: pointer;
 }
 
-/* Base body styling */
-body {
-  background: #f9fafb;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+/* ==========================================================================
+   Legacy component classes.
+   Kept because login / signup / forgot-password / pricing and parts of the
+   event workspace still use them, but re-pointed from leftover indigo to the
+   LittleWed teal identity.
+   ========================================================================== */
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-brand text-white hover:bg-brand-dark;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+  }
+
+  .btn-danger {
+    @apply bg-danger text-white hover:brightness-95;
+  }
+
+  .btn-outline {
+    @apply border border-gray-300 bg-white hover:bg-gray-50;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
 }
 
 /* Toast auto-dismiss progress bar (Material SnackBar style) */

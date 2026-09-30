@@ -68,7 +68,7 @@ function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; a
   const { tiles, xOff, yOff } = useStaticPreview(lat, lng);
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden>
+    <div className="absolute inset-0 overflow-hidden rounded-card bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden>
       <div
         className="absolute"
         style={{
@@ -194,7 +194,7 @@ export default function VenueMap({
   return (
     <>
       {/* Preview card — the map itself is the card background (never a blank card) */}
-      <div className="relative h-52 overflow-hidden rounded-2xl shadow-sm sm:h-64">
+      <div className="relative h-52 overflow-hidden rounded-card shadow-sm sm:h-64">
         {venue ? (
           <StaticMapImage lat={venue.lat} lng={venue.lng} accentColor={accentColor} />
         ) : (
@@ -290,7 +290,7 @@ export default function VenueMap({
                     href={directionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
+                    className="flex w-full items-center justify-center gap-2 rounded-tap px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]"
                     style={{ backgroundColor: primaryColor }}
                   >
                     <Navigation size={16} /> Get Directions
@@ -302,8 +302,8 @@ export default function VenueMap({
                   rel="noopener noreferrer"
                   className={
                     directionsUrl
-                      ? 'mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50'
-                      : 'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]'
+                      ? 'mt-3 flex w-full items-center justify-center gap-2 rounded-tap border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50'
+                      : 'flex w-full items-center justify-center gap-2 rounded-tap px-4 py-3 text-sm font-bold text-white transition-transform active:scale-[0.98]'
                   }
                   style={!directionsUrl ? { backgroundColor: primaryColor } : undefined}
                 >

@@ -748,7 +748,7 @@ export default function ImportGuestsPage() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
       <Link
         href={`/client/events/${eventId}`}
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)] mb-6"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-brand/10 border border-brand/20 rounded-tap px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)] mb-6"
       >
         <ArrowLeft size={14} /> Back to Event
       </Link>
@@ -758,13 +758,13 @@ export default function ImportGuestsPage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={downloadSampleCSV}
-            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
+            className="inline-flex items-center justify-center gap-1 text-sm text-brandtext bg-brand/10 border border-brand/20 px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
           >
             <Download size={14} /> Sample CSV
           </button>
           <button
             onClick={downloadSamplePDF}
-            className="inline-flex items-center justify-center gap-1 text-sm text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
+            className="inline-flex items-center justify-center gap-1 text-sm text-brandtext bg-brand/10 border border-brand/20 px-4 py-2 rounded-lg hover:bg-[rgba(13,75,75,0.14)] transition"
           >
             <FileText size={14} /> PDF Format
           </button>
@@ -786,14 +786,14 @@ export default function ImportGuestsPage() {
             <button
               onClick={importFromPhone}
               disabled={uploading}
-              className="w-full mb-4 py-3 bg-[rgba(13,75,75,0.08)] text-[#0D4B4B] border border-[rgba(13,75,75,0.2)] rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[rgba(13,75,75,0.14)] transition disabled:opacity-50"
+              className="w-full mb-4 py-3 bg-brand/10 text-brandtext border border-[rgba(13,75,75,0.2)] rounded-tap font-semibold flex items-center justify-center gap-2 hover:bg-[rgba(13,75,75,0.14)] transition disabled:opacity-50"
             >
               <Phone size={18} /> Import from Phone Contacts
             </button>
           )}
 
           <div
-            className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition ${dragActive ? 'border-[#0D4B4B] bg-[rgba(13,75,75,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
+            className={`border-2 border-dashed rounded-card p-8 text-center cursor-pointer transition ${dragActive ? 'border-brandborder bg-[rgba(13,75,75,0.04)]' : 'border-gray-300 bg-white hover:bg-gray-50'
               }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -805,17 +805,17 @@ export default function ImportGuestsPage() {
             <p className="text-gray-600">Drag & drop your file here, or click to browse</p>
             <p className="text-xs text-gray-400 mt-1">Supports CSV, Excel, VCF, and PDF</p>
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.vcf,.pdf" onChange={handleFileSelect} className="hidden" />
-            {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+            {error && <p className="text-danger text-sm mt-2">{error}</p>}
           </div>
 
           {/* ─── WhatsApp Detection Toggle ─── */}
-          <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-tap border border-gray-200">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={detectWhatsApp}
                 onChange={(e) => setDetectWhatsApp(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B]"
+                className="w-4 h-4 rounded border-gray-300 text-brandtext focus:ring-brandring"
               />
               <span className="text-sm font-medium text-gray-700">
                 Auto-detect WhatsApp numbers
@@ -828,9 +828,9 @@ export default function ImportGuestsPage() {
 
 
           {/* PDF Format Guide */}
-          <div className="mt-6 bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <div className="mt-6 bg-gray-50 rounded-tap p-4 border border-gray-200">
             <h3 className="font-semibold text-sm flex items-center gap-2 mb-2">
-              <FileText size={16} className="text-[#0D4B4B]" />
+              <FileText size={16} className="text-brandtext" />
               PDF Format Guide
             </h3>
             <p className="text-xs text-gray-600 mb-2">
@@ -855,18 +855,18 @@ export default function ImportGuestsPage() {
 
       {step === 'map' && rawData.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 rounded-xl p-3 mb-4 gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 rounded-tap p-3 mb-4 gap-2">
             <div className="flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-green-600" />
+              <FileSpreadsheet className="w-5 h-5 text-success" />
               <span className="text-sm font-medium truncate">{file?.name}</span>
               <span className="text-xs text-gray-500">({rawData.length} rows)</span>
             </div>
-            <button onClick={removeFile} className="text-gray-400 hover:text-red-500 flex-shrink-0">
+            <button onClick={removeFile} className="text-gray-400 hover:text-danger flex-shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+          <div className="bg-white rounded-tap shadow-sm overflow-x-auto">
             <h2 className="font-semibold px-4 py-3 border-b">Map Columns</h2>
             <div className="p-4">
               <p className="text-sm text-gray-600 mb-4">
@@ -892,10 +892,10 @@ export default function ImportGuestsPage() {
                   </div>
                 ))}
               </div>
-              {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+              {error && <p className="text-danger text-sm mt-3">{error}</p>}
               <button
                 onClick={applyMapping}
-                className="mt-4 w-full sm:w-auto bg-[#0D4B4B] text-white px-6 py-2 rounded-lg font-semibold hover:bg-[#0A3939] transition"
+                className="mt-4 w-full sm:w-auto bg-brandbg text-white px-6 py-2 rounded-lg font-semibold hover:bg-brand-deepbg transition"
               >
                 Apply Mapping & Preview
               </button>
@@ -906,33 +906,33 @@ export default function ImportGuestsPage() {
 
       {step === 'preview' && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 rounded-xl p-3 mb-4 gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-gray-50 rounded-tap p-3 mb-4 gap-2">
             <div className="flex items-center gap-2">
               {file?.name?.endsWith('.pdf') ? (
-                <FileText className="w-5 h-5 text-red-600" />
+                <FileText className="w-5 h-5 text-danger" />
               ) : (
-                <FileSpreadsheet className="w-5 h-5 text-green-600" />
+                <FileSpreadsheet className="w-5 h-5 text-success" />
               )}
               <span className="text-sm font-medium truncate">{file?.name}</span>
               <span className="text-xs text-gray-500">({parsedGuests.length} guests)</span>
             </div>
-            <button onClick={removeFile} className="text-gray-400 hover:text-red-500 flex-shrink-0">
+            <button onClick={removeFile} className="text-gray-400 hover:text-danger flex-shrink-0">
               <X className="w-5 h-5" />
             </button>
           </div>
 
           <div className="flex flex-wrap gap-3 mb-4">
-            <div className="bg-[#EDFAF4] border border-[#A8D5C4] rounded-xl px-4 py-2 flex items-center gap-2">
+            <div className="bg-[#EDFAF4] border border-[#A8D5C4] rounded-tap px-4 py-2 flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-[#1A7A4A]" />
               <span className="text-sm font-medium text-[#1A7A4A]">{validCount} valid</span>
             </div>
             {invalidCount > 0 && (
-              <div className="bg-[#FEF6EC] border border-[#F5D6B8] rounded-xl px-4 py-2 flex items-center gap-2">
+              <div className="bg-[#FEF6EC] border border-[#F5D6B8] rounded-tap px-4 py-2 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-[#C07A20]" />
                 <span className="text-sm font-medium text-[#C07A20]">{invalidCount} invalid</span>
                 <button
                   onClick={downloadInvalid}
-                  className="text-xs text-[#0D4B4B] underline hover:no-underline"
+                  className="text-xs text-brandtext underline hover:no-underline"
                 >
                   Export invalid
                 </button>
@@ -960,7 +960,7 @@ export default function ImportGuestsPage() {
       )}
 
           {limitWarning && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-xl mb-4">
+            <div className="bg-warn-soft border border-warn-border text-warn px-4 py-3 rounded-tap mb-4">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0 text-sm">{limitWarning}</div>
@@ -968,13 +968,13 @@ export default function ImportGuestsPage() {
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => setShowCreditRequest(true)}
-                  className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0A3939] transition"
+                  className="inline-flex items-center gap-1.5 bg-brandbg text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-deepbg transition"
                 >
                   <Plus size={15} /> Request {creditDeficit > 0 ? `${creditDeficit} ` : ''}Credits
                 </button>
                 <a
                   href="/client/billing"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-[#0D4B4B] bg-white border border-[#0D4B4B]/20 hover:bg-[rgba(13,75,75,0.06)] transition"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-brandtext bg-white border border-brandborder hover:bg-brand/10 transition"
                 >
                   Billing
                 </a>
@@ -983,7 +983,7 @@ export default function ImportGuestsPage() {
           )}
 
           {parsedGuests.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white rounded-tap shadow-sm overflow-hidden">
               <h2 className="font-semibold px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span>Preview ({parsedGuests.length} guests)</span>
                 <label className="flex items-center gap-2 text-sm font-normal">
@@ -1003,7 +1003,7 @@ export default function ImportGuestsPage() {
                   const isEditingName = editingIndex === originalIndex && editField === 'name';
                   const isEditingTitle = editingIndex === originalIndex && editField === 'title';
                   return (
-                    <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-amber-50/50'}`}>
+                    <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-warn-soft/50'}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           {/* Title with always-visible edit button */}
@@ -1014,7 +1014,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-brandring"
                                   placeholder="Title"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1024,14 +1024,14 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
                                 </button>
                                 <button
                                   onClick={cancelEdit}
-                                  className="text-red-500 hover:text-red-700 transition"
+                                  className="text-danger hover:text-danger transition"
                                   title="Cancel"
                                 >
                                   <XCircle size={14} />
@@ -1044,7 +1044,7 @@ export default function ImportGuestsPage() {
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4B4B] transition"
+                                  className="text-gray-400 hover:text-brandtext transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
@@ -1060,7 +1060,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                                   placeholder="Name"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1070,14 +1070,14 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
                                 </button>
                                 <button
                                   onClick={cancelEdit}
-                                  className="text-red-500 hover:text-red-700 transition"
+                                  className="text-danger hover:text-danger transition"
                                   title="Cancel"
                                 >
                                   <XCircle size={14} />
@@ -1088,7 +1088,7 @@ export default function ImportGuestsPage() {
                                 <p className="font-medium text-gray-800 break-words">{guest.name}</p>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4B4B] transition flex-shrink-0"
+                                  className="text-gray-400 hover:text-brandtext transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
@@ -1106,11 +1106,11 @@ export default function ImportGuestsPage() {
                           )}
                           <div className="mt-1">
                             {guest.isValid ? (
-                              <span className="text-green-600 text-xs font-medium flex items-center gap-1">
+                              <span className="text-success text-xs font-medium flex items-center gap-1">
                                 <CheckCircle size={12} /> Valid
                               </span>
                             ) : (
-                              <span className="text-amber-600 text-xs font-medium flex items-center gap-1">
+                              <span className="text-warn text-xs font-medium flex items-center gap-1">
                                 <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
                               </span>
                             )}
@@ -1142,7 +1142,7 @@ export default function ImportGuestsPage() {
                       const isEditingName = editingIndex === originalIndex && editField === 'name';
                       const isEditingTitle = editingIndex === originalIndex && editField === 'title';
                       return (
-                        <tr key={originalIndex} className={guest.isValid ? '' : 'bg-amber-50/50'}>
+                        <tr key={originalIndex} className={guest.isValid ? '' : 'bg-warn-soft/50'}>
                           <td className="px-4 py-2">
                             {isEditingTitle ? (
                               <div className="flex items-center gap-1">
@@ -1150,7 +1150,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                                  className="border rounded px-2 py-0.5 w-20 text-xs focus:outline-none focus:ring-2 focus:ring-brandring"
                                   placeholder="Title"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1160,14 +1160,14 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
                                 </button>
                                 <button
                                   onClick={cancelEdit}
-                                  className="text-red-500 hover:text-red-700 transition"
+                                  className="text-danger hover:text-danger transition"
                                   title="Cancel"
                                 >
                                   <XCircle size={14} />
@@ -1180,7 +1180,7 @@ export default function ImportGuestsPage() {
                                 </span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'title', guest.title || '')}
-                                  className="text-gray-400 hover:text-[#0D4B4B] transition"
+                                  className="text-gray-400 hover:text-brandtext transition"
                                   title="Edit title"
                                 >
                                   <Pencil size={12} />
@@ -1195,7 +1195,7 @@ export default function ImportGuestsPage() {
                                   type="text"
                                   value={editValue}
                                   onChange={(e) => setEditValue(e.target.value)}
-                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]"
+                                  className="border rounded px-2 py-1 w-full text-sm focus:outline-none focus:ring-2 focus:ring-brandring"
                                   placeholder="Name"
                                   autoFocus
                                   onKeyDown={(e) => {
@@ -1205,14 +1205,14 @@ export default function ImportGuestsPage() {
                                 />
                                 <button
                                   onClick={() => saveEdit(originalIndex)}
-                                  className="text-[#1A7A4A] hover:text-[#0D4B4B] transition"
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
                                   title="Save"
                                 >
                                   <Save size={14} />
                                 </button>
                                 <button
                                   onClick={cancelEdit}
-                                  className="text-red-500 hover:text-red-700 transition"
+                                  className="text-danger hover:text-danger transition"
                                   title="Cancel"
                                 >
                                   <XCircle size={14} />
@@ -1223,7 +1223,7 @@ export default function ImportGuestsPage() {
                                 <span className="break-words">{guest.name}</span>
                                 <button
                                   onClick={() => startEditing(originalIndex, 'name', guest.name)}
-                                  className="text-gray-400 hover:text-[#0D4B4B] transition flex-shrink-0"
+                                  className="text-gray-400 hover:text-brandtext transition flex-shrink-0"
                                   title="Edit name"
                                 >
                                   <Pencil size={14} />
@@ -1246,11 +1246,11 @@ export default function ImportGuestsPage() {
                           <td className="px-4 py-2 font-mono text-xs">{guest.cardNumber || '-'}</td>
                           <td className="px-4 py-2">
                             {guest.isValid ? (
-                              <span className="text-green-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                              <span className="text-success text-xs font-medium flex items-center gap-1 whitespace-nowrap">
                                 <CheckCircle size={12} /> Valid
                               </span>
                             ) : (
-                              <span className="text-amber-600 text-xs font-medium flex items-center gap-1 whitespace-nowrap">
+                              <span className="text-warn text-xs font-medium flex items-center gap-1 whitespace-nowrap">
                                 <AlertTriangle size={12} /> {guest.statusMessage || 'Invalid'}
                               </span>
                             )}
@@ -1271,7 +1271,7 @@ export default function ImportGuestsPage() {
               <div className="flex flex-col sm:flex-row sm:justify-between items-center px-4 py-2 border-t gap-2">
                 <button
                   onClick={() => setShowValidOnly(!showValidOnly)}
-                  className="text-sm text-[#0D4B4B] hover:underline"
+                  className="text-sm text-brandtext hover:underline"
                 >
                   {showValidOnly ? 'Show all' : 'Show valid only'}
                 </button>
@@ -1292,7 +1292,7 @@ export default function ImportGuestsPage() {
             <button
               onClick={handleImport}
               disabled={uploading || validCount === 0 || !!limitWarning}
-              className="px-6 py-2 bg-[#0D4B4B] text-white rounded-lg hover:bg-[#0A3939] disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="px-6 py-2 bg-brandbg text-white rounded-lg hover:bg-brand-deepbg disabled:opacity-50 transition flex items-center justify-center gap-2"
             >
               {uploading ? (
                 <>

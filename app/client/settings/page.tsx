@@ -161,7 +161,7 @@ export default function SettingsPage() {
   if (!session) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#0D4B4B] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-brand rounded-full animate-spin" />
       </div>
     );
   }
@@ -170,8 +170,8 @@ export default function SettingsPage() {
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
       {/* ─── Page Header ─── */}
       <div className="mb-7">
-        <p className="text-[11px] font-bold tracking-[1.5px] text-[#0D4B4B] uppercase mb-1.5">Account</p>
-        <h1 className="font-serif text-3xl sm:text-[32px] font-black text-gray-900 leading-tight tracking-tight">
+        <p className="text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1.5">Account</p>
+        <h1 className="font-display text-3xl sm:text-[32px] font-black text-gray-900 leading-tight tracking-tight">
           Settings
         </h1>
         <p className="text-sm text-gray-400 mt-1.5">Manage your account, profile, and preferences.</p>
@@ -181,14 +181,14 @@ export default function SettingsPage() {
         {/* ─── Appearance Link ─── */}
         <Link
           href="/client/settings/guest-page"
-          className="block bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] rounded-2xl p-5 shadow-md shadow-[#0D4B4B]/20 hover:shadow-lg hover:shadow-[#0D4B4B]/30 transition-all group"
+          className="block bg-gradient-to-r from-brandfrom to-brand-deepto rounded-card p-5 shadow-md shadow-brandshadow hover:shadow-lg hover:shadow-brandshadow transition-all group"
         >
           <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:bg-white/20 transition-all shrink-0">
+            <div className="w-11 h-11 rounded-tap bg-white/10 flex items-center justify-center text-white group-hover:bg-white/20 transition-all shrink-0">
               <Palette size={20} />
             </div>
             <div className="flex-1">
-              <p className="text-white font-serif font-extrabold m-0 group-hover:underline">Guest Page Theme</p>
+              <p className="text-white font-display font-extrabold m-0 group-hover:underline">Guest Page Theme</p>
               <p className="text-[#9CC4C4] text-xs m-0 mt-0.5">Customize colors, font &amp; hero for your invitation link page</p>
             </div>
             <ArrowRight size={18} className="text-[#9CC4C4] group-hover:text-white group-hover:translate-x-1 transition-all shrink-0" />
@@ -196,12 +196,12 @@ export default function SettingsPage() {
         </Link>
 
         {/* ─── Profile Card ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           {/* Avatar Section */}
           <div className="px-6 py-6 border-b border-gray-100">
             <div className="flex items-center gap-5">
               <div className="relative group">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0D4B4B] to-pink-400 flex items-center justify-center text-white font-bold text-2xl font-serif shadow-lg shadow-[#0D4B4B]/20 overflow-hidden">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brandfrom to-pink-400 flex items-center justify-center text-white font-bold text-2xl font-display shadow-lg shadow-brandshadow overflow-hidden">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
                   ) : (
@@ -256,17 +256,17 @@ export default function SettingsPage() {
                 )}
               </div>
               <div>
-                <h3 className="font-serif text-lg font-extrabold text-gray-800">{name || 'User'}</h3>
+                <h3 className="font-display text-lg font-extrabold text-gray-800">{name || 'User'}</h3>
                 <p className="text-sm text-gray-400 mt-0.5">{email}</p>
                 {uploadingAvatar ? (
                   <div className="mt-2">
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs text-[#0D4B4B] font-semibold m-0">Uploading…</p>
-                      <p className="text-xs text-[#0D4B4B] font-bold m-0">{uploadProgress}%</p>
+                      <p className="text-xs text-brandtext font-semibold m-0">Uploading…</p>
+                      <p className="text-xs text-brandtext font-bold m-0">{uploadProgress}%</p>
                     </div>
                     <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-[#0D4B4B] to-[#0D4B4B] rounded-full transition-[width] duration-300 ease-out"
+                        className="h-full bg-gradient-to-r from-brandfrom to-brandto rounded-full transition-[width] duration-300 ease-out"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
@@ -279,7 +279,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Profile Information</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Profile Information</h2>
             <form onSubmit={handleProfileUpdate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">Full Name</label>
@@ -289,7 +289,7 @@ export default function SettingsPage() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     required
                   />
                 </div>
@@ -303,7 +303,7 @@ export default function SettingsPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     required
                   />
                 </div>
@@ -317,7 +317,7 @@ export default function SettingsPage() {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     placeholder="e.g., +255712345678"
                   />
                 </div>
@@ -327,7 +327,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-[#0D4B4B]/25 hover:shadow-lg hover:shadow-[#0D4B4B]/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-2.5 rounded-tap font-semibold text-sm shadow-md shadow-brandshadow hover:shadow-lg hover:shadow-brandshadow transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {savingProfile ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
@@ -340,12 +340,12 @@ export default function SettingsPage() {
         </div>
 
         {/* ─── Account Details Card ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-4">Account Details</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-4">Account Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-[#0D4B4B]/5 flex items-center justify-center text-[#0D4B4B] shrink-0">
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-tap border border-gray-100">
+                <div className="w-10 h-10 rounded-tap bg-brandbg flex items-center justify-center text-brandtext shrink-0">
                   <Shield size={18} />
                 </div>
                 <div>
@@ -356,8 +356,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-tap border border-gray-100">
+                <div className="w-10 h-10 rounded-tap bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
                   <Calendar size={18} />
                 </div>
                 <div>
@@ -366,8 +366,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-tap border border-gray-100">
+                <div className="w-10 h-10 rounded-tap bg-warn-soft flex items-center justify-center text-warn shrink-0">
                   <CheckCircle size={18} />
                 </div>
                 <div>
@@ -378,8 +378,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 shrink-0">
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-tap border border-gray-100">
+                <div className="w-10 h-10 rounded-tap bg-violet-50 flex items-center justify-center text-violet-600 shrink-0">
                   <Building2 size={18} />
                 </div>
                 <div>
@@ -394,15 +394,15 @@ export default function SettingsPage() {
         </div>
 
         {/* ─── Notification Preferences ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1">Notifications</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-1">Notifications</h2>
             <p className="text-xs text-gray-400 mb-4">Choose how you want to be notified.</p>
 
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-tap border border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-[#0D4B4B]/5 flex items-center justify-center text-[#0D4B4B] shrink-0">
+                  <div className="w-9 h-9 rounded-tap bg-brandbg flex items-center justify-center text-brandtext shrink-0">
                     <Mail size={16} />
                   </div>
                   <div>
@@ -413,7 +413,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => setNotifEmail(v => !v)}
                   className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer border-none ${
-                    notifEmail ? 'bg-[#0D4B4B]' : 'bg-gray-300'
+                    notifEmail ? 'bg-brandbg' : 'bg-gray-300'
                   }`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
@@ -422,9 +422,9 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-tap border border-gray-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+                  <div className="w-9 h-9 rounded-tap bg-success-soft flex items-center justify-center text-success shrink-0">
                     <CreditCard size={16} />
                   </div>
                   <div>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => setNotifWhatsApp(v => !v)}
                   className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer border-none ${
-                    notifWhatsApp ? 'bg-[#0D4B4B]' : 'bg-gray-300'
+                    notifWhatsApp ? 'bg-brandbg' : 'bg-gray-300'
                   }`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${
@@ -448,9 +448,9 @@ export default function SettingsPage() {
         </div>
 
         {/* ─── Change Password Card ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-6 py-5">
-            <h2 className="font-serif text-lg font-extrabold text-gray-800 mb-1">Change Password</h2>
+            <h2 className="font-display text-lg font-extrabold text-gray-800 mb-1">Change Password</h2>
             <p className="text-xs text-gray-400 mb-4">Keep your account secure with a strong password.</p>
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div>
@@ -461,7 +461,7 @@ export default function SettingsPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     required
                   />
                   <button
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     required
                     minLength={8}
                   />
@@ -498,7 +498,7 @@ export default function SettingsPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] outline-none transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                     required
                   />
                 </div>
@@ -507,7 +507,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={savingPassword}
-                className="w-full bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-semibold text-sm shadow-md shadow-[#0D4B4B]/25 hover:shadow-lg hover:shadow-[#0D4B4B]/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-2.5 rounded-tap font-semibold text-sm shadow-md shadow-brandshadow hover:shadow-lg hover:shadow-brandshadow transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {savingPassword ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
@@ -520,24 +520,24 @@ export default function SettingsPage() {
         </div>
 
         {/* ─── Danger Zone ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden">
+        <div className="bg-white rounded-card shadow-sm border border-danger-border overflow-hidden">
           <div className="px-6 py-5">
             <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle size={16} className="text-red-500" />
-              <h2 className="font-serif text-lg font-extrabold text-red-600 m-0">Danger Zone</h2>
+              <AlertTriangle size={16} className="text-danger" />
+              <h2 className="font-display text-lg font-extrabold text-danger m-0">Danger Zone</h2>
             </div>
             <p className="text-xs text-gray-400 mb-4">Irreversible actions. Proceed with caution.</p>
 
             {!showDeleteConfirm ? (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2.5 border border-red-200 rounded-xl bg-red-50 text-red-600 text-sm font-semibold cursor-pointer transition-all hover:bg-red-100 hover:border-red-300"
+                className="flex items-center gap-2 px-4 py-2.5 border border-danger-border rounded-tap bg-danger-soft text-danger text-sm font-semibold cursor-pointer transition-all hover:bg-red-100 hover:border-red-300"
               >
                 <Trash2 size={16} /> Delete Account
               </button>
             ) : (
-              <div className="p-4 bg-red-50 rounded-xl border border-red-200">
-                <p className="text-sm text-red-700 font-medium mb-3">
+              <div className="p-4 bg-danger-soft rounded-tap border border-danger-border">
+                <p className="text-sm text-danger font-medium mb-3">
                   Are you sure? This will permanently delete your account and all associated data.
                 </p>
                 <div className="flex gap-2">

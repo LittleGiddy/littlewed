@@ -184,7 +184,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
 
           {/* Wedding theme + color dots - shown clearly */}
           {(theme.weddingTheme || theme.themeColors.length > 0) && (
-            <div className="gp-fade-scale mt-5 mx-auto max-w-md rounded-2xl border border-gray-100 bg-white px-6 py-5 shadow-sm">
+            <div className="gp-fade-scale mt-5 mx-auto max-w-md rounded-card border border-gray-100 bg-white px-6 py-5 shadow-sm">
               {theme.weddingTheme && (
                 <>
                   <p className="text-[10px] font-bold uppercase tracking-[3px] text-gray-400 mb-1.5">
@@ -226,7 +226,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
             <img
               src={guest.invitationCard}
               alt={`Invitation card for ${guestName}`}
-              className="gp-card-image rounded-2xl max-w-full mx-auto max-h-[420px] sm:max-h-[560px] h-auto"
+              className="gp-card-image rounded-card max-w-full mx-auto max-h-[420px] sm:max-h-[560px] h-auto"
               style={{ width: 'auto' }}
             />
           </div>
@@ -246,7 +246,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
 
         {/* Event info cards */}
         <div className="gp-fade-up gp-fade-up-3 grid gap-3 mb-12">
-          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+          <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
             <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -259,7 +259,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           </div>
 
           {event.time && (
-            <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+            <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
               <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${secondaryColor}88`, color: secondaryColor }}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -272,7 +272,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
             </div>
           )}
 
-          <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+          <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
             <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -297,7 +297,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
             </div>
             <div className="grid gap-3">
               {(theme.contactPerson || theme.contactPersonPhone) && (
-                <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+                <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
                   <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${secondaryColor}88`, color: secondaryColor }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h1.5a1 1 0 01.9.55l1.1 2.2a1 1 0 01-.1 1.05l-1.3 1.7a14 14 0 006.5 6.5l1.7-1.3a1 1 0 011.05-.1l2.2 1.1a1 1 0 01.55.9V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
@@ -312,7 +312,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                           {' · '}
                           <a
                             href={`tel:${theme.contactPersonPhone.replace(/[^+\d]/g, '')}`}
-                            className="font-medium text-[#0D4B4B] hover:underline"
+                            className="font-medium text-brandtext hover:underline"
                           >
                             {theme.contactPersonPhone}
                           </a>
@@ -323,7 +323,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 </div>
               )}
               {theme.masterOfCeremony && (
-                <div className="flex items-center gap-4 p-4 rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+                <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
                   <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a3 3 0 00-3 3v1.5M12 2a3 3 0 013 3v1.5M12 5a7 7 0 00-7 7v3a2 2 0 002 2h10a2 2 0 002-2v-3a7 7 0 00-7-7zm-5 12v2a3 3 0 006 0v-2" />
@@ -359,7 +359,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
                 primaryColor={primaryColor}
               />
             ) : (
-              <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-200 px-6 py-8 text-center shadow-sm">
+              <div className="relative overflow-hidden rounded-card border border-gray-100 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-200 px-6 py-8 text-center shadow-sm">
                 <svg className="mx-auto h-8 w-8 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5} style={{ color: primaryColor }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
@@ -408,7 +408,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           {wishes.length > 0 && (
             <div className="mt-6 space-y-3">
               {wishes.map(wish => (
-                <div key={wish.id} className="gp-fade-scale bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                <div key={wish.id} className="gp-fade-scale bg-white rounded-card border border-gray-100 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="text-sm font-bold text-gray-800" style={{ color: primaryColor }}>
                       {wish.guestName}

@@ -12,6 +12,12 @@ import Image from 'next/image';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import RequestCreditsButton from '@/app/components/RequestCreditsButton';
+import AppPageHeader from '@/components/ui/AppPageHeader';
+import AppEmptyState from '@/components/ui/AppEmptyState';
+import AppChip from '@/components/ui/AppChip';
+import AppSegmentedControl from '@/components/ui/AppSegmentedControl';
+import { buttonClasses } from '@/components/ui/AppButton';
+import { useReducedMotion } from '@/lib/motion';
 
 interface DashboardContentProps {
   firstName: string;
@@ -90,7 +96,7 @@ function EventCarousel() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
-            <h3 className="font-serif text-xl sm:text-2xl font-bold text-white leading-tight">
+            <h3 className="font-display text-xl sm:text-2xl font-bold text-white leading-tight">
               {carouselImages[currentIndex].title}
             </h3>
             <p className="text-xs sm:text-sm text-white/85 mt-1 max-w-[85%]">
@@ -149,7 +155,7 @@ function CompactDeleteButton({ eventId }: { eventId: string }) {
     <button
       onClick={handleDelete}
       disabled={isDeleting}
-      className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors active:scale-90"
+      className="w-9 h-9 rounded-full bg-danger-soft flex items-center justify-center text-red-400 hover:bg-red-100 hover:text-danger transition-colors active:scale-90"
     >
       <Trash2 size={15} />
     </button>
@@ -166,24 +172,30 @@ export default function DashboardContent({
   newEventUrl,
 }: DashboardContentProps) {
   const [activeCategory, setActiveCategory] = useState('all');
-  const [isLoaded, setIsLoaded] = useState(false);
   const [hasPending, setHasPending] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
-    setIsLoaded(true);
     fetch('/api/credits/pending', { credentials: 'include' })
       .then((res) => res.json())
       .then((data) => setHasPending(!!data.pending))
       .catch(() => {});
   }, []);
 
+  // Restrained palette: teal carries the brand, green only means "good",
+  // amber only means "needs attention". No decorative rainbow.
   const stats = [
-    { label: 'Credits', value: credits, icon: Coins, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5', ring: 'ring-[#0D4B4B]/10', isCredits: true },
-    { label: 'Total Guests', value: totalGuests, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100', isCredits: false },
-    { label: 'RSVPs', value: responded, icon: PartyPopper, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-100', isCredits: false },
-    { label: 'Checked In', value: checkedIn, icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50', ring: 'ring-green-100', isCredits: false },
-    { label: 'Events', value: events.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100', isCredits: false },
-  ];
+    { label: 'Credits', value: credits, icon: Coins, tone: 'brand', isCredits: true },
+    { label: 'Total Guests', value: totalGuests, icon: Users, tone: 'brand', isCredits: false },
+    { label: 'RSVPs', value: responded, icon: PartyPopper, tone: 'brand', isCredits: false },
+    { label: 'Checked In', value: checkedIn, icon: UserCheck, tone: 'success', isCredits: false },
+    { label: 'Events', value: events.length, icon: CalendarDays, tone: 'brand', isCredits: false },
+  ] as const;
+
+  const statTones = {
+    brand: { tile: 'bg-brand-soft text-brand', value: 'text-gray-900' },
+    success: { tile: 'bg-success-soft text-success', value: 'text-gray-900' },
+  } as const;
 
   const categories = [
     { id: 'all', label: 'All', icon: Grid3x3 },
@@ -193,15 +205,13 @@ export default function DashboardContent({
   ];
 
   const quickActions = [
-    { label: 'New Event', sub: 'Start planning', icon: Plus, href: newEventUrl, color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
-    { label: 'Import Guests', sub: 'From a file', icon: Upload, href: '/client/guests/import/select-event', color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event', color: 'text-amber-600', bg: 'bg-amber-50' },
-    { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event', color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup', color: 'text-violet-600', bg: 'bg-violet-50' },
-    { label: 'Check-in', sub: 'Scan guests in', icon: QrCode, href: '/client/check-in/select-event', color: 'text-rose-600', bg: 'bg-rose-50' },
+    { label: 'New Event', sub: 'Start planning', icon: Plus, href: newEventUrl },
+    { label: 'Import Guests', sub: 'From a file', icon: Upload, href: '/client/guests/import/select-event' },
+    { label: 'Design Card', sub: 'Custom invites', icon: Palette, href: '/client/invitations/design/select-event' },
+    { label: 'Send Invites', sub: 'WhatsApp / SMS', icon: Send, href: '/client/invitations/send/select-event' },
+    { label: 'Backup Guests', sub: 'Export data', icon: Download, href: '/client/guests/backup' },
+    { label: 'Check-in', sub: 'Scan guests in', icon: QrCode, href: '/client/check-in/select-event' },
   ];
-
-  const eventColors = ['bg-[#0D4B4B]', 'bg-green-600', 'bg-amber-600'];
 
   const now = new Date();
   const liveEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000); // next 24h window
@@ -234,18 +244,17 @@ export default function DashboardContent({
     completed: events.filter((e) => e.status === 'EXPIRED' || e.status === 'ARCHIVED').length,
   };
 
-  const featuredEvents = filteredEvents.slice(0, 6).map((event, index) => {
+  const featuredEvents = filteredEvents.slice(0, 6).map((event) => {
     const d = new Date(event.date);
-    const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-      DRAFT: { label: 'Draft', color: 'text-gray-600', bg: 'bg-gray-100' },
-      ACTIVE: { label: 'Upcoming', color: 'text-blue-600', bg: 'bg-blue-50' },
-      LIVE: { label: 'Live', color: 'text-[#0D4B4B]', bg: 'bg-[#0D4B4B]/5' },
-      EXPIRED: { label: 'Completed', color: 'text-gray-500', bg: 'bg-gray-50' },
-      ARCHIVED: { label: 'Archived', color: 'text-gray-400', bg: 'bg-gray-50' },
+    const statusConfig: Record<string, { label: string; tone: 'neutral' | 'brand' | 'success' | 'warn' }> = {
+      DRAFT: { label: 'Draft', tone: 'neutral' },
+      ACTIVE: { label: 'Upcoming', tone: 'brand' },
+      LIVE: { label: 'Live', tone: 'success' },
+      EXPIRED: { label: 'Completed', tone: 'neutral' },
+      ARCHIVED: { label: 'Archived', tone: 'neutral' },
     };
     return {
       ...event,
-      accentColor: eventColors[index % eventColors.length],
       day: d.getDate(),
       month: d.toLocaleString('default', { month: 'short' }),
       weekday: d.toLocaleString('default', { weekday: 'short' }),
@@ -266,20 +275,19 @@ export default function DashboardContent({
 
   return (
     <motion.div
-      className="min-h-screen pb-4"
+      className="pb-4"
       initial="hidden"
-      animate={isLoaded ? 'visible' : 'hidden'}
+      animate="visible"
       variants={containerVariants}
     >
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-2xl lg:max-w-5xl mx-auto">
         {/* ─── Header ─── */}
-        <motion.div variants={itemVariants} className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-xs font-medium tracking-wide text-gray-400">WELCOME BACK</p>
-            <h1 className="font-serif text-2xl font-bold mt-0.5 text-gray-900">
-              {firstName}
-            </h1>
-          </div>
+        <motion.div variants={itemVariants} className="mb-5">
+          <AppPageHeader
+            eyebrow="Welcome back"
+            title={firstName}
+            description="Here is how your weddings are looking today."
+          />
         </motion.div>
 
         {/* ─── Carousel ─── */}
@@ -290,38 +298,38 @@ export default function DashboardContent({
         {/* ─── Pending Request Banner ─── */}
         {hasPending && (
           <motion.div variants={itemVariants} className="mb-4">
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-              <Clock size={18} className="text-amber-600 shrink-0" />
+            <div className="flex items-start gap-3 bg-warn-soft border border-warn-border rounded-card px-4 py-3">
+              <Clock size={18} className="text-warn shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-amber-800">Credit request pending</p>
-                <p className="text-xs text-amber-600 mt-0.5">Waiting for admin to review your credit request. Need it sooner? WhatsApp +255702529514.</p>
+                <p className="text-sm font-semibold text-warn">Credit request pending</p>
+                <p className="text-xs text-warn/80 mt-0.5">Waiting for admin to review your credit request. Need it sooner? WhatsApp +255702529514.</p>
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* ─── Stats 2x2 Grid ─── */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 gap-3 mb-6">
+        {/* ─── Stats ─── */}
+        <motion.div variants={containerVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           {stats.map((stat) => (
             <motion.div
               key={stat.label}
               variants={itemVariants}
-              whileTap={{ scale: 0.97 }}
-              className="bg-white rounded-3xl p-4 flex flex-col justify-between shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
+              whileTap={reducedMotion ? undefined : { scale: 0.97 }}
+              className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 flex flex-col justify-between"
             >
-              <div className="flex items-center justify-between mb-3">
-                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${stat.bg} ${stat.color} ring-1 ${stat.ring}`}>
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <span className={`w-10 h-10 rounded-tap grid place-items-center shrink-0 ${statTones[stat.tone].tile}`}>
                   <stat.icon size={18} />
-                </div>
+                </span>
                 {stat.isCredits && (
                   <RequestCreditsButton compact hasPending={hasPending} onRequestSent={() => window.location.reload()} />
                 )}
               </div>
               <div>
-                <p className="font-serif text-2xl font-bold text-gray-900">
+                <p className={`font-display text-2xl font-black ${statTones[stat.tone].value}`}>
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                 </p>
-                <p className="text-xs font-medium mt-0.5 text-gray-400">{stat.label}</p>
+                <p className="text-[11px] font-semibold mt-0.5 text-gray-400">{stat.label}</p>
               </div>
             </motion.div>
           ))}
@@ -329,134 +337,113 @@ export default function DashboardContent({
 
         {/* ─── Quick Actions ─── */}
         <motion.div variants={itemVariants} className="mb-6">
-          <h2 className="font-serif text-lg font-bold mb-3 text-gray-900">Quick Actions</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <h2 className="font-display text-lg font-bold mb-3 text-gray-900">Quick Actions</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {quickActions.map((action) => (
-              <Link key={action.label} href={action.href}>
+              <Link key={action.label} href={action.href} className="no-underline">
                 <motion.div
-                  whileTap={{ scale: 0.96 }}
-                  className="bg-white rounded-3xl p-4 h-full flex flex-col justify-between shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
+                  whileTap={reducedMotion ? undefined : { scale: 0.97 }}
+                  className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 h-full flex flex-col justify-between transition-colors duration-150 hover:border-brand/30 active:bg-gray-50"
                 >
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-4 ${action.bg} ${action.color}`}>
+                  <span className="w-11 h-11 rounded-tap grid place-items-center mb-4 bg-brand-soft text-brand">
                     <action.icon size={20} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{action.label}</p>
-                    <p className="text-[11px] mt-0.5 text-gray-400">{action.sub}</p>
-                  </div>
+                  </span>
+                  <span className="block">
+                    <span className="block text-sm font-bold text-gray-900">{action.label}</span>
+                    <span className="block text-[11px] mt-0.5 text-gray-400">{action.sub}</span>
+                  </span>
                 </motion.div>
               </Link>
             ))}
           </div>
         </motion.div>
 
-        {/* ─── Category Tabs ─── */}
+        {/* ─── Category filter ─── */}
         <motion.div variants={itemVariants} className="mb-4">
-          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {categories.map((category) => {
-              const isActive = activeCategory === category.id;
-              const count = categoryCounts[category.id as keyof typeof categoryCounts];
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-semibold whitespace-nowrap transition-all ${
-                    isActive
-                      ? 'bg-[#0D4B4B] text-white'
-                      : 'bg-white text-gray-400 shadow-[0_2px_8px_rgba(20,30,45,0.05)]'
-                  }`}
-                >
-                  <category.icon size={14} />
-                  {category.label}
-                  <span className={`ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'
-                  }`}>{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          <AppSegmentedControl
+            label="Filter events by status"
+            value={activeCategory}
+            onChange={(next) => setActiveCategory(next as typeof activeCategory)}
+            options={categories.map((category) => ({
+              value: category.id,
+              label: category.label,
+              icon: <category.icon size={14} />,
+              badge: categoryCounts[category.id as keyof typeof categoryCounts],
+            }))}
+          />
         </motion.div>
 
         {/* ─── Featured Events ─── */}
         <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-serif text-lg font-bold text-gray-900">
-              {activeCategory === 'all' ? 'Your Events' : categories.find((c) => c.id === activeCategory)?.label + ' Events'}
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="font-display text-lg font-bold text-gray-900">
+              {activeCategory === 'all' ? 'Your Events' : `${categories.find((c) => c.id === activeCategory)?.label} Events`}
             </h2>
             <Link
               href="/client/events"
-              className="flex items-center gap-0.5 text-xs font-bold text-[#0D4B4B]"
+              className="flex items-center gap-0.5 text-xs font-bold text-brand no-underline"
             >
               See all <ChevronRight size={13} />
             </Link>
           </div>
 
           {featuredEvents.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center shadow-[0_2px_10px_rgba(20,30,45,0.06)]">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-[#0D4B4B]/5">
-                <Calendar className="w-8 h-8 text-[#0D4B4B]" />
-              </div>
-              <h3 className="font-serif text-lg font-bold text-gray-900">
-                {activeCategory === 'all' ? 'No events yet' : `No ${activeCategory} events`}
-              </h3>
-              <p className="text-sm mt-1 text-gray-400">
-                {activeCategory === 'all'
-                  ? 'Create your first event to get started.'
-                  : 'Events will appear here when they match this filter.'}
-              </p>
-              {activeCategory === 'all' && (
-                <Link
-                  href={newEventUrl}
-                  className="inline-flex items-center gap-2 mt-5 px-6 py-3 bg-[#0D4B4B] text-white text-sm font-bold rounded-2xl"
-                >
-                  <Plus size={16} /> Create Event
-                </Link>
-              )}
+            <div className="bg-white rounded-card border border-gray-200/80 shadow-elev-1">
+              <AppEmptyState
+                icon={<Calendar className="w-7 h-7" />}
+                title={activeCategory === 'all' ? 'No events yet' : `No ${activeCategory} events`}
+                description={
+                  activeCategory === 'all'
+                    ? 'Create your first event to start planning.'
+                    : 'Events will appear here once they match this filter.'
+                }
+                action={
+                  activeCategory === 'all' ? (
+                    <Link href={newEventUrl} className={`${buttonClasses()} no-underline`}>
+                      <Plus size={16} /> Create Event
+                    </Link>
+                  ) : undefined
+                }
+              />
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-3 sm:space-y-0">
               {featuredEvents.map((event, index) => (
                 <motion.div
                   key={event.id}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={reducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06 }}
-                  className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_10px_rgba(20,30,45,0.06)]"
+                  transition={{ delay: reducedMotion ? 0 : index * 0.05 }}
+                  className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 overflow-hidden"
                 >
-                  <Link href={`/client/events/${event.id}`} className="block">
-                    <div className="flex items-stretch">
-                      <div className={`w-20 flex flex-col items-center justify-center text-white shrink-0 ${event.accentColor}`}>
-                        <span className="text-[10px] font-bold uppercase opacity-80">{event.weekday}</span>
-                        <span className="font-serif text-2xl font-bold leading-none mt-0.5">{event.day}</span>
-                        <span className="text-[10px] font-bold uppercase opacity-80 mt-0.5">{event.month}</span>
+                  <Link href={`/client/events/${event.id}`} className="block no-underline">
+                    <div className="flex items-stretch h-full">
+                      <div className="w-[72px] flex flex-col items-center justify-center text-white shrink-0 bg-brand">
+                        <span className="text-[10px] font-bold uppercase opacity-75">{event.weekday}</span>
+                        <span className="font-display text-2xl font-black leading-none mt-0.5">{event.day}</span>
+                        <span className="text-[10px] font-bold uppercase opacity-75 mt-0.5">{event.month}</span>
                       </div>
 
                       <div className="flex-1 min-w-0 p-4 flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <h3 className="font-bold text-sm truncate text-gray-900">{event.name}</h3>
                           <div className="flex items-center gap-1 mt-1">
-                            <MapPin size={12} className="text-gray-400" />
+                            <MapPin size={12} className="text-gray-400 shrink-0" />
                             <span className="text-xs truncate text-gray-400">{event.venue}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0D4B4B]/5 text-[#0D4B4B] ring-1 ring-[#0D4B4B]/10">
-                              {event.guestCount} guests
-                            </span>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <AppChip tone="brand">{event.guestCount} guests</AppChip>
                             {event.respondedCount > 0 && (
-                              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
-                                {event.respondedCount} RSVPs
-                              </span>
+                              <AppChip tone="neutral">{event.respondedCount} RSVPs</AppChip>
                             )}
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${event.statusInfo.bg} ${event.statusInfo.color}`}>
-                              {event.statusInfo.label}
-                            </span>
+                            <AppChip tone={event.statusInfo.tone}>{event.statusInfo.label}</AppChip>
                           </div>
                         </div>
 
                         <div className="flex flex-col items-center gap-2 shrink-0">
-                          <div className="w-9 h-9 rounded-full flex items-center justify-center bg-gray-100 text-[#0D4B4B]">
+                          <span className="w-9 h-9 rounded-full grid place-items-center bg-brand-soft text-brand">
                             <ArrowUpRight size={15} />
-                          </div>
+                          </span>
                           <CompactDeleteButton eventId={event.id} />
                         </div>
                       </div>

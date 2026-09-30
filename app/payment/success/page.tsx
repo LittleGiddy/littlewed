@@ -7,12 +7,12 @@ export const metadata = {
 
 export default function PaymentSuccessPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0D4B4B] via-[#0A3939] to-[#0D1B1B] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-brandfrom via-brand-deepvia to-[#0D1B1B] flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 text-center">
         <div className="w-16 h-16 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-5">
-          <CheckCircle size={32} className="text-green-600" />
+          <CheckCircle size={32} className="text-success" />
         </div>
-        <h1 className="font-serif text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">
           Payment Successful
         </h1>
         <p className="text-sm text-gray-500 leading-relaxed mb-6">
@@ -21,7 +21,7 @@ export default function PaymentSuccessPage() {
         </p>
         <Link
           href="/client/dashboard"
-          className="block w-full bg-[#0D4B4B] hover:bg-[#0A3939] text-white text-sm font-bold py-3 px-6 rounded-xl transition-colors"
+          className="block w-full bg-brandbg hover:bg-brand-deepbg text-white text-sm font-bold py-3 px-6 rounded-tap transition-colors"
         >
           Go to Dashboard
         </Link>

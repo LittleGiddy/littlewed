@@ -56,14 +56,14 @@ export default function WishForm({
           rows={3}
           maxLength={500}
           placeholder="Share a wedding wish for the couple..."
-          className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0D4B4B]/20 focus:border-[#0D4B4B] transition resize-none"
+          className="w-full px-4 py-3 rounded-card border border-gray-200 bg-white text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-brandring focus:border-brandborder transition resize-none"
         />
         <span className="absolute bottom-2 right-3 text-[10px] text-gray-300">{message.length}/500</span>
       </div>
       <button
         type="submit"
         disabled={loading}
-        className="w-full inline-flex items-center justify-center gap-2 text-white py-2.5 rounded-xl font-semibold hover:opacity-90 transition shadow-md disabled:opacity-50"
+        className="w-full inline-flex items-center justify-center gap-2 text-white py-2.5 rounded-tap font-semibold hover:opacity-90 transition shadow-md disabled:opacity-50"
         style={
           primaryColor && secondaryColor
             ? { backgroundImage: `linear-gradient(to right, ${primaryColor}, ${secondaryColor})` }

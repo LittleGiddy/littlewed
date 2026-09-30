@@ -90,9 +90,9 @@ const getCheckInStatus = (guest: Guest) => {
   const count = guest.checkInCount || 0;
   
   if (count >= maxCheckIns) {
-    return { label: 'Fully Checked In', color: 'text-green-600 bg-green-50', icon: CheckCheck };
+    return { label: 'Fully Checked In', color: 'text-success bg-success-soft', icon: CheckCheck };
   } else if (count > 0) {
-    return { label: `Partial (${count}/${maxCheckIns})`, color: 'text-amber-600 bg-amber-50', icon: UserCheck };
+    return { label: `Partial (${count}/${maxCheckIns})`, color: 'text-warn bg-warn-soft', icon: UserCheck };
   }
   return { label: 'Not Scanned', color: 'text-gray-400 bg-gray-50', icon: User };
 };
@@ -297,7 +297,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         playSound('fail');
         setMessage(data.error || 'Check-in failed');
         toast.error(data.error || 'Check-in failed', {
-          icon: <XCircle size={20} className="text-red-500" />,
+          icon: <XCircle size={20} className="text-danger" />,
         });
         setShowSuccess(false);
       }
@@ -305,7 +305,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       playSound('fail');
       setMessage('Network error');
       toast.error('Network error', {
-        icon: <AlertCircle size={20} className="text-red-500" />,
+        icon: <AlertCircle size={20} className="text-danger" />,
       });
     } finally {
       setLoading(false);
@@ -316,7 +316,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     e.preventDefault();
     if (!cardNumber || cardNumber.length !== 5) {
       toast.error('Please enter a valid 5-digit card number', {
-        icon: <AlertCircle size={18} className="text-amber-500" />,
+        icon: <AlertCircle size={18} className="text-warn" />,
       });
       return;
     }
@@ -361,7 +361,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             ? (data.count > 1 ? `${data.count} guests force checked in` : `${fullName} force checked in`)
             : `${fullName} force checked in`,
           {
-            icon: <UserCheck size={18} className="text-amber-500" />,
+            icon: <UserCheck size={18} className="text-warn" />,
           }
         );
         loadGuests();
@@ -369,12 +369,12 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to force check in', {
-          icon: <XCircle size={18} className="text-red-500" />,
+          icon: <XCircle size={18} className="text-danger" />,
         });
       }
     } catch (error) {
       toast.error('Network error', {
-        icon: <AlertCircle size={18} className="text-red-500" />,
+        icon: <AlertCircle size={18} className="text-danger" />,
       });
     }
   };
@@ -390,7 +390,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       if (res.ok) {
         const fullName = getFullName(guest);
         toast.success(`${fullName} deleted`, {
-          icon: <Trash2 size={18} className="text-red-500" />,
+          icon: <Trash2 size={18} className="text-danger" />,
         });
         loadGuests();
         setSelectedGuest(null);
@@ -398,12 +398,12 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to delete guest', {
-          icon: <XCircle size={18} className="text-red-500" />,
+          icon: <XCircle size={18} className="text-danger" />,
         });
       }
     } catch (error) {
       toast.error('Network error', {
-        icon: <AlertCircle size={18} className="text-red-500" />,
+        icon: <AlertCircle size={18} className="text-danger" />,
       });
     }
   };
@@ -439,13 +439,13 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   if (!eventId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50">
-        <div className="bg-white rounded-2xl shadow-lg p-6 max-w-sm text-center">
-          <AlertCircle size={48} className="text-red-500 mx-auto mb-3" />
+        <div className="bg-white rounded-card shadow-lg p-6 max-w-sm text-center">
+          <AlertCircle size={48} className="text-danger mx-auto mb-3" />
           <h2 className="font-semibold text-lg text-gray-800">Missing Event ID</h2>
           <p className="text-sm text-gray-500 mt-1">Please select an event first.</p>
           <button
             onClick={() => router.push('/client/dashboard')}
-            className="mt-4 px-6 py-2 bg-[#0D4B4B] text-white rounded-xl font-medium"
+            className="mt-4 px-6 py-2 bg-brandbg text-white rounded-tap font-medium"
           >
             Go to Dashboard
           </button>
@@ -482,16 +482,16 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         {/* ─── Back Button ─── */}
         <Link
           href={`/client/events/${eventId}`}
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-white border border-[rgba(13,75,75,0.12)] rounded-xl px-3 py-1.5 transition hover:bg-[rgba(13,75,75,0.06)] mb-3 sm:mb-4"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-white border border-brand/20 rounded-tap px-3 py-1.5 transition hover:bg-brand/10 mb-3 sm:mb-4"
         >
           <ArrowLeft size={14} /> Back
         </Link>
 
         {/* ─── Event Info ─── */}
         {eventInfo && (
-          <div className="bg-white rounded-xl border border-gray-200 p-3 mb-3 sm:mb-4 shadow-sm">
+          <div className="bg-white rounded-tap border border-gray-200 p-3 mb-3 sm:mb-4 shadow-sm">
             <div className="flex items-center gap-2 text-sm">
-              <PartyPopper size={14} className="text-[#FF6B5C] flex-shrink-0" />
+              <PartyPopper size={14} className="text-coraltext flex-shrink-0" />
               <span className="font-semibold text-gray-800 truncate">{eventInfo.name}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-gray-500 mt-0.5">
@@ -502,12 +502,12 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         )}
 
         {/* ─── Tabs ─── */}
-        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 mb-3 sm:mb-4 shadow-sm">
+        <div className="flex gap-1 bg-white rounded-tap border border-gray-200 p-1 mb-3 sm:mb-4 shadow-sm">
           <button
             onClick={() => setActiveTab('scan')}
             className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${
               activeTab === 'scan' 
-                ? 'bg-[#0D4B4B] text-white shadow-sm' 
+                ? 'bg-brandbg text-white shadow-sm' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -517,7 +517,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             onClick={() => setActiveTab('data')}
             className={`flex-1 py-2.5 rounded-lg font-semibold text-sm transition flex items-center justify-center gap-1.5 ${
               activeTab === 'data' 
-                ? 'bg-[#0D4B4B] text-white shadow-sm' 
+                ? 'bg-brandbg text-white shadow-sm' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -529,8 +529,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         {activeTab === 'scan' && (
           <>
             {/* QR Scanner */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
-              <div className="relative rounded-xl overflow-hidden bg-black aspect-square qr-scanner-container">
+            <div className="bg-white rounded-card shadow-lg border border-gray-100 p-3 sm:p-4">
+              <div className="relative rounded-tap overflow-hidden bg-black aspect-square qr-scanner-container">
                 <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
                 {!scanning && !loading && (
@@ -545,10 +545,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 )}
                 <div className="absolute inset-0 pointer-events-none">
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 sm:w-48 h-40 sm:h-48 border-2 border-white/50 rounded-lg">
-                    <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-[#FF6B5C] rounded-tl" />
-                    <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-[#FF6B5C] rounded-tr" />
-                    <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-[#FF6B5C] rounded-bl" />
-                    <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-[#FF6B5C] rounded-br" />
+                    <div className="absolute top-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-l-4 border-coralborder rounded-tl" />
+                    <div className="absolute top-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-t-4 border-r-4 border-coralborder rounded-tr" />
+                    <div className="absolute bottom-0 left-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-l-4 border-coralborder rounded-bl" />
+                    <div className="absolute bottom-0 right-0 w-5 sm:w-6 h-5 sm:h-6 border-b-4 border-r-4 border-coralborder rounded-br" />
                   </div>
                 </div>
               </div>
@@ -558,9 +558,9 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             </div>
 
             {/* Manual Entry - Restructured for mobile */}
-            <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-gray-100 p-3 sm:p-4">
+            <div className="mt-3 sm:mt-4 bg-white rounded-card shadow-lg border border-gray-100 p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Key size={16} className="text-[#0D4B4B] flex-shrink-0" />
+                <Key size={16} className="text-brandtext flex-shrink-0" />
                 <span className="font-medium text-sm text-gray-700">Manual Entry</span>
               </div>
               <form onSubmit={handleManualCheckIn} className="space-y-3">
@@ -574,7 +574,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     const val = e.target.value.replace(/\D/g, '').slice(0, 5);
                     setCardNumber(val);
                   }}
-                  className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-gray-50"
+                  className="w-full p-3 text-center text-xl tracking-[6px] font-mono border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-gray-50"
                   placeholder="00000"
                   maxLength={5}
                   autoComplete="off"
@@ -582,7 +582,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 <button
                   type="submit"
                   disabled={loading || cardNumber.length !== 5}
-                  className="w-full py-3 bg-[#0D4B4B] text-white rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                  className="w-full py-3 bg-brandbg text-white rounded-tap font-semibold disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
                 >
                   {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
                   Check In
@@ -593,10 +593,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             {/* ─── Success Message ─── */}
             {message && (
               <div
-                className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-2xl text-center font-medium transition-all text-sm ${
+                className={`mt-3 sm:mt-4 p-3 sm:p-4 rounded-card text-center font-medium transition-all text-sm ${
                   showSuccess
-                    ? 'bg-green-50 border border-green-200 text-green-800'
-                    : 'bg-red-50 border border-red-200 text-red-800'
+                    ? 'bg-success-soft border border-success-border text-green-800'
+                    : 'bg-danger-soft border border-danger-border text-red-800'
                 }`}
               >
                 {message}
@@ -605,10 +605,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
             {/* ─── Scanned Guest Details ─── */}
             {scannedGuest && showSuccess && (
-              <div className="mt-3 sm:mt-4 bg-white rounded-2xl shadow-lg border border-green-200 p-3 sm:p-4 animate-fadeInUp">
+              <div className="mt-3 sm:mt-4 bg-white rounded-card shadow-lg border border-success-border p-3 sm:p-4 animate-fadeInUp">
                 <div className="flex items-center gap-3">
                   <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle size={16} className="text-green-600 sm:text-2xl" />
+                    <CheckCircle size={16} className="text-success sm:text-2xl" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-gray-800 text-sm sm:text-base truncate">{getFullName(scannedGuest)}</p>
@@ -626,7 +626,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     </div>
                   </div>
                   <div className="text-right text-xs flex-shrink-0">
-                    <span className="text-green-600 font-medium">
+                    <span className="text-success font-medium">
                       {scannedGuest.checkInCount || 1}/{guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount)}
                     </span>
                   </div>
@@ -643,8 +643,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             <div className="grid grid-cols-4 gap-1.5 sm:gap-2 mb-3 sm:mb-4">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`rounded-xl border p-2 text-center shadow-sm transition ${
-                  statusFilter === 'all' ? 'bg-[#0D4B4B] border-[#0D4B4B]' : 'bg-white border-gray-200 hover:bg-gray-50'
+                className={`rounded-tap border p-2 text-center shadow-sm transition ${
+                  statusFilter === 'all' ? 'bg-brandbg border-brandborder' : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
                 <p className={`text-base sm:text-lg font-bold ${statusFilter === 'all' ? 'text-white' : 'text-gray-800'}`}>{totalGuests}</p>
@@ -652,25 +652,25 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
               </button>
               <button
                 onClick={() => setStatusFilter(statusFilter === 'fully' ? 'all' : 'fully')}
-                className={`rounded-xl border p-2 text-center shadow-sm transition ${
+                className={`rounded-tap border p-2 text-center shadow-sm transition ${
                   statusFilter === 'fully' ? 'bg-green-600 border-green-600' : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <p className={`text-base sm:text-lg font-bold ${statusFilter === 'fully' ? 'text-white' : 'text-green-600'}`}>{fullyCheckedIn}</p>
+                <p className={`text-base sm:text-lg font-bold ${statusFilter === 'fully' ? 'text-white' : 'text-success'}`}>{fullyCheckedIn}</p>
                 <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'fully' ? 'text-white/80' : 'text-gray-400'}`}>Fully In</p>
               </button>
               <button
                 onClick={() => setStatusFilter(statusFilter === 'partial' ? 'all' : 'partial')}
-                className={`rounded-xl border p-2 text-center shadow-sm transition ${
-                  statusFilter === 'partial' ? 'bg-amber-500 border-amber-500' : 'bg-white border-gray-200 hover:bg-gray-50'
+                className={`rounded-tap border p-2 text-center shadow-sm transition ${
+                  statusFilter === 'partial' ? 'bg-warn-soft0 border-amber-500' : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
-                <p className={`text-base sm:text-lg font-bold ${statusFilter === 'partial' ? 'text-white' : 'text-amber-500'}`}>{partiallyCheckedIn}</p>
+                <p className={`text-base sm:text-lg font-bold ${statusFilter === 'partial' ? 'text-white' : 'text-warn'}`}>{partiallyCheckedIn}</p>
                 <p className={`text-[8px] sm:text-[10px] font-medium uppercase tracking-wider ${statusFilter === 'partial' ? 'text-white/80' : 'text-gray-400'}`}>Partial</p>
               </button>
               <button
                 onClick={() => setStatusFilter(statusFilter === 'not' ? 'all' : 'not')}
-                className={`rounded-xl border p-2 text-center shadow-sm transition ${
+                className={`rounded-tap border p-2 text-center shadow-sm transition ${
                   statusFilter === 'not' ? 'bg-gray-500 border-gray-500' : 'bg-white border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -687,7 +687,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search by name, card number, or phone..."
-                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm sm:text-base"
+                className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent text-sm sm:text-base"
               />
               {searchTerm && (
                 <button
@@ -705,17 +705,17 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                   {statusFilter === 'fully' ? 'Fully checked in' : statusFilter === 'partial' ? 'Partially checked in' : 'Not checked in'}
                   {filteredGuests.length > 0 && <span className="text-gray-400"> · {filteredGuests.length}</span>}
                 </span>
-                <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-[#0D4B4B] hover:underline">
+                <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-brandtext hover:underline">
                   Show all ({totalGuests})
                 </button>
               </div>
             )}
 
             {/* ─── Guest List ─── */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-tap border border-gray-200 shadow-sm overflow-hidden">
               {loadingGuests ? (
                 <div className="flex justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-[#0D4B4B]" />
+                  <Loader2 size={24} className="animate-spin text-brandtext" />
                 </div>
               ) : filteredGuests.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -736,12 +736,12 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                       <div
                         key={guest.id}
                         className={`px-3 py-2.5 hover:bg-gray-50 transition cursor-pointer ${
-                          isFullyCheckedIn ? 'bg-green-50/30' : ''
+                          isFullyCheckedIn ? 'bg-success-soft/30' : ''
                         }`}
                         onClick={() => setSelectedGuest(guest)}
                       >
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                          <div className="w-7 sm:w-8 h-7 sm:h-8 rounded-full bg-gradient-to-br from-brandfrom to-brand-deepto flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
                             {guest.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -760,7 +760,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                                 {getGuestTypeLabel(guest.guestType, guest.guestCount)}
                               </span>
                               {guest.routingChannel === 'whatsapp' && (
-                                <span className="text-[9px] sm:text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                <span className="text-[9px] sm:text-[10px] bg-green-100 text-success px-1.5 py-0.5 rounded">
                                   WA
                                 </span>
                               )}
@@ -786,7 +786,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       {/* ─── Guest Detail Modal ─── */}
       {selectedGuest && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setSelectedGuest(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden mx-2" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-card shadow-xl w-full max-w-sm overflow-hidden mx-2" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-800 text-sm sm:text-base">Guest Details</h3>
               <button onClick={() => setSelectedGuest(null)} className="text-gray-400 hover:text-gray-600 p-1">
@@ -795,7 +795,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             </div>
             <div className="p-4 sm:p-5 space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-gradient-to-br from-brandfrom to-brand-deepto flex items-center justify-center text-white font-bold text-base sm:text-lg flex-shrink-0">
                   {selectedGuest.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -840,7 +840,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     setForceCheckinGuest(selectedGuest);
                     setSelectedGuest(null);
                   }}
-                  className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 bg-warn text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition flex items-center justify-center gap-1.5"
                 >
                   <UserCheck size={14} /> Force
                 </button>
@@ -849,7 +849,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     setShowDeleteConfirm(true);
                     setSelectedGuest(null);
                   }}
-                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2 bg-danger-soft0 text-white rounded-lg font-medium text-sm hover:bg-red-600 transition flex items-center justify-center gap-1.5"
                 >
                   <Trash2 size={14} /> Delete
                 </button>
@@ -864,10 +864,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         const { isGroup, groupCount } = getForceOptions(forceCheckinGuest);
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+            <div className="bg-white rounded-card shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
               <div className="text-center">
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3">
-                  <UserCheck size={24} className="text-amber-600" />
+                  <UserCheck size={24} className="text-warn" />
                 </div>
                 <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
                 <p className="text-sm text-gray-500 mt-1">
@@ -884,13 +884,13 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }}
-                        className="w-full py-2.5 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm"
+                        className="w-full py-2.5 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm"
                       >
                         Force all {groupCount} guests
                       </button>
                       <button
                         onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }}
-                        className="w-full py-2.5 border border-amber-300 bg-amber-50 text-amber-700 rounded-lg font-medium hover:bg-amber-100 transition text-sm"
+                        className="w-full py-2.5 border border-amber-300 bg-warn-soft text-warn rounded-lg font-medium hover:bg-amber-100 transition text-sm"
                       >
                         Force just {getFullName(forceCheckinGuest)}
                       </button>
@@ -914,7 +914,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     </button>
                     <button
                       onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }}
-                      className="flex-1 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm"
+                      className="flex-1 py-2 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm"
                     >
                       Confirm
                     </button>
@@ -929,16 +929,16 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       {/* ─── Delete Confirm ─── */}
       {showDeleteConfirm && selectedGuest && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
+          <div className="bg-white rounded-card shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
             <div className="text-center">
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
-                <Trash2 size={24} className="text-red-600" />
+                <Trash2 size={24} className="text-danger" />
               </div>
               <h3 className="font-bold text-gray-800 text-sm sm:text-base">Delete Guest?</h3>
               <p className="text-sm text-gray-500 mt-1">
                 Are you sure you want to delete <span className="font-semibold">{getFullName(selectedGuest)}</span>?
                 <br />
-                <span className="text-xs text-red-500">This action cannot be undone.</span>
+                <span className="text-xs text-danger">This action cannot be undone.</span>
               </p>
               <div className="flex gap-3 mt-4">
                 <button
@@ -952,7 +952,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 </button>
                 <button
                   onClick={() => handleDeleteGuest(selectedGuest)}
-                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm"
+                  className="flex-1 py-2 bg-danger-soft0 text-white rounded-lg font-medium hover:bg-red-600 transition text-sm"
                 >
                   Delete
                 </button>

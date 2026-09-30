@@ -20,8 +20,8 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-6">
-        <h1 className="font-serif text-2xl font-bold text-[#0D4B4B]">
+      <div className="max-w-md w-full bg-white rounded-card shadow-xl p-6">
+        <h1 className="font-display text-2xl font-bold text-brandtext">
           Welcome, {guest.title || 'Mr'} {guest.name}!
         </h1>
         <p className="text-gray-500 text-sm">Event Details</p>
@@ -46,7 +46,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
         </div>
 
         {/* ─── QR Code ────────────────────────────────────────────────────── */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-xl text-center">
+        <div className="mt-6 p-4 bg-gray-50 rounded-tap text-center">
           <p className="text-sm text-gray-500 mb-2">Your Check-in QR Code</p>
           {/* ✅ Use the QR token in the img src */}
           <img
@@ -61,7 +61,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
 
         <Link
           href={`/guest/confirm/${guest.id}`}
-          className="flex items-center justify-center gap-2 w-full mt-4 bg-[#0D4B4B] text-white text-center py-3 rounded-xl font-bold hover:bg-[#0A3939] transition"
+          className="flex items-center justify-center gap-2 w-full mt-4 bg-brandbg text-white text-center py-3 rounded-tap font-bold hover:bg-brand-deepbg transition"
         >
           <CircleCheck size={18} /> Confirm Attendance
         </Link>

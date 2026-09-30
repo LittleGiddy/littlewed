@@ -86,23 +86,23 @@ export default function AddGuestPage() {
         setWhatsappStatus(data);
         if (data.hasWhatsApp) {
           toast.success('Number has WhatsApp!', {
-            icon: <CheckCircle size={18} className="text-green-600" />,
+            icon: <CheckCircle size={18} className="text-success" />,
             duration: 3000,
           });
         } else {
           toast('Number does not have WhatsApp (SMS will be used)', {
-            icon: <Info size={18} className="text-amber-500" />,
+            icon: <Info size={18} className="text-warn" />,
             duration: 4000,
           });
         }
       } else {
         toast.error(data.error || 'Failed to check WhatsApp', {
-          icon: <AlertCircle size={18} className="text-red-500" />,
+          icon: <AlertCircle size={18} className="text-danger" />,
         });
       }
     } catch {
       toast.error('Failed to check WhatsApp', {
-        icon: <AlertCircle size={18} className="text-red-500" />,
+        icon: <AlertCircle size={18} className="text-danger" />,
       });
     } finally {
       setCheckingWhatsApp(false);
@@ -160,7 +160,7 @@ export default function AddGuestPage() {
         const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
         if (isSharedDouble && data.sharedGuest) {
           toast.success(`Shared double card added: ${form.title} ${form.name} & ${guest2.title} ${guest2.name} (${channel})`, {
-            icon: <UserCheck size={18} className="text-green-600" />,
+            icon: <UserCheck size={18} className="text-success" />,
             duration: 5000,
           });
         } else {
@@ -170,7 +170,7 @@ export default function AddGuestPage() {
               ? 'Double'
               : 'Single';
           toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
-            icon: <UserCheck size={18} className="text-green-600" />,
+            icon: <UserCheck size={18} className="text-success" />,
           });
         }
         router.push(`/client/events/${eventId}`);
@@ -181,9 +181,9 @@ export default function AddGuestPage() {
             (t) => (
               <div
                 className={`${t.visible ? 'animate-enter' : 'animate-leave'
-                  } max-w-md w-full bg-white shadow-lg rounded-2xl pointer-events-auto overflow-hidden border border-amber-200`}
+                  } max-w-md w-full bg-white shadow-lg rounded-card pointer-events-auto overflow-hidden border border-warn-border`}
               >
-                <div className="p-4 bg-amber-50 border-b border-amber-200">
+                <div className="p-4 bg-warn-soft border-b border-warn-border">
                   <h3 className="font-semibold text-amber-800 flex items-center gap-2 text-sm">
                     <Coins size={18} />
                     No credits left
@@ -197,13 +197,13 @@ export default function AddGuestPage() {
                     <Link
                       href="/client/billing"
                       onClick={() => toast.dismiss(t.id)}
-                      className="flex-1 bg-[#0D4B4B] text-white px-4 py-2.5 rounded-xl text-center text-sm font-semibold hover:bg-[#0A3939] transition"
+                      className="flex-1 bg-brandbg text-white px-4 py-2.5 rounded-tap text-center text-sm font-semibold hover:bg-brand-deepbg transition"
                     >
                       Request Credits
                     </Link>
                     <button
                       onClick={() => toast.dismiss(t.id)}
-                      className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-200 transition"
+                      className="flex-1 bg-gray-100 text-gray-700 px-4 py-2.5 rounded-tap text-sm font-semibold hover:bg-gray-200 transition"
                     >
                       Dismiss
                     </button>
@@ -215,14 +215,14 @@ export default function AddGuestPage() {
           );
         } else {
           toast.error(data.error || 'Failed to add guest', {
-            icon: <AlertCircle size={18} className="text-red-500" />,
+            icon: <AlertCircle size={18} className="text-danger" />,
           });
         }
       }
     } catch {
       setError('Network error');
       toast.error('Network error. Please try again.', {
-        icon: <AlertCircle size={18} className="text-red-500" />,
+        icon: <AlertCircle size={18} className="text-danger" />,
       });
     } finally {
       setLoading(false);
@@ -248,12 +248,12 @@ export default function AddGuestPage() {
         <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
           <Link
             href={`/client/events/${eventId}`}
-            className="flex-shrink-0 p-2 text-gray-500 hover:text-[#0D4B4B] hover:bg-[rgba(13,75,75,0.06)] rounded-xl transition"
+            className="flex-shrink-0 p-2 text-gray-500 hover:text-brandtext hover:bg-brand/10 rounded-tap transition"
           >
             <ArrowLeft size={20} />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate">Add Guest(s)</h1>
+            <h1 className="font-display text-xl sm:text-2xl font-black text-gray-900 truncate">Add Guest(s)</h1>
             <p className="text-xs sm:text-sm text-gray-500 truncate">
               Add a guest, or a plus-one so both share the same card
             </p>
@@ -261,14 +261,14 @@ export default function AddGuestPage() {
           <button
             type="button"
             onClick={() => router.push(`/client/events/${eventId}`)}
-            className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+            className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-tap hover:bg-gray-50 transition"
           >
             Cancel
           </button>
         </div>
 
         {/* ─── Form Card ─── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
+        <div className="bg-white rounded-card shadow-sm border border-gray-100 p-4 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             {/* ─── Title ─── */}
             <div>
@@ -279,7 +279,7 @@ export default function AddGuestPage() {
               <select
                 value={form.title}
                 onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
               >
                 {TITLES.map(title => (
                   <option key={title} value={title}>{title}</option>
@@ -291,13 +291,13 @@ export default function AddGuestPage() {
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
                 <User size={14} className="sm:text-base" />
-                Full Name <span className="text-red-500">*</span>
+                Full Name <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                 placeholder="e.g., John Doe"
                 required
               />
@@ -307,14 +307,14 @@ export default function AddGuestPage() {
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
                 <Phone size={14} className="sm:text-base" />
-                Phone Number <span className="text-red-500">*</span>
+                Phone Number <span className="text-danger">*</span>
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="tel"
                   value={form.phone}
                   onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))}
-                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                   placeholder="+255712345678"
                   required
                 />
@@ -322,14 +322,14 @@ export default function AddGuestPage() {
                   type="button"
                   onClick={checkWhatsApp}
                   disabled={checkingWhatsApp}
-                  className="px-3 sm:px-4 py-2.5 bg-[#0D4B4B] text-white rounded-xl font-medium hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
+                  className="px-3 sm:px-4 py-2.5 bg-brandbg text-white rounded-tap font-medium hover:bg-brand-deepbg transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
                 >
                   {checkingWhatsApp ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
                   {checkingWhatsApp ? 'Checking...' : 'Check WA'}
                 </button>
               </div>
               {whatsappStatus && (
-                <p className={`text-xs mt-1.5 flex items-center gap-1.5 ${whatsappStatus.hasWhatsApp ? 'text-green-600' : 'text-amber-600'}`}>
+                <p className={`text-xs mt-1.5 flex items-center gap-1.5 ${whatsappStatus.hasWhatsApp ? 'text-success' : 'text-warn'}`}>
                   {whatsappStatus.hasWhatsApp ? (
                     <><CheckCircle size={12} /> WhatsApp number detected {whatsappStatus.waId && `(ID: ${whatsappStatus.waId})`}</>
                   ) : (
@@ -349,7 +349,7 @@ export default function AddGuestPage() {
               <select
                 value={form.guestType}
                 onChange={e => setForm(prev => ({ ...prev, guestType: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
               >
                 {GUEST_TYPES.map(type => (
                   <option key={type} value={type}>
@@ -380,7 +380,7 @@ export default function AddGuestPage() {
                   min={2}
                   value={form.guestCount}
                   onChange={e => setForm(prev => ({ ...prev, guestCount: Math.max(2, Number(e.target.value) || 2) }))}
-                  className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                  className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   The card will be labelled &quot;{form.guestType === 'FAMILIA' ? 'Familia' : 'Wakwe'} {form.guestCount}&quot; and can be scanned up to {form.guestCount} times (1 credit).
@@ -390,11 +390,11 @@ export default function AddGuestPage() {
 
             {/* ─── Second Guest (only for shared DOUBLE card) ─── */}
             {form.guestType === 'DOUBLE' && (
-              <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-3 sm:p-4 space-y-3 sm:space-y-4">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+              <div className="border border-warn-border bg-warn-soft/50 rounded-tap p-3 sm:p-4 space-y-3 sm:space-y-4">
+                <p className="text-xs font-bold text-warn uppercase tracking-wider flex items-center gap-1.5">
                   <UserPlus size={13} /> Second Guest (shared card)
                 </p>
-                <p className="text-[11px] text-amber-600 -mt-2">
+                <p className="text-[11px] text-warn -mt-2">
                   This creates a 2-person double card. Both guests share one card number and receive one invitation card (2 credits).
                 </p>
 
@@ -404,7 +404,7 @@ export default function AddGuestPage() {
                   <select
                     value={guest2.title}
                     onChange={e => setGuest2(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent bg-white"
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
                   >
                     {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -413,13 +413,13 @@ export default function AddGuestPage() {
                 {/* Name */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Full Name <span className="text-red-500">*</span>
+                    Full Name <span className="text-danger">*</span>
                   </label>
                   <input
                     type="text"
                     value={guest2.name}
                     onChange={e => setGuest2(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                     placeholder="e.g., Jane Doe"
                   />
                 </div>
@@ -427,13 +427,13 @@ export default function AddGuestPage() {
                 {/* Phone */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Phone Number <span className="text-red-500">*</span>
+                    Phone Number <span className="text-danger">*</span>
                   </label>
                   <input
                     type="tel"
                     value={guest2.phone}
                     onChange={e => setGuest2(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                     placeholder="+255712345678"
                   />
                 </div>
@@ -445,7 +445,7 @@ export default function AddGuestPage() {
                     type="email"
                     value={guest2.email}
                     onChange={e => setGuest2(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full p-2.5 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                    className="w-full p-2.5 text-sm border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                     placeholder="guest2@example.com"
                   />
                 </div>
@@ -463,14 +463,14 @@ export default function AddGuestPage() {
                   type="text"
                   value={form.cardNumber}
                   onChange={e => setForm(prev => ({ ...prev, cardNumber: e.target.value }))}
-                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                  className="flex-1 p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                   placeholder="e.g., 00001"
                 />
                 <button
                   type="button"
                   onClick={generateCardNumber}
                   disabled={isGeneratingCard}
-                  className="px-3 sm:px-4 py-2.5 bg-[#0D4B4B] text-white rounded-xl font-medium hover:bg-[#0A3939] transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
+                  className="px-3 sm:px-4 py-2.5 bg-brandbg text-white rounded-tap font-medium hover:bg-brand-deepbg transition disabled:opacity-50 flex items-center justify-center gap-1.5 text-sm sm:text-base whitespace-nowrap"
                 >
                   {isGeneratingCard ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
                   {isGeneratingCard ? 'Generating...' : 'Auto'}
@@ -486,14 +486,14 @@ export default function AddGuestPage() {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+                className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent"
                 placeholder="guest@example.com"
               />
             </div>
 
             {/* ─── Error Message ─── */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm flex items-center gap-2">
+              <div className="bg-danger-soft border border-danger-border text-danger px-3 sm:px-4 py-2.5 rounded-tap text-xs sm:text-sm flex items-center gap-2">
                 <AlertCircle size={16} className="flex-shrink-0" />
                 <span className="break-words">{error}</span>
               </div>
@@ -503,14 +503,14 @@ export default function AddGuestPage() {
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 pt-2">
               <Link
                 href={`/client/events/${eventId}`}
-                className="w-full sm:flex-1 px-6 py-3 border border-gray-300 rounded-xl font-medium text-center hover:bg-gray-50 transition text-sm sm:text-base"
+                className="w-full sm:flex-1 px-6 py-3 border border-gray-300 rounded-tap font-medium text-center hover:bg-gray-50 transition text-sm sm:text-base"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-3 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
+                className="w-full sm:flex-1 bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-3 rounded-tap font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 {loading ? <Loader2 size={18} className="animate-spin" /> : <UserCheck size={18} />}
                 {loading ? 'Adding...' : 'Add Guest'}

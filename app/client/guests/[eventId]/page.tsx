@@ -56,11 +56,11 @@ export default async function GuestsPage() {
 
         .gp-eyebrow {
           font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
-          color: #0D4B4B; text-transform: uppercase; margin-bottom: 6px;
+          color: var(--color-brand); text-transform: uppercase; margin-bottom: 6px;
           display: flex; align-items: center; gap: 7px;
         }
         .gp-eyebrow-dot {
-          width: 5px; height: 5px; border-radius: 50%; background: #FF6B5C;
+          width: 5px; height: 5px; border-radius: 50%; background: var(--color-coral);
         }
 
         .gp-title {
@@ -69,7 +69,7 @@ export default async function GuestsPage() {
           color: #0D1B1B; line-height: 1.15;
           letter-spacing: -0.5px; margin: 0 0 6px;
         }
-        .gp-title span { color: #FF6B5C; }
+        .gp-title span { color: var(--color-coral); }
 
         .gp-subtitle {
           font-size: 14px; color: #7A8FA6; line-height: 1.6; margin: 0;
@@ -86,7 +86,7 @@ export default async function GuestsPage() {
         .gp-stat-icon {
           width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
           background: rgba(13,75,75,0.08); border: 1px solid rgba(13,75,75,0.12);
-          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
+          display: flex; align-items: center; justify-content: center; color: var(--color-brand);
         }
         .gp-stat-num { font-size: 20px; font-weight: 800; color: #0D1B1B; line-height: 1; }
         .gp-stat-label { font-size: 11px; color: #9BAAB8; font-weight: 500; margin-top: 1px; }
@@ -111,7 +111,7 @@ export default async function GuestsPage() {
           animation: gpCardIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
         }
         .gp-card:hover {
-          border-color: #0D4B4B;
+          border-color: var(--color-brand);
           box-shadow: 0 4px 20px rgba(13,75,75,0.12);
           transform: translateY(-2px);
         }
@@ -125,7 +125,7 @@ export default async function GuestsPage() {
           width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
           background: linear-gradient(135deg, rgba(13,75,75,0.1), rgba(13,75,75,0.05));
           border: 1px solid rgba(13,75,75,0.12);
-          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
+          display: flex; align-items: center; justify-content: center; color: var(--color-brand);
         }
 
         .gp-card-body { flex: 1; min-width: 0; }
@@ -144,7 +144,7 @@ export default async function GuestsPage() {
           transition: color 0.2s, transform 0.2s;
         }
         .gp-card:hover .gp-card-arrow {
-          color: #0D4B4B;
+          color: var(--color-brand);
           transform: translateX(3px);
         }
 
@@ -154,7 +154,7 @@ export default async function GuestsPage() {
           position: absolute;
           left: 0; top: 20%; bottom: 20%;
           width: 3px; border-radius: 0 2px 2px 0;
-          background: linear-gradient(180deg, #0D4B4B, #FF6B5C);
+          background: linear-gradient(180deg, var(--color-brand), #FF6B5C);
           opacity: 0; transition: opacity 0.2s;
         }
         .gp-card { position: relative; overflow: hidden; }
@@ -169,7 +169,7 @@ export default async function GuestsPage() {
         .gp-empty-icon {
           width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 16px;
           background: rgba(13,75,75,0.06); border: 1.5px solid rgba(13,75,75,0.1);
-          display: flex; align-items: center; justify-content: center; color: #0D4B4B;
+          display: flex; align-items: center; justify-content: center; color: var(--color-brand);
         }
         .gp-empty-title {
           font-family: 'Playfair Display', serif;
@@ -180,7 +180,7 @@ export default async function GuestsPage() {
         .gp-empty-btn {
           display: inline-flex; align-items: center; gap: 7px;
           padding: 11px 22px; border-radius: 12px; border: none;
-          background: linear-gradient(135deg, #0D4B4B, #0A3939);
+          background: linear-gradient(135deg, var(--color-brand), #0A3939);
           color: white; font-size: 14px; font-weight: 700;
           font-family: inherit; cursor: pointer; text-decoration: none;
           box-shadow: 0 4px 14px rgba(13,75,75,0.3);

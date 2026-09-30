@@ -211,7 +211,7 @@ export default function ReminderCardDesigner({
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          className={`block rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer ${
+          className={`block rounded-card border-2 border-dashed p-6 text-center transition cursor-pointer ${
             dragOver ? 'border-[#25D366] bg-[#25D366]/5' : 'border-gray-200 hover:border-[#25D366]/60 hover:bg-gray-50'
           }`}
         >
@@ -227,11 +227,11 @@ export default function ReminderCardDesigner({
             }}
           />
           {uploading ? (
-            <Loader2 size={26} className="mx-auto text-[#0D4B4B] animate-spin" />
+            <Loader2 size={26} className="mx-auto text-brandtext animate-spin" />
           ) : (
             <>
-              <div className="w-12 h-12 rounded-2xl bg-[#0D4B4B]/[0.07] flex items-center justify-center mx-auto mb-2">
-                <ImageUp size={22} className="text-[#0D4B4B]" />
+              <div className="w-12 h-12 rounded-card bg-brandbg/[0.07] flex items-center justify-center mx-auto mb-2">
+                <ImageUp size={22} className="text-brandtext" />
               </div>
               <p className="text-sm font-semibold text-gray-800">Drop your card here</p>
               <p className="text-xs text-gray-400 mt-0.5">or tap to browse · JPEG, JPG, PNG · max 1MB</p>
@@ -241,7 +241,7 @@ export default function ReminderCardDesigner({
 
         <div>
           <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <LayoutTemplate size={13} className="text-[#0D4B4B]" /> Approved cards
+            <LayoutTemplate size={13} className="text-brandtext" /> Approved cards
           </p>
           {loadingTemplates ? (
             <div className="flex justify-center py-6">
@@ -256,7 +256,7 @@ export default function ReminderCardDesigner({
                   key={t.id}
                   type="button"
                   onClick={() => onChange({ cardUrl: t.imageUrl, design })}
-                  className="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-[#0D4B4B] transition"
+                  className="group relative rounded-tap overflow-hidden border border-gray-200 hover:border-brandborder transition"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={t.imageUrl} alt={t.name} className="w-full h-20 object-cover" />
@@ -276,7 +276,7 @@ export default function ReminderCardDesigner({
   return (
     <div className="space-y-3">
       {/* Canvas */}
-      <div className="rounded-2xl bg-[#1c1c1e] p-3 sm:p-4">
+      <div className="rounded-card bg-[#1c1c1e] p-3 sm:p-4">
         <div className="flex items-center justify-between mb-2">
           <button
             type="button"
@@ -322,7 +322,7 @@ export default function ReminderCardDesigner({
               style={{ width: `${100 * zoom}%`, maxWidth: 420, containerType: 'inline-size' }}
             >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cardUrl} alt="Reminder card" className="w-full h-auto block rounded-xl" draggable={false} />
+            <img src={cardUrl} alt="Reminder card" className="w-full h-auto block rounded-tap" draggable={false} />
 
             {/* Snap guides */}
             {guides.x && <div className="absolute top-0 bottom-0 w-px bg-[#25D366] pointer-events-none" style={{ left: '50%' }} />}
@@ -390,9 +390,9 @@ export default function ReminderCardDesigner({
             key={q.label}
             type="button"
             onClick={() => patch({ y: q.y })}
-            className={`flex-1 py-2 rounded-xl text-[11px] font-semibold transition ${
+            className={`flex-1 py-2 rounded-tap text-[11px] font-semibold transition ${
               Math.abs(design.y - q.y) < 1
-                ? 'bg-[#0D4B4B] text-white'
+                ? 'bg-brandbg text-white'
                 : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
             }`}
           >
@@ -402,13 +402,13 @@ export default function ReminderCardDesigner({
       </div>
 
       {/* Style controls */}
-      <div className="space-y-3 bg-white rounded-2xl border border-gray-100 p-3">
+      <div className="space-y-3 bg-white rounded-card border border-gray-100 p-3">
         <div>
           <label className="block text-[11px] font-medium text-gray-500 mb-1">Font</label>
           <select
             value={design.font}
             onChange={(e) => patch({ font: e.target.value })}
-            className="w-full p-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent"
+            className="w-full p-2.5 border border-gray-200 rounded-tap text-sm bg-white focus:ring-2 focus:ring-brandring focus:border-transparent"
           >
             {REMINDER_FONTS.map((f) => (
               <option key={f} value={f} style={{ fontFamily: `'${f}', Georgia, serif` }}>{f}</option>
@@ -427,7 +427,7 @@ export default function ReminderCardDesigner({
             max={90}
             value={design.size}
             onChange={(e) => patch({ size: Number(e.target.value) })}
-            className="w-full accent-[#0D4B4B]"
+            className="w-full accent-brandaccent"
           />
         </div>
 
@@ -439,9 +439,9 @@ export default function ReminderCardDesigner({
                 key={a}
                 type="button"
                 onClick={() => patch({ align: a })}
-                className={`py-2 rounded-xl text-[11px] font-semibold capitalize transition ${
+                className={`py-2 rounded-tap text-[11px] font-semibold capitalize transition ${
                   design.align === a
-                    ? 'bg-[#0D4B4B] text-white'
+                    ? 'bg-brandbg text-white'
                     : 'bg-gray-50 border border-gray-200 text-gray-600'
                 }`}
               >
@@ -460,14 +460,14 @@ export default function ReminderCardDesigner({
           <button
             type="button"
             onClick={() => onChange({ cardUrl, design: { ...DEFAULT_REMINDER_DESIGN, x: design.x, y: design.y, font: design.font, color: design.color } })}
-            className="px-3 border border-gray-200 rounded-xl text-gray-500 hover:border-gray-300 flex items-center gap-1.5 text-xs font-semibold"
+            className="px-3 border border-gray-200 rounded-tap text-gray-500 hover:border-gray-300 flex items-center gap-1.5 text-xs font-semibold"
           >
             <RotateCcw size={13} /> Reset
           </button>
           <button
             type="button"
             onClick={() => { onChange({ cardUrl: null, design: DEFAULT_REMINDER_DESIGN }); toast.success('Card removed'); }}
-            className="ml-auto px-3 border border-gray-200 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-200 flex items-center gap-1.5 text-xs font-semibold"
+            className="ml-auto px-3 border border-gray-200 rounded-tap text-gray-500 hover:text-danger hover:border-danger-border flex items-center gap-1.5 text-xs font-semibold"
           >
             <Trash2 size={13} /> Remove
           </button>

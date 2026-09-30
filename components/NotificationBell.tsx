@@ -85,11 +85,11 @@ export default function NotificationBell() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'success': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'warning': return <AlertTriangle className="w-4 h-4 text-amber-500" />;
-      case 'alert': return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'CREDIT_GRANTED': return <CheckCircle className="w-4 h-4 text-[#0D4B4B]" />;
-      case 'CREDIT_REQUEST': return <Info className="w-4 h-4 text-amber-500" />;
-      case 'CREDIT_REJECTED': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'warning': return <AlertTriangle className="w-4 h-4 text-warn" />;
+      case 'alert': return <XCircle className="w-4 h-4 text-danger" />;
+      case 'CREDIT_GRANTED': return <CheckCircle className="w-4 h-4 text-brandtext" />;
+      case 'CREDIT_REQUEST': return <Info className="w-4 h-4 text-warn" />;
+      case 'CREDIT_REJECTED': return <XCircle className="w-4 h-4 text-danger" />;
       default: return <Info className="w-4 h-4 text-blue-500" />;
     }
   };
@@ -106,7 +106,7 @@ export default function NotificationBell() {
       >
         <Bell className="w-5 h-5 text-gray-600" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white">
+          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-danger-soft0 rounded-full border-2 border-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -119,14 +119,14 @@ export default function NotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-tap shadow-lg border border-gray-200 overflow-hidden z-50"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <h3 className="font-semibold text-gray-800">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="text-xs text-[#0D4B4B] hover:underline font-medium"
+                  className="text-xs text-brandtext hover:underline font-medium"
                 >
                   Mark all read
                 </button>
@@ -167,7 +167,7 @@ export default function NotificationBell() {
               <div className="border-t border-gray-100 px-4 py-2 text-center">
                 <Link
                   href={(session.user as any)?.role === 'SUPER_ADMIN' ? '/admin/notifications' : '/client/notifications'}
-                  className="text-xs text-[#0D4B4B] hover:underline font-medium"
+                  className="text-xs text-brandtext hover:underline font-medium"
                 >
                   View all notifications
                 </Link>

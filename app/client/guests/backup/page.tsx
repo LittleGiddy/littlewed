@@ -125,7 +125,7 @@ export default function BackupGuestsPage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
-        <Loader2 size={32} className="animate-spin text-[#0D4B4B]" />
+        <Loader2 size={32} className="animate-spin text-brandtext" />
         <p className="text-sm text-gray-400">Loading all guests…</p>
       </div>
     );
@@ -136,23 +136,23 @@ export default function BackupGuestsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] border border-[rgba(13,75,75,0.12)] rounded-xl px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)]">
+          <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-brand/10 border border-brand/20 rounded-tap px-3.5 py-1.5 transition hover:bg-[rgba(13,75,75,0.14)]">
             <ArrowLeft size={14} /> Dashboard
           </Link>
-          <h1 className="font-serif text-3xl font-black text-gray-900 mt-3">Guest Database</h1>
+          <h1 className="font-display text-3xl font-black text-gray-900 mt-3">Guest Database</h1>
           <p className="text-sm text-gray-500">All guests across all events - {guests.length} total</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={exportCSV}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white px-4 py-2 rounded-xl font-semibold hover:bg-[#0A3939] transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 bg-brandbg text-white px-4 py-2 rounded-tap font-semibold hover:bg-brand-deepbg transition disabled:opacity-50"
           >
             <Download size={16} /> Export CSV
           </button>
           <button
             onClick={sharePage}
-            className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl font-semibold hover:bg-gray-200 transition"
+            className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-4 py-2 rounded-tap font-semibold hover:bg-gray-200 transition"
           >
             <Share2 size={16} /> Share
           </button>
@@ -167,17 +167,17 @@ export default function BackupGuestsPage() {
           value={search}
           onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
           placeholder="Search by name, phone, or event…"
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent text-sm"
+          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent text-sm"
         />
       </div>
 
       {/* Stats */}
       <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
         <span className="bg-gray-100 px-3 py-1 rounded-full">Total: {guests.length}</span>
-        <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full flex items-center gap-1">
+        <span className="bg-success-soft text-success px-3 py-1 rounded-full flex items-center gap-1">
           <CheckCircle size={14} /> Checked In: {guests.filter(g => g.checkedIn).length}
         </span>
-        <span className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full flex items-center gap-1">
+        <span className="bg-warn-soft text-warn px-3 py-1 rounded-full flex items-center gap-1">
           <Clock size={14} /> Pending: {guests.filter(g => !g.checkedIn).length}
         </span>
         {search && <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full">Filtered: {filtered.length}</span>}
@@ -192,21 +192,21 @@ export default function BackupGuestsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {paginated.map(guest => (
-            <div key={guest.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition">
+            <div key={guest.id} className="bg-white rounded-tap border border-gray-100 p-4 shadow-sm hover:shadow-md transition">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-gray-800 truncate">{guest.name}</p>
                   <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
                     <span className="truncate">{guest.phone || 'No phone'}</span>
                     <span>•</span>
-                    <span className={`inline-flex items-center gap-1 ${guest.checkedIn ? 'text-green-600' : 'text-amber-600'}`}>
+                    <span className={`inline-flex items-center gap-1 ${guest.checkedIn ? 'text-success' : 'text-warn'}`}>
                       {guest.checkedIn ? <CheckCircle size={12} /> : <Clock size={12} />}
                       {guest.checkedIn ? 'Checked in' : 'Pending'}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     {guest.routingChannel === 'whatsapp' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-brandtext bg-brand/10 px-2 py-0.5 rounded-full">
                         <MessageCircle size={10} /> WhatsApp
                       </span>
                     ) : (

@@ -51,7 +51,7 @@ export default function PendingActivationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F8FA]">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#0D4B4B] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-brandborder border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading...</p>
         </div>
       </div>
@@ -62,27 +62,27 @@ export default function PendingActivationPage() {
     <div className="min-h-screen bg-[#F5F8FA] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Decorative top bar */}
-        <div className="h-1.5 bg-gradient-to-r from-[#0D4B4B] via-[#FF6B5C] to-[#0D4B4B] rounded-t-2xl" />
+        <div className="h-1.5 bg-gradient-to-r from-brandfrom via-coralvia to-brandto rounded-t-2xl" />
 
         <div className="bg-white rounded-b-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-6 sm:p-8 text-center">
             {/* Icon with pulse animation */}
             <div className="relative w-24 h-24 mx-auto mb-6">
-              <div className="absolute inset-0 rounded-full border-2 border-[rgba(13,75,75,0.1)] animate-ping" />
+              <div className="absolute inset-0 rounded-full border-2 border-brand/10 animate-ping" />
               <div className="absolute inset-[-6px] rounded-full border-2 border-[rgba(232,165,152,0.15)] animate-pulse" />
-              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-[#0D4B4B] to-[#0A3939] flex items-center justify-center shadow-lg">
+              <div className="relative w-full h-full rounded-full bg-gradient-to-br from-brandfrom to-brand-deepto flex items-center justify-center shadow-lg">
                 <Clock className="w-10 h-10 text-white" />
               </div>
             </div>
 
             {/* Status badge */}
-            <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-full px-4 py-1.5 mb-4">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">Pending Approval</span>
+            <div className="inline-flex items-center gap-2 bg-warn-soft border border-warn-border rounded-full px-4 py-1.5 mb-4">
+              <span className="w-2 h-2 rounded-full bg-warn-soft0 animate-pulse" />
+              <span className="text-xs font-bold text-warn uppercase tracking-wider">Pending Approval</span>
             </div>
 
-            <h1 className="font-serif text-2xl sm:text-3xl font-black text-gray-900 mb-2">
-              Account <span className="text-[#FF6B5C]">Pending</span>
+            <h1 className="font-display text-2xl sm:text-3xl font-black text-gray-900 mb-2">
+              Account <span className="text-coraltext">Pending</span>
             </h1>
 
             <p className="text-gray-500 text-sm mb-2">
@@ -93,19 +93,19 @@ export default function PendingActivationPage() {
             </p>
 
             {/* Email pill */}
-            <div className="inline-flex items-center gap-2 bg-[rgba(13,75,75,0.06)] border border-[rgba(13,75,75,0.12)] rounded-full px-4 py-2 text-sm font-semibold text-[#0D4B4B] mb-6">
+            <div className="inline-flex items-center gap-2 bg-brand/10 border border-brand/20 rounded-full px-4 py-2 text-sm font-semibold text-brandtext mb-6">
               <Mail className="w-4 h-4" />
               {userEmail}
             </div>
 
             {/* Info alert */}
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-left flex items-start gap-3 mb-6">
+            <div className="bg-warn-soft border border-warn-border rounded-tap p-4 text-left flex items-start gap-3 mb-6">
               <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                <AlertCircle className="w-4 h-4 text-amber-600" />
+                <AlertCircle className="w-4 h-4 text-warn" />
               </div>
               <div>
                 <p className="text-sm font-medium text-amber-800">What happens next?</p>
-                <p className="text-sm text-amber-700 mt-0.5">
+                <p className="text-sm text-warn mt-0.5">
                   A super administrator will review and activate your account. This usually takes 24-48 hours.
                 </p>
               </div>
@@ -113,7 +113,7 @@ export default function PendingActivationPage() {
 
             {/* Auto-refresh indicator */}
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mb-6">
-              <RefreshCw size={12} className="text-[#0D4B4B]" />
+              <RefreshCw size={12} className="text-brandtext" />
               <span>This page automatically refreshes to check your status</span>
             </div>
 
@@ -121,7 +121,7 @@ export default function PendingActivationPage() {
             <div className="space-y-3">
               <button
                 onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
-                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gray-100 text-gray-700 rounded-tap font-semibold hover:bg-gray-200 transition flex items-center justify-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
                 Sign Out
@@ -129,7 +129,7 @@ export default function PendingActivationPage() {
 
               <button
                 onClick={() => window.location.reload()}
-                className="w-full py-3 border border-gray-200 text-gray-600 rounded-xl font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                className="w-full py-3 border border-gray-200 text-gray-600 rounded-tap font-medium hover:bg-gray-50 transition flex items-center justify-center gap-2"
               >
                 <Clock className="w-4 h-4" />
                 Check Status Now
@@ -138,7 +138,7 @@ export default function PendingActivationPage() {
 
             <p className="text-xs text-gray-400 mt-6">
               Think this is a mistake?{' '}
-              <a href="mailto:support@littlewed.com" className="text-[#0D4B4B] font-semibold hover:underline">
+              <a href="mailto:support@littlewed.com" className="text-brandtext font-semibold hover:underline">
                 Contact support
               </a>
             </p>

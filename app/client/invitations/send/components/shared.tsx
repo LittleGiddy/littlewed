@@ -241,7 +241,7 @@ export function FlowSteps({ current }: { current: number }) {
                   isDone
                     ? 'bg-[#1A7A4A] text-white'
                     : isActive
-                      ? 'bg-[#0D4B4B] text-white ring-4 ring-[#0D4B4B]/10'
+                      ? 'bg-brandbg text-white ring-4 ring-brandring'
                       : 'bg-gray-100 text-gray-400'
                 }`}
               >
@@ -276,12 +276,12 @@ export function FlowHeader({
     <div className="flex items-center gap-3 mb-6">
       <Link
         href={backUrl}
-        className="flex-shrink-0 w-9 h-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-[#0D4B4B] hover:border-[#0D4B4B] transition"
+        className="flex-shrink-0 w-9 h-9 rounded-tap border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-brandtext hover:border-brandborder transition"
       >
         <ArrowLeft size={17} />
       </Link>
       <div className="min-w-0">
-        <h1 className="font-serif text-xl sm:text-2xl font-black text-gray-900 truncate leading-tight">{title}</h1>
+        <h1 className="font-display text-xl sm:text-2xl font-black text-gray-900 truncate leading-tight">{title}</h1>
         {subtitle && <p className="text-xs sm:text-sm text-gray-500 truncate">{subtitle}</p>}
       </div>
     </div>
@@ -295,10 +295,10 @@ export function VariableChip({ variable, onInsert }: { variable: { key: string; 
     <button
       type="button"
       onClick={onInsert}
-      className="flex items-center gap-1.5 text-[11px] bg-white border border-[#0D4B4B]/20 px-2.5 py-1.5 rounded-full hover:border-[#0D4B4B] hover:bg-[#0D4B4B]/5 transition"
+      className="flex items-center gap-1.5 text-[11px] bg-white border border-brandborder px-2.5 py-1.5 rounded-full hover:border-brandborder hover:bg-brandbg transition"
       title={`${variable.label}: ${variable.example}`}
     >
-      <code className="text-[#0D4B4B] font-mono font-semibold">{variable.key}</code>
+      <code className="text-brandtext font-mono font-semibold">{variable.key}</code>
       <span className="text-gray-400 text-[9px]">+</span>
     </button>
   );
@@ -308,7 +308,7 @@ export function VariableChip({ variable, onInsert }: { variable: { key: string; 
 
 export function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-2xl border border-gray-200 shadow-sm ${className}`}>
+    <div className={`bg-white rounded-card border border-gray-200 shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -319,7 +319,7 @@ export function Card({ children, className = '' }: { children: React.ReactNode; 
 export function LoadingState({ label = 'Loading...' }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
-      <Loader2 size={28} className="animate-spin text-[#0D4B4B]" />
+      <Loader2 size={28} className="animate-spin text-brandtext" />
       <p className="text-sm text-gray-400">{label}</p>
     </div>
   );
@@ -400,7 +400,7 @@ export function SendProgressCard({
   const text = isWa ? '#15803d' : '#0D4B4B';
 
   return (
-    <div className="rounded-2xl bg-[#0D4B4B]/[0.04] border border-[#0D4B4B]/10 p-4">
+    <div className="rounded-card bg-brandbg/[0.04] border border-brandborder p-4">
       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-gray-800">
         <span className="flex items-center gap-1.5">
           <Loader2 size={13} className="animate-spin" style={{ color: accent }} />
@@ -429,13 +429,13 @@ export function SendProgressCard({
 
 export function NeedCardsBanner({ count }: { count: number }) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
-      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold flex-shrink-0">
+    <div className="rounded-card border border-warn-border bg-warn-soft px-4 py-3 flex items-start gap-3">
+      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-warn font-bold flex-shrink-0">
         {count}
       </div>
       <div>
         <p className="text-sm font-semibold text-amber-800">Cards not generated yet</p>
-        <p className="text-xs text-amber-700">
+        <p className="text-xs text-warn">
           {count} guest{count === 1 ? '' : 's'} need a pass-code card before their invitation can be sent. Missing
           cards are generated automatically when you send — just make sure the card design is final first.
         </p>

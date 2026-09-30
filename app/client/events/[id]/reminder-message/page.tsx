@@ -153,7 +153,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#0D4B4B]" />
+        <Loader2 className="w-8 h-8 animate-spin text-brandtext" />
       </div>
     );
   }
@@ -163,7 +163,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       <div className="text-center py-12">
         <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
         <p className="text-gray-500">Event not found.</p>
-        <Link href="/client/dashboard" className="text-[#0D4B4B] underline mt-2 inline-block">
+        <Link href="/client/dashboard" className="text-brandtext underline mt-2 inline-block">
           Go back
         </Link>
       </div>
@@ -175,32 +175,32 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       <div className="flex items-center gap-3 mb-6">
         <Link
           href={`/client/events/${eventId}`}
-          className="text-gray-500 hover:text-[#0D4B4B] transition"
+          className="text-gray-500 hover:text-brandtext transition"
         >
           <ArrowLeft size={20} />
         </Link>
-        <h1 className="font-serif text-2xl font-black text-gray-900">
+        <h1 className="font-display text-2xl font-black text-gray-900">
           Kumbusha Michango - {event.name}
         </h1>
       </div>
 
       {alreadyUsed ? (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-warn-soft border border-warn-border rounded-tap p-4 mb-6 flex items-start gap-3">
+          <AlertCircle size={20} className="text-warn flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-amber-800">Reminder already sent</p>
-            <p className="text-sm text-amber-700 mt-0.5">
+            <p className="text-sm text-warn mt-0.5">
               Reminder messages can only be sent once per event. This event has already used its
               reminder. If you need to reach guests again, please contact support.
             </p>
           </div>
         </div>
       ) : bypassPayment ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-success-soft border border-success-border rounded-tap p-4 mb-6 flex items-start gap-3">
+          <CheckCircle size={20} className="text-success flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-green-800">Unlimited reminders</p>
-            <p className="text-sm text-green-700 mt-0.5">
+            <p className="text-sm text-success mt-0.5">
               Your account is set to bypass usage limits, so you can send reminders as many times as
               you need.
             </p>
@@ -208,14 +208,14 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
         </div>
       ) : null}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-tap shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleSelectAll}
                 disabled={alreadyUsed}
-                className="text-sm text-gray-600 hover:text-[#0D4B4B] flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-sm text-gray-600 hover:text-brandtext flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
                 {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
@@ -256,12 +256,12 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               rows={5}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0D4B4B] focus:border-transparent resize-none"
+              className="w-full p-3 border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent resize-none"
               placeholder="e.g. Habari {name}, tunakumbusha kuhusu michango yako kwa {event}. Asante."
             />
           </div>
 
-          <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+          <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-tap divide-y divide-gray-100">
             {guests.map((guest) => {
               const isWhatsApp = guest.routingChannel === 'whatsapp';
               return (
@@ -274,13 +274,13 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                     checked={selectedGuests.has(guest.id)}
                     onChange={() => toggleSelectGuest(guest.id)}
                     disabled={alreadyUsed}
-                    className="w-4 h-4 rounded border-gray-300 text-[#0D4B4B] focus:ring-[#0D4B4B] disabled:opacity-40"
+                    className="w-4 h-4 rounded border-gray-300 text-brandtext focus:ring-brandring disabled:opacity-40"
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-gray-800">{guest.name}</p>
                       {isWhatsApp ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#0D4B4B] bg-[rgba(13,75,75,0.07)] px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-brandtext bg-[rgba(13,75,75,0.07)] px-2 py-0.5 rounded-full">
                           <MessageCircle size={10} /> WhatsApp
                         </span>
                       ) : (
@@ -293,7 +293,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                   </div>
                   <div className="text-xs text-gray-400">
                     {guest.reminderCount < 2 ? (
-                      <span className="text-[#0D4B4B] flex items-center gap-0.5">
+                      <span className="text-brandtext flex items-center gap-0.5">
                         <Gift size={10} /> Free
                       </span>
                     ) : (
@@ -313,14 +313,14 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             <button
               onClick={sendReminders}
               disabled={sending || alreadyUsed || selectedCount === 0 || !message.trim() || (totalCost > 0 && credits !== null && credits < totalCost)}
-              className="flex-1 bg-gradient-to-r from-[#0D4B4B] to-[#0A3939] text-white py-2.5 rounded-xl font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-brandfrom to-brand-deepto text-white py-2.5 rounded-tap font-bold shadow-md hover:shadow-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send size={18} />}
               {sending ? 'Sending...' : `Send Reminder${selectedCount > 1 ? 's' : ''}`}
             </button>
             <button
               onClick={() => router.push(`/client/events/${eventId}`)}
-              className="px-6 border border-gray-300 rounded-xl py-2.5 font-medium hover:bg-gray-50 transition flex items-center gap-1.5"
+              className="px-6 border border-gray-300 rounded-tap py-2.5 font-medium hover:bg-gray-50 transition flex items-center gap-1.5"
             >
               <X size={16} />
               Cancel

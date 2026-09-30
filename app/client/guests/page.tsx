@@ -27,7 +27,7 @@ export default async function GuestsPage() {
           <Link
             key={event.id}
             href={`/client/guests/${event.id}`}
-            className="block bg-white rounded-xl shadow-sm p-4 hover:bg-gray-50 transition"
+            className="block bg-white rounded-tap shadow-sm p-4 hover:bg-gray-50 transition"
           >
             <h2 className="font-semibold">{event.name}</h2>
             <p className="text-sm text-gray-500">{new Date(event.date).toLocaleDateString()}</p>

@@ -52,10 +52,10 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
   if (!event) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div className="bg-white rounded-card shadow-lg p-8 text-center">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Event Not Found</h1>
           <p className="text-gray-500">This event doesn't exist or you don't have access to it.</p>
-          <Link href="/dashboard" className="inline-block mt-4 text-[#0D4B4B] font-semibold hover:underline">
+          <Link href="/dashboard" className="inline-block mt-4 text-brandtext font-semibold hover:underline">
             Back to Dashboard
           </Link>
         </div>
@@ -79,20 +79,20 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
     <div className="max-w-6xl mx-auto px-4 py-8">
       <Link
         href="/dashboard"
-        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-[#0D4B4B] transition mb-6"
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-brandtext transition mb-6"
       >
         <ArrowLeft size={16} /> Back to Dashboard
       </Link>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-8">
-        <h1 className="font-serif text-3xl font-black text-gray-900">{event.name}</h1>
+      <div className="bg-white rounded-card shadow-lg border border-gray-100 p-6 mb-8">
+        <h1 className="font-display text-3xl font-black text-gray-900">{event.name}</h1>
         <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
           <span className="flex items-center gap-1.5">
-            <Calendar size={16} className="text-[#0D4B4B]" />
+            <Calendar size={16} className="text-brandtext" />
             {format(new Date(event.date), 'PPP')}
           </span>
           <span className="flex items-center gap-1.5">
-            <MapPin size={16} className="text-[#0D4B4B]" />
+            <MapPin size={16} className="text-brandtext" />
             {event.venue}
           </span>
         </div>
@@ -101,26 +101,26 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
 
       {/* ─── Stats ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
+        <div className="bg-white rounded-tap border border-gray-100 p-3 md:p-4 text-center shadow-sm">
           <p className="text-xl md:text-2xl font-bold text-gray-900">{totalGuests}</p>
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Total Guests</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
-          <p className="text-xl md:text-2xl font-bold text-green-600">{checkedInCount}</p>
+        <div className="bg-white rounded-tap border border-gray-100 p-3 md:p-4 text-center shadow-sm">
+          <p className="text-xl md:text-2xl font-bold text-success">{checkedInCount}</p>
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Checked In</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
-          <p className="text-xl md:text-2xl font-bold text-[#0D4B4B]">{guestsWithPhone}</p>
+        <div className="bg-white rounded-tap border border-gray-100 p-3 md:p-4 text-center shadow-sm">
+          <p className="text-xl md:text-2xl font-bold text-brandtext">{guestsWithPhone}</p>
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">With Phone</p>
         </div>
-        <div className="bg-white rounded-xl border border-gray-100 p-3 md:p-4 text-center shadow-sm">
-          <p className="text-xl md:text-2xl font-bold text-amber-600">{guestsWithCard}</p>
+        <div className="bg-white rounded-tap border border-gray-100 p-3 md:p-4 text-center shadow-sm">
+          <p className="text-xl md:text-2xl font-bold text-warn">{guestsWithCard}</p>
           <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">With Card</p>
         </div>
       </div>
 
       {/* ─── Guest List ─── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-tap shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-4">
             <h2 className="font-semibold text-gray-800">Guest List</h2>
@@ -134,10 +134,10 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
                 <UsersIcon size={12} /> {familiaCount}
               </span>
-              <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+              <span className="flex items-center gap-1 text-warn bg-warn-soft px-2 py-0.5 rounded-full">
                 <UsersIcon size={12} /> {wakweCount}
               </span>
-              <span className="flex items-center gap-1 text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+              <span className="flex items-center gap-1 text-success bg-success-soft px-2 py-0.5 rounded-full">
                 <MessageCircle size={12} /> {whatsappCount}
               </span>
             </div>
@@ -175,7 +175,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     </td>
                     <td className="px-3 md:px-4 py-3">
                       {guest.cardNumber ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-[#0D4B4B] bg-[rgba(13,75,75,0.08)] px-2 py-1 rounded-lg">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-brandtext bg-brand/10 px-2 py-1 rounded-lg">
                           <Hash size={12} />
                           {guest.cardNumber}
                         </span>
@@ -186,7 +186,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     <td className="px-3 md:px-4 py-3">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${
                         guest.routingChannel === 'whatsapp'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-100 text-success'
                           : 'bg-gray-100 text-gray-600'
                       }`}>
                         {guest.routingChannel === 'whatsapp' ? (
@@ -223,7 +223,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                     </td>
                     <td className="px-3 md:px-4 py-3">
                       {guest.checkedIn ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-success bg-success-soft px-2 py-1 rounded-lg">
                           <CheckCircle size={12} /> 
                           {guest.checkInCount > 1 ? `Checked In (${guest.checkInCount}x)` : 'Checked In'}
                         </span>

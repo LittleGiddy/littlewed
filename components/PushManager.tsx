@@ -166,8 +166,8 @@ export default function PushManager() {
   return (
     <>
       {showPrompt && (
-        <div className="fixed bottom-4 right-4 z-[9999] max-w-sm w-[calc(100%-2rem)] bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[rgba(13,75,75,0.08)] flex items-center justify-center flex-shrink-0 text-[#0D4B4B]">
+        <div className="fixed bottom-4 right-4 z-[9999] max-w-sm w-[calc(100%-2rem)] bg-white rounded-card shadow-2xl border border-gray-100 p-4 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-tap bg-brand/10 flex items-center justify-center flex-shrink-0 text-brandtext">
             <Bell size={20} />
           </div>
           <div className="flex-1 min-w-0">
@@ -179,7 +179,7 @@ export default function PushManager() {
             <div className="flex items-center gap-2 mt-3">
               <button
                 onClick={requestPermission}
-                className="inline-flex items-center gap-1.5 bg-[#0D4B4B] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#0A3939] transition"
+                className="inline-flex items-center gap-1.5 bg-brandbg text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-brand-deepbg transition"
               >
                 <BellRing size={13} /> Enable
               </button>
