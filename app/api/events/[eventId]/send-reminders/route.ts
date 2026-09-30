@@ -59,21 +59,16 @@ export async function POST(
       eventId,
       phone: { not: null },
     },
-    select: { id: true, name: true, title: true, phone: true, reminderCount: true, routingChannel: true },
+    select: { id: true, name: true, title: true, phone: true, reminderCount: true },
   });
 
-  if (guests.length === 0) {
+  // The guest list shows every guest, so the send honours the selection
+  // verbatim. Routing only decides WHICH channel `chan` delivers over - it must
+  // not silently drop a guest the user could see and tick, or the UI would
+  // promise deliveries the request quietly discards.
+  const targetGuests = guests;
+  if (targetGuests.length === 0) {
     return NextResponse.json({ error: 'No valid guests with phone numbers' }, { status: 400 });
-  }
-
-  // Filter to guests matching the chosen channel
-  const channelGuests = chan === 'whatsapp'
-    ? guests.filter(g => g.routingChannel === 'whatsapp')
-    : guests.filter(g => g.routingChannel === 'sms');
-  if (channelGuests.length === 0) {
-    return NextResponse.json({
-      error: `No ${chan === 'whatsapp' ? 'WhatsApp' : 'SMS'} guests selected for this reminder.`,
-    }, { status: 400 });
   }
 
   // ─── Cost calculation ────────────────────────────────────────────────
@@ -82,7 +77,7 @@ export async function POST(
   // (the disabled case is rejected just below).
   const willCharge = !event.tenant.bypassPayment && !isCreditsDisabled(event.tenant);
   const billableGuestIds = new Set(
-    willCharge ? channelGuests.filter(g => isBillable(g.reminderCount)).map(g => g.id) : []
+    willCharge ? targetGuests.filter(g => isBillable(g.reminderCount)).map(g => g.id) : []
   );
   const totalCost = billableGuestIds.size * REMINDER_COST;
 
@@ -90,7 +85,7 @@ export async function POST(
 
   // Credits disabled overrides bypass-payment mode, so this rejects even for
   // tenants that would otherwise send for free.
-  if (creditsDisabled && channelGuests.length > 0) {
+  if (creditsDisabled && targetGuests.length > 0) {
     return NextResponse.json({
       error: CREDITS_DISABLED_MESSAGE,
       creditsNeeded: totalCost,
@@ -139,7 +134,7 @@ export async function POST(
   // ─── Send via chosen channel ─────────────────────────────────────────
   const whatsappTemplateName = getReminderWhatsAppTemplate();
   const results: Array<{ guestId: string; success: boolean; error?: string; charged: boolean }> = [];
-  for (const guest of channelGuests) {
+  for (const guest of targetGuests) {
     // Charged up front for every billable guest; refunded below if this fails.
     const charged = billableGuestIds.has(guest.id);
     try {

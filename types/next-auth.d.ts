@@ -6,6 +6,7 @@ declare module "next-auth" {
     user: {
       id: string;
       role: string;
+      isActive?: boolean;
       tenantId?: string;
       tenant?: Tenant;
     } & DefaultSession["user"];
@@ -14,6 +15,7 @@ declare module "next-auth" {
   interface User extends DefaultUser {
     id: string;
     role: string;
+    isActive?: boolean;
     tenantId?: string;
     tenant?: Tenant;
   }
