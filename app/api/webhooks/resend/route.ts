@@ -1,79 +1,168 @@
+// app/api/webhooks/resend/route.ts
+// Receives Resend's outbound delivery events and inbound replies.
+//
+// Signature verification is mandatory here: without it anyone who learns this
+// URL can post forged `email.bounced` events and have guests flagged as
+// undeliverable. The secret is RESEND_WEBHOOK_SECRET (the "Signing Secret"
+// shown in Resend's dashboard, not the API key).
 import { NextRequest, NextResponse } from 'next/server';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
-import { headers } from 'next/headers';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
 interface ResendWebhookEvent {
   type: string;
+  created_at?: string;
   data: {
     id?: string;
-    email?: string;
-    to?: string[];
+    email_id?: string;
     from?: string;
+    to?: string[];
     subject?: string;
     html?: string;
     text?: string;
-    attachment?: any[];
-    delivered_at?: string;
-    opened_at?: string;
-    clicked_at?: string;
-    [key: string]: any;
+    message_id?: string;
+    in_reply_to?: string;
+    attachment?: unknown[];
+    timestamp?: string;
+    error?: string;
+    reason?: string;
+    [key: string]: unknown;
   };
 }
 
-interface IncomingEmail {
-  from: string;
-  to: string[];
-  subject: string;
-  html?: string;
-  text?: string;
-  attachment?: any[];
-  messageId?: string;
-  repliedTo?: string; // The original email ID this is a reply to
+// ─── Signature verification ─────────────────────────────────────────────
+
+/**
+ * Resend signs the raw request body with HMAC-SHA256 and sends the digest in
+ * the `resend-signature` header as one or more `v1,<digest>` space/comma
+ * separated parts. Older integrations use hex, newer ones base64, so both are
+ * computed and compared.
+ */
+function verifyResendSignature(rawBody: string, signatureHeader: string | null, secret: string): boolean {
+  if (!signatureHeader || !secret) return false;
+
+  const expectedHex = createHmac('sha256', secret).update(rawBody).digest('hex');
+  const expectedB64 = createHmac('sha256', secret).update(rawBody).digest('base64');
+
+  // Header shape: "v1,<hex>" possibly with extra parts for key rotation.
+  const parts = signatureHeader
+    .split(/[,\s]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const candidates: string[] = [];
+  for (let i = 0; i < parts.length; i += 1) {
+    // Accept both "v1,<digest>" and a bare digest (no version prefix).
+    if (/^v\d+$/.test(parts[i]) && i + 1 < parts.length) candidates.push(parts[i + 1]);
+    else if (!/^v\d+$/.test(parts[i])) candidates.push(parts[i]);
+  }
+
+  return candidates.some((candidate) => {
+    const received = Buffer.from(candidate);
+    for (const expected of [expectedHex, expectedB64]) {
+      const expectedBuf = Buffer.from(expected);
+      // timingSafeEqual throws on length mismatch, so guard first.
+      if (received.length === expectedBuf.length && timingSafeEqual(received, expectedBuf)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+function eventTime(data: ResendWebhookEvent['data']): Date {
+  if (typeof data.timestamp === 'string') {
+    const d = new Date(data.timestamp);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
+
+function errorText(data: ResendWebhookEvent['data']): string | null {
+  const err = data.error;
+  if (typeof err === 'string') return err.slice(0, 500);
+  if (err && typeof err === 'object') {
+    try {
+      return JSON.stringify(err).slice(0, 500);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data.reason === 'string') return data.reason.slice(0, 500);
+  return null;
+}
+
+/**
+ * Append to the DeliveryLog ledger. Resend retries aggressively, so a plain
+ * insert would double-count opens on every retry.
+ */
+async function logDelivery(
+  messageId: string,
+  status: string,
+  payload: Record<string, unknown>,
+  at: Date
+): Promise<void> {
+  const existing = await prisma.deliveryLog.findFirst({
+    where: { messageId, status },
+    select: { id: true },
+  });
+  if (existing) return;
+  await prisma.deliveryLog.create({
+    data: { messageId, status, rawData: payload as never, createdAt: at },
+  });
 }
 
 // ─── Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const secret = process.env.RESEND_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('[Resend] RESEND_WEBHOOK_SECRET is not set. Rejecting webhook.');
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 });
+  }
+
+  // Must read the raw body once: signing is computed over the exact bytes.
+  const rawBody = await req.text();
+
+  if (!verifyResendSignature(rawBody, req.headers.get('resend-signature'), secret)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+  }
+
+  let body: ResendWebhookEvent;
   try {
-    const headersList = await headers();
-    const signature = headersList.get('resend-signature');
+    body = JSON.parse(rawBody) as ResendWebhookEvent;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
 
-    // ─── Verify webhook signature (optional but recommended) ───
-    // const isValid = await verifyResendSignature(
-    //   signature,
-    //   await req.text(),
-    //   process.env.RESEND_WEBHOOK_SECRET!
-    // );
-    // if (!isValid) {
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-    // }
+  const { type, data } = body;
+  if (!type || !data || typeof data !== 'object') {
+    return NextResponse.json({ error: 'Malformed payload' }, { status: 400 });
+  }
 
-    const body = await req.json();
-    console.log('Resend webhook payload:', JSON.stringify(body, null, 2));
-
-    const { type, data } = body as ResendWebhookEvent;
-
-    // ─── Handle different event types ─────────────────────────────
-
+  try {
     switch (type) {
-      // ─── Incoming Email (when someone replies to your email) ───
       case 'email.received':
         await handleIncomingEmail(data);
         break;
 
-      // ─── Email Delivery Events ──────────────────────────────────
       case 'email.delivered':
-        await handleDeliveryEvent(data);
+        await handleDeliveryEvent('DELIVERED', data);
         break;
 
       case 'email.opened':
-        await handleOpenEvent(data);
+        await handleDeliveryEvent('OPENED', data);
         break;
 
       case 'email.clicked':
-        await handleClickEvent(data);
+        await handleDeliveryEvent('CLICKED', data);
         break;
 
       case 'email.bounced':
@@ -85,127 +174,150 @@ export async function POST(req: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled webhook event type: ${type}`);
+        // Resend adds event types over time; acknowledging unknown ones keeps
+        // it from retrying forever.
+        return NextResponse.json({ received: true, ignored: type });
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('Resend webhook error:', error);
+    console.error('[Resend] handler failed:', error);
+    // 500 tells Resend to retry, which is what we want for a transient DB error.
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-// ─── Event Handlers ─────────────────────────────────────────────────────
+// ─── Event handlers ─────────────────────────────────────────────────────
 
-// 🚀 Handle Incoming Emails (replies, forwarded emails)
-async function handleIncomingEmail(data: any) {
-  console.log('📨 Incoming email received:', data);
+async function handleIncomingEmail(data: ResendWebhookEvent['data']) {
+  const messageId = data.message_id || data.id || null;
 
-  const email: IncomingEmail = {
-    from: data.from,
-    to: data.to || [],
-    subject: data.subject || '',
-    html: data.html || '',
-    text: data.text || '',
-    attachment: data.attachment || [],
-    messageId: data.messageId || data.id,
-    repliedTo: data.repliedTo || data.inReplyTo || null,
-  };
+  // Idempotency: Resend redelivers inbound mail on retry.
+  if (messageId) {
+    const seen = await prisma.incomingEmail.findFirst({
+      where: { messageId },
+      select: { id: true },
+    });
+    if (seen) {
+      console.log(`[Resend] Incoming email ${messageId} already stored.`);
+      return;
+    }
+  }
 
-  // ─── Store in database ──────────────────────────────────────────────
-  try {
-    // Option 1: Store in a custom "IncomingEmail" table
-    // await prisma.incomingEmail.create({
-    //   data: {
-    //     from: email.from,
-    //     to: email.to,
-    //     subject: email.subject,
-    //     html: email.html,
-    //     text: email.text,
-    //     messageId: email.messageId,
-    //     repliedTo: email.repliedTo,
-    //     receivedAt: new Date(),
-    //   },
-    // });
+  // Try to attribute the reply to a guest. Tenant event invitations are sent
+  // from the tenant's own address, so matching on the recipient address of the
+  // inbound message is the reliable direction.
+  const to = Array.isArray(data.to) ? data.to : [];
+  const guest = to.length
+    ? await prisma.guest.findFirst({
+        where: { email: { equals: to[0], mode: 'insensitive' } },
+        select: { id: true, eventId: true },
+      })
+    : null;
 
-    // Option 2: Attach to the original guest/event record
-    // Extract the original email ID from the subject or reply-to header
-    // Example: "Re: Your invitation to Sarah & James Wedding (event-123)"
-    // const eventId = extractEventIdFromSubject(email.subject);
-    // if (eventId) {
-    //   await prisma.guest.updateMany({
-    //     where: { eventId, email: email.from },
-    //     data: { replyReceivedAt: new Date(), replyContent: email.text },
-    //   });
-    // }
+  await prisma.incomingEmail.create({
+    data: {
+      from: data.from || '',
+      to,
+      subject: data.subject || '',
+      html: typeof data.html === 'string' ? data.html : null,
+      text: typeof data.text === 'string' ? data.text : null,
+      messageId,
+      repliedTo: data.in_reply_to || null,
+      eventId: guest?.eventId ?? null,
+      guestId: guest?.id ?? null,
+    },
+  });
 
-    console.log('✅ Incoming email processed:', email.subject);
-  } catch (error) {
-    console.error('Failed to store incoming email:', error);
+  // Surface the reply to the tenant who owns the event.
+  if (guest) {
+    const tenantUser = await prisma.user.findFirst({
+      where: { tenantId: (await prisma.event.findUnique({
+        where: { id: guest.eventId },
+        select: { tenantId: true },
+      }))?.tenantId },
+      select: { id: true },
+    });
+    if (tenantUser) {
+      await prisma.notification.create({
+        data: {
+          userId: tenantUser.id,
+          title: 'New guest reply',
+          message: data.subject || 'A guest replied to your invitation email.',
+          type: 'info',
+          link: `/client/events/${guest.eventId}/guests`,
+        },
+      });
+    }
   }
 }
 
-// ─── Delivery Event ─────────────────────────────────────────────────────
-async function handleDeliveryEvent(data: any) {
-  console.log('📬 Email delivered:', data.id);
-  // Update your database to mark this email as delivered
-  // await prisma.emailLog.update({
-  //   where: { resendId: data.id },
-  //   data: { deliveredAt: new Date() },
-  // });
+async function handleDeliveryEvent(
+  status: 'DELIVERED' | 'OPENED' | 'CLICKED',
+  data: ResendWebhookEvent['data']
+) {
+  const messageId = data.email_id || data.id;
+  if (!messageId) return;
+
+  await logDelivery(
+    messageId,
+    status,
+    {
+      to: data.to ?? [],
+      at: eventTime(data).toISOString(),
+    },
+    eventTime(data)
+  );
 }
 
-// ─── Open Event ─────────────────────────────────────────────────────────
-async function handleOpenEvent(data: any) {
-  console.log('👁️ Email opened:', data.id);
-  // Update your database to mark this email as opened
-  // await prisma.emailLog.update({
-  //   where: { resendId: data.id },
-  //   data: { openedAt: new Date(), openCount: { increment: 1 } },
-  // });
+/**
+ * A hard bounce means the address is undeliverable. Record it and raise a
+ * system log so a tenant/admin can see it rather than silently re-sending.
+ */
+async function handleBounceEvent(data: ResendWebhookEvent['data']) {
+  const messageId = data.email_id || data.id;
+  if (messageId) {
+    await logDelivery(
+      messageId,
+      'BOUNCED',
+      { to: data.to ?? [], error: errorText(data), at: eventTime(data).toISOString() },
+      eventTime(data)
+    );
+  }
+
+  const reason = errorText(data) ?? 'No reason supplied by Resend';
+  const recipients = Array.isArray(data.to) ? data.to : [];
+  console.warn(`[Resend] Email bounced (${recipients.join(', ') || 'unknown'}): ${reason}`);
+
+  await prisma.systemLog.create({
+    data: {
+      type: 'email_bounce',
+      level: 'WARN',
+      message: `Email bounced for ${recipients.join(', ') || 'unknown recipient'}: ${reason}`,
+      details: { messageId: messageId ?? null, to: recipients },
+    },
+  });
 }
 
-// ─── Click Event ────────────────────────────────────────────────────────
-async function handleClickEvent(data: any) {
-  console.log('🖱️ Email clicked:', data.id);
-  // await prisma.emailLog.update({
-  //   where: { resendId: data.id },
-  //   data: { clickedAt: new Date(), clickCount: { increment: 1 } },
-  // });
-}
+/** A spam complaint is worse than a bounce: the address must not be used again. */
+async function handleComplaintEvent(data: ResendWebhookEvent['data']) {
+  const messageId = data.email_id || data.id;
+  if (messageId) {
+    await logDelivery(
+      messageId,
+      'COMPLAINED',
+      { to: data.to ?? [], at: eventTime(data).toISOString() },
+      eventTime(data)
+    );
+  }
 
-// ─── Bounce Event ───────────────────────────────────────────────────────
-async function handleBounceEvent(data: any) {
-  console.log('💥 Email bounced:', data.id);
-  // await prisma.emailLog.update({
-  //   where: { resendId: data.id },
-  //   data: { bouncedAt: new Date(), bounceReason: data.error },
-  // });
+  const recipients = Array.isArray(data.to) ? data.to : [];
+  await prisma.systemLog.create({
+    data: {
+      type: 'email_complaint',
+      level: 'ERROR',
+      message: `Recipient reported spam for ${recipients.join(', ') || 'unknown recipient'}`,
+      details: { messageId: messageId ?? null, to: recipients },
+    },
+  });
 }
-
-// ─── Complaint Event ────────────────────────────────────────────────────
-async function handleComplaintEvent(data: any) {
-  console.log('🚫 Email complained:', data.id);
-  // Mark the recipient as inactive or remove them
-  // await prisma.guest.updateMany({
-  //   where: { email: data.to?.[0] },
-  //   data: { isActive: false, complaintAt: new Date() },
-  // });
-}
-
-// ─── Optional: Webhook Signature Verification ─────────────────────────
-// async function verifyResendSignature(
-//   signature: string | null,
-//   body: string,
-//   secret: string
-// ): Promise<boolean> {
-//   if (!signature) return false;
-//   const crypto = await import('crypto');
-//   const hmac = crypto.createHmac('sha256', secret);
-//   hmac.update(body);
-//   const digest = hmac.digest('hex');
-//   return crypto.timingSafeEqual(
-//     Buffer.from(digest),
-//     Buffer.from(signature)
-//   );
-// }

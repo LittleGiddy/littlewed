@@ -173,6 +173,18 @@ model Event {
   checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
   qrRotation       Float?   @default(0)
 
+  // ─── Contribution (MCHANGO) fields ───────────────────────────────────
+  // These feed the approved "Mchango" WhatsApp template and the public
+  // /[eventId]/contributions tracker page.
+  eventType            String?   // template var1 - e.g. "Send-Off", "Wedding"
+  contributionDeadline DateTime? // template var9 - date contributions are due
+  mpesaInstructions    String?   // template var10 - e.g. "M-Pesa: 0762208760 - MAGRETH MKUMBI"
+  airtelInstructions   String?   // template var11
+  bankInstructions     String?   // template var12 - e.g. "CRDB BANK: 0152546773500 - MAGRETH MK"
+  contributionTarget   Int?      // optional event-wide fundraising target (TZS)
+  contributionCurrency String?   @default("TZS")
+  contributionsEnabled Boolean   @default(false) // opt-in: shows the tracker + enables status tracking
+
   // ─── Wedding-specific fields ─────────────────────────────────────────
   hostFamily  String?  // e.g., "Mr & Mrs Allan Swai"
   person1     String?  // e.g., "Agape"
@@ -279,6 +291,7 @@ model Event {
   reminderCardNameColor     String?  @default("#ffffff")
   reminderCardNameAlign     String?  @default("center") // "left" | "center" | "right"
   reminderCardNameFont      String?  @default("Playfair Display")
+  contributions   Contribution[]
 }
 
 model PendingEvent {
@@ -335,12 +348,40 @@ model Guest {
   messageLogs MessageLog[]
   rsvps       Rsvp[]
   wishes      GuestWish[]
+  contribution Contribution?
 
   @@index([eventId])
   @@index([phone])
   @@index([cardNumber])
   @@index([cardGroupId])
   @@index([passCode])
+}
+
+// ─── Contribution ("Mchango") tracking ─────────────────────────────────
+// One row per guest on an event. Created when a guest is first reminded, so
+// the tracker only lists people who were actually asked to contribute.
+// A guest counts as SETTLED when status is "PAID", or when an
+// amountExpected exists and amountPaid has reached it - which is what stops
+// the reminder pipeline from chasing people who have already finished.
+model Contribution {
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId    String   @unique
+  guest      Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  status       String   @default("PENDING") // "PENDING" | "PARTIAL" | "PAID"
+  amountPaid   Int      @default(0)         // TZS received so far
+  amountExpected Int?                      // TZS this guest owes; null = unspecified
+  note         String?                    // free-text note from whoever updated it
+  updatedByName String?                   // "a client" on the public page, or the tenant's name
+  remindedAt   DateTime?                  // last time a contribution reminder was sent
+  remindedCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, status])
 }
 
 // ─── RSVP submissions & guest wishes ──────────────────────────────────

@@ -107,7 +107,7 @@ export default function AboutPage() {
                 transition={{ duration: 0.4, delay: idx * 0.05 }}
                 className="bg-white rounded-card p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group"
               >
-                <div className="w-12 h-12 rounded-tap bg-gradient-to-br from-brandfrom to-coralto flex items-center justify-center text-brandtext group-hover:scale-105 transition-transform mb-4">
+                <div className="w-12 h-12 rounded-tap bg-gradient-to-br from-brandfrom to-coralto flex items-center justify-center text-white group-hover:scale-105 transition-transform mb-4">
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 mb-2">{feature.title}</h3>

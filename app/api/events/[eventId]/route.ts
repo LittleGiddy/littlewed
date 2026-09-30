@@ -41,6 +41,11 @@ export async function GET(
             thanksSentAt: true,
             reminderCount: true,
             createdAt: true,
+            // The reminder picker hides guests whose contribution is settled,
+            // so it needs the contribution row on the list it already fetches.
+            contribution: {
+              select: { status: true, amountPaid: true, amountExpected: true },
+            },
           },
           orderBy: { name: 'asc' },
         },

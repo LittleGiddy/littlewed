@@ -1304,6 +1304,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <span className="ml-auto text-xs text-warn font-bold">{guests.length}</span>
                     )}
                   </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setShowManageMenu(false);
+                      router.push(`/client/events/${event.id}/contributions`);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus-visible:bg-gray-50 transition"
+                  >
+                    <Coins size={15} className="text-gray-400" /> Contributions
+                  </button>
                   {checkedInCount > 0 && (
                     <button
                       role="menuitem"

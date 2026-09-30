@@ -33,4 +33,17 @@ export {
 
 export { AppField, AppInput, AppTextarea, AppSelect, fieldClasses } from './AppField';
 
+export { ShareLinkButton } from './ShareLinkButton';
+
+export {
+  CONTRIBUTION_STATUSES,
+  CONTRIBUTION_STATUS_META,
+  parseContributionStatus,
+  isContributionSettled,
+  summariseContributions,
+  formatTZS,
+  maskPhone,
+} from '@/lib/contributions';
+export type { ContributionStatus, ContributionSummary } from '@/lib/contributions';
+
 export { useReducedMotion, useTransition, motionEase, motionDuration } from '@/lib/motion';

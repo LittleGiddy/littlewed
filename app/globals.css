@@ -21,6 +21,8 @@
   --color-brand-50: #f0f7f7;
   /* Soft teal for selected states / tinted tiles */
   --color-brand-soft: #eef5f5;
+  --color-brand-700: #0b4242;
+  --color-brand-800: #0a3939;
 
   /* ── Semantic ── */
   --color-success: #1a7a4a;
@@ -35,6 +37,45 @@
   /* Coral is already established by the toast renderer */
   --color-coral: #ff6b5c;
   --color-whatsapp: #25d366;
+
+  /* ── Alias tokens ───────────────────────────────────────────────────
+     Most of the UI predates the @theme block above and was written against
+     these names directly. Tailwind v4 only generates a utility when a
+     matching theme variable exists, so every one of these was silently
+     emitting no CSS at all. That is where "invisible buttons" came from:
+     `bg-brandbg text-white` dropped the background, leaving white text on
+     the page's near-white canvas. Each alias now points at a real anchor
+     above so the class resolves. */
+  --color-brandbg: var(--color-brand);
+  --color-brandtext: var(--color-brand);
+  --color-brandring: var(--color-brand);
+  --color-brandborder: var(--color-brand);
+  --color-brandaccent: var(--color-brand-500);
+  --color-brandfrom: var(--color-brand-600);
+  --color-brandto: var(--color-brand);
+  --color-brand-deepto: var(--color-brand-deep);
+  --color-brand-deepvia: var(--color-brand-dark);
+  --color-brand-deeptext: var(--color-brand-deep);
+  --color-brand-deepbg: var(--color-brand-dark);
+  --color-successtext: var(--color-success);
+  --color-coraltext: var(--color-coral);
+  --color-coralborder: var(--color-coral);
+  --color-coralbg: #fff1ef;
+  --color-coralto: #ff8a7d;
+  --color-coralvia: #ff5747;
+
+  /* The `*-soft0` names are all paired with `text-white` (solid delete
+     buttons, filter tiles, the notification badge), so they have to be
+     solid fills, not tints. Values are chosen to clear 4.5:1 against
+     white. */
+  --color-danger-soft0: var(--color-danger);
+  --color-warn-soft0: var(--color-warn);
+  --color-success-soft0: var(--color-success);
+
+  /* Neutral surface ramp used by the contributions and reminder screens. */
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f8f8;
+  --color-line: #e5e7eb;
 
   /* ── Surfaces ── */
   --color-canvas: #f5f6f7;
@@ -62,6 +103,8 @@
   --shadow-elev-3: 0 8px 24px rgb(13 20 26 / 0.1), 0 2px 6px rgb(13 20 26 / 0.05);
   --shadow-brand: 0 6px 18px -6px rgb(13 75 75 / 0.35);
   --shadow-brand-sm: 0 3px 10px -4px rgb(13 75 75 / 0.3);
+  --shadow-brandshadow: 0 6px 18px -6px rgb(13 75 75 / 0.35);
+  --shadow-card: 0 1px 2px rgb(13 20 26 / 0.04), 0 1px 3px rgb(13 20 26 / 0.06);
 
   /* ── Motion: 150-250ms, soft ease-out ── */
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);

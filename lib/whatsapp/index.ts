@@ -414,38 +414,42 @@ export function getThanksWhatsAppTemplate(): string {
 }
 
 /**
- * Sends a WhatsApp reminder to a single guest. The approved reminder template
- * embeds a per-guest NAME variable ({var1} = guest name). When a reminder card
- * image is composed, it is attached as the template header image so each guest
- * receives their personalised card. REMINDER_WHATSAPP_TEMPLATE is configurable;
- * update it once the new reminder template is approved.
+ * Sends the approved "Mchango" contribution reminder to a single guest.
+ *
+ * The template is a broadcast body: var1..var13 are event-level values (occasion,
+ * names, venue, date, payment instructions, contact), so the personalisation is
+ * built once per send in `buildMchangoPersonalisation` and reused for every
+ * guest. Per-guest personalisation comes from the reminder card, which is
+ * attached as the template header image.
+ *
+ * `account` is the tenant's NexSMS account name. It is threaded through on
+ * purpose: the provider answers HTTP 422 for the whole request when the account
+ * is wrong, and reminders used to silently fall back to the env var and ignore
+ * Tenant.whatsappAccount.
  */
-const REMINDER_TEMPLATE_DEFAULT = 'mwaliko_reminder';
-
-export function getReminderWhatsAppTemplate(): string {
-  return process.env.REMINDER_WHATSAPP_TEMPLATE || REMINDER_TEMPLATE_DEFAULT;
-}
-
 export async function sendWhatsAppReminder({
   to,
-  guestName,
+  personalisation,
   templateName,
   cardUrl,
+  account,
 }: {
   to: string;
-  guestName: string;
+  personalisation: Record<string, string>[];
   templateName: string;
   cardUrl?: string;
+  account?: string | null;
 }): Promise<SendWhatsAppResult> {
-  console.log('[WhatsApp] ====== SENDING REMINDER ======');
-  console.log('[WhatsApp] Template:', templateName);
+  console.log('[WhatsApp] ====== SENDING MCHANGO REMINDER ======');
+  console.log('[WhatsApp] Template:', templateName, '| account:', account ?? '(env fallback)');
   const header = cardUrl
     ? { image: { file: cardUrl, name: 'Reminder Card' } }
     : undefined;
   return sendWhatsAppTemplate({
     to,
     template: templateName,
-    personalisation: [{ var1: guestName }],
+    account: account ?? undefined,
+    personalisation,
     header,
   });
 }

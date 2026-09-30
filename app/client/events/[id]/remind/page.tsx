@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import { isContributionSettled, formatTZS } from '@/lib/contributions';
+import { ShareLinkButton } from '@/components/ui';
 import SmsCounter from '@/components/SmsCounter';
 import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import ReminderCardDesigner, {
@@ -25,12 +27,19 @@ interface Guest {
   reminderCount: number;
   routingChannel: string;
   cardNumber?: string | null;
+  /** Present when contribution tracking is on for this event. */
+  contribution?: {
+    status: string;
+    amountPaid: number;
+    amountExpected: number | null;
+  } | null;
 }
 
 interface EventData {
   id: string;
   name: string;
   manualReminderSent?: boolean;
+  contributionsEnabled?: boolean;
   reminderCardUrl?: string | null;
   reminderCardNameX?: number | null;
   reminderCardNameY?: number | null;
@@ -110,7 +119,24 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   // as a badge so the user still knows how each guest is normally contacted.
   // Guests without a phone number are excluded because the provider can't
   // reach them, and offering them would be a dead end.
-  const remindableGuests = useMemo(() => guests.filter((g) => !!g.phone), [guests]);
+  const contactsOnly = useMemo(() => guests.filter((g) => !!g.phone), [guests]);
+
+  // Anyone who has already settled their contribution is removed from the list
+  // entirely. Reminding someone who has paid wastes their money and the
+  // tenant's credits, and offering them the option invites the mistake. The API
+  // enforces the same rule, so a stale tab cannot slip a paid guest through.
+  const settledGuests = useMemo(
+    () =>
+      event?.contributionsEnabled
+        ? contactsOnly.filter((g) => isContributionSettled(g.contribution))
+        : [],
+    [contactsOnly, event?.contributionsEnabled]
+  );
+
+  const remindableGuests = useMemo(
+    () => (event?.contributionsEnabled ? contactsOnly.filter((g) => !settledGuests.some((s) => s.id === g.id)) : contactsOnly),
+    [contactsOnly, event?.contributionsEnabled, settledGuests]
+  );
 
   const filteredGuests = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -268,6 +294,14 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       if (sent === total) toast.success(`Reminder sent to ${sent} guest${sent > 1 ? 's' : ''}.`);
       else toast.success(`Reminder sent to ${sent}/${total} guests.`);
 
+      // Guests paid in full are skipped server-side too. Say so, otherwise the
+      // gap between "selected" and "sent" looks like a delivery failure.
+      if (data.skippedSettledCount > 0) {
+        toast.success(
+          `${data.skippedSettledCount} guest${data.skippedSettledCount > 1 ? 's were' : ' was'} skipped - contribution already completed.`
+        );
+      }
+
       // Tell the user when a failed send gave credits back, so the balance on
       // screen is never a surprise.
       if (data.creditsRefunded > 0) {
@@ -292,20 +326,20 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh] bg-[#F5F6F7]">
-        <Loader2 className="w-8 h-8 animate-spin text-brandtext" />
+      <div className="flex justify-center items-center min-h-[60vh] bg-canvas">
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-[#F5F6F7] flex flex-col items-center justify-center text-center px-6">
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center text-center px-6">
         <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
           <Bell size={28} className="text-gray-400" />
         </div>
         <p className="text-gray-500 mt-3">Event not found.</p>
-        <Link href="/client/dashboard" className="text-brandtext underline mt-2 inline-block">
+        <Link href="/client/dashboard" className="text-brand underline mt-2 inline-block">
           Go back
         </Link>
       </div>
@@ -319,7 +353,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     (channel === 'whatsapp' ? !!cardUrl : !!message.trim());
 
   return (
-    <div className="min-h-screen bg-[#F5F6F7] flex flex-col">
+    <div className="min-h-screen bg-canvas flex flex-col">
       {/* ─── App bar ─── */}
       <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-200/70">
         <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 h-14 flex items-center gap-2 sm:gap-3">
@@ -349,8 +383,39 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
         </div>
       </header>
 
-      <main className="flex-1 pb-28">
-        <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 space-y-4">
+        <main className="flex-1 pb-28">
+          <div className="mx-auto w-full max-w-5xl px-3 sm:px-4 py-4 space-y-4">
+          {/* Contribution tracker entry point + share */}
+          {event?.contributionsEnabled && eventId ? (
+            <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <Coins size={16} className="mt-0.5 shrink-0 text-brand" />
+                <div>
+                  <p className="text-xs font-semibold text-ink">Contribution tracker is live</p>
+                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-muted">
+                    Share the link so your client can mark who has paid.
+                  </p>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <ShareLinkButton
+                  url={`${typeof window !== 'undefined' ? window.location.origin : ''}/${eventId}/contributions`}
+                  title={`${event.name} contributions`}
+                  text="Track who has completed their contribution."
+                  label="Share link"
+                  variant="primary"
+                  size="sm"
+                />
+                <Link
+                  href={`/client/events/${eventId}/contributions`}
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-tap bg-surface-2 px-3.5 text-xs font-semibold text-ink ring-1 ring-inset ring-line transition-colors hover:bg-brand-50"
+                >
+                  Review
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
           {alreadyUsed && (
             <div className="bg-warn-soft border border-warn-border rounded-card p-3 flex items-start gap-2.5">
               <Bell size={16} className="text-warn shrink-0 mt-0.5" />
@@ -360,11 +425,35 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
             </div>
           )}
 
+          {/* Settled guests: hidden from the picker, but never silently so. */}
+          {event?.contributionsEnabled && settledGuests.length > 0 ? (
+            <div className="flex flex-col gap-3 rounded-card border border-success-border bg-success-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" />
+                <div>
+                  <p className="text-xs font-semibold text-success">
+                    {settledGuests.length} guest{settledGuests.length > 1 ? 's' : ''} already paid in full
+                  </p>
+                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-success/80">
+                    Hidden from this list so nobody is reminded twice.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/client/events/${eventId}/contributions`}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-tap bg-white px-3.5 text-xs font-semibold text-success ring-1 ring-inset ring-success-border transition-colors hover:bg-success-soft"
+              >
+                <Coins size={14} aria-hidden="true" />
+                Review statuses
+              </Link>
+            </div>
+          ) : null}
+
           {/* ─── Channel switch ─── */}
-          <div className="bg-gray-200/60 rounded-card p-1 grid grid-cols-2 gap-1">
+          <div className="bg-surface-2 rounded-card p-1 grid grid-cols-2 gap-1">
             {([
-              { key: 'whatsapp' as const, label: 'WhatsApp', icon: MessageCircle, on: 'bg-[#25D366]' },
-              { key: 'sms' as const, label: 'SMS', icon: Phone, on: 'bg-brandbg' },
+              { key: 'whatsapp' as const, label: 'WhatsApp', icon: MessageCircle, on: 'bg-whatsapp' },
+              { key: 'sms' as const, label: 'SMS', icon: Phone, on: 'bg-brand' },
             ]).map((c) => {
               const active = channel === c.key;
               return (
@@ -399,13 +488,13 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                     active
                       ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                       : done
-                        ? 'text-brandtext'
+                        ? 'text-brand'
                         : 'text-gray-400'
                   } disabled:opacity-40`}
                 >
                   <span
                     className={`w-4 h-4 rounded-full grid place-items-center text-[9px] shrink-0 ${
-                      active ? 'bg-brandbg text-white' : done ? 'bg-brandbg text-brandtext' : 'bg-gray-200 text-gray-400'
+                      active ? 'bg-brand text-white' : done ? 'bg-brand text-brand' : 'bg-gray-200 text-gray-400'
                     }`}
                   >
                     {done ? <Check size={9} /> : i + 1}
@@ -471,14 +560,14 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                   <button
                     type="button"
                     onClick={() => setMessage((m) => `${m} {name}`)}
-                    className="text-[11px] font-semibold text-brandtext bg-brandbg/[0.07] rounded-lg px-2.5 py-1.5"
+                    className="text-[11px] font-semibold text-brand bg-brand/[0.07] rounded-lg px-2.5 py-1.5"
                   >
                     + {'{name}'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setMessage((m) => `${m} {event}`)}
-                    className="text-[11px] font-semibold text-brandtext bg-brandbg/[0.07] rounded-lg px-2.5 py-1.5"
+                    className="text-[11px] font-semibold text-brand bg-brand/[0.07] rounded-lg px-2.5 py-1.5"
                   >
                     + {'{event}'}
                   </button>
@@ -506,7 +595,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                     type="button"
                     onClick={toggleSelectAll}
                     disabled={alreadyUsed || remindableGuests.length === 0}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-brandtext disabled:opacity-40 shrink-0"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-brand disabled:opacity-40 shrink-0"
                   >
                     {selectedGuests.size === remindableGuests.length && remindableGuests.length > 0 ? (
                       <CheckSquare size={15} />
@@ -553,12 +642,12 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                           >
                             <span
                               className={`w-5 h-5 rounded-md grid place-items-center shrink-0 border transition ${
-                                on ? 'bg-brandbg border-brandborder' : 'border-gray-300'
+                                on ? 'bg-brand border-brand-200' : 'border-gray-300'
                               }`}
                             >
                               {on && <Check size={12} className="text-white" />}
                             </span>
-                            <span className="w-8 h-8 rounded-full bg-brandbg/[0.08] text-brandtext grid place-items-center text-[11px] font-bold shrink-0">
+                            <span className="w-8 h-8 rounded-full bg-brand/[0.08] text-brand grid place-items-center text-[11px] font-bold shrink-0">
                               {guest.name.trim().charAt(0).toUpperCase()}
                             </span>
                             <span className="flex-1 min-w-0">
@@ -571,7 +660,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                                 <span
                                   className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
                                     isWhatsApp
-                                      ? 'text-brandtext bg-[rgba(13,75,75,0.07)]'
+                                      ? 'text-brand bg-[rgba(13,75,75,0.07)]'
                                       : 'text-gray-600 bg-gray-100'
                                   }`}
                                 >
@@ -583,7 +672,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                             </span>
                             <span className="text-[10px] text-right shrink-0 flex flex-col items-end gap-0.5">
                               {free ? (
-                                <span className="text-brandtext flex items-center gap-0.5 font-semibold">
+                                <span className="text-brand flex items-center gap-0.5 font-semibold">
                                   <Gift size={9} /> Free
                                 </span>
                               ) : (
@@ -645,7 +734,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               type="button"
               onClick={goNext}
               disabled={savingDesign || !canOpenStep(step + 1)}
-              className="h-12 px-5 rounded-card bg-brandbg text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
+              className="h-12 px-5 rounded-card bg-brand text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
             >
               {savingDesign ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} className="sm:hidden" />}
               Continue
@@ -656,7 +745,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               type="button"
               onClick={sendReminders}
               disabled={sending || !canSend}
-              className="h-12 px-5 rounded-card bg-brandbg text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
+              className="h-12 px-5 rounded-card bg-brand text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
             >
               {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               {sending ? 'Sending' : 'Send'}

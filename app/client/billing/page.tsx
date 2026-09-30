@@ -60,7 +60,7 @@ export default function BillingPage() {
       <div className="flex items-start justify-between mb-7 gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 text-[11px] font-bold tracking-[1.5px] text-brandtext uppercase mb-1.5">
-            <span className="w-[5px] h-[5px] rounded-full bg-coralbg" />
+            <span className="w-[5px] h-[5px] rounded-full bg-coral" />
             Billing
           </div>
           <h1 className="font-display text-[30px] font-black text-gray-900 leading-tight tracking-tight m-0 mb-1.5">
