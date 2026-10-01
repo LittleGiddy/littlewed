@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
+import { parseGuestType } from '@/lib/guestTypes';
 
 // ─── Helper: Generate a unique random card number ──────────────────────
 async function generateUniqueCardNumber(eventId: string): Promise<string> {
@@ -50,26 +51,6 @@ async function generateUniqueCardNumber(eventId: string): Promise<string> {
 // to WhatsApp; users can manually switch a guest (or all) to WhatsApp.
 async function checkWhatsAppWithRetry(phone: string, retries = 2): Promise<{ hasWhatsApp: boolean; waId?: string; error?: string }> {
   return { hasWhatsApp: false };
-}
-
-// ─── Helper: Validate guest type ──────────────────────────────────────────
-// Accepts raw values like "WAKWE 30" or "Familia 20" and returns
-// { type, count } where count is only set for FAMILIA/WAKWE.
-function validateGuestType(type: string | undefined): { type: string; count: number | null } {
-  if (!type) return { type: 'SINGLE', count: null };
-  const upper = type.trim().toUpperCase();
-  const match = upper.match(/^([A-Z]+)\s*(\d+)?$/);
-  if (!match) return { type: 'SINGLE', count: null };
-  const typeUpper = match[1];
-  if (!['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE'].includes(typeUpper)) {
-    return { type: 'SINGLE', count: null };
-  }
-  const count = match[2] ? parseInt(match[2], 10) : null;
-  const isGroupType = typeUpper === 'FAMILIA' || typeUpper === 'WAKWE';
-  return {
-    type: typeUpper,
-    count: isGroupType && Number.isFinite(count) && (count as number) > 0 ? count : null,
-  };
 }
 
 export async function POST(req: NextRequest) {
@@ -220,7 +201,7 @@ export async function POST(req: NextRequest) {
       // FAMILIA/WAKWE keep their own type with a group count.
       const rawGroupId = typeof g.cardGroupId === 'string' ? g.cardGroupId.trim() : '';
       const isGrouped = rawGroupId.length > 0;
-      const parsed = validateGuestType(g.guestType);
+      const parsed = parseGuestType(g.guestType);
       const guestType = isGrouped && parsed.type === 'SINGLE' ? 'DOUBLE' : parsed.type;
       const guestCount = parsed.type === 'FAMILIA' || parsed.type === 'WAKWE' ? parsed.count : null;
 

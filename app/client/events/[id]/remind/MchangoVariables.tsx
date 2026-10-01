@@ -1,14 +1,17 @@
 // app/client/events/[id]/remind/MchangoVariables.tsx
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertCircle,
   Banknote,
   CalendarClock,
   Check,
+  ChevronDown,
   RotateCcw,
+  Search,
   Smartphone,
+  UserRound,
   Users,
 } from 'lucide-react';
 import {
@@ -17,18 +20,26 @@ import {
   AppField,
   AppInput,
   AppSelect,
+  fieldClasses,
 } from '@/components/ui';
 import {
   MCHANGO_FIELDS,
   MCHANGO_FIELD_GROUPS,
   hasMchangoOverride,
   missingMchangoFields,
-  renderMchangoPreview,
+  renderMchangoPreviewRuns,
   resolveMchangoValues,
   type MchangoEventSource,
   type MchangoFieldKey,
   type MchangoValues,
 } from '@/lib/whatsapp/mchango';
+
+/** A guest the tenant can preview the greeting with. */
+export interface MchangoGuest {
+  id: string;
+  name: string;
+  title?: string | null;
+}
 
 const GROUP_ICONS: Record<string, typeof Users> = {
   occasion: Users,
@@ -69,20 +80,45 @@ interface Props {
   /** Tenant edits. A key absent here means "use the event value". */
   overrides: Overrides;
   onChange: (next: Overrides) => void;
-  /** Shown in the preview header so the sample is not mistaken for real output. */
-  sampleName: string;
+  /** The event's guests, so var2 can be picked from the real list. */
+  guests: MchangoGuest[];
+  /** Which guest the preview greets. Null until one is chosen. */
+  previewGuestId: string | null;
+  onPreviewGuestChange: (guestId: string | null) => void;
   saving: boolean;
 }
 
-export default function MchangoVariables({ event, overrides, onChange, sampleName, saving }: Props) {
+export default function MchangoVariables({
+  event,
+  overrides,
+  onChange,
+  guests,
+  previewGuestId,
+  onPreviewGuestChange,
+  saving,
+}: Props) {
   const clean = useMemo(() => normaliseOverrides(overrides), [overrides]);
+
+  const previewGuest = useMemo(
+    () => guests.find((g) => g.id === previewGuestId) ?? null,
+    [guests, previewGuestId]
+  );
+
+  // var2 is the guest's own name, so the preview resolves against the guest being
+  // previewed rather than against the event. This is the same resolution the send
+  // path does per recipient, which is what keeps the preview honest.
+  const greetingForPreview = previewGuest
+    ? previewGuest.title
+      ? `${previewGuest.title} ${previewGuest.name}`
+      : previewGuest.name
+    : undefined;
 
   // Resolved on every keystroke, so the preview can never disagree with the form.
   const values: MchangoValues = useMemo(
-    () => resolveMchangoValues(event, clean),
-    [event, clean]
+    () => resolveMchangoValues(event, clean, greetingForPreview),
+    [event, clean, greetingForPreview]
   );
-  const preview = useMemo(() => renderMchangoPreview(values), [values]);
+  const previewRuns = useMemo(() => renderMchangoPreviewRuns(values), [values]);
   const missing = useMemo(() => missingMchangoFields(values), [values]);
 
   const editedCount = Object.keys(clean).length;
@@ -128,6 +164,9 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                   const isCleared = hasOverride && clean[field.key] === '';
                   const isMissing = missing.includes(field.key);
                   const current = values[field.key];
+                  // A per-guest slot has nothing to clear or restore: it is filled
+                  // from the guest list at send time, not typed here.
+                  const isPerGuest = field.kind === 'guest';
 
                   return (
                     <div key={field.key} className={field.kind === 'text' && field.placeholder.length > 30 ? 'sm:col-span-2' : ''}>
@@ -138,7 +177,11 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                             <span className="font-mono text-[10px] font-normal text-muted">
                               {field.varKey}
                             </span>
-                            {hasOverride ? (
+                            {isPerGuest ? (
+                              <span className="text-[10px] font-medium text-brand">
+                                per guest
+                              </span>
+                            ) : hasOverride ? (
                               <span className="text-[10px] font-semibold text-brand">
                                 {isCleared ? 'cleared' : 'edited'}
                               </span>
@@ -150,7 +193,24 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                           </span>
                         }
                         hint={
-                          hasOverride ? (
+                          isPerGuest ? (
+                            <span className="flex flex-wrap items-center gap-x-2">
+                              <span>
+                                {previewGuest
+                                  ? 'Previewing as this guest. Each guest receives their own name.'
+                                  : 'Pick a guest to see the greeting.'}
+                              </span>
+                              {hasOverride ? (
+                                <button
+                                  type="button"
+                                  onClick={() => resetField(field.key)}
+                                  className="font-semibold text-brand underline decoration-dotted underline-offset-2 hover:text-ink"
+                                >
+                                  Use each guest&apos;s own name
+                                </button>
+                              ) : null}
+                            </span>
+                          ) : hasOverride ? (
                             // The way back to the event's own value, per field.
                             // Without it, clearing a box would be a one-way door.
                             <span className="flex flex-wrap items-center gap-x-2">
@@ -175,7 +235,14 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                         }
                       >
                         {({ id }) =>
-                          field.kind === 'select' ? (
+                          isPerGuest ? (
+                            <GuestPicker
+                              id={id}
+                              guests={guests}
+                              selected={previewGuest}
+                              onSelect={onPreviewGuestChange}
+                            />
+                          ) : field.kind === 'select' ? (
                             <AppSelect
                               id={id}
                               value={current}
@@ -264,14 +331,28 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
               <div className="min-w-0">
                 <p className="truncate text-[11px] font-bold text-gray-800">Mchango</p>
                 <p className="truncate text-[10px] text-gray-500">
-                  Sample · for {sampleName || 'your guest'}
+                  {previewGuest
+                    ? `Previewing as ${previewGuest.title ? `${previewGuest.title} ` : ''}${previewGuest.name}`
+                    : 'Pick a guest above to preview the greeting'}
                 </p>
               </div>
             </div>
 
             <div className="rounded-2xl rounded-tl-sm bg-white p-3.5 text-[13px] leading-[1.6] text-gray-800 shadow-sm">
-              {preview ? (
-                <p className="whitespace-pre-wrap break-words">{preview}</p>
+              {previewRuns.length > 0 ? (
+                // The asterisks are WhatsApp bold markers, so they are rendered as
+                // weight here instead of being shown as literal characters.
+                <p className="whitespace-pre-wrap break-words">
+                  {previewRuns.map((run, i) =>
+                    run.bold ? (
+                      <strong key={i} className="font-bold">
+                        {run.text}
+                      </strong>
+                    ) : (
+                      <span key={i}>{run.text}</span>
+                    )
+                  )}
+                </p>
               ) : (
                 <p className="text-gray-400">Nothing to preview yet.</p>
               )}
@@ -287,7 +368,7 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                   aria-hidden="true"
                 />
                 <p className="text-[11px] leading-relaxed text-gray-600">
-                  Empty and sent as a dash:{' '}
+                  Not filled in, so the guest sees a dash instead:{' '}
                   <span className="font-semibold">
                     {missing.map((k) => MCHANGO_FIELDS.find((f) => f.key === k)?.label).join(', ')}
                   </span>
@@ -297,11 +378,122 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
           </div>
 
           <p className="border-t border-line px-4 py-3 text-[11px] leading-relaxed text-muted">
-            The guest name is added automatically by the reminder card. Every other slot is exactly
-            what the fields on the left say — clear one and it is left out.
+            The greeting is the only per-guest part: every guest receives their own name. Every other
+            slot is exactly what the fields on the left say — clear one and it is left out.
           </p>
         </AppCard>
       </div>
+    </div>
+  );
+}
+
+/**
+ * var2's control: the event's real guests, searchable.
+ *
+ * A free-text box would let the tenant type a name that is not on the guest list,
+ * and since the send resolves this slot per recipient from the guest rows, that
+ * typed value would be the one thing in the message with no guest behind it.
+ */
+function GuestPicker({
+  id,
+  guests,
+  selected,
+  onSelect,
+}: {
+  id: string;
+  guests: MchangoGuest[];
+  selected: MchangoGuest | null;
+  onSelect: (guestId: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return guests;
+    return guests.filter(
+      (g) =>
+        g.name.toLowerCase().includes(q) || (g.title ?? '').toLowerCase().includes(q)
+    );
+  }, [guests, query]);
+
+  const label = selected
+    ? `${selected.title ? `${selected.title} ` : ''}${selected.name}`
+    : guests.length > 0
+      ? 'Select a guest…'
+      : 'No guests yet';
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        id={id}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((o) => !o)}
+        className={`${fieldClasses} flex items-center gap-2 text-left ${open ? 'border-brand ring-4 ring-brand/10' : ''}`}
+      >
+        <UserRound size={15} className="shrink-0 text-muted" aria-hidden="true" />
+        <span className={`min-w-0 flex-1 truncate ${selected ? '' : 'text-gray-300'}`}>{label}</span>
+        <ChevronDown size={15} className="shrink-0 text-muted" aria-hidden="true" />
+      </button>
+
+      {open ? (
+        <>
+          {/* Click-away layer. */}
+          <div
+            className="fixed inset-0 z-10"
+            aria-hidden="true"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute z-20 mt-1 w-full rounded-tap border border-gray-200 bg-white shadow-lg">
+            <div className="relative border-b border-line p-2">
+              <Search size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search guests"
+                className="w-full rounded-lg border border-gray-200 py-1.5 pl-8 pr-2 text-sm focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
+              />
+            </div>
+            <ul role="listbox" className="max-h-56 overflow-y-auto py-1">
+              {matches.length === 0 ? (
+                <li className="px-3 py-2 text-xs text-gray-400">
+                  {guests.length === 0 ? 'Import guests to preview the greeting.' : 'No guest matches.'}
+                </li>
+              ) : (
+                matches.map((g) => {
+                  const isOn = g.id === selected?.id;
+                  return (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isOn}
+                        onClick={() => {
+                          onSelect(g.id);
+                          setOpen(false);
+                          setQuery('');
+                        }}
+                        className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                          isOn ? 'bg-brand-50 text-brand' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          {g.title ? <span className="text-muted">{g.title} </span> : null}
+                          {g.name}
+                        </span>
+                        {isOn ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}
+                      </button>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -155,8 +155,8 @@ export default function ImportGuestsPage() {
   };
 
   // ─── PDF Parser (Enhanced for Tables) ──────────────────────────────
-  const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] => {
-    const guests: { name: string; phone: string; cardNumber: string; guestType: string; title?: string }[] = [];
+  const parsePDFGuests = (text: string): { name: string; phone: string; cardNumber: string; guestType?: string; title?: string }[] => {
+    const guests: { name: string; phone: string; cardNumber: string; guestType?: string; title?: string }[] = [];
     const lines = text.split('\n');
 
     for (const line of lines) {
@@ -213,7 +213,7 @@ export default function ImportGuestsPage() {
           name: cleanName,
           phone,
           cardNumber: '',
-          guestType: 'SINGLE',
+          guestType: undefined,
           title: title || '', // ✅ Empty string if no title
         });
         continue;
@@ -227,7 +227,9 @@ export default function ImportGuestsPage() {
         name = name.replace(/^\d+\s*/, '').replace(/\s*\d+$/, '').trim();
 
         if (name && name.length > 2) {
-          let cardType = 'SINGLE';
+          // Left undefined when the PDF has no card column so the server
+          // resolves it to SINGLE instead of the row being rejected.
+          let cardType: string | undefined;
           const cardMatch = name.match(/\b(SINGLE|DOUBLE|COUPLE|FAMILY|FAMILIA|WAKWE)(?:\s+(\d+))?\b/i);
           if (cardMatch) {
             cardType = cardMatch[1].toUpperCase();
@@ -297,7 +299,7 @@ export default function ImportGuestsPage() {
           normalizedPhone: norm.normalized,
           isValid: norm.isValid,
           statusMessage: norm.message,
-          guestType: g.guestType || 'SINGLE',
+          guestType: g.guestType,
           cardNumber: g.cardNumber || '',
           title: g.title || '', // ✅ Empty string if no title
         };
@@ -343,9 +345,9 @@ export default function ImportGuestsPage() {
             if (['name', 'full name', 'fullname', 'guest name', 'names'].includes(lower)) autoMap[h] = 'name';
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
-            else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
+            else if (['type', 'guest type', 'guesttype', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
-            else if (['card group', 'cardgroup', 'card group id', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
+            else if (['card group', 'cardgroup', 'card group id', 'cardgroupid', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -377,9 +379,9 @@ export default function ImportGuestsPage() {
             if (['name', 'full name', 'fullname', 'guest name', 'names'].includes(lower)) autoMap[h] = 'name';
             else if (['phone', 'mobile', 'telephone', 'phone number', 'tel', 'cell'].includes(lower)) autoMap[h] = 'phone';
             else if (['email', 'mail', 'e-mail', 'email address'].includes(lower)) autoMap[h] = 'email';
-            else if (['type', 'guest type', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
+            else if (['type', 'guest type', 'guesttype', 'single/double', 'single or double', 'category'].includes(lower)) autoMap[h] = 'guestType';
             else if (['title', 'salutation', 'prefix'].includes(lower)) autoMap[h] = 'title';
-            else if (['card group', 'cardgroup', 'card group id', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
+            else if (['card group', 'cardgroup', 'card group id', 'cardgroupid', 'pair', 'group id', 'groupid'].includes(lower)) autoMap[h] = 'cardGroupId';
             else autoMap[h] = 'skip';
           });
           setMapping(autoMap);
@@ -427,7 +429,7 @@ export default function ImportGuestsPage() {
       let name = '';
       let phone = '';
       let email = '';
-      let guestType = '';
+      let guestType: string | undefined;
       let title = '';
 
       for (const line of lines) {
@@ -453,13 +455,13 @@ export default function ImportGuestsPage() {
           if (emailParts.length > 1) email = emailParts.slice(1).join(':').trim();
         } else if (trimmed.startsWith('X-GUEST-TYPE:')) {
           const parts = trimmed.split(':');
-          if (parts.length > 1) guestType = parts.slice(1).join(':').trim();
+          if (parts.length > 1) guestType = parts.slice(1).join(':').trim() || undefined;
         } else if (trimmed.startsWith('X-TITLE:')) {
           const parts = trimmed.split(':');
           if (parts.length > 1) title = parts.slice(1).join(':').trim();
         }
       }
-      if (name && phone) guests.push({ name, phone, email: email || undefined, guestType: guestType || undefined, title: title || undefined });
+      if (name && phone) guests.push({ name, phone, email: email || undefined, guestType, title: title || undefined });
     }
     return guests;
   };
@@ -492,7 +494,8 @@ export default function ImportGuestsPage() {
   };
 
   const downloadSampleCSV = () => {
-    const headers = ['title', 'name', 'phone', 'email', 'guestType', 'cardGroupId'];
+      // guestType is optional - leave the cell blank if unknown.
+      const headers = ['title', 'name', 'phone', 'email', 'guestType', 'cardGroupId'];
     const sampleData = [
       ['Mr', 'John Doe', '+255712345678', 'john@example.com', 'single', ''],
       ['', 'Jane Smith', '+255755123456', 'jane@example.com', 'double', ''],
@@ -500,6 +503,7 @@ export default function ImportGuestsPage() {
       ['MR', 'Bob Brown', '+255786345679', 'bob@example.com', 'double', 'pair-1'],
       ['MRS', 'Diana Mwaka', '+255788123456', 'diana@example.com', 'familia 30', ''],
       ['', 'James Mwaka', '+255789654321', 'james@example.com', 'wakwe 20', ''],
+      ['', 'Grace Mushi', '+255700112233', 'grace@example.com', '', ''],
     ];
     const csv = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -625,7 +629,9 @@ export default function ImportGuestsPage() {
       const name = row[nameCol]?.toString().trim() || '';
       const phone = row[phoneCol]?.toString().trim() || '';
       const email = emailCol ? row[emailCol]?.toString().trim() : undefined;
-      const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() : undefined;
+      // guestType is optional: a blank/null cell stays undefined and the server
+      // resolves it to SINGLE, so rows without a type still import.
+      const guestType = guestTypeCol ? row[guestTypeCol]?.toString().trim() || undefined : undefined;
       const title = titleCol ? row[titleCol]?.toString().trim() : undefined;
       const cardGroupId = cardGroupIdCol ? String(row[cardGroupIdCol] ?? '').trim() : undefined;
       const norm = normalizePhone(phone);
@@ -658,11 +664,13 @@ export default function ImportGuestsPage() {
     toast.error('Cannot import - exceeds guest limit');
     return;
   }
+  // guestType is optional: omit the key entirely when the document has none so
+  // the server resolves it to SINGLE. Validation depends only on name/phone.
   const guestsToImport = validGuests.map(g => ({
     name: g.name,
     phone: g.normalizedPhone,
     email: g.email,
-    guestType: g.guestType,
+    ...(g.guestType ? { guestType: g.guestType } : {}),
     cardNumber: g.cardNumber,
     title: g.title || '',
     cardGroupId: g.cardGroupId,

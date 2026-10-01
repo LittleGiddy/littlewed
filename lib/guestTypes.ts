@@ -8,12 +8,43 @@ export interface GuestTypeInfo {
   count: number | null;
 }
 
+// ─── Empty guest type tokens ───────────────────────────────────────────
+// Spreadsheet/CSV exports represent "no guest type given" in many ways. All of
+// these mean "not provided" and fall back to SINGLE; they are never an error,
+// so a document with a null/blank guestType imports cleanly.
+const EMPTY_GUEST_TYPE_TOKENS = new Set([
+  '',
+  '-',
+  '--',
+  '?',
+  'n/a',
+  'na',
+  'nil',
+  'none',
+  'null',
+  'undefined',
+  'unknown',
+  'not set',
+  'empty',
+  'blank',
+  '0',
+]);
+
+// True when the raw value carries no guest type at all (null, undefined, blank
+// or a placeholder token such as "N/A").
+export function isEmptyGuestType(raw?: string | null): boolean {
+  if (raw === null || raw === undefined) return true;
+  return EMPTY_GUEST_TYPE_TOKENS.has(raw.trim().toLowerCase());
+}
+
 // Parses a raw guestType value (e.g. "WAKWE 30", "familia", "SINGLE") into
 // the canonical type plus an optional group count. The count is only used for
 // FAMILIA/WAKWE (e.g. "WAKWE 30" → { type: 'WAKWE', count: 30 }).
+// A missing, blank or unrecognised value is never an error - it resolves to
+// SINGLE so the guest still imports.
 export function parseGuestType(raw?: string | null): GuestTypeInfo {
-  if (!raw) return { type: 'SINGLE', count: null };
-  const trimmed = raw.trim().toUpperCase();
+  if (isEmptyGuestType(raw)) return { type: 'SINGLE', count: null };
+  const trimmed = (raw as string).trim().toUpperCase();
   const match = trimmed.match(/^([A-Z]+)\s*(\d+)?$/);
   if (!match) return { type: 'SINGLE', count: null };
 

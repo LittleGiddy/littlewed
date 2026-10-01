@@ -1,17 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, ArrowRight, Send, Loader2, Users, CheckSquare, Square,
   MessageCircle, Phone, Info, Gift, Bell, Search,
-  Hash, Coins, ShieldCheck, Save, Check,
+  Hash, Coins, ShieldCheck, Save, Check, CircleCheck, CircleX,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
-import { AppSegmentedControl, ShareLinkButton } from '@/components/ui';
+import { AppSegmentedControl, AppProgressBar, ShareLinkButton } from '@/components/ui';
 import SmsCounter from '@/components/SmsCounter';
 import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import ReminderCardDesigner, {
@@ -21,6 +21,48 @@ import ReminderCardDesigner, {
 import MchangoVariables from './MchangoVariables';
 import ReminderCardPreview from './ReminderCardPreview';
 import type { MchangoEventSource, MchangoFieldKey } from '@/lib/whatsapp/mchango';
+
+/** Where the typed SMS reminder is kept so it survives a reload. */
+const SMS_DRAFT_KEY = (eventId: string) => `reminder_sms_draft_${eventId}`;
+
+/** The request asks for a progress stream; the route falls back to plain JSON. */
+const NDJSON_MEDIA_TYPE = 'application/x-ndjson';
+
+/** Live send progress, drawn from the route's newline-delimited stream. */
+interface SendProgress {
+  total: number;
+  processed: number;
+  sent: number;
+  failed: number;
+  lastName?: string;
+}
+
+/** The summary the route returns once the send is over. */
+interface ReminderSummary {
+  success?: boolean;
+  error?: string;
+  successCount?: number;
+  totalCost?: number;
+  chargedCount?: number;
+  refundedCount?: number;
+  creditsRefunded?: number;
+  remainingCredits?: number;
+  skippedSettledCount?: number;
+  errors?: Array<{ guestId: string; error?: string }>;
+}
+
+type ReminderStreamEvent =
+  | { type: 'start'; total?: number }
+  | {
+      type: 'progress';
+      name?: string;
+      processed?: number;
+      sent?: number;
+      failed?: number;
+      total?: number;
+    }
+  | ({ type: 'done' } & ReminderSummary)
+  | { type: 'error'; error?: string };
 
 interface Guest {
   id: string;
@@ -80,6 +122,8 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  /** Live progress while a send is in flight. Null whenever nothing is sending. */
+  const [progress, setProgress] = useState<SendProgress | null>(null);
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState<number | null>(null);
   const [bypassPayment, setBypassPayment] = useState(false);
@@ -98,6 +142,9 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     Partial<Record<MchangoFieldKey, string>>
   >({});
   const [savingVariables, setSavingVariables] = useState(false);
+
+  /** Which guest the message preview greets by name. */
+  const [previewGuestId, setPreviewGuestId] = useState<string | null>(null);
 
   /** The event shaped the way the Mchango resolver reads it. */
   const mchangoEvent: MchangoEventSource | null = useMemo(() => {
@@ -119,6 +166,25 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       contactPersonPhone: event.contactPersonPhone,
     };
   }, [event]);
+
+  // ─── Remember the SMS reminder between visits ─────────────────────────
+  // A typed reminder is expensive to recreate — the payment details, the date and
+  // the wording are all retyped — so the draft is written on every keystroke and
+  // read back on load. This follows the invitation composer's draft keys so there
+  // is one place to look for "my unsent message".
+  const draftReady = useRef(false);
+
+  useEffect(() => {
+    if (!eventId || !draftReady.current) return;
+    try {
+      // An emptied box removes the key, so a later visit starts clean rather than
+      // restoring an empty reminder.
+      if (message.trim()) window.localStorage.setItem(SMS_DRAFT_KEY(eventId), message);
+      else window.localStorage.removeItem(SMS_DRAFT_KEY(eventId));
+    } catch {
+      // Storage unavailable - the message still works, it just will not persist.
+    }
+  }, [eventId, message]);
 
   const fetchEvent = useCallback(async (id: string) => {
     try {
@@ -148,6 +214,18 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
           font: data.event.reminderCardNameFont ?? DEFAULT_REMINDER_DESIGN.font,
         });
       }
+
+      // The saved SMS draft is read here, with the rest of the page's data, so
+      // the textbox starts out holding what was last typed. Reading it in its own
+      // effect would set state on every mount as well as after each send refresh.
+      try {
+        const saved = window.localStorage.getItem(SMS_DRAFT_KEY(id));
+        if (saved) setMessage((current) => (current ? current : saved));
+      } catch {
+        // Private mode or a full quota: losing the draft is not worth an error.
+      }
+      // The draft has now been read, so the write effect may start saving.
+      draftReady.current = true;
     } catch {
       toast.error('Could not load event data');
     } finally {
@@ -214,11 +292,18 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const insufficientCredits = totalCost > 0 && credits !== null && credits < totalCost;
 
   // A representative name so the canvas previews the real result, not a token.
+  // The selected guest wins when there is one; otherwise it falls back to the
+  // guest picked for the WhatsApp preview so the card and the message greet the
+  // same person.
   const sampleName = useMemo(() => {
     const first = selected[0];
-    if (!first) return 'John Doe';
-    return first.title ? `${first.title} ${first.name}` : first.name;
-  }, [selected]);
+    if (first) return first.title ? `${first.title} ${first.name}` : first.name;
+    const previewed = remindableGuests.find((g) => g.id === previewGuestId);
+    if (previewed) return previewed.title ? `${previewed.title} ${previewed.name}` : previewed.name;
+    const anyGuest = remindableGuests[0];
+    if (anyGuest) return anyGuest.title ? `${anyGuest.title} ${anyGuest.name}` : anyGuest.name;
+    return 'John Doe';
+  }, [selected, remindableGuests, previewGuestId]);
 
   // ─── Step model ────────────────────────────────────────────────────────
   // WhatsApp: 0 pick the card (which also places the name) · 1 fill the
@@ -376,6 +461,73 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     setStep((s) => Math.min(lastStep, s + 1));
   };
 
+  /**
+   * Reads the newline-delimited progress stream the route streams back.
+   *
+   * The route returns a plain JSON body instead when it rejects the request early
+   * (auth, credits, the once-per-event lock), so a non-stream content type is
+   * handled here as an error rather than parsed as progress.
+   */
+  const streamProgress = async (res: Response): Promise<ReminderSummary> => {
+    const contentType = res.headers.get('content-type') ?? '';
+
+    if (!contentType.includes(NDJSON_MEDIA_TYPE)) {
+      // The route rejected the request before it started streaming (auth, credits,
+      // the once-per-event lock), so the body is a plain JSON error.
+      const data = (await res.json().catch(() => ({}))) as ReminderSummary;
+      if (!res.ok) throw new Error(data.error || 'Failed to send reminders.');
+      return data;
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('This browser cannot read the send progress.');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let summary: ReminderSummary | null = null;
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      // A chunk can end mid-line, so only whole lines are consumed and the rest
+      // stays buffered for the next read.
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let event: ReminderStreamEvent;
+        try {
+          event = JSON.parse(trimmed) as ReminderStreamEvent;
+        } catch {
+          continue;
+        }
+
+        if (event.type === 'start') {
+          setProgress({ total: event.total ?? 0, processed: 0, sent: 0, failed: 0 });
+        } else if (event.type === 'progress') {
+          setProgress({
+            total: event.total ?? 0,
+            processed: event.processed ?? 0,
+            sent: event.sent ?? 0,
+            failed: event.failed ?? 0,
+            lastName: event.name,
+          });
+        } else if (event.type === 'done') {
+          summary = event;
+        } else if (event.type === 'error') {
+          throw new Error(event.error || 'Sending failed');
+        }
+      }
+    }
+
+    if (!summary) throw new Error('The send ended before it finished. Please check the guest list.');
+    return summary;
+  };
+
   const sendReminders = async () => {
     if (alreadyUsed) {
       toast.error('Reminder messages have already been sent for this event.');
@@ -410,10 +562,11 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     if (!ok) return;
 
     setSending(true);
+    setProgress({ total: selectedGuests.size, processed: 0, sent: 0, failed: 0 });
     try {
       const res = await fetch(`/api/events/${eventId}/send-reminders`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: NDJSON_MEDIA_TYPE },
         body: JSON.stringify({
           guestIds: Array.from(selectedGuests),
           message,
@@ -425,8 +578,8 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
         }),
         credentials: 'include',
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await streamProgress(res);
+      if (!data.success) {
         toast.error(data.error || 'Failed to send reminders.');
         return;
       }
@@ -438,17 +591,20 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
       // Guests paid in full are skipped server-side too. Say so, otherwise the
       // gap between "selected" and "sent" looks like a delivery failure.
-      if (data.skippedSettledCount > 0) {
+      const skippedSettled = data.skippedSettledCount ?? 0;
+      if (skippedSettled > 0) {
         toast.success(
-          `${data.skippedSettledCount} guest${data.skippedSettledCount > 1 ? 's were' : ' was'} skipped - contribution already completed.`
+          `${skippedSettled} guest${skippedSettled > 1 ? 's were' : ' was'} skipped - contribution already completed.`
         );
       }
 
       // Tell the user when a failed send gave credits back, so the balance on
       // screen is never a surprise.
-      if (data.creditsRefunded > 0) {
+      const creditsRefunded = data.creditsRefunded ?? 0;
+      if (creditsRefunded > 0) {
+        const refundedCount = data.refundedCount ?? 0;
         toast.success(
-          `${data.creditsRefunded} credits refunded for ${data.refundedCount} failed send${data.refundedCount > 1 ? 's' : ''}.`
+          `${creditsRefunded} credits refunded for ${refundedCount} failed send${refundedCount > 1 ? 's' : ''}.`
         );
       }
       if (data.errors?.length) {
@@ -459,10 +615,11 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
       await fetchEvent(eventId!);
       router.push(`/client/events/${eventId}`);
-    } catch {
-      toast.error('Network error. Please try again.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Network error. Please try again.');
     } finally {
       setSending(false);
+      setProgress(null);
     }
   };
 
@@ -677,13 +834,15 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               <>
                 <StepTitle
                   title="Fill in the message"
-                  hint="Every slot the WhatsApp template can personalise. Anything you leave alone keeps the event's own details — clear a field to leave it out of the message."
+                  hint="Every slot the WhatsApp template can personalise. The greeting is each guest's own name — pick who to preview. Anything you leave alone keeps the event's own details, and clearing a field leaves it out of the message."
                 />
                 <MchangoVariables
                   event={mchangoEvent}
                   overrides={mchangoOverrides}
                   onChange={setMchangoOverrides}
-                  sampleName={sampleName}
+                  guests={remindableGuests.map((g) => ({ id: g.id, name: g.name, title: g.title }))}
+                  previewGuestId={previewGuestId}
+                  onPreviewGuestChange={setPreviewGuestId}
                   saving={savingVariables}
                 />
               </>
@@ -691,7 +850,10 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
             {channel === 'sms' && step === 0 && (
               <>
-                <StepTitle title="Write your reminder" hint="Use {name} and {event} to personalise it." />
+                <StepTitle
+                  title="Write your reminder"
+                  hint="Use {name} and {event} to personalise it. What you type is saved on this device, so it is here next time you come to send."
+                />
                 <textarea
                   rows={7}
                   value={message}
@@ -860,6 +1022,80 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       </main>
+
+      {/* ─── Sending overlay ─── */}
+      {/* A send can run for minutes on a large guest list, so the tenant watches
+          it advance instead of staring at a button that says "Sending". */}
+      {sending && progress ? (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="w-full max-w-sm rounded-card border border-line bg-surface p-5 shadow-elev-2">
+            <div className="flex items-center gap-2.5">
+              <span
+                className={`grid size-9 shrink-0 place-items-center rounded-full text-white ${
+                  channel === 'whatsapp' ? 'bg-whatsapp' : 'bg-brand'
+                }`}
+              >
+                {channel === 'whatsapp' ? (
+                  <MessageCircle className="size-4" aria-hidden="true" />
+                ) : (
+                  <Phone className="size-4" aria-hidden="true" />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-ink">
+                  Sending {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} reminders
+                </p>
+                <p className="text-[11px] text-muted">
+                  Keep this page open until it finishes.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <p className="text-2xl font-bold leading-none text-ink tabular-nums">
+                  {progress.processed}
+                  <span className="text-base font-semibold text-muted">
+                    /{progress.total}
+                  </span>
+                </p>
+                <p className="text-[11px] font-semibold text-brand tabular-nums">
+                  {progress.total > 0
+                    ? Math.round((progress.processed / progress.total) * 100)
+                    : 0}
+                  %
+                </p>
+              </div>
+
+              <AppProgressBar
+                value={progress.processed}
+                max={progress.total}
+                tone={progress.failed > 0 ? 'warn' : 'brand'}
+              />
+
+              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                <span className="flex items-center gap-1 font-semibold text-success">
+                  <CircleCheck size={12} aria-hidden="true" /> {progress.sent} sent
+                </span>
+                {progress.failed > 0 ? (
+                  <span className="flex items-center gap-1 font-semibold text-danger">
+                    <CircleX size={12} aria-hidden="true" /> {progress.failed} failed
+                  </span>
+                ) : null}
+                {progress.lastName ? (
+                  <span className="min-w-0 flex-1 truncate text-right text-muted">
+                    Last: {progress.lastName}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* ─── Sticky action bar ─── */}
       {/* Sits above the mobile tab bar via --app-nav-h. */}

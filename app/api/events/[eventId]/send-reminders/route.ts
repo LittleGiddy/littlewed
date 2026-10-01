@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
 import { sendWhatsAppReminder } from '@/lib/whatsapp/index';
-import { buildMchangoPersonalisation, getMchangoTemplate, MCHANGO_FIELDS, type MchangoOverrides } from '@/lib/whatsapp/mchango';
+import { buildMchangoPersonalisation, getMchangoTemplate, MCHANGO_FIELDS, type MchangoEventSource, type MchangoOverrides } from '@/lib/whatsapp/mchango';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateReminderCardForGuest } from '@/lib/image-storage';
 import { sendPushToTenantRole } from '@/lib/push';
@@ -14,6 +14,22 @@ import { isContributionSettled } from '@/lib/contributions';
 
 const REMINDER_COST = 50; // credits per reminder for the 3rd+ reminder
 const FREE_REMINDERS_PER_GUEST = 2;
+
+/** Newline-delimited JSON, so the browser can watch a send as it happens. */
+const NDJSON_MEDIA_TYPE = 'application/x-ndjson';
+
+/** One guest finished. Pushed as it happens so the UI can draw a progress bar. */
+interface ReminderProgress {
+  type: 'progress';
+  guestId: string;
+  name: string;
+  channel: string;
+  /** How many guests have been processed so far, and how many of those failed. */
+  processed: number;
+  sent: number;
+  failed: number;
+  total: number;
+}
 
 /** A guest is only billable once they've used up their free reminders. */
 function isBillable(reminderCount: number): boolean {
@@ -197,218 +213,291 @@ export async function POST(
 
   // ─── Send via chosen channel ─────────────────────────────────────────
   const whatsappTemplateName = getMchangoTemplate();
-  // var1..var13 are event-level, so build the payload once and reuse it. The
-  // per-guest personalisation is the reminder card header image.
-  //
+
+  const mchangoEvent: MchangoEventSource = {
+    name: event.name,
+    eventType: event.eventType,
+    hostFamily: event.hostFamily,
+    person1: event.person1,
+    person2: event.person2,
+    venue: event.venue,
+    address: event.address,
+    date: event.date,
+    contributionDeadline: event.contributionDeadline,
+    mpesaInstructions: event.mpesaInstructions,
+    airtelInstructions: event.airtelInstructions,
+    bankInstructions: event.bankInstructions,
+    contactPerson: event.contactPerson,
+    contactPersonPhone: event.contactPersonPhone,
+  };
+
   // `variables` carries whatever the tenant typed in the editor. They override
   // the stored event values for this send only, so the message always matches
   // the preview they approved even if a save had not landed yet.
-  const mchangoPersonalisation = buildMchangoPersonalisation(
-    {
-      name: event.name,
-      eventType: event.eventType,
-      hostFamily: event.hostFamily,
-      person1: event.person1,
-      person2: event.person2,
-      venue: event.venue,
-      address: event.address,
-      date: event.date,
-      contributionDeadline: event.contributionDeadline,
-      mpesaInstructions: event.mpesaInstructions,
-      airtelInstructions: event.airtelInstructions,
-      bankInstructions: event.bankInstructions,
-      contactPerson: event.contactPerson,
-      contactPersonPhone: event.contactPersonPhone,
-    },
-    sanitiseMchangoOverrides(variables)
-  );
+  const mchangoOverrides = sanitiseMchangoOverrides(variables);
 
-  const results: Array<{ guestId: string; success: boolean; error?: string; charged: boolean }> = [];
-  const sentAt = new Date();
-  for (const guest of targetGuests) {
-    // Charged up front for every billable guest; refunded below if this fails.
-    const charged = billableGuestIds.has(guest.id);
-    try {
-      const phone = guest.phone as string;
-      let sendResult: { success: boolean; error?: string };
+  /**
+   * var2 is the guest's own name, so the payload is built per guest rather than
+   * once for the whole broadcast — otherwise "Habari *John*" would be sent to
+   * everyone, including the guests who are not John. An explicit override still
+   * wins, which is how the editor pins the preview to one guest.
+   */
+  const greetingNameFor = (guest: { name: string; title: string | null }): string =>
+    (guest.title ? `${guest.title} ${guest.name}` : guest.name).trim();
 
-      if (chan === 'whatsapp') {
-        // Cards are composed to Cloudinary (same helper the invitation cards
-        // use) and served as the template header image, which is what makes an
-        // otherwise identical broadcast body feel personal.
-        let cardUrl: string | undefined;
-        if (event.reminderCardUrl) {
-          try {
-            cardUrl = await generateReminderCardForGuest(guest, event);
-          } catch (cardError) {
-            console.error(`[Reminders] Card composition failed for ${guest.name}:`, cardError);
-            cardUrl = undefined;
+  /**
+   * Sends to every target guest, reporting each one as it finishes.
+   *
+   * `emit` is how a streamed response keeps the browser's progress bar honest;
+   * the plain JSON path leaves it unset and only the summary is used.
+   */
+  const runSend = async (emit?: (progress: ReminderProgress) => void) => {
+    const results: Array<{ guestId: string; success: boolean; error?: string; charged: boolean }> = [];
+    const sentAt = new Date();
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (const guest of targetGuests) {
+      // Charged up front for every billable guest; refunded below if this fails.
+      const charged = billableGuestIds.has(guest.id);
+      try {
+        const phone = guest.phone as string;
+        let sendResult: { success: boolean; error?: string };
+
+        if (chan === 'whatsapp') {
+          // Cards are composed to Cloudinary (same helper the invitation cards
+          // use) and served as the template header image, which is what makes an
+          // otherwise identical broadcast body feel personal.
+          let cardUrl: string | undefined;
+          if (event.reminderCardUrl) {
+            try {
+              cardUrl = await generateReminderCardForGuest(guest, event);
+            } catch (cardError) {
+              console.error(`[Reminders] Card composition failed for ${guest.name}:`, cardError);
+              cardUrl = undefined;
+            }
+          }
+          sendResult = await sendWhatsAppReminder({
+            to: phone,
+            personalisation: buildMchangoPersonalisation(
+              mchangoEvent,
+              mchangoOverrides,
+              greetingNameFor(guest)
+            ),
+            templateName: whatsappTemplateName,
+            cardUrl,
+            account: event.tenant.whatsappAccount,
+          });
+        } else {
+          const personalized = message
+            .replace(/\{name\}/g, () => greetingNameFor(guest))
+            .replace(/\{event\}/g, () => event.name);
+          const parts = smsPartCount(personalized);
+          if (!event.tenant.bypassPayment && parts > MAX_SMS_PARTS_PER_GUEST) {
+            sendResult = { success: false, error: smsPartsError(parts) };
+          } else {
+            sendResult = await sendSMS({ to: phone, message: personalized });
           }
         }
-        sendResult = await sendWhatsAppReminder({
-          to: phone,
-          personalisation: mchangoPersonalisation,
-          templateName: whatsappTemplateName,
-          cardUrl,
-          account: event.tenant.whatsappAccount,
-        });
-      } else {
-        const personalized = message
-          .replace(/\{name\}/g, () => guest.name)
-          .replace(/\{event\}/g, () => event.name);
-        const parts = smsPartCount(personalized);
-        if (!event.tenant.bypassPayment && parts > MAX_SMS_PARTS_PER_GUEST) {
-          sendResult = { success: false, error: smsPartsError(parts) };
+
+        if (sendResult.success) {
+          sentCount += 1;
+          await prisma.guest.update({
+            where: { id: guest.id },
+            data: { reminderCount: { increment: 1 } },
+          });
+
+          // Open a contribution row on first reminder and stamp every send. This
+          // is what populates the /[eventId]/contributions tracker and what makes
+          // "stop reminding people who have paid" possible later.
+          if (event.contributionsEnabled) {
+            await prisma.contribution.upsert({
+              where: { guestId: guest.id },
+              create: {
+                eventId,
+                guestId: guest.id,
+                status: 'PENDING',
+                remindedAt: sentAt,
+                remindedCount: 1,
+              },
+              update: { remindedAt: sentAt, remindedCount: { increment: 1 } },
+            });
+          }
+
+          results.push({ guestId: guest.id, success: true, charged });
         } else {
-          sendResult = await sendSMS({ to: phone, message: personalized });
-        }
-      }
-
-      if (sendResult.success) {
-        await prisma.guest.update({
-          where: { id: guest.id },
-          data: { reminderCount: { increment: 1 } },
-        });
-
-        // Open a contribution row on first reminder and stamp every send. This
-        // is what populates the /[eventId]/contributions tracker and what makes
-        // "stop reminding people who have paid" possible later.
-        if (event.contributionsEnabled) {
-          await prisma.contribution.upsert({
-            where: { guestId: guest.id },
-            create: {
-              eventId,
-              guestId: guest.id,
-              status: 'PENDING',
-              remindedAt: sentAt,
-              remindedCount: 1,
-            },
-            update: { remindedAt: sentAt, remindedCount: { increment: 1 } },
+          failedCount += 1;
+          results.push({
+            guestId: guest.id,
+            success: false,
+            error: sendResult.error || (chan === 'whatsapp' ? 'WhatsApp sending failed' : 'SMS sending failed'),
+            charged,
           });
         }
-
-        results.push({ guestId: guest.id, success: true, charged });
-      } else {
-        results.push({
-          guestId: guest.id,
-          success: false,
-          error: sendResult.error || (chan === 'whatsapp' ? 'WhatsApp sending failed' : 'SMS sending failed'),
-          charged,
-        });
+      } catch (error) {
+        failedCount += 1;
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        results.push({ guestId: guest.id, success: false, error: msg, charged });
       }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      results.push({ guestId: guest.id, success: false, error: msg, charged });
-    }
-  }
 
-  const successCount = results.filter(r => r.success).length;
-  const errors = results.filter(r => !r.success).map(r => ({ guestId: r.guestId, error: r.error }));
-
-  // ─── Refund guests that were charged but never delivered ──────────────
-  // Credits are reserved before sending, so a provider failure must give the
-  // money back. Otherwise a tenant pays for messages nobody received.
-  const refundedCount = results.filter(r => !r.success && r.charged).length;
-  const refundAmount = refundedCount * REMINDER_COST;
-
-  if (refundAmount > 0) {
-    await prisma.tenant.update({
-      where: { id: tenantId },
-      data: { credits: { increment: refundAmount } },
-    });
-    await prisma.usageRecord.createMany({
-      data: Array.from({ length: refundedCount }, () => ({
-        tenantId,
-        eventId,
-        channel: `${chan}_reminder_refund`,
-        cost: -REMINDER_COST,
-      })),
-    });
-    console.warn(`[Reminders] Refunded ${refundAmount} credits for ${refundedCount} failed send(s)`);
-  }
-
-  // Record what was actually charged, so the usage ledger matches the balance.
-  const chargedCount = results.filter(r => r.success && r.charged).length;
-  if (chargedCount > 0) {
-    await prisma.usageRecord.createMany({
-      data: Array.from({ length: chargedCount }, () => ({
-        tenantId,
-        eventId,
-        channel: `${chan}_reminder`,
-        cost: REMINDER_COST,
-      })),
-    });
-  }
-
-  // Log every attempt so the WhatsApp delivery webhook can correlate a
-  // reminder messageId. Without a MessageLog row the webhook can never match a
-  // reminder, so delivery failures were invisible to the tenant.
-  if (chan === 'whatsapp' && results.length > 0) {
-    const successGuestIds = results.filter((r) => r.success).map((r) => r.guestId);
-    const successPhones = new Map(
-      targetGuests
-        .filter((g) => successGuestIds.includes(g.id))
-        .map((g) => [g.id, g.phone as string])
-    );
-    await prisma.messageLog
-      .createMany({
-        data: results.map((r, index) => ({
-          // messageId is @unique and we do not always get one back, so fall
-          // back to a deterministic local id rather than colliding on null.
-          messageId: `reminder-${eventId}-${r.guestId}-${sentAt.getTime()}-${index}`,
-          guestId: r.success ? r.guestId : null,
-          type: 'WHATSAPP',
-          template: whatsappTemplateName,
-          status: r.success ? 'SENT' : 'FAILED',
-          error: r.error ?? null,
-          rawData: r.success
-            ? { channel: 'whatsapp', to: successPhones.get(r.guestId) ?? null, source: 'send-reminders' }
-            : { channel: 'whatsapp', source: 'send-reminders' },
-        })),
-      })
-      .catch((logError) => {
-        // Never fail a completed send because bookkeeping did not persist.
-        console.error('[Reminders] MessageLog write failed:', logError);
+      emit?.({
+        type: 'progress',
+        guestId: guest.id,
+        name: guest.name,
+        channel: chan,
+        processed: results.length,
+        sent: sentCount,
+        failed: failedCount,
+        total: targetGuests.length,
       });
-  }
+    }
 
-  // Read the true balance back rather than deriving it, so the UI can never
-  // show a number that disagrees with the database.
-  const freshTenant = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: { credits: true },
-  });
-  const remainingCredits = freshTenant?.credits ?? 0;
+    const successCount = results.filter(r => r.success).length;
+    const errors = results.filter(r => !r.success).map(r => ({ guestId: r.guestId, error: r.error }));
 
-  if (successCount > 0) {
-    await prisma.event.update({
-      where: { id: eventId },
-      data: { manualReminderSent: true },
+    // ─── Refund guests that were charged but never delivered ──────────────
+    // Credits are reserved before sending, so a provider failure must give the
+    // money back. Otherwise a tenant pays for messages nobody received.
+    const refundedCount = results.filter(r => !r.success && r.charged).length;
+    const refundAmount = refundedCount * REMINDER_COST;
+
+    if (refundAmount > 0) {
+      await prisma.tenant.update({
+        where: { id: tenantId },
+        data: { credits: { increment: refundAmount } },
+      });
+      await prisma.usageRecord.createMany({
+        data: Array.from({ length: refundedCount }, () => ({
+          tenantId,
+          eventId,
+          channel: `${chan}_reminder_refund`,
+          cost: -REMINDER_COST,
+        })),
+      });
+      console.warn(`[Reminders] Refunded ${refundAmount} credits for ${refundedCount} failed send(s)`);
+    }
+
+    // Record what was actually charged, so the usage ledger matches the balance.
+    const chargedCount = results.filter(r => r.success && r.charged).length;
+    if (chargedCount > 0) {
+      await prisma.usageRecord.createMany({
+        data: Array.from({ length: chargedCount }, () => ({
+          tenantId,
+          eventId,
+          channel: `${chan}_reminder`,
+          cost: REMINDER_COST,
+        })),
+      });
+    }
+
+    // Log every attempt so the WhatsApp delivery webhook can correlate a
+    // reminder messageId. Without a MessageLog row the webhook can never match a
+    // reminder, so delivery failures were invisible to the tenant.
+    if (chan === 'whatsapp' && results.length > 0) {
+      const successGuestIds = results.filter((r) => r.success).map((r) => r.guestId);
+      const successPhones = new Map(
+        targetGuests
+          .filter((g) => successGuestIds.includes(g.id))
+          .map((g) => [g.id, g.phone as string])
+      );
+      await prisma.messageLog
+        .createMany({
+          data: results.map((r, index) => ({
+            // messageId is @unique and we do not always get one back, so fall
+            // back to a deterministic local id rather than colliding on null.
+            messageId: `reminder-${eventId}-${r.guestId}-${sentAt.getTime()}-${index}`,
+            guestId: r.success ? r.guestId : null,
+            type: 'WHATSAPP',
+            template: whatsappTemplateName,
+            status: r.success ? 'SENT' : 'FAILED',
+            error: r.error ?? null,
+            rawData: r.success
+              ? { channel: 'whatsapp', to: successPhones.get(r.guestId) ?? null, source: 'send-reminders' }
+              : { channel: 'whatsapp', source: 'send-reminders' },
+          })),
+        })
+        .catch((logError) => {
+          // Never fail a completed send because bookkeeping did not persist.
+          console.error('[Reminders] MessageLog write failed:', logError);
+        });
+    }
+
+    // Read the true balance back rather than deriving it, so the UI can never
+    // show a number that disagrees with the database.
+    const freshTenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { credits: true },
+    });
+    const remainingCredits = freshTenant?.credits ?? 0;
+
+    if (successCount > 0) {
+      await prisma.event.update({
+        where: { id: eventId },
+        data: { manualReminderSent: true },
+      });
+
+      sendPushToTenantRole(tenantId, 'CLIENT', {
+        title: 'Reminders sent',
+        body: `Reminder messages sent to ${successCount} guest${successCount > 1 ? 's' : ''} for ${event.name}.`,
+        url: '/client/dashboard',
+        type: 'success',
+        sound: true,
+      }).catch(() => {});
+    }
+
+    return {
+      success: true,
+      successCount,
+      // What was actually taken, after refunds - not the pre-send estimate.
+      totalCost: totalCost - refundAmount,
+      chargedCount,
+      refundedCount,
+      creditsRefunded: refundAmount,
+      channel: chan,
+      remainingCredits,
+      // People skipped because they had already paid. The UI shows this so the
+      // tenant understands the gap between "selected" and "sent".
+      skippedSettledCount: skippedSettled.length,
+      errors: errors.length > 0 ? errors : undefined,
+      details: results,
+    };
+  };
+
+  // A streamed response lets the browser show real progress instead of a spinner
+  // that could be sitting on 400 finished sends. Everything that can still fail
+  // with a meaningful status code - auth, credits, the once-per-event lock -
+  // already returned above, so from here the status is committed and any
+  // remaining failure has to travel in the stream body.
+  if ((req.headers.get('accept') ?? '').includes(NDJSON_MEDIA_TYPE)) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const write = (payload: unknown) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+        };
+        try {
+          write({ type: 'start', channel: chan, total: targetGuests.length });
+          write({ type: 'done', ...(await runSend(write)) });
+        } catch (error) {
+          write({
+            type: 'error',
+            error: error instanceof Error ? error.message : 'Sending failed',
+          });
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    sendPushToTenantRole(tenantId, 'CLIENT', {
-      title: 'Reminders sent',
-      body: `Reminder messages sent to ${successCount} guest${successCount > 1 ? 's' : ''} for ${event.name}.`,
-      url: '/client/dashboard',
-      type: 'success',
-      sound: true,
-    }).catch(() => {});
+    return new Response(stream, {
+      headers: {
+        'Content-Type': `${NDJSON_MEDIA_TYPE}; charset=utf-8`,
+        'Cache-Control': 'no-cache, no-transform',
+        // Stops nginx buffering the whole send into a single response.
+        'X-Accel-Buffering': 'no',
+      },
+    });
   }
 
-  return NextResponse.json({
-    success: true,
-    successCount,
-    // What was actually taken, after refunds - not the pre-send estimate.
-    totalCost: totalCost - refundAmount,
-    chargedCount,
-    refundedCount,
-    creditsRefunded: refundAmount,
-    channel: chan,
-    remainingCredits,
-    // People skipped because they had already paid. The UI shows this so the
-    // tenant understands the gap between "selected" and "sent".
-    skippedSettledCount: skippedSettled.length,
-    errors: errors.length > 0 ? errors : undefined,
-    details: results,
-  });
+  return NextResponse.json(await runSend());
 }

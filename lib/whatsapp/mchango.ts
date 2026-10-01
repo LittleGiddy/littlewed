@@ -67,10 +67,14 @@ export interface MchangoFieldSpec {
   hint: string;
   placeholder: string;
   group: 'occasion' | 'details' | 'payment' | 'contact';
-  kind: 'text' | 'date' | 'select' | 'tel';
+  kind: 'text' | 'date' | 'select' | 'tel' | 'guest';
   /** Event column that seeds the default, if any. */
   fromEvent?: string;
   options?: readonly string[];
+  /** The slot is filled per recipient from the guest list rather than once for
+   *  the whole broadcast. A guest always sees their own name here, so typing a
+   *  fixed value only changes the preview. */
+  perGuest?: boolean;
 }
 
 export const MCHANGO_OCCASIONS = [
@@ -105,12 +109,13 @@ export const MCHANGO_FIELDS: readonly MchangoFieldSpec[] = [
   {
     key: 'greetingName',
     varKey: 'var2',
-    label: 'Greeting name',
-    labelSw: 'Jina la salamu',
-    hint: 'Who the message opens with. Defaults to the family name.',
-    placeholder: 'Familia ya Mkumbo',
+    label: 'Guest name',
+    labelSw: 'Jina la mgeni',
+    hint: 'Pick who to preview. Every guest actually receives their own name here.',
+    placeholder: 'Select a guest from the list',
     group: 'occasion',
-    kind: 'text',
+    kind: 'guest',
+    perGuest: true,
   },
   {
     key: 'familyName',
@@ -236,32 +241,23 @@ export const MCHANGO_FIELDS: readonly MchangoFieldSpec[] = [
 ] as const;
 
 /**
- * The preview mirrors the approved NexSMS template. The provider holds the
- * authoritative body; this exists so the tenant can see their edits.
+ * The approved NexSMS body, verbatim.
  *
- * var6 carries the celebrant in the opening line rather than in the body,
- * because the event name (var5) usually already contains both names and
- * "…kwa ajili ya <event name> ya <name>" reads as a stutter.
+ * The asterisks are WhatsApp bold markers and are part of the wire format, so
+ * they stay in this string exactly as the provider holds them. `renderMchangoPreview`
+ * turns them into real bold runs for the on-screen preview instead of showing the
+ * guest raw `*` characters.
  */
-export const MCHANGO_PREVIEW_BODY = [
-  'MCHANGO WA {var1} ya {var6},',
-  '',
-  'Habari {var2},',
-  '',
-  '{var3} inaomba msaada wako kwa ajili ya {var5},',
-  'itakayofanyika tarehe {var7} mahali {var4}, {var8}.',
-  '',
-  'Mchango unaweza kulipwa kwa njia zifuatazo:',
-  '{var10}',
-  '{var11}',
-  '{var12}',
-  '',
-  'Tunapenda mchango ukamilishae tarehe {var9}.',
-  '',
-  'Kwa mawasiliano zaidi wasiliana na {var13}.',
-  '',
-  'Asante sana!',
-].join('\n');
+export const MCHANGO_TEMPLATE_BODY =
+  'MCHANGO WA *{var1},* Habari *{var2},* Kwa Upendo na Furaha kubwa, ' +
+  'Familia ya *{var3}* wa {var4}, inakuomba uwe sehemu ya safari hii ya maandalizi ya {var5} *{var6}* ' +
+  'itanayotarajiwa kufanyika tarehe {var7} {var8}. ' +
+  'Tutashukuru kupokea Mchango wako kabla ya tarehe {var9}. ' +
+  'Namna ya kutuma Mchango: {var10} {var11} {var12} ' +
+  'Kwa maswali na mawasiliano zaidi, wasiliana nasi {var13}. Ahsante!!!';
+
+/** Kept as an alias so existing imports of the preview body keep working. */
+export const MCHANGO_PREVIEW_BODY = MCHANGO_TEMPLATE_BODY;
 
 function text(value: string | null | undefined, fallback = DASH): string {
   const trimmed = (value ?? '').toString().trim();
@@ -291,7 +287,7 @@ export function formatSwahiliDate(value: Date | string | null | undefined): stri
   return `${d.getDate()} ${SW_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/** "Familia ya X" — the family name, preferring the explicit host family. */
+/** "Mkumbo" — the family name on its own. */
 function resolveFamilyName(event: MchangoEventSource): string {
   const hostFamily = (event.hostFamily ?? '').trim();
   const parts = [event.person1, event.person2].map((p) => (p ?? '').trim()).filter(Boolean);
@@ -299,10 +295,30 @@ function resolveFamilyName(event: MchangoEventSource): string {
 
   const family = hostFamily || derived;
   if (!family) return '';
-  // The body already reads "{var3} inaomba…", so the slot has to carry the
-  // "Familia ya" lead-in itself. Tenants type either form, so normalise rather
-  // than printing "Familia ya Familia ya Mkumbo".
-  return /^familia\b/i.test(family) ? family : `Familia ya ${family}`;
+  // The approved body reads "Familia ya {var3}", so the lead-in is already in
+  // the fixed text and the slot must carry only the name. Tenants type either
+  // form, so a typed "Familia ya" is stripped rather than printed as
+  // "Familia ya Familia ya Mkumbo". A value that is nothing but the lead-in is
+  // left alone so the tenant can see what they entered and fix it.
+  const stripped = family.replace(/^familia\s+ya\s+/i, '').trim();
+  return stripped || family;
+}
+
+/**
+ * var6 is the second name, and it is left empty whenever the event's own name
+ * already says it.
+ *
+ * Event names are usually "Send-Off ya Neema na Kelvin", so defaulting var6 to
+ * a person prints the name twice — "…maandalizi ya Send-Off ya Neema na Kelvin
+ * Kelvin". Repeating a name is worse than omitting it, and an empty slot is
+ * flagged in the editor for the tenant to confirm or clear.
+ */
+function resolveCelebrant(event: MchangoEventSource): string {
+  const candidate = (event.person2 || event.person1 || '').trim();
+  if (!candidate) return '';
+  const eventName = (event.name ?? '').trim();
+  if (eventName && eventName.toLowerCase().includes(candidate.toLowerCase())) return '';
+  return candidate;
 }
 
 /**
@@ -363,10 +379,16 @@ function slotDate(
  *
  * This is the single place a value is decided. The preview and the send path
  * both call it, so what the tenant saw is what gets sent.
+ *
+ * `guestName` is the recipient. var2 is the only per-guest slot — it greets each
+ * guest by their own name — so the send path passes the guest being sent to and
+ * gets a payload that is right for that recipient. The editor passes the guest
+ * picked for the preview, so the preview shows a real recipient too.
  */
 export function resolveMchangoValues(
   event: MchangoEventSource,
-  overrides: MchangoOverrides = {}
+  overrides: MchangoOverrides = {},
+  guestName?: string
 ): MchangoValues {
   const familyName = resolveFamilyName(event);
   const occasion = resolveOccasion(event);
@@ -381,13 +403,13 @@ export function resolveMchangoValues(
 
   const values: MchangoValues = {
     occasion: slot(overrides, 'occasion', occasion),
-    greetingName: slot(overrides, 'greetingName', primaryName),
+    greetingName: slot(overrides, 'greetingName', guestName || primaryName),
     familyName: slot(overrides, 'familyName', familyName || primaryName),
     venue: slot(overrides, 'venue', event.venue ?? ''),
     eventName: slot(overrides, 'eventName', event.name ?? ''),
     // No family-name fallback here: it would render as
     // "MCHANGO WA Send-Off ya Familia ya Mkumbo". Better to be flagged missing.
-    celebrant: slot(overrides, 'celebrant', event.person2 || event.person1 || ''),
+    celebrant: slot(overrides, 'celebrant', resolveCelebrant(event)),
     date: slotDate(overrides, 'date', formatSwahiliDate(event.date)),
     address: slot(overrides, 'address', event.address ?? ''),
     deadline: slotDate(overrides, 'deadline', formatSwahiliDate(event.contributionDeadline)),
@@ -403,75 +425,163 @@ export function resolveMchangoValues(
 /**
  * Build the var1..var13 personalisation record for the "Mchango" template.
  * Returns a single-entry array, which is the shape `personalisation` expects.
+ *
+ * `guestName` is the recipient this payload is for. var2 is the only per-guest
+ * slot, so the send path builds one payload per guest rather than one for the
+ * whole broadcast — otherwise every guest would be greeted by name with someone
+ * else's name. An explicit `greetingName` override still wins, which is how the
+ * editor pins the preview to one guest.
  */
+/**
+ * Slots the template already frames on both sides.
+ *
+ * These sit inside a complete phrase, so an empty string leaves a sentence that
+ * still reads ("…maandalizi ya Send-Off ya Neema na Kelvin itanayotarajiwa…")
+ * while a dash would leave a visible mark the tenant never asked for
+ * ("…na Kelvin — itanayotarajiwa…"). The preview drops these slots entirely, so
+ * sending '' is also what keeps the wire and the preview identical. Every other
+ * slot keeps the dash, because there a blank leaves the sentence hanging — the
+ * gap "tarehe" alone is worse than "tarehe —".
+ */
+const BLANK_WHEN_EMPTY: ReadonlySet<MchangoFieldKey> = new Set(['greetingName', 'celebrant']);
+
 export function buildMchangoPersonalisation(
   event: MchangoEventSource,
-  overrides: MchangoOverrides = {}
+  overrides: MchangoOverrides = {},
+  guestName?: string
 ): Record<string, string>[] {
-  const v = resolveMchangoValues(event, overrides);
+  const v = resolveMchangoValues(event, overrides, guestName);
 
   const personalisation: Record<string, string> = {};
   for (const field of MCHANGO_FIELDS) {
     // NexSMS rejects non-strings, and the template only ever receives strings.
-    personalisation[field.varKey] = text(v[field.key], DASH);
+    personalisation[field.varKey] = BLANK_WHEN_EMPTY.has(field.key)
+      ? text(v[field.key], '')
+      : text(v[field.key], DASH);
   }
   return [personalisation];
 }
 
-/**
- * The message as the guest will read it, for the on-screen preview.
+/** A run of preview text, `bold` true for the parts the asterisks wrap. */
+export interface MchangoPreviewRun {
+  text: string;
+  bold: boolean;
+}
+
+/** Reads one `{varN}` and returns its value, or '' when the slot is unfilled. */
+function slotText(byVar: Record<string, string>, varKey: string): string {
+  const value = (byVar[varKey] ?? '').trim();
+  return !value || value === DASH ? '' : value;
+}
+
+/** Tidies the gaps and orphaned punctuation an empty slot leaves behind.
  *
- * A line whose every slot resolved to empty is dropped whole, and one that kept
- * some slots has its orphaned punctuation tidied. Substituting blanks in place
- * would leave sentences like "itakayofanyika tarehe mahali , ." — exactly the
- * gap the preview exists to reveal, but said as nonsense instead of as a
- * legible message with a visible omission.
+ *  Leading and trailing whitespace is deliberately kept: it is the only space
+ *  between two runs, and a bold run that follows plain text has to stay a word
+ *  away from it ("MCHANGO WA" + bold "Send-Off," must not read
+ *  "MCHANGO WASend-Off,"). */
+function tidyPreview(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    // "familia ya  wa" -> "familia ya wa"
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/,\s*\./g, '.');
+}
+
+/**
+ * The message as the guest will read it, split into plain and bold runs.
+ *
+ * The wire body keeps WhatsApp's `*…*` markers, so the preview has to render
+ * them rather than show them — otherwise the tenant reads a message littered
+ * with asterisks that their guest will never see. A slot that resolves to empty
+ * is dropped with the asterisks that wrapped it, so an unfilled greeting leaves
+ * no `**` behind.
+ *
+ * Runs concatenate directly rather than being joined with a separator, so the
+ * spaces between them come from the body itself.
  */
-export function renderMchangoPreview(values: MchangoValues): string {
+export function renderMchangoPreviewRuns(values: MchangoValues): MchangoPreviewRun[] {
   const byVar: Record<string, string> = {};
   for (const field of MCHANGO_FIELDS) byVar[field.varKey] = values[field.key];
 
-  const lines = MCHANGO_PREVIEW_BODY.split('\n').map((line) => {
-    let filled = 0;
-    let total = 0;
+  const runs: MchangoPreviewRun[] = [];
 
-    const text = line.replace(/\{(var\d+)\}/g, (_match, varKey: string) => {
-      total += 1;
-      const value = (byVar[varKey] ?? '').trim();
-      if (!value || value === DASH) return '';
-      filled += 1;
-      return value;
-    });
+  // Split on the asterisk pairs first so each segment knows its own weight, then
+  // substitute the slots inside it.
+  const segments = MCHANGO_TEMPLATE_BODY.split(/(\*[^*]*\*)/g);
+  for (const segment of segments) {
+    if (segment === '') continue;
 
-    // Nothing on this line survived, so the sentence it belonged to is gone.
-    if (total > 0 && filled === 0) return null;
+    const isBold = segment.length > 2 && segment.startsWith('*') && segment.endsWith('*');
+    const inner = isBold ? segment.slice(1, -1) : segment;
+    const filled = inner.replace(/\{(var\d+)\}/g, (_m, varKey: string) => slotText(byVar, varKey));
 
-    return text
-      // Collapse the whitespace an empty slot left behind.
-      .replace(/\s+/g, ' ')
-      // "mahali , ." -> "mahali."
-      .replace(/\s+([,.;:])/g, '$1')
-      .replace(/,\s*\./g, '.')
-      // A slot that ended the sentence but was empty: "asante ." -> "asante"
-      .replace(/\s+\.$/g, '.')
-      .trim();
-  });
+    if (isBold) {
+      // The whole bold run was empty; drop it rather than leave bare asterisks.
+      if (!filled.trim()) continue;
+    }
 
-  return lines
-    .filter((line): line is string => line !== null)
-    .filter((line, index, all) => {
-      // Collapse the runs of blank lines left behind by dropped lines, but keep
-      // intentional single blank lines between paragraphs.
-      if (line !== '') return true;
-      return index > 0 && all[index - 1] !== '';
-    })
-    .join('\n')
-    .replace(/^\s+|\s+$/g, '');
+    const tidy = tidyPreview(filled);
+    if (!tidy.trim()) continue;
+
+    const previous = runs[runs.length - 1];
+    if (previous && previous.bold === isBold) {
+      // Glue the two runs together: the space between them was in the body
+      // segment that just got filled. Concatenating means we do not add an
+      // extra space when a slot empties.
+      previous.text += tidy;
+    } else {
+      runs.push({ text: tidy, bold: isBold });
+    }
+  }
+
+  if (runs.length === 0) return runs;
+
+  // Dropping a run leaves the spaces that surrounded it touching, so "…na Kelvin "
+  // and " itanayotarajiwa…" become a double space. Collapse again now that the
+  // runs are final, then trim only the outer edges; the whitespace in between is
+  // the body's.
+  for (const run of runs) run.text = run.text.replace(/ {2,}/g, ' ');
+  runs[0].text = runs[0].text.replace(/^\s+/, '');
+  runs[runs.length - 1].text = runs[runs.length - 1].text.replace(/\s+$/, '');
+
+  return runs.filter((run) => run.text.length > 0);
 }
 
-/** Slots still carrying the placeholder, so the editor can flag them. */
+/**
+ * The message as the guest will read it, as one string.
+ *
+ * A run whose every slot resolved to empty is dropped, and one that kept some
+ * slots has its orphaned punctuation tidied. Substituting blanks in place would
+ * leave sentences like "itakayofanyika tarehe mahali , ." — exactly the gap the
+ * preview exists to reveal, but said as nonsense instead of as a legible message
+ * with a visible omission.
+ */
+export function renderMchangoPreview(values: MchangoValues): string {
+  const runs = renderMchangoPreviewRuns(values);
+  const merged = runs.map((run) => run.text).join('');
+
+  // With no payment method filled the label would sit alone against a full stop,
+  // so the sentence goes with it. The closing clause is the next fixed label in
+  // the approved body, which is what makes this unambiguous.
+  return merged
+    .replace(/\s*Namna ya kutuma Mchango:\s*(?=Kwa maswali)/, ' ')
+    .replace(/\s*Familia ya\s+wa\s+/, ' ')
+    .trim();
+}
+
+/**
+ * Slots the editor should flag as a gap.
+ *
+ * `BLANK_WHEN_EMPTY` slots are excluded: the template frames them on both sides
+ * so an empty one still reads, it is sent as an empty string rather than a dash,
+ * and var2 is filled per guest at send time whatever the preview shows. Flagging
+ * them would train the tenant to ignore a warning that fires on a correct
+ * message.
+ */
 export function missingMchangoFields(values: MchangoValues): MchangoFieldKey[] {
   return MCHANGO_FIELDS.filter((f) => {
+    if (BLANK_WHEN_EMPTY.has(f.key)) return false;
     const value = values[f.key].trim();
     return value === '' || value === DASH;
   }).map((f) => f.key);
