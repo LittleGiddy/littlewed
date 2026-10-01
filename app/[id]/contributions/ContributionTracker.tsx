@@ -1,32 +1,35 @@
 // app/[id]/contributions/ContributionTracker.tsx
 //
-// Public, shared contribution tracker. Anyone with the link can open it and
-// update their own status, so this screen is deliberately read-mostly: it shows
-// the progress of the whole event but only ever edits the row a guest taps.
+// The event owner's contribution ledger. This link belongs to the wedding
+// owner, not to the guests: they open it to record what they have actually
+// received from each guest and watch the totals move.
+//
+// That changes the voice of the whole screen. The earlier version was written
+// for guests, so every control spoke to the visitor ("I have sent my
+// contribution", "How much did you send?", "Asante, Neema!"). A guest is never
+// the person filling this in, so that copy is gone and each action is named
+// from the owner's side of the transaction: record, receive, received.
+//
+// Payment instructions were removed for the same reason — the owner already has
+// those numbers in their Event Details and the ledger has no reason to restate
+// them. Editing them belongs on the event, not here.
 //
 // Visual language is shared with the tenant-side manager (widgets.tsx) so the
-// two do not drift apart, but there is no settings screen and no share control
-// here — there is nothing for a guest to configure and no second audience to
-// share with.
+// two screens do not drift apart.
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Banknote,
   CalendarClock,
   Check,
   CheckCircle2,
-  Copy,
   Hourglass,
   Loader2,
   MapPin,
-  MessageCircle,
   PartyPopper,
-  Phone,
   RefreshCw,
   Search,
-  Smartphone,
   Users,
   Wallet,
   X,
@@ -53,19 +56,17 @@ import { ProgressRing, StatTiles, buildTiles } from '@/app/client/events/[id]/co
 
 interface TrackerEvent {
   id: string;
+  /** The event name as set in Event Details. */
   name: string;
   eventType: string | null;
+  /** Already formatted as a Swahili date by the server. */
   date: string;
+  /** From Event Details. Falls back to the address when no venue was set. */
   venue: string | null;
   address: string | null;
   hostFamily: string | null;
-  person1: string | null;
-  person2: string | null;
   currency: string;
   target: number | null;
-  mpesaInstructions: string | null;
-  airtelInstructions: string | null;
-  bankInstructions: string | null;
 }
 
 interface TrackerRow {
@@ -137,7 +138,7 @@ export default function ContributionTracker({
    *
    * The server echoes back a full payload, so a successful write replaces the
    * summary and rows wholesale rather than patching them locally. That is what
-   * keeps a guest's optimistic tap from leaving the headline numbers stale.
+   * keeps a tap from leaving the headline totals stale.
    */
   const patch = useCallback(
     async (
@@ -147,8 +148,7 @@ export default function ContributionTracker({
     ) => {
       setSavingId(row.guestId);
       const previous = data;
-      // Optimistic: one tap on a phone over a slow connection should not feel
-      // like it did nothing.
+      // Optimistic: the totals should not sit still while a write is in flight.
       if ('status' in body) {
         setData((cur) => ({
           ...cur,
@@ -180,26 +180,25 @@ export default function ContributionTracker({
   );
 
   /**
-   * A guest's update is one action, not two.
+   * One action, not two.
    *
    * Previously the row had three status buttons *and* a separate amount editor,
-   * so the two could disagree: tapping "Completed" recorded no figure, and the
-   * collected total stayed where it was. Now a guest states how much they sent
-   * and whether that was everything, in a single pass, and the server
-   * reconciles the status from the two (see reconcileContribution).
+   * so the two could disagree: marking someone completed recorded no figure and
+   * the collected total never moved. The owner states how much has come in and
+   * whether that settles the guest, in a single pass, and the server reconciles
+   * the status from the two (see reconcileContribution).
    */
   const recordContribution = useCallback(
     async (row: TrackerRow, amountPaid: number, finished: boolean, note: string) => {
-      const ok = await patch(
+      return patch(
         row,
         { amountPaid, status: finished ? 'PAID' : 'PARTIAL', note: note.trim() || undefined },
         finished
-          ? `Asante, ${firstName(row.guestName)}! Marked as completed`
-          : `Thank you, ${firstName(row.guestName)}. Recorded as part payment`
+          ? `${row.guestName} marked complete`
+          : `Recorded ${formatTZS(amountPaid, currency)} from ${row.guestName}`
       );
-      return ok;
     },
-    [patch]
+    [patch, currency]
   );
 
   const refresh = useCallback(async () => {
@@ -230,16 +229,16 @@ export default function ContributionTracker({
       ? Math.min(100, Math.round((data.summary.collected / data.summary.target) * 100))
       : null;
 
-  const occasion = data.event.eventType || data.event.name;
-  // Flattened into plain objects rather than a filtered tuple array: narrowing
-  // a `readonly ['Bank', string | null, Icon]` union needs a per-entry predicate.
-  const instructions = [
-    { label: 'M-Pesa', value: data.event.mpesaInstructions, Icon: Smartphone },
-    { label: 'Airtel Money', value: data.event.airtelInstructions, Icon: Phone },
-    { label: 'Bank', value: data.event.bankInstructions, Icon: Banknote },
-  ].filter((entry): entry is { label: string; value: string; Icon: typeof Banknote } =>
-    Boolean(entry.value)
-  );
+  // Event Details is the single source of the event's name, so the heading is
+  // that name verbatim. The occasion sits under it as context rather than
+  // replacing it, which is what a ledger is titled with.
+  const eventName = data.event.name || 'Contributions';
+  const venue = data.event.venue || data.event.address;
+
+  const details = [
+    { icon: CalendarClock, label: 'Event date', value: data.event.date },
+    { icon: MapPin, label: 'Venue', value: venue || 'Not set' },
+  ];
 
   return (
     <div className="min-h-dvh bg-canvas pb-16">
@@ -264,12 +263,13 @@ export default function ContributionTracker({
           >
             <p className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-brand-200">
               <PartyPopper className="size-3.5" aria-hidden="true" />
-              Contribution tracker
+              Contributions
             </p>
-            <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">{occasion}</h1>
-            {data.event.hostFamily || data.event.name ? (
+            {/* The event's own name from Event Details. */}
+            <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">{eventName}</h1>
+            {data.event.eventType || data.event.hostFamily ? (
               <p className="mt-2 text-sm text-brand-100">
-                {data.event.hostFamily || data.event.name}
+                {[data.event.eventType, data.event.hostFamily].filter(Boolean).join(' · ')}
               </p>
             ) : null}
           </motion.div>
@@ -283,18 +283,7 @@ export default function ContributionTracker({
               shown: { transition: { staggerChildren: reduced ? 0 : 0.06 } },
             }}
           >
-            {            [
-              {
-                icon: CalendarClock,
-                label: 'Event date',
-                value: data.event.date,
-              },
-              {
-                icon: MapPin,
-                label: 'Venue',
-                value: data.event.venue || data.event.address || '—',
-              },
-            ].map((item) => (
+            {details.map((item) => (
               <motion.div
                 key={item.label}
                 variants={{
@@ -342,7 +331,7 @@ export default function ContributionTracker({
                   <span className="font-semibold text-ink">{progressPct}%</span> of the target
                   collected
                   {data.summary.outstanding > 0
-                    ? ` · ${formatTZS(data.summary.outstanding, currency)} still owed`
+                    ? ` · ${formatTZS(data.summary.outstanding, currency)} still outstanding`
                     : ' · nothing outstanding'}
                 </p>
               ) : null}
@@ -350,59 +339,13 @@ export default function ContributionTracker({
           </div>
         </AppCard>
 
-        {/* ── How to pay ──────────────────────────────────────────────────── */}
-        {instructions.length ? (
-          <AppCard>
-            <AppCardTitle
-              title="How to send your contribution"
-              subtitle="Tap any instruction to copy it."
-            />
-            <ul className="mt-3 space-y-2">
-              {instructions.map(({ label, value, Icon }, i) => (
-                <motion.li
-                  key={label}
-                  initial={reducedInitial(transition)}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ ...transition, delay: i * 0.05 }}
-                >
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(value);
-                        toast.success(`${label} details copied`);
-                      } catch {
-                        toast.error('Could not copy on this device');
-                      }
-                    }}
-                    className="flex w-full items-start gap-3 rounded-tap bg-surface-2 px-3.5 py-3 text-left transition active:scale-[0.99]"
-                  >
-                    <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-blob bg-brand/10 text-brand">
-                      <Icon size={15} aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[0.68rem] font-semibold uppercase tracking-wide text-brand-600">
-                        {label}
-                      </span>
-                      <span className="mt-0.5 block text-[13px] leading-snug text-ink">
-                        {value}
-                      </span>
-                    </span>
-                    <Copy size={14} className="mt-1 shrink-0 text-muted" aria-hidden="true" />
-                  </button>
-                </motion.li>
-              ))}
-            </ul>
-          </AppCard>
-        ) : null}
-
-        {/* ── Guest list ──────────────────────────────────────────────────── */}
+        {/* ── Guest ledger ────────────────────────────────────────────────── */}
         <AppCard padded={false}>
           <div className="space-y-3 border-b border-line p-4">
             <div className="flex items-center justify-between gap-3">
               <AppCardTitle
-                title="Who has contributed"
-                subtitle="Tap a status to update your own. Everyone sees the change immediately."
+                title="Guest contributions"
+                subtitle="Tap a guest to record what you have received from them."
               />
               <button
                 type="button"
@@ -426,8 +369,8 @@ export default function ContributionTracker({
               options={[
                 { value: 'ALL', label: `All ${data.summary.total}` },
                 { value: 'PENDING', label: `Not started ${data.summary.pending}` },
-                { value: 'PARTIAL', label: `Partial ${data.summary.partial}` },
-                { value: 'PAID', label: `Done ${data.summary.paid}` },
+                { value: 'PARTIAL', label: `Part paid ${data.summary.partial}` },
+                { value: 'PAID', label: `Completed ${data.summary.paid}` },
               ]}
             />
 
@@ -440,7 +383,7 @@ export default function ContributionTracker({
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name or number"
+                placeholder="Search by guest name"
                 aria-label="Search guests"
                 className="pl-9"
               />
@@ -467,7 +410,7 @@ export default function ContributionTracker({
               description={
                 data.rows.length === 0
                   ? 'Once guests are added to the event they will appear here.'
-                  : 'Try a different name, number, or status filter.'
+                  : 'Try a different name or status filter.'
               }
             />
           ) : (
@@ -497,14 +440,13 @@ export default function ContributionTracker({
         </AppCard>
 
         <AppCard tone="tinted">
-          <div className="space-y-2 text-center">
+          <div className="space-y-1.5 text-center">
             <p className="flex items-center justify-center gap-2 text-[13px] font-medium text-ink">
-              <MessageCircle size={14} className="text-brand" aria-hidden="true" />
-              Updates here show instantly for everyone with this link.
+              <CheckCircle2 size={14} className="text-brand" aria-hidden="true" />
+              Guests marked completed stop receiving reminders.
             </p>
             <p className="text-[11px] leading-relaxed text-muted">
-              Phone numbers are hidden for privacy. The payment details above are the official
-              channels — please pay only through those.
+              Every change here is saved to this event straight away.
             </p>
           </div>
         </AppCard>
@@ -524,11 +466,6 @@ export default function ContributionTracker({
       />
     </div>
   );
-}
-
-function firstName(full: string): string {
-  const cleaned = full.replace(/^(mr|mrs|miss|ms|dr|prof)\.?\s+/i, '');
-  return cleaned.split(/\s+/)[0] || full;
 }
 
 function GuestRow({
@@ -579,9 +516,9 @@ function GuestRow({
           <p className="mt-1 text-[12px] italic leading-snug text-muted">“{row.note}”</p>
         ) : null}
 
-        {/* One action, one meaning. A guest answers "how much did you send, and
-            is that all?" in a single sheet rather than picking a status from a
-            row of buttons that knows nothing about the figure. */}
+        {/* One action, one meaning. The owner answers "how much has come in from
+            them, and does that settle it?" in a single sheet rather than picking
+            a status from buttons that know nothing about the figure. */}
         <motion.button
           type="button"
           whileTap={{ scale: 0.97 }}
@@ -598,7 +535,7 @@ function GuestRow({
           ) : (
             <Wallet size={14} aria-hidden="true" />
           )}
-          {recorded ? 'Update my contribution' : 'I have sent my contribution'}
+          {recorded ? 'Update received amount' : 'Record contribution received'}
         </motion.button>
       </div>
     </div>
@@ -606,16 +543,16 @@ function GuestRow({
 }
 
 /**
- * "How much did you send, and is that everything?"
+ * "How much has come in from them, and does that settle it?"
  *
  * One sheet answers both, because splitting them across two controls is what
- * let a guest tick "Completed" without a figure and leave the collected total
+ * let a guest be ticked off without a figure and leave the collected total
  * unchanged. The amount comes first and the yes/no finishes it, so the status
  * always has a number attached to it.
  *
- * Guests record what they sent but cannot set the figure they are expected to
- * pay — that is the tenant's number, and a shared link must not be able to move
- * the target.
+ * The figure a guest is expected to pay is not editable here — that is the
+ * target the owner set for the event, and a record of what arrived should not be
+ * able to move it.
  */
 function RecordSheet({
   row,
@@ -632,7 +569,7 @@ function RecordSheet({
 }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  // null until the guest answers, so the sheet never presumes "finished" on
+  // null until the owner answers, so the sheet never presumes "settled" on
   // their behalf — that decision is the whole point of the question.
   const [finished, setFinished] = useState<boolean | null>(null);
 
@@ -655,10 +592,10 @@ function RecordSheet({
     <AppBottomSheet
       open={!!row}
       onClose={onClose}
-      title="Record your contribution"
+      title="Record contribution received"
       description={
         row
-          ? `${row.guestName}${expected ? ` · the full amount is ${formatTZS(expected, currency)}` : ''}`
+          ? `${row.guestName}${expected ? ` · expected ${formatTZS(expected, currency)}` : ''}`
           : undefined
       }
       footer={
@@ -688,7 +625,7 @@ function RecordSheet({
               htmlFor="tracker-amount"
               className="block text-[13px] font-semibold text-gray-700 mb-1.5"
             >
-              How much did you send?
+              How much have you received?
             </label>
             <div className="relative">
               <input
@@ -707,7 +644,7 @@ function RecordSheet({
               </span>
             </div>
             <p id="tracker-amount-hint" className="mt-1.5 text-[12px] leading-relaxed text-gray-400">
-              Enter the amount you have already sent, not what you still owe.
+              The total received from this guest so far, including anything already recorded.
             </p>
           </div>
 
@@ -720,29 +657,29 @@ function RecordSheet({
               {coversExpected ? <Check size={14} /> : <Wallet size={14} />}
               {coversExpected
                 ? `That covers the full ${formatTZS(expected, currency)}.`
-                : `${formatTZS(expected - paid > 0 ? expected - paid : 0, currency)} still to go.`}
+                : `${formatTZS(expected - paid > 0 ? expected - paid : 0, currency)} still expected.`}
             </p>
           ) : null}
 
           <fieldset>
             <legend className="mb-2 text-[13px] font-semibold text-gray-700">
-              Have you finished contributing?
+              Is the contribution complete?
             </legend>
             <div className="grid gap-2">
               {(
                 [
                   {
                     value: true,
-                    label: 'Yes, that is everything',
-                    hint: 'I have sent the full amount.',
+                    label: 'Yes, fully received',
+                    hint: 'They have paid everything expected.',
                     Icon: CheckCircle2,
                     on: 'border-success bg-success-soft',
                     dot: 'bg-success',
                   },
                   {
                     value: false,
-                    label: 'Not yet, I will send more',
-                    hint: 'I have sent part of it so far.',
+                    label: 'Not yet, more expected',
+                    hint: 'Only part of it has come in so far.',
                     Icon: Hourglass,
                     on: 'border-warn bg-warn-soft',
                     dot: 'bg-warn',
@@ -796,11 +733,11 @@ function RecordSheet({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               maxLength={200}
-              placeholder="e.g. sent via M-Pesa this morning"
+              placeholder="e.g. bank transfer, 20 Nov"
               className="w-full rounded-tap border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-150 ease-soft placeholder:text-gray-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
             />
             <p className="mt-1.5 text-[12px] leading-relaxed text-gray-400">
-              Anything the organisers should know, such as which method you used.
+              A short reminder for yourself, such as how it arrived or when.
             </p>
           </div>
         </div>

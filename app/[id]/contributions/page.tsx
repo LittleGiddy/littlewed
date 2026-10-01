@@ -54,9 +54,10 @@ export default async function ContributionsPage({
       person2: true,
       contributionCurrency: true,
       contributionTarget: true,
-      mpesaInstructions: true,
-      airtelInstructions: true,
-      bankInstructions: true,
+      // Payment instructions are deliberately NOT selected. The owner's ledger
+      // records what has been received; restating the M-Pesa/Airtel/bank
+      // numbers here duplicated Event Details on a page that has no reason to
+      // display them, and those values belong on the event itself.
       // Every guest, not just the ones with a Contribution row, so the first
       // paint matches what /api/public/.../contributions returns. Selecting the
       // relation alone made the server-rendered list shorter than the list the
@@ -110,9 +111,6 @@ export default async function ContributionsPage({
       person2: event.person2,
       currency,
       target: event.contributionTarget,
-      mpesaInstructions: event.mpesaInstructions,
-      airtelInstructions: event.airtelInstructions,
-      bankInstructions: event.bankInstructions,
     },
     summary,
     rows: event.guests.map((g) => ({

@@ -1,6 +1,10 @@
 // app/api/public/events/[eventId]/contributions/route.ts
-// Public, unauthenticated read + status update for the shared tracker page at
-// /[eventId]/contributions.
+// Read + update for the shared contribution ledger at /[eventId]/contributions.
+//
+// The link is the event owner's: they open it to record the contributions they
+// have received. That makes this an owner's tool rather than a guest's, which
+// is why payment instructions are no longer part of the payload and the page no
+// longer speaks to the visitor as if they were the one paying.
 //
 // There is no middleware in this project, so "public" simply means this route
 // does not call getServerSession. That is fine for reads, but it also means a
@@ -8,6 +12,8 @@
 //   - phone numbers are masked before they leave the server
 //   - every write records who made it and when, so the tenant can see changes
 //   - writes only ever move a guest between known statuses
+// The link is a capability, not an authentication. Treat it as the owner's own
+// secret: anyone who opens it can change the ledger.
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
@@ -36,9 +42,10 @@ async function loadPublicEvent(eventId: string) {
       person2: true,
       contributionTarget: true,
       contributionCurrency: true,
-      mpesaInstructions: true,
-      airtelInstructions: true,
-      bankInstructions: true,
+      // Payment instructions are deliberately not selected: this payload feeds
+      // the owner's ledger, which no longer shows them. Leaving them selected
+      // would keep the account numbers one network-tab away from a page that has
+      // no use for them.
       // Every guest on the event, not only the ones with a Contribution row.
       // A row appears once a reminder has been sent, so selecting on the
       // relation alone hid guests who had never been reminded — and the public
@@ -89,9 +96,10 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       person2: event.person2,
       currency: event.contributionCurrency || 'TZS',
       target: event.contributionTarget,
-      mpesaInstructions: event.mpesaInstructions,
-      airtelInstructions: event.airtelInstructions,
-      bankInstructions: event.bankInstructions,
+      // Payment instructions are not sent to this page. The tracker is the
+      // owner's record of what has been received, not an instruction sheet, so
+      // the M-Pesa/Airtel/bank details are left out of both the page and this
+      // payload. Nothing else consumes this endpoint.
     },
     summary,
     rows: event.guests.map((g) => ({
