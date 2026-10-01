@@ -512,7 +512,11 @@ export async function generateReminderCardForGuest(
     throw new Error('Guest has no name');
   }
 
-  const fontSize = Math.round((event.reminderCardNameSize ?? 34) * scaleFactor);
+  // Left unrounded on purpose. The designer sizes the name with
+  // `size / 8 * 1cqw`, which is fractional, and a rounded server font size
+  // changes the run width by up to half a pixel - enough to shift a centred
+  // name visibly off the position that was approved.
+  const fontSize = (event.reminderCardNameSize ?? 34) * scaleFactor;
   const finalBuffer = await composeReminderCard(cardBuffer, name, {
     fontSize,
     fontFamily: event.reminderCardNameFont || 'Playfair Display',

@@ -130,16 +130,22 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       setBypassPayment(!!data.bypassPayment);
       if (data.event?.reminderCardUrl) {
         setCardUrl(data.event.reminderCardUrl);
+        // Every fallback comes from DEFAULT_REMINDER_DESIGN rather than being
+        // spelled out here, because that object is the one documented as having
+        // to match reminderCardName*'s column defaults and the server's own
+        // fallbacks. A literal here drifts: it used to open at y=42 while the
+        // server drew at 40, so an untouched name appeared 2% low in the designer
+        // and the guest never saw that position at all.
         setDesign({
-          x: data.event.reminderCardNameX ?? 50,
-          y: data.event.reminderCardNameY ?? 42,
-          size: data.event.reminderCardNameSize ?? 34,
-          color: data.event.reminderCardNameColor ?? '#ffffff',
+          x: data.event.reminderCardNameX ?? DEFAULT_REMINDER_DESIGN.x,
+          y: data.event.reminderCardNameY ?? DEFAULT_REMINDER_DESIGN.y,
+          size: data.event.reminderCardNameSize ?? DEFAULT_REMINDER_DESIGN.size,
+          color: data.event.reminderCardNameColor ?? DEFAULT_REMINDER_DESIGN.color,
           align:
             data.event.reminderCardNameAlign === 'left' || data.event.reminderCardNameAlign === 'right'
               ? data.event.reminderCardNameAlign
-              : 'center',
-          font: data.event.reminderCardNameFont ?? 'Playfair Display',
+              : DEFAULT_REMINDER_DESIGN.align,
+          font: data.event.reminderCardNameFont ?? DEFAULT_REMINDER_DESIGN.font,
         });
       }
     } catch {
@@ -286,6 +292,10 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   // rest. The values are written to the Event columns (rather than kept in
   // localStorage like the invitation composer) because the send path and the
   // public contribution tracker both read them from the database.
+  //
+  // A cleared field is a change too: it arrives here as an empty string and the
+  // settings route turns that into NULL, which is how a prefilled value finally
+  // gets removed from the event rather than being re-seeded on the next load.
   const persistVariables = useCallback(async (): Promise<boolean> => {
     if (!eventId || channel !== 'whatsapp') return true;
     const keys = Object.keys(mchangoOverrides) as MchangoFieldKey[];
@@ -667,7 +677,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               <>
                 <StepTitle
                   title="Fill in the message"
-                  hint="Every slot the WhatsApp template can personalise. Anything you leave alone keeps the event's own details."
+                  hint="Every slot the WhatsApp template can personalise. Anything you leave alone keeps the event's own details — clear a field to leave it out of the message."
                 />
                 <MchangoVariables
                   event={mchangoEvent}

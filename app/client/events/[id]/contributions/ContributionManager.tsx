@@ -164,9 +164,6 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
     setForm({
       contributionsEnabled: data.event.contributionsEnabled,
       eventType: data.event.eventType ?? '',
-      contributionDeadline: data.event.contributionDeadline
-        ? data.event.contributionDeadline.slice(0, 10)
-        : '',
       contributionTarget: data.event.contributionTarget
         ? String(data.event.contributionTarget)
         : '',
@@ -235,7 +232,6 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
           settings: {
             contributionsEnabled: form.contributionsEnabled,
             eventType: form.eventType || null,
-            contributionDeadline: form.contributionDeadline || null,
             contributionTarget: form.contributionTarget ? Number(form.contributionTarget) : null,
             contributionCurrency: form.contributionCurrency || 'TZS',
             mpesaInstructions: form.mpesaInstructions || null,
@@ -586,17 +582,21 @@ function OverviewScreen({
           title="Needs a reminder"
           subtitle={
             needsAttention.length
-              ? 'The guests with money still outstanding.'
-              : 'Everyone has completed their contribution.'
+              ? `${needsAttention.length} guest${needsAttention.length > 1 ? 's have' : ' has'} money still outstanding. Reminders only ever go to these.`
+              : 'Everyone has completed their contribution, so reminders will skip them all.'
           }
           action={
-            <button
-              type="button"
-              onClick={onGoToGuests}
-              className="flex items-center gap-1 text-[13px] font-semibold text-brand"
-            >
-              All guests <ArrowRight size={13} />
-            </button>
+            needsAttention.length ? (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onGoToGuests}
+                  className="flex items-center gap-1 text-[13px] font-semibold text-brand"
+                >
+                  All guests <ArrowRight size={13} />
+                </button>
+              </div>
+            ) : null
           }
         />
         {needsAttention.length === 0 ? (
@@ -1095,14 +1095,6 @@ function SettingsScreen({
           </AppSelect>
 
           <AppInput
-            type="date"
-            label="Payment deadline"
-            hint="Template var9"
-            value={form.contributionDeadline}
-            onChange={(e) => set('contributionDeadline', e.target.value)}
-          />
-
-          <AppInput
             inputMode="numeric"
             label="Target amount"
             hint="Optional. Drives the progress ring and the outstanding figure."
@@ -1139,8 +1131,9 @@ function SettingsScreen({
           <p className="flex items-start gap-2 rounded-tap bg-brand-soft px-3 py-2.5 text-[12px] leading-relaxed text-brand">
             <SlidersHorizontal size={14} className="mt-0.5 shrink-0" />
             <span>
-              Greetings, names, venue, address and the contact number come from the event itself.
-              Edit those from the reminder screen, where you can preview the finished message.
+              Greetings, names, venue, address, the payment deadline and the contact number come
+              from the event itself. Edit those from the reminder screen, where you can preview the
+              finished message.
             </span>
           </p>
         </div>

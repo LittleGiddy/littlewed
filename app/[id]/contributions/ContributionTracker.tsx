@@ -16,7 +16,9 @@ import {
   Banknote,
   CalendarClock,
   Check,
+  CheckCircle2,
   Copy,
+  Hourglass,
   Loader2,
   MapPin,
   MessageCircle,
@@ -42,7 +44,6 @@ import {
   AppSegmentedControl,
 } from '@/components/ui';
 import {
-  CONTRIBUTION_STATUSES,
   CONTRIBUTION_STATUS_META,
   formatTZS,
   type ContributionStatus,
@@ -55,7 +56,6 @@ interface TrackerEvent {
   name: string;
   eventType: string | null;
   date: string;
-  deadline: string;
   venue: string | null;
   address: string | null;
   hostFamily: string | null;
@@ -101,18 +101,6 @@ interface TrackerPayload {
 }
 
 type Filter = 'ALL' | ContributionStatus;
-
-const STATUS_BG: Record<ContributionStatus, string> = {
-  PENDING: 'bg-muted',
-  PARTIAL: 'bg-warn',
-  PAID: 'bg-success',
-};
-
-const STATUS_DOT: Record<ContributionStatus, string> = {
-  PENDING: 'bg-muted',
-  PARTIAL: 'bg-warn',
-  PAID: 'bg-success',
-};
 
 function reducedInitial(transition: { duration: number }) {
   return transition.duration === 0 ? { opacity: 0 } : { opacity: 0, y: 10 };
@@ -191,14 +179,25 @@ export default function ContributionTracker({
     [data, eventId]
   );
 
-  const setStatus = useCallback(
-    (row: TrackerRow, status: ContributionStatus) => {
-      if (row.status === status) return;
-      void patch(
+  /**
+   * A guest's update is one action, not two.
+   *
+   * Previously the row had three status buttons *and* a separate amount editor,
+   * so the two could disagree: tapping "Completed" recorded no figure, and the
+   * collected total stayed where it was. Now a guest states how much they sent
+   * and whether that was everything, in a single pass, and the server
+   * reconciles the status from the two (see reconcileContribution).
+   */
+  const recordContribution = useCallback(
+    async (row: TrackerRow, amountPaid: number, finished: boolean, note: string) => {
+      const ok = await patch(
         row,
-        { status },
-        status === 'PAID' ? `Asante, ${firstName(row.guestName)}! Marked completed` : 'Updated'
+        { amountPaid, status: finished ? 'PAID' : 'PARTIAL', note: note.trim() || undefined },
+        finished
+          ? `Asante, ${firstName(row.guestName)}! Marked as completed`
+          : `Thank you, ${firstName(row.guestName)}. Recorded as part payment`
       );
+      return ok;
     },
     [patch]
   );
@@ -276,7 +275,7 @@ export default function ContributionTracker({
           </motion.div>
 
           <motion.dl
-            className="mt-6 grid gap-2.5 sm:grid-cols-3"
+            className="mt-6 grid gap-2.5 sm:grid-cols-2"
             initial="hidden"
             animate="shown"
             variants={{
@@ -284,16 +283,11 @@ export default function ContributionTracker({
               shown: { transition: { staggerChildren: reduced ? 0 : 0.06 } },
             }}
           >
-            {[
+            {            [
               {
                 icon: CalendarClock,
                 label: 'Event date',
                 value: data.event.date,
-              },
-              {
-                icon: Wallet,
-                label: 'Pay before',
-                value: data.event.deadline,
               },
               {
                 icon: MapPin,
@@ -494,7 +488,6 @@ export default function ContributionTracker({
                       currency={currency}
                       busy={savingId === row.guestId}
                       onOpen={() => setEditing(row)}
-                      onSetStatus={(status) => setStatus(row, status)}
                     />
                   </motion.li>
                 ))}
@@ -517,18 +510,14 @@ export default function ContributionTracker({
         </AppCard>
       </main>
 
-      <AmountSheet
+      <RecordSheet
         row={editing}
         currency={currency}
         saving={savingId === editing?.guestId}
         onClose={() => setEditing(null)}
-        onSave={async (amountPaid, note) => {
+        onSave={async (amountPaid, finished, note) => {
           if (!editing) return false;
-          const ok = await patch(
-            editing,
-            { amountPaid, note: note.trim() || undefined },
-            'Asante, contribution recorded'
-          );
+          const ok = await recordContribution(editing, amountPaid, finished, note);
           if (ok) setEditing(null);
           return ok;
         }}
@@ -547,127 +536,88 @@ function GuestRow({
   currency,
   busy,
   onOpen,
-  onSetStatus,
 }: {
   row: TrackerRow;
   currency: string;
   busy: boolean;
   onOpen: () => void;
-  onSetStatus: (status: ContributionStatus) => void;
 }) {
-  const transition = useTransition();
-  const [tapped, setTapped] = useState<ContributionStatus | null>(null);
   const meta = CONTRIBUTION_STATUS_META[row.status];
-
-  const press = (status: ContributionStatus) => {
-    setTapped(status);
-    // Cleared on the next tick so the pulse reads as feedback on the button
-    // rather than as a stuck loading state if the request is slow.
-    window.setTimeout(() => setTapped(null), 320);
-    onSetStatus(status);
-  };
 
   const remaining =
     row.amountExpected && row.amountExpected > row.amountPaid
       ? row.amountExpected - row.amountPaid
       : 0;
 
+  const recorded = row.amountPaid > 0 || row.note !== null;
+
   return (
-    <>
-      <div className="flex items-start gap-3">
-        <AppAvatar name={row.guestName} size="md" />
-        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-[14px] font-semibold text-ink">{row.guestName}</span>
-            <AppChip
-              tone={row.status === 'PAID' ? 'success' : row.status === 'PARTIAL' ? 'warn' : 'neutral'}
-            >
-              {meta.label}
-            </AppChip>
-          </span>
-          <span className="mt-0.5 block truncate text-[12px] text-muted">
-            {row.phone}
-            {row.updatedAt
-              ? ` · updated ${new Date(row.updatedAt).toLocaleDateString()}`
-              : ' · not tracked yet'}
-          </span>
-          {row.amountPaid > 0 || row.amountExpected ? (
-            <span className="mt-1 block text-[12px] tabular-nums text-ink">
-              {formatTZS(row.amountPaid, currency)} received
-              {remaining > 0 ? (
-                <span className="text-muted"> · {formatTZS(remaining, currency)} remaining</span>
-              ) : null}
-            </span>
-          ) : null}
-        </button>
-      </div>
+    <div className="flex items-start gap-3">
+      <AppAvatar name={row.guestName} size="md" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate text-[14px] font-semibold text-ink">{row.guestName}</span>
+          <AppChip
+            tone={row.status === 'PAID' ? 'success' : row.status === 'PARTIAL' ? 'warn' : 'neutral'}
+          >
+            {meta.label}
+          </AppChip>
+        </div>
+        <p className="mt-0.5 truncate text-[12px] text-muted">
+          {row.phone}
+          {row.updatedAt ? ` · updated ${new Date(row.updatedAt).toLocaleDateString()}` : ''}
+        </p>
+        {row.amountPaid > 0 || row.amountExpected ? (
+          <p className="mt-1 text-[12px] tabular-nums text-ink">
+            {formatTZS(row.amountPaid, currency)} received
+            {remaining > 0 ? (
+              <span className="text-muted"> · {formatTZS(remaining, currency)} remaining</span>
+            ) : null}
+          </p>
+        ) : null}
+        {row.note ? (
+          <p className="mt-1 text-[12px] italic leading-snug text-muted">“{row.note}”</p>
+        ) : null}
 
-      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-        {CONTRIBUTION_STATUSES.map((status) => {
-          const on = row.status === status;
-          const spinning = busy && on;
-          return (
-            <motion.button
-              key={status}
-              type="button"
-              whileTap={{ scale: 0.96 }}
-              transition={transition}
-              disabled={busy}
-              aria-pressed={on}
-              aria-label={`Mark ${row.guestName} as ${CONTRIBUTION_STATUS_META[status].label}`}
-              onClick={() => press(status)}
-              className={`relative flex h-9 items-center justify-center gap-1 overflow-hidden rounded-tap text-[12px] font-semibold transition-colors disabled:opacity-50 ${
-                on ? 'text-white' : 'bg-surface-2 text-muted hover:text-ink'
-              }`}
-            >
-              {on ? (
-                <motion.span
-                  layoutId={`tracker-row-bg-${row.guestId}`}
-                  className={`absolute inset-0 ${STATUS_BG[status]}`}
-                  transition={transition}
-                />
-              ) : null}
-              {tapped === status ? (
-                <motion.span
-                  className="absolute inset-0 bg-white/25"
-                  initial={{ opacity: 0.9 }}
-                  animate={{ opacity: 0 }}
-                  transition={{ duration: 0.32 }}
-                />
-              ) : null}
-              <span className="relative z-10 inline-flex items-center gap-1">
-                {spinning ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <span
-                    className={`size-1.5 rounded-full ${on ? 'bg-white/80' : STATUS_DOT[status]}`}
-                  />
-                )}
-                {CONTRIBUTION_STATUS_META[status].label}
-              </span>
-            </motion.button>
-          );
-        })}
+        {/* One action, one meaning. A guest answers "how much did you send, and
+            is that all?" in a single sheet rather than picking a status from a
+            row of buttons that knows nothing about the figure. */}
+        <motion.button
+          type="button"
+          whileTap={{ scale: 0.97 }}
+          disabled={busy}
+          onClick={onOpen}
+          className={`mt-2.5 flex h-10 w-full items-center justify-center gap-1.5 rounded-tap px-3 text-[13px] font-semibold transition disabled:opacity-50 ${
+            row.status === 'PAID'
+              ? 'bg-surface-2 text-ink ring-1 ring-inset ring-line'
+              : 'bg-brand text-white shadow-elev-1'
+          }`}
+        >
+          {busy ? (
+            <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Wallet size={14} aria-hidden="true" />
+          )}
+          {recorded ? 'Update my contribution' : 'I have sent my contribution'}
+        </motion.button>
       </div>
-
-      <button
-        type="button"
-        onClick={onOpen}
-        className="mt-2 flex min-h-9 items-center gap-1.5 text-[12px] font-semibold text-brand-600 hover:text-brand"
-      >
-        <Wallet size={13} aria-hidden="true" />
-        {row.amountPaid > 0 || row.note ? 'Edit amount or note' : 'Record an amount you sent'}
-      </button>
-    </>
+    </div>
   );
 }
 
 /**
- * Amount + note editor. Guests can record what they have sent but not the
- * figure they are expected to pay — that is the tenant's number, and letting a
- * shared link rewrite it would let anyone move the target.
+ * "How much did you send, and is that everything?"
+ *
+ * One sheet answers both, because splitting them across two controls is what
+ * let a guest tick "Completed" without a figure and leave the collected total
+ * unchanged. The amount comes first and the yes/no finishes it, so the status
+ * always has a number attached to it.
+ *
+ * Guests record what they sent but cannot set the figure they are expected to
+ * pay — that is the tenant's number, and a shared link must not be able to move
+ * the target.
  */
-function AmountSheet({
+function RecordSheet({
   row,
   currency,
   saving,
@@ -678,10 +628,13 @@ function AmountSheet({
   currency: string;
   saving: boolean;
   onClose: () => void;
-  onSave: (amountPaid: number, note: string) => Promise<boolean>;
+  onSave: (amountPaid: number, finished: boolean, note: string) => Promise<boolean>;
 }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // null until the guest answers, so the sheet never presumes "finished" on
+  // their behalf — that decision is the whole point of the question.
+  const [finished, setFinished] = useState<boolean | null>(null);
 
   // Re-seed during render rather than in an effect so opening a guest never
   // shows the previous guest's figures for a frame.
@@ -690,20 +643,22 @@ function AmountSheet({
     setSeededId(row.guestId);
     setAmount(row.amountPaid ? String(row.amountPaid) : '');
     setNote(row.note ?? '');
+    setFinished(row.amountPaid > 0 ? row.status === 'PAID' : null);
   }
 
   const paid = Number(amount.replace(/[^\d]/g, '')) || 0;
-  const dirty =
-    amount !== (row?.amountPaid ? String(row.amountPaid) : '') || note !== (row?.note ?? '');
+  const canSave = paid > 0 && finished !== null;
+  const expected = row?.amountExpected ?? null;
+  const coversExpected = expected !== null && paid >= expected;
 
   return (
     <AppBottomSheet
       open={!!row}
       onClose={onClose}
-      title={row?.guestName}
+      title="Record your contribution"
       description={
         row
-          ? `${row.phone}${row.amountExpected ? ` · expected ${formatTZS(row.amountExpected, currency)}` : ''}`
+          ? `${row.guestName}${expected ? ` · the full amount is ${formatTZS(expected, currency)}` : ''}`
           : undefined
       }
       footer={
@@ -713,10 +668,10 @@ function AmountSheet({
               Cancel
             </AppButton>
             <AppButton
-              onClick={() => void onSave(paid, note)}
+              onClick={() => finished !== null && void onSave(paid, finished, note)}
               loading={saving}
               loadingText="Saving"
-              disabled={!dirty}
+              disabled={!canSave}
               fullWidth
               data-autofocus
             >
@@ -727,31 +682,127 @@ function AmountSheet({
       }
     >
       {row ? (
-        <div className="space-y-4">
-          <AppInput
-            label={`Amount you sent (${currency})`}
-            hint="Leave 0 if you have not sent anything yet."
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-          />
+        <div className="space-y-5">
+          <div>
+            <label
+              htmlFor="tracker-amount"
+              className="block text-[13px] font-semibold text-gray-700 mb-1.5"
+            >
+              How much did you send?
+            </label>
+            <div className="relative">
+              <input
+                id="tracker-amount"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                aria-describedby="tracker-amount-hint"
+                className="w-full rounded-tap border border-gray-200 bg-white px-3.5 py-3 pr-16 text-lg font-semibold tabular-nums text-gray-900 transition-all duration-150 ease-soft placeholder:text-gray-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
+              />
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-gray-400">
+                {currency}
+              </span>
+            </div>
+            <p id="tracker-amount-hint" className="mt-1.5 text-[12px] leading-relaxed text-gray-400">
+              Enter the amount you have already sent, not what you still owe.
+            </p>
+          </div>
 
-          <AppInput
-            label="Note (optional)"
-            hint="Anything the organisers should know, e.g. which method you used."
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={200}
-            placeholder="e.g. sent via M-Pesa this morning"
-          />
-
-          {row.amountExpected && paid >= row.amountExpected ? (
-            <p className="flex items-center gap-2 rounded-tap bg-success-soft px-3 py-2.5 text-[13px] text-success">
-              <Check size={14} />
-              This will be marked completed automatically.
+          {expected !== null ? (
+            <p
+              className={`flex items-center gap-2 rounded-tap px-3 py-2.5 text-[13px] ${
+                coversExpected ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted'
+              }`}
+            >
+              {coversExpected ? <Check size={14} /> : <Wallet size={14} />}
+              {coversExpected
+                ? `That covers the full ${formatTZS(expected, currency)}.`
+                : `${formatTZS(expected - paid > 0 ? expected - paid : 0, currency)} still to go.`}
             </p>
           ) : null}
+
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-semibold text-gray-700">
+              Have you finished contributing?
+            </legend>
+            <div className="grid gap-2">
+              {(
+                [
+                  {
+                    value: true,
+                    label: 'Yes, that is everything',
+                    hint: 'I have sent the full amount.',
+                    Icon: CheckCircle2,
+                    on: 'border-success bg-success-soft',
+                    dot: 'bg-success',
+                  },
+                  {
+                    value: false,
+                    label: 'Not yet, I will send more',
+                    hint: 'I have sent part of it so far.',
+                    Icon: Hourglass,
+                    on: 'border-warn bg-warn-soft',
+                    dot: 'bg-warn',
+                  },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={String(option.value)}
+                  type="button"
+                  onClick={() => setFinished(option.value)}
+                  aria-pressed={finished === option.value}
+                  className={`flex items-start gap-3 rounded-tap border p-3.5 text-left transition ${
+                    finished === option.value
+                      ? option.on
+                      : 'border-line bg-surface hover:border-brand/40'
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                      finished === option.value ? 'border-transparent' : 'border-line'
+                    } ${finished === option.value ? option.dot : ''}`}
+                  >
+                    {finished === option.value ? (
+                      <span className="size-1.5 rounded-full bg-white" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+                      <option.Icon size={14} aria-hidden="true" />
+                      {option.label}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-muted">
+                      {option.hint}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <label
+              htmlFor="tracker-note"
+              className="block text-[13px] font-semibold text-gray-700 mb-1.5"
+            >
+              Note <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <input
+              id="tracker-note"
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={200}
+              placeholder="e.g. sent via M-Pesa this morning"
+              className="w-full rounded-tap border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 transition-all duration-150 ease-soft placeholder:text-gray-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
+            />
+            <p className="mt-1.5 text-[12px] leading-relaxed text-gray-400">
+              Anything the organisers should know, such as which method you used.
+            </p>
+          </div>
         </div>
       ) : null}
     </AppBottomSheet>

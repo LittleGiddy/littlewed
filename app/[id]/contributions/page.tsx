@@ -103,7 +103,6 @@ export default async function ContributionsPage({
       name: event.name,
       eventType: event.eventType,
       date: formatSwahiliDate(event.date),
-      deadline: formatSwahiliDate(event.contributionDeadline),
       venue: event.venue,
       address: event.address,
       hostFamily: event.hostFamily,

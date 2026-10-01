@@ -91,8 +91,8 @@ export async function GET(
 
     const composed = await composeReminderCard(cardBuffer, name, {
       // The designer's size is authored against DESIGNER_WIDTH (800), matching the
-      // scaleFactor the send path applies.
-      fontSize: Math.round((event.reminderCardNameSize ?? 34) * ((width || 800) / DESIGNER_WIDTH)),
+      // scaleFactor the send path applies. Left unrounded for the same reason.
+      fontSize: (event.reminderCardNameSize ?? 34) * ((width || 800) / DESIGNER_WIDTH),
       fontFamily: event.reminderCardNameFont || 'Playfair Display',
       color: event.reminderCardNameColor || '#ffffff',
       align: normaliseReminderAlign(event.reminderCardNameAlign),

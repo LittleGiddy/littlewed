@@ -183,7 +183,7 @@ export const MCHANGO_FIELDS: readonly MchangoFieldSpec[] = [
     varKey: 'var9',
     label: 'Payment deadline',
     labelSw: 'Tarehe ya malipo',
-    hint: 'The date contributions are due.',
+    hint: 'The date contributions are due. (set on the Reminders screen)',
     placeholder: '20 Novemba 2026',
     group: 'payment',
     kind: 'date',
@@ -314,10 +314,49 @@ function resolveOccasion(event: MchangoEventSource): string {
   return (event.eventType ?? '').trim();
 }
 
-/** Overrides are keyed by field name, so an empty string means "unset", not "keep". */
+/** Overrides are keyed by field name. A key that is ABSENT means "not touched,
+ *  use the event value"; a key that is PRESENT means the tenant decided, and an
+ *  empty string there is a decision to leave the slot out. Conflating the two
+ *  is what made prefilled text impossible to remove from the form. */
 export type MchangoOverrides = Partial<Record<MchangoFieldKey, string | null | undefined>>;
 
 export type MchangoValues = Record<MchangoFieldKey, string>;
+
+/** True when the tenant has made a decision about this slot, cleared or not. */
+export function hasMchangoOverride(overrides: MchangoOverrides, key: MchangoFieldKey): boolean {
+  const value = overrides[key];
+  return value !== undefined && value !== null;
+}
+
+/**
+ * Resolves one slot: a present override wins outright, and only an absent one
+ * falls through to the event.
+ *
+ * The empty string is returned as-is rather than falling back. A tenant who
+ * clears "Airtel Money" is saying "do not mention Airtel", and handing them the
+ * event's instructions back is both wrong and the reason prefilled values could
+ * never be deleted. Genuine gaps stay as '' rather than becoming a dash: the
+ * wire format and the preview each decide their own placeholder, and
+ * `missingMchangoFields` needs to be able to tell "empty" from "filled".
+ */
+function slot(overrides: MchangoOverrides, key: MchangoFieldKey, fallback: string): string {
+  const override = overrides[key];
+  if (override === undefined || override === null) return fallback;
+  return override.trim();
+}
+
+/** `slot` for the two date slots, whose overrides arrive as ISO strings from a
+ *  <input type="date"> and so are formatted rather than passed through. */
+function slotDate(
+  overrides: MchangoOverrides,
+  key: 'date' | 'deadline',
+  fallback: string
+): string {
+  const override = overrides[key];
+  if (override === undefined || override === null) return fallback;
+  const trimmed = override.trim();
+  return trimmed ? formatSwahiliDate(trimmed) : '';
+}
 
 /**
  * Resolve all 13 slots from the event, with any tenant override winning.
@@ -340,34 +379,23 @@ export function resolveMchangoValues(
   // column is what makes the editor round-trip.
   const contactPhone = text(event.contactPersonPhone, '');
 
-  // The override is applied only when it has content, so clearing a field on the
-  // form falls back to the event value instead of shipping an empty slot.
-  // Genuine gaps stay as '' here rather than becoming a dash: the wire format
-  // and the preview each decide their own placeholder, and `missingMchangoFields`
-  // needs to be able to tell "empty" from "filled".
   const values: MchangoValues = {
-    occasion: text(overrides.occasion, occasion),
-    greetingName: text(overrides.greetingName, primaryName),
-    familyName: text(overrides.familyName, familyName || primaryName),
-    venue: text(overrides.venue, event.venue ?? ''),
-    eventName: text(overrides.eventName, event.name ?? ''),
+    occasion: slot(overrides, 'occasion', occasion),
+    greetingName: slot(overrides, 'greetingName', primaryName),
+    familyName: slot(overrides, 'familyName', familyName || primaryName),
+    venue: slot(overrides, 'venue', event.venue ?? ''),
+    eventName: slot(overrides, 'eventName', event.name ?? ''),
     // No family-name fallback here: it would render as
     // "MCHANGO WA Send-Off ya Familia ya Mkumbo". Better to be flagged missing.
-    celebrant: text(overrides.celebrant, event.person2 || event.person1 || ''),
-    date: formatSwahiliDate(event.date),
-    address: text(overrides.address, event.address ?? ''),
-    deadline: formatSwahiliDate(event.contributionDeadline),
-    mpesa: text(overrides.mpesa, event.mpesaInstructions ?? ''),
-    airtel: text(overrides.airtel, event.airtelInstructions ?? ''),
-    bank: text(overrides.bank, event.bankInstructions ?? ''),
-    contact: text(overrides.contact, contactPhone),
+    celebrant: slot(overrides, 'celebrant', event.person2 || event.person1 || ''),
+    date: slotDate(overrides, 'date', formatSwahiliDate(event.date)),
+    address: slot(overrides, 'address', event.address ?? ''),
+    deadline: slotDate(overrides, 'deadline', formatSwahiliDate(event.contributionDeadline)),
+    mpesa: slot(overrides, 'mpesa', event.mpesaInstructions ?? ''),
+    airtel: slot(overrides, 'airtel', event.airtelInstructions ?? ''),
+    bank: slot(overrides, 'bank', event.bankInstructions ?? ''),
+    contact: slot(overrides, 'contact', contactPhone),
   };
-
-  // var7 and var9 are the two date slots. Their overrides arrive as ISO strings
-  // from a <input type="date">, so they are formatted here rather than being
-  // read straight from the event.
-  if (overrides.date) values.date = formatSwahiliDate(overrides.date);
-  if (overrides.deadline) values.deadline = formatSwahiliDate(overrides.deadline);
 
   return values;
 }

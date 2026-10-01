@@ -76,7 +76,7 @@ export function reconcileContribution(input: {
     typeof input.amountExpected === 'number' && input.amountExpected >= 0
       ? Math.round(input.amountExpected)
       : null;
-  let amountPaid =
+  const amountPaid =
     typeof input.amountPaid === 'number' && input.amountPaid > 0
       ? Math.round(input.amountPaid)
       : 0;
@@ -85,8 +85,13 @@ export function reconcileContribution(input: {
     return { status: 'PAID', amountPaid, amountExpected };
   }
   if (status === 'PAID') {
-    // Keep the figure honest: a completed row with a known target records it.
-    amountPaid = amountExpected && amountExpected > 0 ? amountExpected : amountPaid;
+    // Keep the recorded figure exactly as it was entered. An earlier version
+    // overwrote it with the expected amount on any PAID row, which was
+    // defensible while "mark completed" was a separate, figure-less action but
+    // not now that a guest types the amount and the status together: it let a
+    // guest who entered 200,000 against a 500,000 target silently inflate the
+    // collected total by 300,000. `isContributionSettled` still treats a PAID
+    // row as settled, so the reminder pipeline is unaffected.
     return { status: 'PAID', amountPaid, amountExpected };
   }
   return {

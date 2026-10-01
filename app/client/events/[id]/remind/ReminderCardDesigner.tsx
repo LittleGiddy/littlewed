@@ -334,61 +334,67 @@ export default function ReminderCardDesigner({
             {guides.x && <div className="absolute top-0 bottom-0 w-px bg-[#25D366] pointer-events-none" style={{ left: '50%' }} />}
             {guides.y && <div className="absolute left-0 right-0 h-px bg-[#25D366] pointer-events-none" style={{ top: '50%' }} />}
 
-            {/* The draggable name token */}
+            {/* The draggable name token.
+                Everything that decides where the text lands lives on THIS
+                element, not on a child, because the transform is a percentage
+                of this element's own border box. Two things have to line up
+                with the server for `center` to be exact:
+                  - the box must BE the glyph run. The wrapper carries the text's
+                    own font-size and `leading-none`, so its line box is the run
+                    rather than a run padded out by an inherited 16px strut.
+                  - the box must MEASURE the run the same way. The server places
+                    each glyph at the running sum of its advance width, with no
+                    kerning or ligature substitution, so those are disabled
+                    here; otherwise the browser shapes the run wider or narrower
+                    and a centred name previews off from where it lands.
+                Alignment itself is the translate:   -> the glyph's left edge on x
+                                                         centre  -> the run centred on x
+                                                         right   -> the glyph's right edge on x */}
             <div
               onPointerDown={onPointerDown}
               role="button"
               tabIndex={0}
               aria-label="Drag to position the guest name"
-              className={`absolute cursor-grab active:cursor-grabbing touch-none select-none ${
+              className={`absolute cursor-grab active:cursor-grabbing touch-none select-none whitespace-nowrap leading-none ${
                 dragging ? '' : 'hover:ring-1 hover:ring-[#25D366]/60'
               }`}
               style={{
                 top: `${design.y}%`,
                 left: `${design.x}%`,
-                // The server anchors the *glyph run* on x and the text's visual
-                // centre on y, so the preview has to anchor the same two things:
-                //   left   -> the glyph's left edge sits on x
-                //   center -> the glyph run is centred on x
-                //   right  -> the glyph's right edge sits on x
                 transform:
                   design.align === 'center'
                     ? 'translate(-50%, -50%)'
                     : design.align === 'right'
                       ? 'translate(-100%, -50%)'
                       : 'translate(0, -50%)',
+                // Mirrors the server: fontSize = size * (width / 800), where 1cqw
+                // is 1% of this canvas's rendered width.
+                fontSize: `calc(${design.size || 34} / 8 * 1cqw)`,
+                fontWeight: fontHasBold(design.font) ? 700 : 400,
+                fontFamily: `'${design.font}', Georgia, serif`,
+                color: design.color || '#ffffff',
+                lineHeight: 1,
+                letterSpacing: 0,
+                fontKerning: 'none',
+                fontVariantLigatures: 'none',
+                fontFeatureSettings: '"liga" 0, "clig" 0, "kern" 0, "calt" 0',
               }}
             >
               {/* The highlight sits on the wrapper, not the text, so the visible
-                  box never nudges the anchor the way padding on the text would.
-                  `leading-none` is deliberate: the default strut inherits the
-                  page's 16px font and would push small sizes off y. See
-                  `baselineOffsetEm` in lib/cardFonts.ts for the shared math. */}
+                  box never nudges the anchor the way padding on the text would. */}
               <span
                 className={`pointer-events-none absolute -inset-x-2 -inset-y-1 rounded-md ${
                   showToken ? 'bg-[#25D366]/20 outline-dashed outline-1 outline-[#25D366]' : 'bg-black/20'
                 }`}
               />
-              <span
-                className="relative inline-block whitespace-nowrap leading-none"
-                style={{
-                  // Mirrors the server: fontSize = size * (width / 800)
-                  fontSize: `calc(${design.size || 34} / 8 * 1cqw)`,
-                  fontWeight: fontHasBold(design.font) ? 700 : 400,
-                  color: design.color || '#ffffff',
-                  fontFamily: `'${design.font}', Georgia, serif`,
-                  textAlign: design.align,
-                }}
-              >
-                {showToken ? GUEST_NAME_TOKEN : (sampleName || 'Guest name')}
-              </span>
+              {showToken ? GUEST_NAME_TOKEN : (sampleName || 'Guest name')}
               {/* Grab handle */}
               <span
                 className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] bg-[#25D366] text-white px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5 pointer-events-none whitespace-nowrap"
               >
                 <GripVertical size={9} /> name
               </span>
-              </div>
+            </div>
             </div>
           </div>
         </div>

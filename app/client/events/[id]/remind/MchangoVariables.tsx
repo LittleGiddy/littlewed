@@ -21,6 +21,7 @@ import {
 import {
   MCHANGO_FIELDS,
   MCHANGO_FIELD_GROUPS,
+  hasMchangoOverride,
   missingMchangoFields,
   renderMchangoPreview,
   resolveMchangoValues,
@@ -36,51 +37,65 @@ const GROUP_ICONS: Record<string, typeof Users> = {
   contact: Smartphone,
 };
 
-/** Whitespace-only overrides are dropped so an emptied field falls back to the
- *  event value instead of shipping a blank slot. */
-function cleanOverrides(overrides: Partial<Record<MchangoFieldKey, string>>) {
-  const out: Partial<Record<MchangoFieldKey, string>> = {};
+type Overrides = Partial<Record<MchangoFieldKey, string>>;
+
+/**
+ * Trims each override but KEEPS the empty ones.
+ *
+ * An absent key means "never touched, fall back to the event"; an empty key
+ * means "I cleared this on purpose". Dropping empties here made every prefilled
+ * value impossible to remove, because clearing a field quietly handed the event
+ * value straight back.
+ */
+function normaliseOverrides(overrides: Overrides): Overrides {
+  const out: Overrides = {};
   for (const [key, value] of Object.entries(overrides)) {
-    if (typeof value === 'string' && value.trim()) {
-      out[key as MchangoFieldKey] = value;
-    }
+    if (typeof value === 'string') out[key as MchangoFieldKey] = value.trim();
   }
   return out;
 }
 
 /** A <input type="date"> only understands YYYY-MM-DD, but the resolved slot is
- *  the Swahili form ("25 Novemba 2026"). Both sides convert at the boundary. */
-function toInputDate(value: string | null | undefined): string {
+ *  the Swahili form ("25 Novemba 2026"). Both sides convert at the boundary, so
+ *  a date box reads the RAW override rather than the resolved slot. */
+function toInputDate(value: Date | string | null | undefined): string {
   if (!value || value === '—') return '';
-  const d = new Date(value);
+  const d = value instanceof Date ? value : new Date(value);
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
 interface Props {
   event: MchangoEventSource;
   /** Tenant edits. A key absent here means "use the event value". */
-  overrides: Partial<Record<MchangoFieldKey, string>>;
-  onChange: (next: Partial<Record<MchangoFieldKey, string>>) => void;
+  overrides: Overrides;
+  onChange: (next: Overrides) => void;
   /** Shown in the preview header so the sample is not mistaken for real output. */
   sampleName: string;
   saving: boolean;
 }
 
 export default function MchangoVariables({ event, overrides, onChange, sampleName, saving }: Props) {
+  const clean = useMemo(() => normaliseOverrides(overrides), [overrides]);
+
   // Resolved on every keystroke, so the preview can never disagree with the form.
   const values: MchangoValues = useMemo(
-    () => resolveMchangoValues(event, cleanOverrides(overrides)),
-    [event, overrides]
+    () => resolveMchangoValues(event, clean),
+    [event, clean]
   );
   const preview = useMemo(() => renderMchangoPreview(values), [values]);
   const missing = useMemo(() => missingMchangoFields(values), [values]);
 
-  const editedCount = Object.keys(cleanOverrides(overrides)).length;
+  const editedCount = Object.keys(clean).length;
 
   const setField = (key: MchangoFieldKey, value: string) => {
+    // The key is kept even when the box is empty: that is the tenant's decision
+    // to leave the slot out, not a request to fall back to the event.
+    onChange({ ...overrides, [key]: value });
+  };
+
+  const resetField = (key: MchangoFieldKey) => {
     const next = { ...overrides };
-    if (value.trim()) next[key] = value;
-    else delete next[key];
+    delete next[key];
     onChange(next);
   };
 
@@ -109,8 +124,10 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
 
               <div className="grid gap-3.5 p-4 sm:grid-cols-2">
                 {fields.map((field) => {
-                  const isEdited = Boolean(cleanOverrides(overrides)[field.key]);
+                  const hasOverride = hasMchangoOverride(clean, field.key);
+                  const isCleared = hasOverride && clean[field.key] === '';
                   const isMissing = missing.includes(field.key);
+                  const current = values[field.key];
 
                   return (
                     <div key={field.key} className={field.kind === 'text' && field.placeholder.length > 30 ? 'sm:col-span-2' : ''}>
@@ -121,8 +138,10 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                             <span className="font-mono text-[10px] font-normal text-muted">
                               {field.varKey}
                             </span>
-                            {isEdited ? (
-                              <span className="text-[10px] font-semibold text-brand">edited</span>
+                            {hasOverride ? (
+                              <span className="text-[10px] font-semibold text-brand">
+                                {isCleared ? 'cleared' : 'edited'}
+                              </span>
                             ) : field.fromEvent ? (
                               <span className="text-[10px] font-medium text-muted">
                                 from event
@@ -130,16 +149,45 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                             ) : null}
                           </span>
                         }
-                        hint={isMissing ? 'Still empty — will send a dash' : field.hint}
+                        hint={
+                          hasOverride ? (
+                            // The way back to the event's own value, per field.
+                            // Without it, clearing a box would be a one-way door.
+                            <span className="flex flex-wrap items-center gap-x-2">
+                              <span>
+                                {isCleared
+                                  ? 'Left out — the guest sees a dash here.'
+                                  : 'Sending your value.'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => resetField(field.key)}
+                                className="font-semibold text-brand underline decoration-dotted underline-offset-2 hover:text-ink"
+                              >
+                                Use event value
+                              </button>
+                            </span>
+                          ) : isMissing ? (
+                            'Still empty — the guest sees a dash.'
+                          ) : (
+                            field.hint
+                          )
+                        }
                       >
                         {({ id }) =>
                           field.kind === 'select' ? (
                             <AppSelect
                               id={id}
-                              value={values[field.key] === 'Mchango' ? '' : values[field.key]}
+                              value={current}
                               onChange={(e) => setField(field.key, e.target.value)}
                             >
                               <option value="">Not set</option>
+                              {/* An eventType stored before this list existed would
+                                  otherwise render as a blank select and read as
+                                  "missing" while the send still used it. */}
+                              {current && !field.options?.includes(current) ? (
+                                <option value={current}>{current} (from event)</option>
+                              ) : null}
                               {field.options?.map((o) => (
                                 <option key={o} value={o}>
                                   {o}
@@ -154,14 +202,13 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
                               value={
                                 field.kind === 'date'
                                   ? toInputDate(
-                                      (cleanOverrides(overrides)[field.key] ??
-                                        (field.key === 'date'
+                                      hasOverride
+                                        ? clean[field.key]
+                                        : field.key === 'date'
                                           ? event.date
-                                          : event.contributionDeadline)) as string
+                                          : event.contributionDeadline
                                     )
-                                  : values[field.key] === '—'
-                                    ? ''
-                                    : values[field.key]
+                                  : current
                               }
                               onChange={(e) => setField(field.key, e.target.value)}
                               placeholder={field.placeholder}
@@ -184,7 +231,7 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
             className="inline-flex min-h-11 items-center gap-1.5 rounded-tap px-3 text-xs font-semibold text-muted transition-colors hover:text-ink"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" />
-            Reset {editedCount} edit{editedCount > 1 ? 's' : ''} to the event details
+            Reset {editedCount} change{editedCount > 1 ? 's' : ''} back to the event details
           </button>
         ) : null}
       </div>
@@ -250,8 +297,8 @@ export default function MchangoVariables({ event, overrides, onChange, sampleNam
           </div>
 
           <p className="border-t border-line px-4 py-3 text-[11px] leading-relaxed text-muted">
-            The guest name is added automatically by the reminder card. Every other slot comes
-            from the fields on the left.
+            The guest name is added automatically by the reminder card. Every other slot is exactly
+            what the fields on the left say — clear one and it is left out.
           </p>
         </AppCard>
       </div>

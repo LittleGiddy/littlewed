@@ -73,6 +73,37 @@ export interface TextSvgOptions {
   height?: number;
 }
 
+/** Advance width of one character, in px. A character with no glyph in the face
+ *  advances like a space, which is what the browser does with `.notdef`. */
+function advanceFor(ch: string, font: opentype.Font, emScale: number, spaceAdvance: number): number {
+  const index = font.charToGlyphIndex(ch);
+  if (index <= 0) return spaceAdvance;
+  return (font.glyphs.get(index)?.advanceWidth ?? 0) * emScale;
+}
+
+function spaceAdvanceFor(font: opentype.Font, emScale: number): number {
+  return (font.glyphs.get(font.charToGlyphIndex(' '))?.advanceWidth ?? 0) * emScale;
+}
+
+/**
+ * Width of a whole run, in px: the running sum of its glyph advances.
+ *
+ * This is the single measurement both `textAlign: 'center'` and `'right'` are
+ * anchored against, and it is deliberately the *naive* sum rather than a shaped
+ * one. The browser designer turns kerning and ligatures off for this text (see
+ * ReminderCardDesigner), so its inline box measures the same run the same way.
+ * Any divergence between the two shows up as a name that is off-centre on the
+ * delivered card relative to the position the tenant dragged it to.
+ */
+export function measureTextRun(text: string, font: opentype.Font, fontSize: number): number {
+  const emScale = fontSize / font.unitsPerEm;
+  const spaceAdvance = spaceAdvanceFor(font, emScale);
+  let total = 0;
+  for (const ch of text) total += advanceFor(ch, font, emScale, spaceAdvance);
+  return total;
+}
+
+/** The same run, emitted as one `<path>` starting at `cursorStart`. */
 function buildPathData(
   text: string,
   font: opentype.Font,
@@ -80,35 +111,25 @@ function buildPathData(
   emScale: number,
   baselineY: number,
   cursorStart: number
-): { d: string; widthPx: number } {
+): string {
   let d = '';
   let cursor = cursorStart;
-  let total = 0;
-
-  const spaceAdvance =
-    (font.glyphs.get(font.charToGlyphIndex(' '))?.advanceWidth ?? 0) * emScale;
+  const spaceAdvance = spaceAdvanceFor(font, emScale);
 
   for (const ch of text) {
-    if (font.charToGlyphIndex(ch) > 0) {
-      const advance =
-        (font.glyphs.get(font.charToGlyphIndex(ch))?.advanceWidth ?? 0) * emScale;
-      if (ch !== ' ') {
-        d += font.getPath(ch, cursor, baselineY, fontSize).toPathData(2);
-      }
-      cursor += advance;
-      total += advance;
-    } else {
-      cursor += spaceAdvance;
-      total += spaceAdvance;
+    // Spaces advance the cursor but contribute no outline.
+    if (ch !== ' ' && font.charToGlyphIndex(ch) > 0) {
+      d += font.getPath(ch, cursor, baselineY, fontSize).toPathData(2);
     }
+    cursor += advanceFor(ch, font, emScale, spaceAdvance);
   }
 
-  return { d, widthPx: total };
+  return d;
 }
 
 export function textSvg(options: TextSvgOptions): string {
   const {
-    text,
+    text: rawText,
     fontSize,
     color,
     x,
@@ -120,7 +141,13 @@ export function textSvg(options: TextSvgOptions): string {
     height = 100,
   } = options;
 
-  if (!text.trim()) {
+  // Leading/trailing whitespace is trimmed rather than measured. CSS collapses
+  // it at the edges of a line box, so a name typed with a stray trailing space
+  // measures narrower in the designer than it does here - which would drag a
+  // centred name sideways by half a space on the delivered card.
+  const text = rawText.trim();
+
+  if (!text) {
     // An empty string still produces a valid, fully transparent SVG so callers
     // can composite unconditionally.
     return `<?xml version="1.0" encoding="UTF-8"?>
@@ -129,16 +156,18 @@ export function textSvg(options: TextSvgOptions): string {
 
   const family = resolveFontFamily(options.fontFamily);
   const face = faceFor(family);
-  const emScale = fontSize / face.unitsPerEm;
 
-  const baselineY = y + ((face.ascender + face.descender) / 2) * emScale;
-  const advancePass = buildPathData(text, face, fontSize, emScale, baselineY, 0);
+  // The anchor is the text's visual centre, so the baseline sits half the
+  // ascent/descent difference below it. `baselineOffsetEm` is the same
+  // expression the browser derives from its own metrics.
+  const baselineY = y + baselineOffsetEm(family) * fontSize;
 
+  const runWidth = measureTextRun(text, face, fontSize);
   let startX = x;
-  if (textAlign === 'center') startX = x - advancePass.widthPx / 2;
-  else if (textAlign === 'right') startX = x - advancePass.widthPx;
+  if (textAlign === 'center') startX = x - runWidth / 2;
+  else if (textAlign === 'right') startX = x - runWidth;
 
-  const { d } = buildPathData(text, face, fontSize, emScale, baselineY, startX);
+  const d = buildPathData(text, face, fontSize, fontSize / face.unitsPerEm, baselineY, startX);
 
   const shadowFilter = shadow
     ? `<filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/></filter>`

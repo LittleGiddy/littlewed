@@ -63,7 +63,6 @@ export interface ManagerPayload {
 export interface SettingsForm {
   contributionsEnabled: boolean;
   eventType: string;
-  contributionDeadline: string;
   contributionTarget: string;
   contributionCurrency: string;
   mpesaInstructions: string;
