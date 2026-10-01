@@ -4,6 +4,25 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+/**
+ * Event columns that back the Mchango reminder template's var1..var13 slots.
+ * Declared here so the writer stays in step with the editor that drives it.
+ */
+const MCHANGO_EVENT_FIELDS = [
+  'eventType',
+  'contributionDeadline',
+  'mpesaInstructions',
+  'airtelInstructions',
+  'bankInstructions',
+  'hostFamily',
+  'person1',
+  'person2',
+  'contactPerson',
+  'contactPersonPhone',
+  'venue',
+  'address',
+] as const;
+
 // ─── GET ──────────────────────────────────────────────────────────────
 export async function GET(
   req: NextRequest,
@@ -137,6 +156,30 @@ export async function PUT(
   if (body.reminderCardNameColor !== undefined) updateData.reminderCardNameColor = body.reminderCardNameColor;
   if (body.reminderCardNameAlign !== undefined) updateData.reminderCardNameAlign = body.reminderCardNameAlign;
   if (body.reminderCardNameFont !== undefined) updateData.reminderCardNameFont = body.reminderCardNameFont;
+
+  // ─── Mchango template variables (var1..var13) ───────────────────────
+  // These back the reminder editor. Each one is a real Event column rather than
+  // a free-text blob, so the contribution tracker and the public share page
+  // read the same values the tenant typed here. `hostFamily`/`person1`/
+  // `person2`/`contactPersonPhone` had no writer anywhere in the app until
+  // now, which is why every Mchango slot used to render as an em dash.
+  for (const key of MCHANGO_EVENT_FIELDS) {
+    if (body[key] === undefined) continue;
+    const value = body[key];
+    updateData[key] =
+      key === 'contributionDeadline'
+        ? value
+          ? new Date(String(value))
+          : null
+        : value === ''
+          ? null
+          : String(value).slice(0, 400);
+  }
+
+  // Guard against a value the column cannot hold.
+  if (updateData.contributionDeadline && Number.isNaN(updateData.contributionDeadline.getTime())) {
+    delete updateData.contributionDeadline;
+  }
 
   await prisma.event.updateMany({
     where: { id: eventId, tenantId },

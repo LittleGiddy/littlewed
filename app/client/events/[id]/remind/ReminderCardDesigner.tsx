@@ -7,14 +7,12 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ModernColorPicker from '@/app/components/ModernColorPicker';
+import { CARD_FONTS } from '@/lib/card-fonts.shared';
 
-// Same list as the invitation designer so both screens feel identical.
-export const REMINDER_FONTS = [
-  'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
-  'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
-  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
-  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script',
-];
+// Only faces that exist as bundled TTFs, because the server draws the name from
+// those outlines. Offering a font the server cannot render means the delivered
+// card differs from the preview the tenant approved.
+export const REMINDER_FONTS = CARD_FONTS.map((f) => f.id);
 
 export interface CardTemplate {
   id: string;
@@ -31,9 +29,17 @@ export interface ReminderDesign {
   font: string;
 }
 
+/** True when the chosen family has no bold cut, so the server draws its regular
+ *  outlines. The preview must not synthesise a weight the server won't. */
+function fontHasBold(font: string): boolean {
+  return !CARD_FONTS.find((f) => f.id === font)?.regularOnly;
+}
+
 export const DEFAULT_REMINDER_DESIGN: ReminderDesign = {
   x: 50,
-  y: 42,
+  // Must match reminderCardNameY's default (40) and the server's fallback,
+  // otherwise "Reset" lands the name somewhere the user did not choose.
+  y: 40,
   size: 34,
   color: '#ffffff',
   align: 'center',
@@ -340,11 +346,11 @@ export default function ReminderCardDesigner({
               style={{
                 top: `${design.y}%`,
                 left: `${design.x}%`,
-                // Must match the server's textSvg anchoring exactly, otherwise
-                // the name lands in a different place on the sent card:
-                //   left   -> the name's left edge sits on x
-                //   center -> the name is centred on x
-                //   right  -> the name's right edge sits on x
+                // The server anchors the *glyph run* on x and the text's visual
+                // centre on y, so the preview has to anchor the same two things:
+                //   left   -> the glyph's left edge sits on x
+                //   center -> the glyph run is centred on x
+                //   right  -> the glyph's right edge sits on x
                 transform:
                   design.align === 'center'
                     ? 'translate(-50%, -50%)'
@@ -353,16 +359,25 @@ export default function ReminderCardDesigner({
                       : 'translate(0, -50%)',
               }}
             >
+              {/* The highlight sits on the wrapper, not the text, so the visible
+                  box never nudges the anchor the way padding on the text would.
+                  `leading-none` is deliberate: the default strut inherits the
+                  page's 16px font and would push small sizes off y. See
+                  `baselineOffsetEm` in lib/cardFonts.ts for the shared math. */}
               <span
-                className="inline-block font-bold whitespace-nowrap leading-tight px-1.5 py-0.5 rounded-md"
+                className={`pointer-events-none absolute -inset-x-2 -inset-y-1 rounded-md ${
+                  showToken ? 'bg-[#25D366]/20 outline-dashed outline-1 outline-[#25D366]' : 'bg-black/20'
+                }`}
+              />
+              <span
+                className="relative inline-block whitespace-nowrap leading-none"
                 style={{
                   // Mirrors the server: fontSize = size * (width / 800)
                   fontSize: `calc(${design.size || 34} / 8 * 1cqw)`,
+                  fontWeight: fontHasBold(design.font) ? 700 : 400,
                   color: design.color || '#ffffff',
                   fontFamily: `'${design.font}', Georgia, serif`,
                   textAlign: design.align,
-                  background: showToken ? 'rgba(37,211,102,0.18)' : 'rgba(0,0,0,0.18)',
-                  outline: showToken ? '1px dashed rgba(37,211,102,0.9)' : 'none',
                 }}
               >
                 {showToken ? GUEST_NAME_TOKEN : (sampleName || 'Guest name')}

@@ -10,14 +10,17 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
-import { isContributionSettled, formatTZS } from '@/lib/contributions';
-import { ShareLinkButton } from '@/components/ui';
+import { isContributionSettled } from '@/lib/contributions';
+import { AppSegmentedControl, ShareLinkButton } from '@/components/ui';
 import SmsCounter from '@/components/SmsCounter';
 import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import ReminderCardDesigner, {
   DEFAULT_REMINDER_DESIGN,
   type ReminderDesign,
 } from './ReminderCardDesigner';
+import MchangoVariables from './MchangoVariables';
+import ReminderCardPreview from './ReminderCardPreview';
+import type { MchangoEventSource, MchangoFieldKey } from '@/lib/whatsapp/mchango';
 
 interface Guest {
   id: string;
@@ -47,6 +50,21 @@ interface EventData {
   reminderCardNameColor?: string | null;
   reminderCardNameAlign?: string | null;
   reminderCardNameFont?: string | null;
+  // Mchango template variables (var1..var13). Seeded into the editor; a typed
+  // override wins over these for the send.
+  eventType?: string | null;
+  hostFamily?: string | null;
+  person1?: string | null;
+  person2?: string | null;
+  venue?: string | null;
+  address?: string | null;
+  date?: string | null;
+  contributionDeadline?: string | null;
+  mpesaInstructions?: string | null;
+  airtelInstructions?: string | null;
+  bankInstructions?: string | null;
+  contactPerson?: string | null;
+  contactPersonPhone?: string | null;
 }
 
 type Channel = 'whatsapp' | 'sms';
@@ -73,6 +91,34 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   // Reminder card + name placement
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [design, setDesign] = useState<ReminderDesign>(DEFAULT_REMINDER_DESIGN);
+
+  // Tenant-typed Mchango variable overrides. Only keys the tenant actually
+  // changed are held here, so everything else tracks the event row live.
+  const [mchangoOverrides, setMchangoOverrides] = useState<
+    Partial<Record<MchangoFieldKey, string>>
+  >({});
+  const [savingVariables, setSavingVariables] = useState(false);
+
+  /** The event shaped the way the Mchango resolver reads it. */
+  const mchangoEvent: MchangoEventSource | null = useMemo(() => {
+    if (!event) return null;
+    return {
+      name: event.name ?? '',
+      eventType: event.eventType,
+      hostFamily: event.hostFamily,
+      person1: event.person1,
+      person2: event.person2,
+      venue: event.venue,
+      address: event.address,
+      date: event.date ?? '',
+      contributionDeadline: event.contributionDeadline,
+      mpesaInstructions: event.mpesaInstructions,
+      airtelInstructions: event.airtelInstructions,
+      bankInstructions: event.bankInstructions,
+      contactPerson: event.contactPerson,
+      contactPersonPhone: event.contactPersonPhone,
+    };
+  }, [event]);
 
   const fetchEvent = useCallback(async (id: string) => {
     try {
@@ -169,10 +215,11 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   }, [selected]);
 
   // ─── Step model ────────────────────────────────────────────────────────
-  // WhatsApp: 0 pick card · 1 place name · 2 pick guests
-  // SMS:      0 write message · 1 pick guests
+  // WhatsApp: 0 pick the card (which also places the name) · 1 fill the
+  //            message variables · 2 pick guests
+  // SMS:      0 write the message · 1 pick guests
   const stepLabels = channel === 'whatsapp'
-    ? ['Card', 'Name', 'Guests']
+    ? ['Card', 'Message', 'Guests']
     : ['Message', 'Guests'];
   const lastStep = stepLabels.length - 1;
 
@@ -183,8 +230,8 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     setStep(0);
   };
 
-  // A WhatsApp reminder without a card can't show a name, so block step 1
-  // until one is chosen.
+  // A WhatsApp reminder without a card can't show a name, so block the later
+  // steps until one is chosen.
   const canOpenStep = (index: number) => {
     if (channel === 'whatsapp' && index >= 1 && !cardUrl) return false;
     return true;
@@ -233,9 +280,87 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     }
   }, [eventId, channel, cardUrl, design]);
 
+  // ─── Persist the template variables ───────────────────────────────────
+  // Only the slots the tenant actually changed are sent, so untouched slots keep
+  // whatever the event already held and a half-filled form cannot blank out the
+  // rest. The values are written to the Event columns (rather than kept in
+  // localStorage like the invitation composer) because the send path and the
+  // public contribution tracker both read them from the database.
+  const persistVariables = useCallback(async (): Promise<boolean> => {
+    if (!eventId || channel !== 'whatsapp') return true;
+    const keys = Object.keys(mchangoOverrides) as MchangoFieldKey[];
+    if (keys.length === 0) return true;
+
+    setSavingVariables(true);
+    try {
+      const body: Record<string, string> = {};
+      for (const key of keys) {
+        const value = mchangoOverrides[key];
+        if (value === undefined) continue;
+        switch (key) {
+          case 'occasion':
+            body.eventType = value;
+            break;
+          case 'deadline':
+            body.contributionDeadline = value;
+            break;
+          case 'mpesa':
+            body.mpesaInstructions = value;
+            break;
+          case 'airtel':
+            body.airtelInstructions = value;
+            break;
+          case 'bank':
+            body.bankInstructions = value;
+            break;
+          case 'familyName':
+            body.hostFamily = value;
+            break;
+          case 'celebrant':
+            body.person2 = value;
+            break;
+          case 'venue':
+            body.venue = value;
+            break;
+          case 'contact':
+            body.contactPersonPhone = value;
+            break;
+          case 'address':
+            body.address = value;
+            break;
+          // greetingName, eventName and date are display-only overrides: they
+          // change this send without rewriting the event the rest of the app
+          // reads from. Renaming the event from the reminder screen would
+          // silently retitle it everywhere.
+          default:
+            break;
+        }
+      }
+      if (Object.keys(body).length === 0) return true;
+
+      const res = await fetch(`/api/events/${eventId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Could not save the message details');
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not save the message details.');
+      return false;
+    } finally {
+      setSavingVariables(false);
+    }
+  }, [eventId, channel, mchangoOverrides]);
+
   const goNext = async () => {
-    if (step === 0 && channel === 'whatsapp') {
+    if (channel === 'whatsapp' && step === 0) {
       const ok = await persistDesign();
+      if (!ok) return;
+    }
+    if (channel === 'whatsapp' && step === 1) {
+      const ok = await persistVariables();
       if (!ok) return;
     }
     setStep((s) => Math.min(lastStep, s + 1));
@@ -266,7 +391,6 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
     // The card must be saved before we start rendering per-guest cards.
     if (channel === 'whatsapp' && !(await persistDesign())) return;
-
     const costText = totalCost === 0 ? 'Free' : `${totalCost} credits`;
     const ok = await confirmToast({
       title: `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} reminder to ${selectedGuests.size} guest${selectedGuests.size > 1 ? 's' : ''}?`,
@@ -280,7 +404,15 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       const res = await fetch(`/api/events/${eventId}/send-reminders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guestIds: Array.from(selectedGuests), message, channel }),
+        body: JSON.stringify({
+          guestIds: Array.from(selectedGuests),
+          message,
+          channel,
+          // The overrides travel with the send so the delivered message is
+          // built from exactly the values shown in the preview, whether or not
+          // the tenant stepped through and saved them.
+          variables: channel === 'whatsapp' ? mchangoOverrides : undefined,
+        }),
         credentials: 'include',
       });
       const data = await res.json();
@@ -450,60 +582,65 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
           ) : null}
 
           {/* ─── Channel switch ─── */}
-          <div className="bg-surface-2 rounded-card p-1 grid grid-cols-2 gap-1">
-            {([
-              { key: 'whatsapp' as const, label: 'WhatsApp', icon: MessageCircle, on: 'bg-whatsapp' },
-              { key: 'sms' as const, label: 'SMS', icon: Phone, on: 'bg-brand' },
-            ]).map((c) => {
-              const active = channel === c.key;
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => selectChannel(c.key)}
-                  className={`h-11 rounded-tap text-sm font-semibold flex items-center justify-center gap-2 transition active:scale-[0.98] ${
-                    active ? `${c.on} text-white shadow-sm` : 'text-gray-600'
-                  }`}
-                >
-                  <c.icon size={15} />
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
+          <AppSegmentedControl
+            label="Reminder channel"
+            value={channel}
+            onChange={(v) => selectChannel(v as Channel)}
+            size="lg"
+            options={[
+              {
+                value: 'whatsapp',
+                label: 'WhatsApp',
+                icon: <MessageCircle className="size-4" />,
+                activeClassName: 'bg-whatsapp',
+              },
+              {
+                value: 'sms',
+                label: 'SMS',
+                icon: <Phone className="size-4" />,
+                activeClassName: 'bg-brand',
+              },
+            ]}
+          />
 
           {/* ─── Step rail ─── */}
-          <div className="flex items-center gap-1.5">
+          <ol className="flex items-center gap-1.5">
             {stepLabels.map((label, i) => {
               const active = step === i;
               const done = step > i;
               const reachable = canOpenStep(i);
               return (
-                <button
-                  key={label}
-                  type="button"
-                  disabled={!reachable || alreadyUsed}
-                  onClick={() => setStep(i)}
-                  className={`flex-1 flex items-center gap-1.5 rounded-tap px-2.5 py-2 text-[11px] font-semibold transition ${
-                    active
-                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
-                      : done
-                        ? 'text-brand'
-                        : 'text-gray-400'
-                  } disabled:opacity-40`}
-                >
-                  <span
-                    className={`w-4 h-4 rounded-full grid place-items-center text-[9px] shrink-0 ${
-                      active ? 'bg-brand text-white' : done ? 'bg-brand text-brand' : 'bg-gray-200 text-gray-400'
-                    }`}
+                <li key={label} className="flex-1">
+                  <button
+                    type="button"
+                    disabled={!reachable || alreadyUsed}
+                    onClick={() => setStep(i)}
+                    aria-current={active ? 'step' : undefined}
+                    className={`flex w-full items-center gap-1.5 rounded-tap border px-2.5 py-2 text-[11px] font-semibold transition-colors ${
+                      active
+                        ? 'border-transparent bg-surface text-ink shadow-elev-1'
+                        : done
+                          ? 'border-transparent bg-brand-soft text-brand'
+                          : 'border-line bg-surface text-muted'
+                    } disabled:opacity-40`}
                   >
-                    {done ? <Check size={9} /> : i + 1}
-                  </span>
-                  {label}
-                </button>
+                    <span
+                      className={`grid size-4 shrink-0 place-items-center rounded-full text-[9px] font-bold ${
+                        active
+                          ? 'bg-brand text-white'
+                          : done
+                            ? 'bg-brand-soft text-brand'
+                            : 'bg-surface-2 text-muted'
+                      }`}
+                    >
+                      {done ? <Check size={9} /> : i + 1}
+                    </span>
+                    <span className="truncate">{label}</span>
+                  </button>
+                </li>
               );
             })}
-          </div>
+          </ol>
 
           {/* ─── Step body ─── */}
           <div className="bg-white rounded-card border border-gray-100 p-3 sm:p-4">
@@ -511,7 +648,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               <>
                 <StepTitle
                   title="Choose a card"
-                  hint="Pick an approved card or upload your own. The guest name is added automatically."
+                  hint="Pick an approved card or upload your own, then drag the guest name onto it."
                 />
                 <ReminderCardDesigner
                   eventId={eventId!}
@@ -521,27 +658,23 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                   onChange={({ cardUrl: url, design: d }) => {
                     setCardUrl(url);
                     setDesign(d);
-                    if (url) setStep(1);
                   }}
                 />
               </>
             )}
 
-            {channel === 'whatsapp' && step === 1 && (
+            {channel === 'whatsapp' && step === 1 && mchangoEvent && (
               <>
-                <StepTitle title="Place the guest name" hint="Drag it onto the card and style it." />
-                <ReminderCardDesigner
-                  eventId={eventId!}
-                  cardUrl={cardUrl}
-                  design={design}
+                <StepTitle
+                  title="Fill in the message"
+                  hint="Every slot the WhatsApp template can personalise. Anything you leave alone keeps the event's own details."
+                />
+                <MchangoVariables
+                  event={mchangoEvent}
+                  overrides={mchangoOverrides}
+                  onChange={setMchangoOverrides}
                   sampleName={sampleName}
-                  onChange={({ cardUrl: url, design: d }) => {
-                    setCardUrl(url);
-                    setDesign(d);
-                    // Removing the card from the "place the name" step would
-                    // otherwise leave an empty screen behind.
-                    if (!url) setStep(0);
-                  }}
+                  saving={savingVariables}
                 />
               </>
             )}
@@ -591,19 +724,31 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                       {channel === 'whatsapp' ? 'WhatsApp' : 'SMS'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={toggleSelectAll}
-                    disabled={alreadyUsed || remindableGuests.length === 0}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-brand disabled:opacity-40 shrink-0"
-                  >
-                    {selectedGuests.size === remindableGuests.length && remindableGuests.length > 0 ? (
-                      <CheckSquare size={15} />
-                    ) : (
-                      <Square size={15} />
-                    )}
-                    {selectedGuests.size === remindableGuests.length && remindableGuests.length > 0 ? 'None' : 'All'}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      disabled={alreadyUsed || remindableGuests.length === 0}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-brand disabled:opacity-40"
+                    >
+                      {selectedGuests.size === remindableGuests.length && remindableGuests.length > 0 ? (
+                        <CheckSquare size={15} />
+                      ) : (
+                        <Square size={15} />
+                      )}
+                      {selectedGuests.size === remindableGuests.length && remindableGuests.length > 0
+                        ? 'None'
+                        : 'All'}
+                    </button>
+                    {channel === 'whatsapp' && cardUrl ? (
+                      <ReminderCardPreview
+                        eventId={eventId!}
+                        guests={selected.map((g) => ({ id: g.id, name: g.name, title: g.title }))}
+                        disabled={alreadyUsed}
+                        disabledHint="Reminders have already been sent for this event."
+                      />
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="relative mb-2">
@@ -733,10 +878,14 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
             <button
               type="button"
               onClick={goNext}
-              disabled={savingDesign || !canOpenStep(step + 1)}
+              disabled={savingDesign || savingVariables || !canOpenStep(step + 1)}
               className="h-12 px-5 rounded-card bg-brand text-white font-semibold text-sm flex items-center gap-1.5 active:scale-[0.98] transition disabled:opacity-40 shadow-sm"
             >
-              {savingDesign ? <Loader2 size={16} className="animate-spin" /> : <Save size={15} className="sm:hidden" />}
+              {savingDesign || savingVariables ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Save size={15} className="sm:hidden" />
+              )}
               Continue
               <ArrowRight size={15} className="hidden sm:block" />
             </button>
@@ -759,9 +908,9 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
 function StepTitle({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="mb-3">
-      <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-      {hint && <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{hint}</p>}
+    <div className="mb-4">
+      <h2 className="font-display text-lg leading-tight text-ink">{title}</h2>
+      {hint ? <p className="mt-1 text-[13px] leading-relaxed text-muted">{hint}</p> : null}
     </div>
   );
 }

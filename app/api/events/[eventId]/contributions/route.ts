@@ -38,69 +38,120 @@ const EVENT_FIELDS = [
   'bankInstructions',
 ] as const;
 
+/**
+ * The tenant's full contribution view.
+ *
+ * Built from the guest list rather than from the Contribution rows, because a
+ * row only exists once someone has been reminded. Reading rows alone hid every
+ * guest who has not been reminded yet, which made "All" show an incomplete
+ * list and left the tenant unable to record a contribution for a guest before
+ * sending the first reminder.
+ *
+ * `hasContribution` distinguishes a real tracked row from a guest who is
+ * simply included by virtue of being on the list.
+ */
+async function tenantPayload(eventId: string, tenantId: string) {
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      venue: true,
+      address: true,
+      person1: true,
+      person2: true,
+      hostFamily: true,
+      contributionsEnabled: true,
+      eventType: true,
+      contributionDeadline: true,
+      contributionTarget: true,
+      contributionCurrency: true,
+      mpesaInstructions: true,
+      airtelInstructions: true,
+      bankInstructions: true,
+    },
+  });
+  if (!event) return null;
+
+  const guests = await prisma.guest.findMany({
+    where: { eventId },
+    select: {
+      id: true,
+      name: true,
+      title: true,
+      phone: true,
+      reminderCount: true,
+      contribution: {
+        select: {
+          id: true,
+          status: true,
+          amountPaid: true,
+          amountExpected: true,
+          note: true,
+          updatedByName: true,
+          remindedAt: true,
+          remindedCount: true,
+          updatedAt: true,
+        },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  const rows = guests.map((g) => {
+    const c = g.contribution;
+    return {
+      id: c?.id ?? '',
+      guestId: g.id,
+      guestName: g.title ? `${g.title} ${g.name}` : g.name,
+      // Tenant view shows the full number: they need it to send reminders and
+      // to reconcile against a bank statement.
+      phone: g.phone,
+      phoneMasked: maskPhone(g.phone),
+      status: parseContributionStatus(c?.status),
+      amountPaid: c?.amountPaid ?? 0,
+      amountExpected: c?.amountExpected ?? null,
+      note: c?.note ?? null,
+      updatedByName: c?.updatedByName ?? null,
+      // The guest's own counter is the live one; the contribution row's copy is
+      // only written when a reminder actually sends.
+      remindedCount: g.reminderCount,
+      remindedAt: c?.remindedAt ?? null,
+      updatedAt: c?.updatedAt ?? null,
+      /** False for a guest who has never been reminded and so has no row yet. */
+      hasContribution: !!c,
+    };
+  });
+
+  // Sort so the money that needs attention surfaces first: anyone not settled,
+  // then by how much is still outstanding, then alphabetically.
+  const rank: Record<ContributionStatus, number> = { PARTIAL: 0, PENDING: 1, PAID: 2 };
+  rows.sort((a, b) => {
+    const byStatus = rank[a.status] - rank[b.status];
+    if (byStatus !== 0) return byStatus;
+    const byGuest = a.guestName.localeCompare(b.guestName);
+    if (byGuest !== 0) return byGuest;
+    return (b.amountPaid ?? 0) - (a.amountPaid ?? 0);
+  });
+
+  const summary = summariseContributions(
+    rows.map((r) => ({ status: r.status, amountPaid: r.amountPaid, amountExpected: r.amountExpected })),
+    { target: event.contributionTarget, currency: event.contributionCurrency }
+  );
+
+  return { event, summary, rows };
+}
+
 export async function GET(_req: NextRequest, { params }: Ctx) {
   const auth = await requireTenantSession();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { eventId } = await params;
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId, tenantId: auth.tenantId },
-    include: {
-      contributions: {
-        include: {
-          guest: {
-            select: { id: true, name: true, title: true, phone: true, reminderCount: true },
-          },
-        },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      },
-    },
-  });
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  const payload = await tenantPayload(eventId, auth.tenantId);
+  if (!payload) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-  const summary = summariseContributions(event.contributions, {
-    target: event.contributionTarget,
-    currency: event.contributionCurrency,
-  });
-
-  return NextResponse.json({
-    event: {
-      id: event.id,
-      name: event.name,
-      date: event.date,
-      venue: event.venue,
-      address: event.address,
-      person1: event.person1,
-      person2: event.person2,
-      hostFamily: event.hostFamily,
-      contributionsEnabled: event.contributionsEnabled,
-      eventType: event.eventType,
-      contributionDeadline: event.contributionDeadline,
-      contributionTarget: event.contributionTarget,
-      contributionCurrency: event.contributionCurrency,
-      mpesaInstructions: event.mpesaInstructions,
-      airtelInstructions: event.airtelInstructions,
-      bankInstructions: event.bankInstructions,
-    },
-    summary,
-    rows: event.contributions.map((c) => ({
-      id: c.id,
-      guestId: c.guestId,
-      guestName: c.guest.title ? `${c.guest.title} ${c.guest.name}` : c.guest.name,
-      // Tenant view shows the full number: they need it to send reminders and
-      // to reconcile against a bank statement.
-      phone: c.guest.phone,
-      phoneMasked: maskPhone(c.guest.phone),
-      status: parseContributionStatus(c.status),
-      amountPaid: c.amountPaid,
-      amountExpected: c.amountExpected,
-      note: c.note,
-      updatedByName: c.updatedByName,
-      remindedAt: c.remindedAt,
-      remindedCount: c.remindedCount,
-      updatedAt: c.updatedAt,
-    })),
-  });
+  return NextResponse.json(payload);
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
@@ -209,47 +260,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     });
   }
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId, tenantId: auth.tenantId },
-    include: {
-      contributions: {
-        include: { guest: { select: { id: true, name: true, title: true, phone: true } } },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
-      },
-    },
-  });
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  // Rebuilt through the same helper as GET, so a settings save can never return
+  // a narrower event object than a plain read. The client keeps this payload
+  // as its state, and a partial event was blanking the page title.
+  const payload = await tenantPayload(eventId, auth.tenantId);
+  if (!payload) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
-  return NextResponse.json({
-    event: {
-      id: event.id,
-      contributionsEnabled: event.contributionsEnabled,
-      eventType: event.eventType,
-      contributionDeadline: event.contributionDeadline,
-      contributionTarget: event.contributionTarget,
-      contributionCurrency: event.contributionCurrency,
-      mpesaInstructions: event.mpesaInstructions,
-      airtelInstructions: event.airtelInstructions,
-      bankInstructions: event.bankInstructions,
-    },
-    summary: summariseContributions(event.contributions, {
-      target: event.contributionTarget,
-      currency: event.contributionCurrency,
-    }),
-    rows: event.contributions.map((c) => ({
-      id: c.id,
-      guestId: c.guestId,
-      guestName: c.guest.title ? `${c.guest.title} ${c.guest.name}` : c.guest.name,
-      phone: c.guest.phone,
-      phoneMasked: maskPhone(c.guest.phone),
-      status: parseContributionStatus(c.status),
-      amountPaid: c.amountPaid,
-      amountExpected: c.amountExpected,
-      note: c.note,
-      updatedByName: c.updatedByName,
-      remindedAt: c.remindedAt,
-      remindedCount: c.remindedCount,
-      updatedAt: c.updatedAt,
-    })),
-  });
+  return NextResponse.json(payload);
 }

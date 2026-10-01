@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendSMS } from '@/lib/sms/index'; // ✅ Keep this - NexSMS SMS
 import { sendWhatsAppReminder } from '@/lib/whatsapp/index';
-import { buildMchangoPersonalisation, getMchangoTemplate } from '@/lib/whatsapp/mchango';
+import { buildMchangoPersonalisation, getMchangoTemplate, MCHANGO_FIELDS, type MchangoOverrides } from '@/lib/whatsapp/mchango';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateReminderCardForGuest } from '@/lib/image-storage';
 import { sendPushToTenantRole } from '@/lib/push';
@@ -20,6 +20,26 @@ function isBillable(reminderCount: number): boolean {
   return reminderCount >= FREE_REMINDERS_PER_GUEST;
 }
 
+/**
+ * Whitelist the client-supplied template overrides.
+ *
+ * The request body is attacker-controlled, so it is filtered down to the known
+ * field keys, coerced to strings and length-capped. Without this the loop below
+ * would build the personalisation from arbitrary user input with no bound.
+ */
+function sanitiseMchangoOverrides(input: unknown): MchangoOverrides {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const source = input as Record<string, unknown>;
+  const out: MchangoOverrides = {};
+  for (const field of MCHANGO_FIELDS) {
+    const value = source[field.key];
+    if (value === undefined || value === null) continue;
+    if (typeof value !== 'string' && typeof value !== 'number') continue;
+    out[field.key] = String(value).slice(0, 400);
+  }
+  return out;
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
@@ -30,7 +50,7 @@ export async function POST(
   }
   const tenantId = (session.user as any).tenantId;
   const { eventId } = await params;
-  const { guestIds, message, channel } = await req.json();
+  const { guestIds, message, channel, variables } = await req.json();
 
   if (!guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
     return NextResponse.json({ error: 'No guests selected' }, { status: 400 });
@@ -179,23 +199,29 @@ export async function POST(
   const whatsappTemplateName = getMchangoTemplate();
   // var1..var13 are event-level, so build the payload once and reuse it. The
   // per-guest personalisation is the reminder card header image.
-  const mchangoPersonalisation = buildMchangoPersonalisation({
-    name: event.name,
-    eventType: event.eventType,
-    hostFamily: event.hostFamily,
-    person1: event.person1,
-    person2: event.person2,
-    venue: event.venue,
-    address: event.address,
-    date: event.date,
-    contributionDeadline: event.contributionDeadline,
-    mpesaInstructions: event.mpesaInstructions,
-    airtelInstructions: event.airtelInstructions,
-    bankInstructions: event.bankInstructions,
-    contactPerson: event.contactPerson,
-    contactPersonPhone: event.contactPersonPhone,
-    tenant: { name: event.tenant.name, whatsappAccount: event.tenant.whatsappAccount },
-  });
+  //
+  // `variables` carries whatever the tenant typed in the editor. They override
+  // the stored event values for this send only, so the message always matches
+  // the preview they approved even if a save had not landed yet.
+  const mchangoPersonalisation = buildMchangoPersonalisation(
+    {
+      name: event.name,
+      eventType: event.eventType,
+      hostFamily: event.hostFamily,
+      person1: event.person1,
+      person2: event.person2,
+      venue: event.venue,
+      address: event.address,
+      date: event.date,
+      contributionDeadline: event.contributionDeadline,
+      mpesaInstructions: event.mpesaInstructions,
+      airtelInstructions: event.airtelInstructions,
+      bankInstructions: event.bankInstructions,
+      contactPerson: event.contactPerson,
+      contactPersonPhone: event.contactPersonPhone,
+    },
+    sanitiseMchangoOverrides(variables)
+  );
 
   const results: Array<{ guestId: string; success: boolean; error?: string; charged: boolean }> = [];
   const sentAt = new Date();

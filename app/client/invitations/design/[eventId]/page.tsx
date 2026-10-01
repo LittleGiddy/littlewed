@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ModernColorPicker from '@/app/components/ModernColorPicker';
+import { CARD_FONTS } from '@/lib/card-fonts.shared';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
@@ -29,13 +30,10 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
-// ─── Google Fonts list ──────────────────────────────────────────────────
-const FONTS = [
-  'Playfair Display', 'DM Sans', 'Roboto', 'Lora', 'Montserrat',
-  'Georgia', 'Open Sans', 'Raleway', 'Nunito', 'Poppins',
-  'Great Vibes', 'Parisienne', 'Alex Brush', 'Tangerine',
-  'Dancing Script', 'Pacifico', 'Satisfy', 'Cedarville Cursive', 'Kaushan Script'
-];
+// ─── Font list ──────────────────────────────────────────────────────────
+// Shared with the reminder designer and restricted to families the server can
+// actually draw, so an approved design and the rendered card match.
+const FONTS = CARD_FONTS.map((f) => f.id);
 
 // ─── Layer creators ──────────────────────────────────────────────────────
 const createTextLayer = (text = 'New Text', x = 50, y = 50, isGuestName = false, isGuestType = false, isCardNumber = false) => ({

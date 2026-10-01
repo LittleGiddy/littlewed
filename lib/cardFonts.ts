@@ -2,9 +2,13 @@
 // Renders text as true SVG <path> outlines so card generation never depends
 // on system fonts being installed on the server. Font outlines come from the
 // TTF files copied to public/fonts (see scripts/copy-fonts.js).
+//
+// The font palette itself lives in lib/card-fonts.shared.ts so the browser
+// designer offers exactly the faces that can be rendered here.
 import * as opentype from 'opentype.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { isCardFontRegularOnly, resolveCardFont } from './card-fonts.shared';
 
 interface FontPair {
   regular: opentype.Font;
@@ -18,33 +22,10 @@ const FONT_FILES: Record<string, { regular: string; bold?: string }> = {
   'Great Vibes': { regular: 'GreatVibes-Regular.ttf' },
 };
 
-// Map the full designer font palette (and the old system-font names) to one
-// of the TTF families bundled in public/fonts.
-const FAMILY_ALIASES: Record<string, string> = {
-  Georgia: 'Playfair Display',
-  Lora: 'Playfair Display',
-  Parisienne: 'Playfair Display',
-  'Alex Brush': 'Playfair Display',
-  Tangerine: 'Playfair Display',
-  Pacifico: 'Playfair Display',
-  Satisfy: 'Playfair Display',
-  'Cedarville Cursive': 'Playfair Display',
-  'Kaushan Script': 'Playfair Display',
-  Arial: 'DM Sans',
-  Roboto: 'DM Sans',
-  Montserrat: 'DM Sans',
-  'Open Sans': 'DM Sans',
-  Raleway: 'DM Sans',
-  Nunito: 'DM Sans',
-  Poppins: 'DM Sans',
-  monospace: 'DM Sans',
-};
-
 const fontCache = new Map<string, FontPair>();
 
 export function resolveFontFamily(fontFamily: string): string {
-  if (FONT_FILES[fontFamily]) return fontFamily;
-  return FAMILY_ALIASES[fontFamily] || 'Playfair Display';
+  return resolveCardFont(fontFamily);
 }
 
 function fontsFor(family: string): FontPair {
@@ -55,6 +36,9 @@ function fontsFor(family: string): FontPair {
   const base = path.join(process.cwd(), 'public', 'fonts');
   const regular = opentype.parse(readFileSync(path.join(base, files.regular)));
 
+  // A family with only one weight reuses its regular outlines as the "bold" so
+  // there is no synthetic emboldening. The designer mirrors this by not asking
+  // for bold weight in the browser for those faces.
   let bold: opentype.Font = regular;
   if (files.bold) {
     try {
@@ -67,6 +51,12 @@ function fontsFor(family: string): FontPair {
   const pair: FontPair = { regular, bold };
   fontCache.set(family, pair);
   return pair;
+}
+
+/** The outlines actually used to draw card text. */
+function faceFor(family: string): opentype.Font {
+  const { regular, bold } = fontsFor(family);
+  return isCardFontRegularOnly(family) ? regular : bold;
 }
 
 export interface TextSvgOptions {
@@ -130,18 +120,25 @@ export function textSvg(options: TextSvgOptions): string {
     height = 100,
   } = options;
 
-  const family = resolveFontFamily(options.fontFamily);
-  const { bold } = fontsFor(family);
-  const emScale = fontSize / bold.unitsPerEm;
+  if (!text.trim()) {
+    // An empty string still produces a valid, fully transparent SVG so callers
+    // can composite unconditionally.
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"/>`;
+  }
 
-  const baselineY = y - ((bold.ascender + bold.descender) / 2) * emScale;
-  const advancePass = buildPathData(text, bold, fontSize, emScale, baselineY, 0);
+  const family = resolveFontFamily(options.fontFamily);
+  const face = faceFor(family);
+  const emScale = fontSize / face.unitsPerEm;
+
+  const baselineY = y + ((face.ascender + face.descender) / 2) * emScale;
+  const advancePass = buildPathData(text, face, fontSize, emScale, baselineY, 0);
 
   let startX = x;
   if (textAlign === 'center') startX = x - advancePass.widthPx / 2;
   else if (textAlign === 'right') startX = x - advancePass.widthPx;
 
-  const { d } = buildPathData(text, bold, fontSize, emScale, baselineY, startX);
+  const { d } = buildPathData(text, face, fontSize, emScale, baselineY, startX);
 
   const shadowFilter = shadow
     ? `<filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/></filter>`
@@ -156,4 +153,24 @@ export function textSvg(options: TextSvgOptions): string {
     <path d="${d}" fill="${color}"/>
   </g>
 </svg>`;
+}
+
+/**
+ * Vertical offset from a text's centre to its baseline, in em.
+ *
+ * `y` is the anchor point a designer drags, and both the designer and this
+ * renderer treat it as the visual centre of the text. A baseline sits below
+ * that centre by half the difference between the ascent and the descent, so
+ * converting "centre" to "baseline" means adding this.
+ *
+ * The browser derives the same value from the font's own metrics: with a
+ * line-height of `L`, half-leading is `(L - (ascender + |descender|)) / 2` and
+ * the baseline sits at `halfLeading + ascender`, so the centre-to-baseline
+ * distance is `(ascender - |descender|) / 2` — the same expression below. The
+ * designer relies on that equivalence, so this is the one place the sign has to
+ * be right.
+ */
+export function baselineOffsetEm(fontFamily: string): number {
+  const face = faceFor(resolveFontFamily(fontFamily));
+  return (face.ascender + face.descender) / 2 / face.unitsPerEm;
 }

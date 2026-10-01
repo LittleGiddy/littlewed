@@ -41,10 +41,44 @@ export default async function ContributionsPage({
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, contributionsEnabled: true },
-    include: {
-      contributions: {
-        include: { guest: { select: { id: true, name: true, title: true, phone: true } } },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+    select: {
+      id: true,
+      name: true,
+      eventType: true,
+      date: true,
+      contributionDeadline: true,
+      venue: true,
+      address: true,
+      hostFamily: true,
+      person1: true,
+      person2: true,
+      contributionCurrency: true,
+      contributionTarget: true,
+      mpesaInstructions: true,
+      airtelInstructions: true,
+      bankInstructions: true,
+      // Every guest, not just the ones with a Contribution row, so the first
+      // paint matches what /api/public/.../contributions returns. Selecting the
+      // relation alone made the server-rendered list shorter than the list the
+      // client fetched on the next refresh.
+      guests: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          phone: true,
+          contribution: {
+            select: {
+              id: true,
+              status: true,
+              amountPaid: true,
+              amountExpected: true,
+              note: true,
+              updatedAt: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
       },
     },
   });
@@ -52,10 +86,14 @@ export default async function ContributionsPage({
   if (!event) notFound();
 
   const currency = event.contributionCurrency || 'TZS';
-  const summary = summariseContributions(event.contributions, {
-    target: event.contributionTarget,
-    currency,
-  });
+  const summary = summariseContributions(
+    event.guests.map((g) => ({
+      status: g.contribution?.status,
+      amountPaid: g.contribution?.amountPaid ?? 0,
+      amountExpected: g.contribution?.amountExpected ?? null,
+    })),
+    { target: event.contributionTarget, currency }
+  );
 
   // Server-render the first paint so the page is readable before hydration and
   // so the data is correct on a cold load, then let the client take over.
@@ -78,17 +116,19 @@ export default async function ContributionsPage({
       bankInstructions: event.bankInstructions,
     },
     summary,
-    rows: event.contributions.map((c) => ({
-      id: c.id,
-      guestId: c.guestId,
-      guestName: c.guest.title ? `${c.guest.title} ${c.guest.name}` : c.guest.name,
+    rows: event.guests.map((g) => ({
+      // Empty until a row exists: the guest is on the event but has not been
+      // tracked yet, which is a different state from a tracked zero.
+      id: g.contribution?.id ?? '',
+      guestId: g.id,
+      guestName: g.title ? `${g.title} ${g.name}` : g.name,
       // Masked. The full number is never sent to this page.
-      phone: maskPhone(c.guest.phone),
-      status: parseContributionStatus(c.status),
-      amountPaid: c.amountPaid,
-      amountExpected: c.amountExpected,
-      note: c.note,
-      updatedAt: c.updatedAt.toISOString(),
+      phone: maskPhone(g.phone),
+      status: parseContributionStatus(g.contribution?.status),
+      amountPaid: g.contribution?.amountPaid ?? 0,
+      amountExpected: g.contribution?.amountExpected ?? null,
+      note: g.contribution?.note ?? null,
+      updatedAt: g.contribution?.updatedAt?.toISOString() ?? null,
     })),
   };
 

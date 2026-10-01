@@ -15,7 +15,12 @@ cloudinary.config({
 });
 
 // ─── Constants ──────────────────────────────────────────────────────────
-const DESIGNER_WIDTH = 800;
+/**
+ * The canvas width the card designers lay out against. Name sizes are stored
+ * in these units and scaled to the real card width at render time, so the same
+ * design works for an 800px upload and a 1080px one.
+ */
+export const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
 
 // ─── Type definitions ─────────────────────────────────────────────────────
@@ -495,53 +500,81 @@ export async function generateReminderCardForGuest(
 
   const cardBuffer = await fetchTemplateBuffer(event.reminderCardUrl);
 
-  // ─── 1. Actual image dimensions ──────────────────────────────────────
-  const metadata = await sharp(cardBuffer).metadata();
-  const actualWidth = metadata.width || 800;
-  const actualHeight = metadata.height || 1200;
+  // Reminder cards scale their name by width, matching the designer's 1cqw
+  // units. Height is resolved inside composeReminderCard from the same buffer,
+  // so the two cannot drift.
+  const { width = DESIGNER_WIDTH } = await sharp(cardBuffer).metadata();
+  const scaleFactor = width / DESIGNER_WIDTH;
 
-  // Reminder cards scale their name by width (matches the preview's 1cqw units).
-  const scaleFactor = actualWidth / DESIGNER_WIDTH;
-
-  // ─── 2. Guest name ───────────────────────────────────────────────────
+  // ─── Guest name ──────────────────────────────────────────────────────
   const name = getGuestFullName(guest);
   if (!name) {
     throw new Error('Guest has no name');
   }
 
-  const x = ((event.reminderCardNameX ?? 50) / 100) * actualWidth;
-  const y = ((event.reminderCardNameY ?? 40) / 100) * actualHeight;
   const fontSize = Math.round((event.reminderCardNameSize ?? 34) * scaleFactor);
-  const align = (event.reminderCardNameAlign === 'left' || event.reminderCardNameAlign === 'right'
-    ? event.reminderCardNameAlign
-    : 'center') as 'left' | 'center' | 'right';
+  const finalBuffer = await composeReminderCard(cardBuffer, name, {
+    fontSize,
+    fontFamily: event.reminderCardNameFont || 'Playfair Display',
+    color: event.reminderCardNameColor || '#ffffff',
+    align: normaliseReminderAlign(event.reminderCardNameAlign),
+    // Percentages are resolved against the card's real pixel dimensions, so a
+    // 1080x1620 upload lands the name in the same spot as an 800x1200 one.
+    xPct: event.reminderCardNameX ?? 50,
+    yPct: event.reminderCardNameY ?? 40,
+  });
 
-  try {
-    const textImage = await renderTextSvg(name, {
-      fontSize,
-      fontFamily: event.reminderCardNameFont || 'Playfair Display',
-      color: event.reminderCardNameColor || '#ffffff',
-      width: actualWidth,
-      height: actualHeight,
-      x,
-      y,
-      rotation: 0,
-      shadow: false,
-      textAlign: align,
-    });
+  const filePath = `${event.tenantId}/${guest.id}-reminder`;
+  const publicUrl = await saveToCloudinary(finalBuffer, filePath);
 
-    const finalBuffer = await sharp(cardBuffer)
-      .composite([{ input: textImage, top: 0, left: 0 }])
-      .png()
-      .toBuffer();
+  console.log('[ReminderCard] ✅ Saved:', publicUrl);
+  return publicUrl;
+}
 
-    const filePath = `${event.tenantId}/${guest.id}-reminder`;
-    const publicUrl = await saveToCloudinary(finalBuffer, filePath);
+export interface ReminderCardNameSettings {
+  fontSize: number;
+  fontFamily: string;
+  color: string;
+  align: 'left' | 'center' | 'right';
+  /** Percentage from the card's left edge. */
+  xPct: number;
+  /** Percentage from the card's top edge. */
+  yPct: number;
+}
 
-    console.log('[ReminderCard] ✅ Saved:', publicUrl);
-    return publicUrl;
-  } catch (error) {
-    console.error('[ReminderCard] Composition failed:', error);
-    throw error;
-  }
+export function normaliseReminderAlign(value: string | null | undefined): 'left' | 'center' | 'right' {
+  return value === 'left' || value === 'right' ? value : 'center';
+}
+
+/**
+ * Draws the guest name onto a reminder card at the position the designer chose.
+ *
+ * Kept separate from `generateReminderCardForGuest` so the preview endpoint can
+ * produce the exact bytes that would be sent, without uploading anything. If
+ * the placement math changes here it changes for both, so the preview can never
+ * drift from the delivered card.
+ */
+export async function composeReminderCard(
+  cardBuffer: Buffer,
+  name: string,
+  settings: ReminderCardNameSettings
+): Promise<Buffer> {
+  const metadata = await sharp(cardBuffer).metadata();
+  const actualWidth = metadata.width || 800;
+  const actualHeight = metadata.height || 1200;
+
+  const textImage = await renderTextSvg(name, {
+    fontSize: settings.fontSize,
+    fontFamily: settings.fontFamily,
+    color: settings.color,
+    width: actualWidth,
+    height: actualHeight,
+    x: (settings.xPct / 100) * actualWidth,
+    y: (settings.yPct / 100) * actualHeight,
+    rotation: 0,
+    shadow: false,
+    textAlign: settings.align,
+  });
+
+  return sharp(cardBuffer).composite([{ input: textImage, top: 0, left: 0 }]).png().toBuffer();
 }

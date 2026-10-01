@@ -1,27 +1,54 @@
-// app/[eventId]/contributions/ContributionTracker.tsx
+// app/[id]/contributions/ContributionTracker.tsx
+//
+// Public, shared contribution tracker. Anyone with the link can open it and
+// update their own status, so this screen is deliberately read-mostly: it shows
+// the progress of the whole event but only ever edits the row a guest taps.
+//
+// Visual language is shared with the tenant-side manager (widgets.tsx) so the
+// two do not drift apart, but there is no settings screen and no share control
+// here — there is nothing for a guest to configure and no second audience to
+// share with.
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Banknote,
   CalendarClock,
   Check,
-  ChevronDown,
-  CircleDashed,
+  Copy,
   Loader2,
   MapPin,
   MessageCircle,
   PartyPopper,
+  Phone,
   RefreshCw,
+  Search,
+  Smartphone,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
+  AppAvatar,
+  AppBottomSheet,
+  AppButton,
+  AppCard,
+  AppCardTitle,
+  AppChip,
+  AppEmptyState,
+  AppInput,
+  AppSegmentedControl,
+} from '@/components/ui';
+import {
   CONTRIBUTION_STATUSES,
+  CONTRIBUTION_STATUS_META,
   formatTZS,
   type ContributionStatus,
 } from '@/lib/contributions';
+import { motionEase, useReducedMotion, useTransition } from '@/lib/motion';
+import { ProgressRing, StatTiles, buildTiles } from '@/app/client/events/[id]/contributions/widgets';
 
 interface TrackerEvent {
   id: string;
@@ -42,15 +69,17 @@ interface TrackerEvent {
 }
 
 interface TrackerRow {
+  /** Empty for a guest who has no Contribution row yet. */
   id: string;
   guestId: string;
   guestName: string;
+  /** Masked server-side. Never the full number. */
   phone: string;
   status: ContributionStatus;
   amountPaid: number;
   amountExpected: number | null;
   note: string | null;
-  updatedAt: string;
+  updatedAt: string | null;
 }
 
 interface TrackerSummary {
@@ -58,6 +87,7 @@ interface TrackerSummary {
   pending: number;
   partial: number;
   paid: number;
+  settled: number;
   outstanding: number;
   collected: number;
   target: number | null;
@@ -70,38 +100,22 @@ interface TrackerPayload {
   rows: TrackerRow[];
 }
 
-const STATUS_META: Record<
-  ContributionStatus,
-  { label: string; labelSw: string; icon: typeof Check; chip: string; dot: string }
-> = {
-  PENDING: {
-    label: 'Not started',
-    labelSw: 'Bado',
-    icon: CircleDashed,
-    chip: 'bg-surface-2 text-muted ring-line',
-    dot: 'bg-muted',
-  },
-  PARTIAL: {
-    label: 'Partial',
-    labelSw: 'Sehemu',
-    icon: RefreshCw,
-    chip: 'bg-warn-soft text-warn ring-warn-border',
-    dot: 'bg-warn',
-  },
-  PAID: {
-    label: 'Completed',
-    labelSw: 'Imekamilika',
-    icon: Check,
-    chip: 'bg-success-soft text-success ring-success-border',
-    dot: 'bg-success',
-  },
+type Filter = 'ALL' | ContributionStatus;
+
+const STATUS_BG: Record<ContributionStatus, string> = {
+  PENDING: 'bg-muted',
+  PARTIAL: 'bg-warn',
+  PAID: 'bg-success',
 };
 
-function initials(name: string): string {
-  const parts = name.replace(/^(mr|mrs|miss|ms|dr|prof)\.?\s+/i, '').split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
+const STATUS_DOT: Record<ContributionStatus, string> = {
+  PENDING: 'bg-muted',
+  PARTIAL: 'bg-warn',
+  PAID: 'bg-success',
+};
+
+function reducedInitial(transition: { duration: number }) {
+  return transition.duration === 0 ? { opacity: 0 } : { opacity: 0, y: 10 };
 }
 
 export default function ContributionTracker({
@@ -119,46 +133,57 @@ export default function ContributionTracker({
     setLastInitial(initialData);
     setData(initialData);
   }
-  const [filter, setFilter] = useState<'ALL' | ContributionStatus>('ALL');
+
+  const [filter, setFilter] = useState<Filter>('ALL');
   const [query, setQuery] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [draftAmount, setDraftAmount] = useState('');
-  const [draftNote, setDraftNote] = useState('');
+  const [editing, setEditing] = useState<TrackerRow | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const transition = useTransition();
+  const reduced = useReducedMotion();
 
   const currency = data.event.currency || data.summary.currency || 'TZS';
 
-  const setStatus = useCallback(
-    async (row: TrackerRow, status: ContributionStatus) => {
-      if (row.status === status) return;
-      setSavingId(row.id);
+  /**
+   * One write path for the whole screen.
+   *
+   * The server echoes back a full payload, so a successful write replaces the
+   * summary and rows wholesale rather than patching them locally. That is what
+   * keeps a guest's optimistic tap from leaving the headline numbers stale.
+   */
+  const patch = useCallback(
+    async (
+      row: TrackerRow,
+      body: Record<string, unknown>,
+      successMessage: string
+    ) => {
+      setSavingId(row.guestId);
       const previous = data;
-      // Optimistic: this is a one-tap action on a phone and the network round
-      // trip is slow enough that waiting makes it feel broken.
-      setData((cur) => ({
-        ...cur,
-        rows: cur.rows.map((r) => (r.id === row.id ? { ...r, status } : r)),
-      }));
+      // Optimistic: one tap on a phone over a slow connection should not feel
+      // like it did nothing.
+      if ('status' in body) {
+        setData((cur) => ({
+          ...cur,
+          rows: cur.rows.map((r) =>
+            r.guestId === row.guestId ? { ...r, status: body.status as ContributionStatus } : r
+          ),
+        }));
+      }
       try {
         const res = await fetch(`/api/public/events/${eventId}/contributions`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ guestId: row.guestId, status }),
+          body: JSON.stringify({ guestId: row.guestId, ...body }),
         });
-        const payload = await res.json();
+        const payload = await res.json().catch(() => null);
         if (!res.ok) throw new Error(payload?.error || 'Could not save');
-        setData((cur) => ({
-          ...cur,
-          summary: payload.summary,
-          rows: payload.rows,
-        }));
-        toast.success(
-          status === 'PAID' ? `${row.guestName} marked completed` : `${row.guestName} updated`
-        );
+        setData((cur) => ({ ...cur, summary: payload.summary, rows: payload.rows }));
+        toast.success(successMessage);
+        return true;
       } catch (error) {
         setData(previous);
         toast.error(error instanceof Error ? error.message : 'Could not save');
+        return false;
       } finally {
         setSavingId(null);
       }
@@ -166,34 +191,16 @@ export default function ContributionTracker({
     [data, eventId]
   );
 
-  const saveAmounts = useCallback(
-    async (row: TrackerRow) => {
-      const amountPaid = Number(draftAmount.replace(/[^\d]/g, '')) || 0;
-      setSavingId(row.id);
-      try {
-        const res = await fetch(`/api/public/events/${eventId}/contributions`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            guestId: row.guestId,
-            amountPaid,
-            note: draftNote.trim() || undefined,
-          }),
-        });
-        const payload = await res.json();
-        if (!res.ok) throw new Error(payload?.error || 'Could not save');
-        setData((cur) => ({ ...cur, summary: payload.summary, rows: payload.rows }));
-        setExpandedId(null);
-        setDraftAmount('');
-        setDraftNote('');
-        toast.success('Amount recorded');
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Could not save');
-      } finally {
-        setSavingId(null);
-      }
+  const setStatus = useCallback(
+    (row: TrackerRow, status: ContributionStatus) => {
+      if (row.status === status) return;
+      void patch(
+        row,
+        { status },
+        status === 'PAID' ? `Asante, ${firstName(row.guestName)}! Marked completed` : 'Updated'
+      );
     },
-    [draftAmount, draftNote, eventId]
+    [patch]
   );
 
   const refresh = useCallback(async () => {
@@ -201,8 +208,7 @@ export default function ContributionTracker({
     try {
       const res = await fetch(`/api/public/events/${eventId}/contributions`);
       if (!res.ok) throw new Error('Could not refresh');
-      const payload = await res.json();
-      setData(payload);
+      setData(await res.json());
       toast.success('Updated');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not refresh');
@@ -225,400 +231,529 @@ export default function ContributionTracker({
       ? Math.min(100, Math.round((data.summary.collected / data.summary.target) * 100))
       : null;
 
-  const counts = {
-    ALL: data.rows.length,
-    PENDING: data.summary.pending,
-    PARTIAL: data.summary.partial,
-    PAID: data.summary.paid,
-  } as const;
-
   const occasion = data.event.eventType || data.event.name;
+  // Flattened into plain objects rather than a filtered tuple array: narrowing
+  // a `readonly ['Bank', string | null, Icon]` union needs a per-entry predicate.
+  const instructions = [
+    { label: 'M-Pesa', value: data.event.mpesaInstructions, Icon: Smartphone },
+    { label: 'Airtel Money', value: data.event.airtelInstructions, Icon: Phone },
+    { label: 'Bank', value: data.event.bankInstructions, Icon: Banknote },
+  ].filter((entry): entry is { label: string; value: string; Icon: typeof Banknote } =>
+    Boolean(entry.value)
+  );
 
   return (
     <div className="min-h-dvh bg-canvas pb-16">
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="relative overflow-hidden bg-brand text-white">
-        <div
+      {/* ── Hero ──────────────────────────────────────────────────────────── */}
+      <header className="relative overflow-hidden bg-brand pb-14 pt-12 text-white sm:pb-16 sm:pt-16">
+        <motion.div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[0.14]"
+          className="pointer-events-none absolute inset-0 opacity-[0.16]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.16 }}
+          transition={{ duration: reduced ? 0 : 0.8 }}
           style={{
             backgroundImage:
               'radial-gradient(circle at 18% 12%, #ffffff 0, transparent 42%), radial-gradient(circle at 88% 82%, #7fb5b4 0, transparent 46%)',
           }}
         />
-        <div className="relative mx-auto w-full max-w-3xl px-5 pb-10 pt-12 sm:px-8 sm:pt-16">
-          <p className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-brand-200">
-            <PartyPopper className="size-3.5" aria-hidden="true" />
-            Contribution tracker
-          </p>
-          <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">
-            {occasion}
-          </h1>
-          <p className="mt-2 text-sm text-brand-100">
-            {data.event.hostFamily || data.event.name}
-          </p>
+        <div className="relative mx-auto w-full max-w-3xl px-5 sm:px-8">
+          <motion.div
+            initial={reducedInitial(transition)}
+            animate={{ opacity: 1, y: 0 }}
+            transition={transition}
+          >
+            <p className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-brand-200">
+              <PartyPopper className="size-3.5" aria-hidden="true" />
+              Contribution tracker
+            </p>
+            <h1 className="mt-3 font-display text-3xl leading-tight sm:text-4xl">{occasion}</h1>
+            {data.event.hostFamily || data.event.name ? (
+              <p className="mt-2 text-sm text-brand-100">
+                {data.event.hostFamily || data.event.name}
+              </p>
+            ) : null}
+          </motion.div>
 
-          <dl className="mt-6 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-card bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/15">
-              <dt className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-brand-200">
-                <CalendarClock className="size-3.5" aria-hidden="true" />
-                Event date
-              </dt>
-              <dd className="mt-1 text-sm font-semibold">{data.event.date}</dd>
-            </div>
-            <div className="rounded-card bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/15">
-              <dt className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-brand-200">
-                <Wallet className="size-3.5" aria-hidden="true" />
-                Pay before
-              </dt>
-              <dd className="mt-1 text-sm font-semibold">{data.event.deadline}</dd>
-            </div>
-            <div className="rounded-card bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/15">
-              <dt className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-brand-200">
-                <MapPin className="size-3.5" aria-hidden="true" />
-                Venue
-              </dt>
-              <dd className="mt-1 truncate text-sm font-semibold">
-                {data.event.venue || data.event.address || '—'}
-              </dd>
-            </div>
-          </dl>
+          <motion.dl
+            className="mt-6 grid gap-2.5 sm:grid-cols-3"
+            initial="hidden"
+            animate="shown"
+            variants={{
+              hidden: {},
+              shown: { transition: { staggerChildren: reduced ? 0 : 0.06 } },
+            }}
+          >
+            {[
+              {
+                icon: CalendarClock,
+                label: 'Event date',
+                value: data.event.date,
+              },
+              {
+                icon: Wallet,
+                label: 'Pay before',
+                value: data.event.deadline,
+              },
+              {
+                icon: MapPin,
+                label: 'Venue',
+                value: data.event.venue || data.event.address || '—',
+              },
+            ].map((item) => (
+              <motion.div
+                key={item.label}
+                variants={{
+                  hidden: reduced ? { opacity: 0 } : { opacity: 0, y: 10 },
+                  shown: { opacity: 1, y: 0 },
+                }}
+                transition={transition}
+                className="rounded-card bg-white/10 px-4 py-3 ring-1 ring-inset ring-white/15"
+              >
+                <dt className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-brand-200">
+                  <item.icon className="size-3.5" aria-hidden="true" />
+                  {item.label}
+                </dt>
+                <dd className="mt-1 truncate text-sm font-semibold">{item.value}</dd>
+              </motion.div>
+            ))}
+          </motion.dl>
         </div>
       </header>
 
-      <main className="mx-auto -mt-6 w-full max-w-3xl space-y-6 px-5 sm:px-8">
-        {/* ── Progress ─────────────────────────────────────────────── */}
-        <section className="rounded-card bg-surface p-5 shadow-card sm:p-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted">
-                Collected
-              </p>
-              <p className="mt-1 font-display text-2xl leading-none sm:text-3xl">
-                {formatTZS(data.summary.collected, currency)}
-              </p>
+      <main className="relative mx-auto -mt-8 w-full max-w-3xl space-y-4 px-5 sm:px-8">
+        {/* ── Progress ────────────────────────────────────────────────────── */}
+        <AppCard>
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
+            <ProgressRing
+              pct={progressPct ?? (data.summary.collected > 0 ? 100 : 0)}
+              collected={data.summary.collected}
+              target={data.summary.target}
+              currency={currency}
+            />
+            <div className="w-full min-w-0 flex-1">
+              <StatTiles
+                tiles={buildTiles({
+                  collected: data.summary.collected,
+                  currency,
+                  total: data.summary.total,
+                  pending: data.summary.pending,
+                  partial: data.summary.partial,
+                  paid: data.summary.paid,
+                  outstanding: data.summary.outstanding,
+                })}
+              />
+              {progressPct !== null ? (
+                <p className="mt-3 text-center text-[12px] text-muted sm:text-left">
+                  <span className="font-semibold text-ink">{progressPct}%</span> of the target
+                  collected
+                  {data.summary.outstanding > 0
+                    ? ` · ${formatTZS(data.summary.outstanding, currency)} still owed`
+                    : ' · nothing outstanding'}
+                </p>
+              ) : null}
             </div>
-            {data.summary.target ? (
-              <div className="text-right">
-                <p className="text-[0.7rem] font-semibold uppercase tracking-wide text-muted">
-                  Target
-                </p>
-                <p className="mt-1 text-sm font-semibold">
-                  {formatTZS(data.summary.target, currency)}
-                </p>
-              </div>
-            ) : null}
           </div>
+        </AppCard>
 
-          {progressPct !== null ? (
-            <div className="mt-4">
-              <div
-                className="h-2.5 overflow-hidden rounded-full bg-brand-50"
-                role="progressbar"
-                aria-valuenow={progressPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Contribution progress"
-              >
-                <div
-                  className="h-full rounded-full bg-brand transition-[width] duration-500"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-              <p className="mt-2 text-xs text-muted">
-                {progressPct}% of target · {formatTZS(data.summary.outstanding, currency)}{' '}
-                outstanding
-              </p>
-            </div>
-          ) : null}
-
-          <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-            {(
-              [
-                { key: 'PENDING' as const, label: 'Not started', value: data.summary.pending },
-                { key: 'PARTIAL' as const, label: 'Partial', value: data.summary.partial },
-                { key: 'PAID' as const, label: 'Completed', value: data.summary.paid },
-              ]
-            ).map((s) => (
-              <div key={s.key} className="rounded-tap bg-surface-2 px-2 py-3">
-                <p className="font-display text-xl leading-none">{s.value}</p>
-                <p className="mt-1 text-[0.68rem] uppercase tracking-wide text-muted">
-                  {s.label}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── Payment instructions ─────────────────────────────────── */}
-        {data.event.mpesaInstructions || data.event.airtelInstructions || data.event.bankInstructions ? (
-          <section className="rounded-card bg-surface p-5 shadow-card sm:p-6">
-            <h2 className="flex items-center gap-2 font-display text-lg">
-              <Banknote className="size-4 text-brand" aria-hidden="true" />
-              How to send your contribution
-            </h2>
-            <ul className="mt-4 space-y-2.5">
-              {(
-                [
-                  ['M-Pesa', data.event.mpesaInstructions],
-                  ['Airtel Money', data.event.airtelInstructions],
-                  ['Bank', data.event.bankInstructions],
-                ] as const
-              ).map(([label, value]) =>
-                value ? (
-                  <li
-                    key={label}
-                    className="flex flex-col gap-0.5 rounded-tap bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        {/* ── How to pay ──────────────────────────────────────────────────── */}
+        {instructions.length ? (
+          <AppCard>
+            <AppCardTitle
+              title="How to send your contribution"
+              subtitle="Tap any instruction to copy it."
+            />
+            <ul className="mt-3 space-y-2">
+              {instructions.map(({ label, value, Icon }, i) => (
+                <motion.li
+                  key={label}
+                  initial={reducedInitial(transition)}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...transition, delay: i * 0.05 }}
+                >
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(value);
+                        toast.success(`${label} details copied`);
+                      } catch {
+                        toast.error('Could not copy on this device');
+                      }
+                    }}
+                    className="flex w-full items-start gap-3 rounded-tap bg-surface-2 px-3.5 py-3 text-left transition active:scale-[0.99]"
                   >
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-                      {label}
+                    <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-blob bg-brand/10 text-brand">
+                      <Icon size={15} aria-hidden="true" />
                     </span>
-                    <span className="text-sm font-medium text-ink sm:text-right">{value}</span>
-                  </li>
-                ) : null
-              )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.68rem] font-semibold uppercase tracking-wide text-brand-600">
+                        {label}
+                      </span>
+                      <span className="mt-0.5 block text-[13px] leading-snug text-ink">
+                        {value}
+                      </span>
+                    </span>
+                    <Copy size={14} className="mt-1 shrink-0 text-muted" aria-hidden="true" />
+                  </button>
+                </motion.li>
+              ))}
             </ul>
-          </section>
+          </AppCard>
         ) : null}
 
-        {/* ── Guest list ──────────────────────────────────────────── */}
-        <section className="rounded-card bg-surface shadow-card">
-          <div className="space-y-4 border-b border-line p-5 sm:p-6">
+        {/* ── Guest list ──────────────────────────────────────────────────── */}
+        <AppCard padded={false}>
+          <div className="space-y-3 border-b border-line p-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-display text-lg">
-                <Users className="size-4 text-brand" aria-hidden="true" />
-                Who has contributed
-              </h2>
+              <AppCardTitle
+                title="Who has contributed"
+                subtitle="Tap a status to update your own. Everyone sees the change immediately."
+              />
               <button
                 type="button"
-                onClick={refresh}
+                onClick={() => void refresh()}
                 disabled={refreshing}
-                className="grid size-9 place-items-center rounded-tap text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                 aria-label="Refresh"
+                className="grid size-9 shrink-0 place-items-center rounded-tap text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
               >
-                <RefreshCw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                <RefreshCw
+                  className={refreshing ? 'animate-spin' : undefined}
+                  size={16}
+                  aria-hidden="true"
+                />
               </button>
             </div>
 
-            <label className="block">
-              <span className="sr-only">Search by name or number</span>
-              <input
+            <AppSegmentedControl
+              label="Filter contributions by status"
+              value={filter}
+              onChange={(v) => setFilter(v as Filter)}
+              options={[
+                { value: 'ALL', label: `All ${data.summary.total}` },
+                { value: 'PENDING', label: `Not started ${data.summary.pending}` },
+                { value: 'PARTIAL', label: `Partial ${data.summary.partial}` },
+                { value: 'PAID', label: `Done ${data.summary.paid}` },
+              ]}
+            />
+
+            <div className="relative">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <AppInput
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or number"
-                className="h-11 w-full rounded-tap border border-line bg-surface-2 px-4 text-sm outline-none transition-colors placeholder:text-muted focus:border-brand-300 focus:bg-surface"
+                aria-label="Search guests"
+                className="pl-9"
               />
-            </label>
-
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              {(['ALL', ...CONTRIBUTION_STATUSES] as const).map((key) => {
-                const meta = key === 'ALL' ? null : STATUS_META[key];
-                const active = filter === key;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilter(key)}
-                    aria-pressed={active}
-                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-semibold transition-colors ${
-                      active
-                        ? 'bg-brand text-white'
-                        : 'bg-surface-2 text-muted ring-1 ring-inset ring-line hover:text-ink'
-                    }`}
-                  >
-                    {meta ? <meta.icon className="size-3.5" aria-hidden="true" /> : null}
-                    {key === 'ALL' ? 'All' : meta?.label}
-                    <span className={active ? 'text-white/70' : 'text-muted'}>{counts[key]}</span>
-                  </button>
-                );
-              })}
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-2"
+                >
+                  <X size={13} />
+                </button>
+              ) : null}
             </div>
           </div>
 
           {visibleRows.length === 0 ? (
-            <p className="px-6 py-14 text-center text-sm text-muted">
-              {data.rows.length === 0
-                ? 'No contributions recorded yet.'
-                : 'No one matches this filter.'}
-            </p>
+            <AppEmptyState
+              icon={<Users size={20} />}
+              size="sm"
+              title={
+                data.rows.length === 0 ? 'No guests on this event yet' : 'No guests match'
+              }
+              description={
+                data.rows.length === 0
+                  ? 'Once guests are added to the event they will appear here.'
+                  : 'Try a different name, number, or status filter.'
+              }
+            />
           ) : (
             <ul className="divide-y divide-line">
-              {visibleRows.map((row) => {
-                const meta = STATUS_META[row.status];
-                const isExpanded = expandedId === row.id;
-                const saving = savingId === row.id;
-                return (
-                  <li key={row.id} className="px-5 py-4 sm:px-6">
-                    <div className="flex items-center gap-3">
-                      <span
-                        aria-hidden="true"
-                        className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700"
-                      >
-                        {initials(row.guestName)}
-                      </span>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink">{row.guestName}</p>
-                        <p className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-                          <span className="tabular-nums">{row.phone}</span>
-                          {row.amountExpected ? (
-                            <span className="hidden sm:inline">
-                              · of {formatTZS(row.amountExpected, currency)}
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
-
-                      <span
-                        className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-semibold ring-1 ring-inset sm:inline-flex ${meta.chip}`}
-                      >
-                        <span className={`size-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
-                        {meta.label}
-                      </span>
-                    </div>
-
-                    {/* Amount line */}
-                    {row.amountPaid > 0 || row.amountExpected ? (
-                      <p className="mt-2.5 pl-[3.25rem] text-xs text-muted">
-                        <span className="font-semibold text-ink">
-                          {formatTZS(row.amountPaid, currency)}
-                        </span>
-                        {row.amountExpected ? (
-                          <>
-                            {' '}
-                            received
-                            {row.amountPaid < row.amountExpected ? (
-                              <>
-                                {' · '}
-                                {formatTZS(row.amountExpected - row.amountPaid, currency)}{' '}
-                                remaining
-                              </>
-                            ) : null}
-                          </>
-                        ) : (
-                          ' received'
-                        )}
-                      </p>
-                    ) : null}
-
-                    {row.note ? (
-                      <p className="mt-1.5 pl-[3.25rem] text-xs italic text-muted">
-                        “{row.note}”
-                      </p>
-                    ) : null}
-
-                    {/* Status control */}
-                    <div className="mt-3 grid grid-cols-3 gap-2 pl-[3.25rem]">
-                      {CONTRIBUTION_STATUSES.map((status) => {
-                        const sMeta = STATUS_META[status];
-                        const SIcon = sMeta.icon;
-                        const isActive = row.status === status;
-                        return (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => setStatus(row, status)}
-                            disabled={saving}
-                            aria-pressed={isActive}
-                            className={`flex min-h-11 items-center justify-center gap-1.5 rounded-tap px-2 py-2 text-xs font-semibold transition-all disabled:opacity-60 ${
-                              isActive
-                                ? 'bg-brand text-white shadow-sm'
-                                : 'bg-surface-2 text-muted ring-1 ring-inset ring-line hover:text-ink'
-                            }`}
-                          >
-                            {saving && isActive ? (
-                              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <SIcon className="size-3.5" aria-hidden="true" />
-                            )}
-                            {sMeta.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Amount editor */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setExpandedId(isExpanded ? null : row.id);
-                        setDraftAmount(row.amountPaid ? String(row.amountPaid) : '');
-                        setDraftNote(row.note ?? '');
-                      }}
-                      aria-expanded={isExpanded}
-                      className="mt-2 flex min-h-9 items-center gap-1.5 pl-[3.25rem] text-xs font-semibold text-brand-600 hover:text-brand"
-                    >
-                      <ChevronDown
-                        className={`size-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                        aria-hidden="true"
-                      />
-                      {isExpanded ? 'Close' : 'Record an amount'}
-                    </button>
-
-                    {isExpanded ? (
-                      <div className="mt-3 space-y-3 rounded-tap bg-surface-2 p-4 pl-[3.25rem]">
-                        <label className="block">
-                          <span className="text-xs font-semibold text-ink">
-                            Amount received ({currency})
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={draftAmount}
-                            onChange={(e) => setDraftAmount(e.target.value)}
-                            placeholder="0"
-                            className="mt-1.5 h-11 w-full rounded-tap border border-line bg-surface px-3.5 text-sm tabular-nums outline-none focus:border-brand-300"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="text-xs font-semibold text-ink">Note (optional)</span>
-                          <input
-                            type="text"
-                            value={draftNote}
-                            onChange={(e) => setDraftNote(e.target.value)}
-                            placeholder="e.g. sent via M-Pesa"
-                            maxLength={200}
-                            className="mt-1.5 h-11 w-full rounded-tap border border-line bg-surface px-3.5 text-sm outline-none focus:border-brand-300"
-                          />
-                        </label>
-                        <p className="text-[0.7rem] leading-relaxed text-muted">
-                          Reaching the expected amount marks this guest completed automatically.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => saveAmounts(row)}
-                          disabled={saving}
-                          className="inline-flex min-h-11 items-center gap-2 rounded-tap bg-brand px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                        >
-                          {saving ? (
-                            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Check className="size-4" aria-hidden="true" />
-                          )}
-                          Save
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
+              <AnimatePresence initial={false} mode="popLayout">
+                {visibleRows.map((row) => (
+                  <motion.li
+                    key={row.guestId}
+                    layout={!reduced}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: reduced ? 0 : 0.18, ease: motionEase }}
+                    className="px-4 py-3"
+                  >
+                    <GuestRow
+                      row={row}
+                      currency={currency}
+                      busy={savingId === row.guestId}
+                      onOpen={() => setEditing(row)}
+                      onSetStatus={(status) => setStatus(row, status)}
+                    />
+                  </motion.li>
+                ))}
+              </AnimatePresence>
             </ul>
           )}
-        </section>
+        </AppCard>
 
-        {/* ── Footer ──────────────────────────────────────────────── */}
-        <footer className="flex flex-col items-center gap-3 rounded-card bg-surface-2 px-5 py-6 text-center">
-          <p className="flex items-center gap-2 text-xs text-muted">
-            <MessageCircle className="size-3.5" aria-hidden="true" />
-            Statuses update instantly for everyone with this link.
-          </p>
-          <p className="text-[0.68rem] text-muted">
-            Phone numbers are hidden for privacy. Contact numbers on the cards above are the
-            official channels.
-          </p>
-        </footer>
+        <AppCard tone="tinted">
+          <div className="space-y-2 text-center">
+            <p className="flex items-center justify-center gap-2 text-[13px] font-medium text-ink">
+              <MessageCircle size={14} className="text-brand" aria-hidden="true" />
+              Updates here show instantly for everyone with this link.
+            </p>
+            <p className="text-[11px] leading-relaxed text-muted">
+              Phone numbers are hidden for privacy. The payment details above are the official
+              channels — please pay only through those.
+            </p>
+          </div>
+        </AppCard>
       </main>
+
+      <AmountSheet
+        row={editing}
+        currency={currency}
+        saving={savingId === editing?.guestId}
+        onClose={() => setEditing(null)}
+        onSave={async (amountPaid, note) => {
+          if (!editing) return false;
+          const ok = await patch(
+            editing,
+            { amountPaid, note: note.trim() || undefined },
+            'Asante, contribution recorded'
+          );
+          if (ok) setEditing(null);
+          return ok;
+        }}
+      />
     </div>
+  );
+}
+
+function firstName(full: string): string {
+  const cleaned = full.replace(/^(mr|mrs|miss|ms|dr|prof)\.?\s+/i, '');
+  return cleaned.split(/\s+/)[0] || full;
+}
+
+function GuestRow({
+  row,
+  currency,
+  busy,
+  onOpen,
+  onSetStatus,
+}: {
+  row: TrackerRow;
+  currency: string;
+  busy: boolean;
+  onOpen: () => void;
+  onSetStatus: (status: ContributionStatus) => void;
+}) {
+  const transition = useTransition();
+  const [tapped, setTapped] = useState<ContributionStatus | null>(null);
+  const meta = CONTRIBUTION_STATUS_META[row.status];
+
+  const press = (status: ContributionStatus) => {
+    setTapped(status);
+    // Cleared on the next tick so the pulse reads as feedback on the button
+    // rather than as a stuck loading state if the request is slow.
+    window.setTimeout(() => setTapped(null), 320);
+    onSetStatus(status);
+  };
+
+  const remaining =
+    row.amountExpected && row.amountExpected > row.amountPaid
+      ? row.amountExpected - row.amountPaid
+      : 0;
+
+  return (
+    <>
+      <div className="flex items-start gap-3">
+        <AppAvatar name={row.guestName} size="md" />
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[14px] font-semibold text-ink">{row.guestName}</span>
+            <AppChip
+              tone={row.status === 'PAID' ? 'success' : row.status === 'PARTIAL' ? 'warn' : 'neutral'}
+            >
+              {meta.label}
+            </AppChip>
+          </span>
+          <span className="mt-0.5 block truncate text-[12px] text-muted">
+            {row.phone}
+            {row.updatedAt
+              ? ` · updated ${new Date(row.updatedAt).toLocaleDateString()}`
+              : ' · not tracked yet'}
+          </span>
+          {row.amountPaid > 0 || row.amountExpected ? (
+            <span className="mt-1 block text-[12px] tabular-nums text-ink">
+              {formatTZS(row.amountPaid, currency)} received
+              {remaining > 0 ? (
+                <span className="text-muted"> · {formatTZS(remaining, currency)} remaining</span>
+              ) : null}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+        {CONTRIBUTION_STATUSES.map((status) => {
+          const on = row.status === status;
+          const spinning = busy && on;
+          return (
+            <motion.button
+              key={status}
+              type="button"
+              whileTap={{ scale: 0.96 }}
+              transition={transition}
+              disabled={busy}
+              aria-pressed={on}
+              aria-label={`Mark ${row.guestName} as ${CONTRIBUTION_STATUS_META[status].label}`}
+              onClick={() => press(status)}
+              className={`relative flex h-9 items-center justify-center gap-1 overflow-hidden rounded-tap text-[12px] font-semibold transition-colors disabled:opacity-50 ${
+                on ? 'text-white' : 'bg-surface-2 text-muted hover:text-ink'
+              }`}
+            >
+              {on ? (
+                <motion.span
+                  layoutId={`tracker-row-bg-${row.guestId}`}
+                  className={`absolute inset-0 ${STATUS_BG[status]}`}
+                  transition={transition}
+                />
+              ) : null}
+              {tapped === status ? (
+                <motion.span
+                  className="absolute inset-0 bg-white/25"
+                  initial={{ opacity: 0.9 }}
+                  animate={{ opacity: 0 }}
+                  transition={{ duration: 0.32 }}
+                />
+              ) : null}
+              <span className="relative z-10 inline-flex items-center gap-1">
+                {spinning ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <span
+                    className={`size-1.5 rounded-full ${on ? 'bg-white/80' : STATUS_DOT[status]}`}
+                  />
+                )}
+                {CONTRIBUTION_STATUS_META[status].label}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-2 flex min-h-9 items-center gap-1.5 text-[12px] font-semibold text-brand-600 hover:text-brand"
+      >
+        <Wallet size={13} aria-hidden="true" />
+        {row.amountPaid > 0 || row.note ? 'Edit amount or note' : 'Record an amount you sent'}
+      </button>
+    </>
+  );
+}
+
+/**
+ * Amount + note editor. Guests can record what they have sent but not the
+ * figure they are expected to pay — that is the tenant's number, and letting a
+ * shared link rewrite it would let anyone move the target.
+ */
+function AmountSheet({
+  row,
+  currency,
+  saving,
+  onClose,
+  onSave,
+}: {
+  row: TrackerRow | null;
+  currency: string;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (amountPaid: number, note: string) => Promise<boolean>;
+}) {
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+
+  // Re-seed during render rather than in an effect so opening a guest never
+  // shows the previous guest's figures for a frame.
+  const [seededId, setSeededId] = useState<string | null>(null);
+  if (row && seededId !== row.guestId) {
+    setSeededId(row.guestId);
+    setAmount(row.amountPaid ? String(row.amountPaid) : '');
+    setNote(row.note ?? '');
+  }
+
+  const paid = Number(amount.replace(/[^\d]/g, '')) || 0;
+  const dirty =
+    amount !== (row?.amountPaid ? String(row.amountPaid) : '') || note !== (row?.note ?? '');
+
+  return (
+    <AppBottomSheet
+      open={!!row}
+      onClose={onClose}
+      title={row?.guestName}
+      description={
+        row
+          ? `${row.phone}${row.amountExpected ? ` · expected ${formatTZS(row.amountExpected, currency)}` : ''}`
+          : undefined
+      }
+      footer={
+        row ? (
+          <div className="flex gap-2">
+            <AppButton variant="ghost" onClick={onClose} fullWidth>
+              Cancel
+            </AppButton>
+            <AppButton
+              onClick={() => void onSave(paid, note)}
+              loading={saving}
+              loadingText="Saving"
+              disabled={!dirty}
+              fullWidth
+              data-autofocus
+            >
+              Save
+            </AppButton>
+          </div>
+        ) : null
+      }
+    >
+      {row ? (
+        <div className="space-y-4">
+          <AppInput
+            label={`Amount you sent (${currency})`}
+            hint="Leave 0 if you have not sent anything yet."
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+          />
+
+          <AppInput
+            label="Note (optional)"
+            hint="Anything the organisers should know, e.g. which method you used."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={200}
+            placeholder="e.g. sent via M-Pesa this morning"
+          />
+
+          {row.amountExpected && paid >= row.amountExpected ? (
+            <p className="flex items-center gap-2 rounded-tap bg-success-soft px-3 py-2.5 text-[13px] text-success">
+              <Check size={14} />
+              This will be marked completed automatically.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </AppBottomSheet>
   );
 }

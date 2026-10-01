@@ -24,20 +24,58 @@ type Ctx = { params: Promise<{ eventId: string }> };
 async function loadPublicEvent(eventId: string) {
   return prisma.event.findFirst({
     where: { id: eventId, contributionsEnabled: true },
-    include: {
-      contributions: {
-        include: { guest: { select: { id: true, name: true, title: true, phone: true } } },
-        orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+    select: {
+      id: true,
+      name: true,
+      eventType: true,
+      date: true,
+      contributionDeadline: true,
+      venue: true,
+      address: true,
+      hostFamily: true,
+      person1: true,
+      person2: true,
+      contributionTarget: true,
+      contributionCurrency: true,
+      mpesaInstructions: true,
+      airtelInstructions: true,
+      bankInstructions: true,
+      // Every guest on the event, not only the ones with a Contribution row.
+      // A row appears once a reminder has been sent, so selecting on the
+      // relation alone hid guests who had never been reminded — and the public
+      // tracker is shared, so a missing guest looked like a missing person.
+      guests: {
+        select: {
+          id: true,
+          name: true,
+          title: true,
+          phone: true,
+          contribution: {
+            select: {
+              id: true,
+              status: true,
+              amountPaid: true,
+              amountExpected: true,
+              note: true,
+              updatedAt: true,
+            },
+          },
+        },
+        orderBy: { name: 'asc' },
       },
     },
   });
 }
 
 function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEvent>>>) {
-  const summary = summariseContributions(event.contributions, {
-    target: event.contributionTarget,
-    currency: event.contributionCurrency,
-  });
+  const summary = summariseContributions(
+    event.guests.map((g) => ({
+      status: g.contribution?.status,
+      amountPaid: g.contribution?.amountPaid ?? 0,
+      amountExpected: g.contribution?.amountExpected ?? null,
+    })),
+    { target: event.contributionTarget, currency: event.contributionCurrency }
+  );
 
   return {
     event: {
@@ -58,17 +96,17 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       bankInstructions: event.bankInstructions,
     },
     summary,
-    rows: event.contributions.map((c) => ({
-      id: c.id,
-      guestId: c.guestId,
-      guestName: c.guest.title ? `${c.guest.title} ${c.guest.name}` : c.guest.name,
+    rows: event.guests.map((g) => ({
+      id: g.contribution?.id ?? '',
+      guestId: g.id,
+      guestName: g.title ? `${g.title} ${g.name}` : g.name,
       // Masked only. The full number never reaches the browser on this route.
-      phone: maskPhone(c.guest.phone),
-      status: parseContributionStatus(c.status),
-      amountPaid: c.amountPaid,
-      amountExpected: c.amountExpected,
-      note: c.note,
-      updatedAt: c.updatedAt,
+      phone: maskPhone(g.phone),
+      status: parseContributionStatus(g.contribution?.status),
+      amountPaid: g.contribution?.amountPaid ?? 0,
+      amountExpected: g.contribution?.amountExpected ?? null,
+      note: g.contribution?.note ?? null,
+      updatedAt: g.contribution?.updatedAt ?? null,
     })),
   };
 }
@@ -107,36 +145,50 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     where: { guestId },
     select: { id: true, status: true, amountPaid: true, amountExpected: true },
   });
-  // Only guests who were actually reminded are listed, so an untracked guest
-  // must not be creatable from the public page.
-  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+  // Every guest on the event is now listed, so a guest without a row is a
+  // legitimate target rather than a stranger: they were added to the event
+  // after the last reminder went out. Writing a row for them is what makes the
+  // list they can see actually editable. This stays a create-only-if-listed
+  // operation on a guest already scoped to this event, and every write is
+  // attributed below, so it cannot be used to touch anything else.
   const merged = reconcileContribution({
     // Absent fields keep whatever the tenant already recorded: a public editor
     // marking a guest "Paid" must not wipe the expected amount.
-    status: ('status' in body ? parseContributionStatus(body.status) : existing.status) as never,
+    status: ('status' in body
+      ? parseContributionStatus(body.status)
+      : (existing?.status ?? 'PENDING')) as never,
     amountPaid:
-      'amountPaid' in body
-        ? (body.amountPaid as number)
-        : (existing.amountPaid as number),
+      'amountPaid' in body ? (body.amountPaid as number) : (existing?.amountPaid ?? 0),
     amountExpected:
       'amountExpected' in body
         ? ((body.amountExpected as number | null) ?? null)
-        : (existing.amountExpected as number | null),
+        : (existing?.amountExpected ?? null),
   });
 
   const note =
     'note' in body ? (body.note ? String(body.note).slice(0, 500) : null) : undefined;
 
-  await prisma.contribution.update({
-    where: { id: existing.id },
-    data: {
+  // `remindedCount` is left alone: only the reminder send path may set it, and
+  // it is deliberately 0 on a row created from the tracker.
+  await prisma.contribution.upsert({
+    where: { guestId },
+    create: {
+      eventId,
+      guestId,
+      status: merged.status,
+      amountPaid: merged.amountPaid,
+      amountExpected: merged.amountExpected,
+      note: note ?? null,
+      // Attribution matters here: this write path is unauthenticated, so the
+      // tenant needs to be able to see who touched a row.
+      updatedByName: 'Tracker (shared link)',
+    },
+    update: {
       status: merged.status,
       amountPaid: merged.amountPaid,
       amountExpected: merged.amountExpected,
       ...(note === undefined ? {} : { note }),
-      // Attribution matters here: this write path is unauthenticated, so the
-      // tenant needs to be able to see who touched a row.
       updatedByName: 'Tracker (shared link)',
     },
   });

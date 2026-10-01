@@ -54,6 +54,9 @@ export async function GET(
             testMode: true,
             thanksCardUrl: true,
             bypassPayment: true,
+            // var13 of the Mchango reminder template defaults to the business
+            // name, so the reminder editor needs it alongside the event.
+            name: true,
           },
         },
         rsvps: {

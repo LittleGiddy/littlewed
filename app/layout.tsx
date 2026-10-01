@@ -8,6 +8,13 @@ import '@fontsource/playfair-display/600.css';
 import '@fontsource/playfair-display/700.css';
 import '@fontsource/playfair-display/800.css';
 import '@fontsource/playfair-display/900.css';
+// Card designer faces. The server renders card text from the TTF outlines in
+// public/fonts, so the browser must load the very same faces or the designer
+// preview and the delivered card disagree. Latin subsets only: card names are
+// Latin, and these weights would otherwise ship for every visitor.
+import '@fontsource/dancing-script/latin-400.css';
+import '@fontsource/dancing-script/latin-700.css';
+import '@fontsource/great-vibes/latin-400.css';
 import AuthProvider from '@/components/AuthProvider';
 import ToasterWithClose from '@/components/ToasterWithClose';
 import PushManager from '@/components/PushManager';
