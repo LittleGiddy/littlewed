@@ -51,17 +51,24 @@ const GROUP_ICONS: Record<string, typeof Users> = {
 type Overrides = Partial<Record<MchangoFieldKey, string>>;
 
 /**
- * Trims each override but KEEPS the empty ones.
+ * Copies each override through untouched, KEEPING the empty ones.
  *
  * An absent key means "never touched, fall back to the event"; an empty key
  * means "I cleared this on purpose". Dropping empties here made every prefilled
  * value impossible to remove, because clearing a field quietly handed the event
  * value straight back.
+ *
+ * Nothing is trimmed. This value goes straight back into the input it came from,
+ * so normalising it here undoes the keystroke that produced it: trimming the
+ * ends of "Garden " returned "Garden", React reset the input to that, and the
+ * space key looked broken — "Garden Paradise" came out as "GardenParadise".
+ * Tidy ends belong to the preview and the wire payload, which trim in
+ * `resolveMchangoValues` without writing anything back to the form.
  */
 function normaliseOverrides(overrides: Overrides): Overrides {
   const out: Overrides = {};
   for (const [key, value] of Object.entries(overrides)) {
-    if (typeof value === 'string') out[key as MchangoFieldKey] = value.trim();
+    if (typeof value === 'string') out[key as MchangoFieldKey] = value;
   }
   return out;
 }
@@ -275,7 +282,13 @@ export default function MchangoVariables({
                                           ? event.date
                                           : event.contributionDeadline
                                     )
-                                  : current
+                                  : // The raw override, not the resolved slot: the
+                                    // resolved value has been trimmed, so feeding
+                                    // it back here would eat a trailing space the
+                                    // moment it was typed.
+                                    hasOverride
+                                    ? (clean[field.key] ?? '')
+                                    : current
                               }
                               onChange={(e) => setField(field.key, e.target.value)}
                               placeholder={field.placeholder}

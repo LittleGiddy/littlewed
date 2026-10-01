@@ -392,36 +392,40 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       for (const key of keys) {
         const value = mchangoOverrides[key];
         if (value === undefined) continue;
+        // Trimmed here rather than in the form: the box has to keep its spaces
+        // while being typed, but a leading or trailing space written to the event
+        // would show up in every other screen that reads the column.
+        const trimmed = value.replace(/^\s+/, '').replace(/\s+$/, '');
         switch (key) {
           case 'occasion':
-            body.eventType = value;
+            body.eventType = trimmed;
             break;
           case 'deadline':
-            body.contributionDeadline = value;
+            body.contributionDeadline = trimmed;
             break;
           case 'mpesa':
-            body.mpesaInstructions = value;
+            body.mpesaInstructions = trimmed;
             break;
           case 'airtel':
-            body.airtelInstructions = value;
+            body.airtelInstructions = trimmed;
             break;
           case 'bank':
-            body.bankInstructions = value;
+            body.bankInstructions = trimmed;
             break;
           case 'familyName':
-            body.hostFamily = value;
+            body.hostFamily = trimmed;
             break;
           case 'celebrant':
-            body.person2 = value;
+            body.person2 = trimmed;
             break;
           case 'venue':
-            body.venue = value;
+            body.venue = trimmed;
             break;
           case 'contact':
-            body.contactPersonPhone = value;
+            body.contactPersonPhone = trimmed;
             break;
           case 'address':
-            body.address = value;
+            body.address = trimmed;
             break;
           // greetingName, eventName and date are display-only overrides: they
           // change this send without rewriting the event the rest of the app

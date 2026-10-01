@@ -354,11 +354,31 @@ export function hasMchangoOverride(overrides: MchangoOverrides, key: MchangoFiel
  * never be deleted. Genuine gaps stay as '' rather than becoming a dash: the
  * wire format and the preview each decide their own placeholder, and
  * `missingMchangoFields` needs to be able to tell "empty" from "filled".
+ *
+ * Interior whitespace is preserved and only the ends are trimmed. Trimming the
+ * whole string on every render made the space key unusable in these boxes: the
+ * controlled input's value came back trimmed the instant a space was typed, so
+ * React reset the caret and the space never appeared — and "Garden Paradise"
+ * came out as "GardenParadise". Trimming the ends is still wanted, since a stray
+ * leading or trailing space would push a dash or a comma away from its word in
+ * the rendered message.
  */
 function slot(overrides: MchangoOverrides, key: MchangoFieldKey, fallback: string): string {
   const override = overrides[key];
   if (override === undefined || override === null) return fallback;
-  return override.trim();
+  return trimEnds(override);
+}
+
+/**
+ * Trims the ends of a string but leaves the inside alone.
+ *
+ * Plain `trim()` also strips interior spaces at both ends of every word run when
+ * a value is re-normalised, which is what silently joined words together. The
+ * preview and the wire payload both need the ends tidy; the middle must be
+ * exactly what was typed.
+ */
+function trimEnds(value: string): string {
+  return value.replace(/^\s+/, '').replace(/\s+$/, '');
 }
 
 /** `slot` for the two date slots, whose overrides arrive as ISO strings from a
