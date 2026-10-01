@@ -453,18 +453,20 @@ export function resolveMchangoValues(
  * editor pins the preview to one guest.
  */
 /**
- * Slots the template already frames on both sides.
+ * NexSMS answers HTTP 422 for the whole request when any entry in the
+ * personalisation array is an empty string:
  *
- * These sit inside a complete phrase, so an empty string leaves a sentence that
- * still reads ("…maandalizi ya Send-Off ya Neema na Kelvin itanayotarajiwa…")
- * while a dash would leave a visible mark the tenant never asked for
- * ("…na Kelvin — itanayotarajiwa…"). The preview drops these slots entirely, so
- * sending '' is also what keeps the wire and the preview identical. Every other
- * slot keeps the dash, because there a blank leaves the sentence hanging — the
- * gap "tarehe" alone is worse than "tarehe —".
+ *   "There is one or more empty value in the personalisation array."
+ *
+ * The rejection is not per-recipient — one unfilled slot fails the entire
+ * broadcast, so every one of the 13 values must always be a non-empty string.
+ * A slot with nothing to say is sent as an em dash, which is also what keeps the
+ * sentence legible instead of leaving "…maandalizi ya Send-Off ya Neema na
+ * Kelvin itanayotarajiwa" with a hole where {var6} belongs.
+ *
+ * Do not reintroduce a "blank when empty" exception here: two slots look safely
+ * omittable but taking that shortcut is precisely what produced the 422.
  */
-const BLANK_WHEN_EMPTY: ReadonlySet<MchangoFieldKey> = new Set(['greetingName', 'celebrant']);
-
 export function buildMchangoPersonalisation(
   event: MchangoEventSource,
   overrides: MchangoOverrides = {},
@@ -474,10 +476,11 @@ export function buildMchangoPersonalisation(
 
   const personalisation: Record<string, string> = {};
   for (const field of MCHANGO_FIELDS) {
-    // NexSMS rejects non-strings, and the template only ever receives strings.
-    personalisation[field.varKey] = BLANK_WHEN_EMPTY.has(field.key)
-      ? text(v[field.key], '')
-      : text(v[field.key], DASH);
+    const value = text(v[field.key], DASH);
+    // Last line of defence. `text` already substitutes the dash, but a value
+    // made only of spaces survives it, and a whitespace-only entry is rejected
+    // exactly like an empty one.
+    personalisation[field.varKey] = value.trim() === '' ? DASH : value;
   }
   return [personalisation];
 }
@@ -593,15 +596,12 @@ export function renderMchangoPreview(values: MchangoValues): string {
 /**
  * Slots the editor should flag as a gap.
  *
- * `BLANK_WHEN_EMPTY` slots are excluded: the template frames them on both sides
- * so an empty one still reads, it is sent as an empty string rather than a dash,
- * and var2 is filled per guest at send time whatever the preview shows. Flagging
- * them would train the tenant to ignore a warning that fires on a correct
- * message.
+ * Now that every slot is sent as a dash rather than an empty string, an unfilled
+ * slot really is visible to the guest, so all of them are flagged — including
+ * var2, which the send fills per guest whatever the preview shows.
  */
 export function missingMchangoFields(values: MchangoValues): MchangoFieldKey[] {
   return MCHANGO_FIELDS.filter((f) => {
-    if (BLANK_WHEN_EMPTY.has(f.key)) return false;
     const value = values[f.key].trim();
     return value === '' || value === DASH;
   }).map((f) => f.key);
