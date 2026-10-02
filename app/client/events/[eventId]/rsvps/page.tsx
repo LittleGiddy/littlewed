@@ -8,19 +8,12 @@ import {
   ArrowLeft, Calendar, MapPin, PartyPopper, Heart, CheckCircle,
   XCircle, CircleHelp, MessageSquareHeart,
 } from 'lucide-react';
+import WishBubbleList, { type WishBubble } from '@/components/WishBubbleList';
 
 interface RsvpRow {
   id: string;
   guestName: string;
   status: string;
-  createdAt: Date;
-}
-
-interface WishRow {
-  id: string;
-  guestName: string;
-  message: string;
-  attending: string | null;
   createdAt: Date;
 }
 
@@ -49,6 +42,9 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ eve
         take: 500,
       },
       wishes: {
+        // Same rule as the invitee page: only wishes a guest actually wrote.
+        // Rows with no guestId are seeded placeholders, not real messages.
+        where: { guestId: { not: null } },
         select: { id: true, guestId: true, guestName: true, message: true, attending: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
         take: 500,
@@ -71,7 +67,7 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ eve
   }
 
   const rsvps = event.rsvps as RsvpRow[];
-  const wishes = event.wishes as WishRow[];
+  const wishes = event.wishes as WishBubble[];
 
   const attendingCount = rsvps.filter(r => r.status === 'yes').length;
   const declinedCount = rsvps.filter(r => r.status === 'no').length;
@@ -190,23 +186,13 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ eve
               </div>
             </div>
           </div>
-          <div className="max-h-[32rem] overflow-y-auto">
-            {wishes.map(w => (
-              <div key={w.id} className="px-5 py-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <p className="text-sm font-bold text-gray-800 truncate">{w.guestName}</p>
-                  <span className="flex items-center gap-2 shrink-0">
-                    {w.attending && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ${statusChip(w.attending).cls}`}>
-                        {statusChip(w.attending).label}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-gray-300">{formatDistanceToNow(new Date(w.createdAt), { addSuffix: true })}</span>
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 leading-relaxed">{w.message}</p>
-              </div>
-            ))}
+          <div className="max-h-[32rem] overflow-y-auto p-4 sm:p-5">
+            <WishBubbleList
+              wishes={wishes}
+              primaryColor="#BE185D"
+              accentColor="#F6C445"
+              variant="tenant"
+            />
           </div>
         </div>
       )}

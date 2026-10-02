@@ -50,6 +50,8 @@ const GUEST_PAGE_FIELDS = [
   'weddingTheme',
   'contactPerson',
   'contactPersonPhone',
+  'contactPerson2',
+  'contactPerson2Phone',
   'masterOfCeremony',
   'mapUrl',
   // Editable user-facing texts (cover + invitee page)
@@ -118,7 +120,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ eve
       themeColors: pickColors(),
       contactPerson: pickNullable('contactPerson'),
       contactPersonPhone: pickNullable('contactPersonPhone'),
+      contactPerson2: pickNullable('contactPerson2'),
+      contactPerson2Phone: pickNullable('contactPerson2Phone'),
       masterOfCeremony: pickNullable('masterOfCeremony'),
+      // Tri-state: null means "inherit from the tenant", so only report an
+      // explicit boolean and let the editor fall back to on.
+      guestPageShowMoc:
+        typeof (event as unknown as Record<string, unknown>)['guestPageShowMoc'] === 'boolean'
+          ? (event as unknown as Record<string, unknown>)['guestPageShowMoc'] === true
+          : typeof (tenant as unknown as Record<string, unknown> | null)?.['guestPageShowMoc'] === 'boolean'
+            ? (tenant as unknown as Record<string, unknown>)['guestPageShowMoc'] === true
+            : true,
       mapUrl: pickNullable('mapUrl'),
       guestPageCoverHint: pick('guestPageCoverHint', 'Tap anywhere to open'),
       guestPageCoverSubtitle: pick('guestPageCoverSubtitle', 'your invitation awaits'),
@@ -150,7 +162,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
     if (auth.error) return auth.error;
 
     const body = await req.json();
-    const data: Record<string, string | null | string[]> = {};
+    const data: Record<string, string | boolean | null | string[]> = {};
     for (const key of GUEST_PAGE_FIELDS) {
       const raw = body[key];
       if (typeof raw === 'string') {
@@ -160,7 +172,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
           key === 'guestPageDetailsTitle' || key === 'guestPageRsvpTitle' ||
           key === 'guestPageFooterNote' ||
           key === 'weddingTheme' || key === 'contactPerson' ||
-          key === 'contactPersonPhone' || key === 'masterOfCeremony' ||
+          key === 'contactPersonPhone' || key === 'contactPerson2' ||
+          key === 'contactPerson2Phone' || key === 'masterOfCeremony' ||
           key === 'mapUrl' ||
           key === 'guestPageCoverHint' || key === 'guestPageCoverSubtitle' ||
           key === 'guestPageGreetingText' || key === 'guestPageThemeLabel' ||
@@ -173,6 +186,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ even
             ? raw.trim() === '' ? null : raw.trim()
             : raw.trim();
       }
+    }
+    // Booleans are handled separately: GUEST_PAGE_FIELDS is string-only, and the
+    // MoC switch must survive as a real boolean rather than "true"/"false" text.
+    if (typeof body.guestPageShowMoc === 'boolean') {
+      data.guestPageShowMoc = body.guestPageShowMoc;
     }
     if (Array.isArray(body.themeColors)) {
       data.themeColors = body.themeColors

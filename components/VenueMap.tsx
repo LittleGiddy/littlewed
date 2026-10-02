@@ -193,22 +193,18 @@ export default function VenueMap({
 
   return (
     <>
-      {/* Preview card — the map itself is the card background (never a blank card) */}
+      {/* Preview thumbnail. No map is loaded here: either the lightweight
+          OpenStreetMap tile image, or - when no coordinates could be resolved -
+          a plain placeholder. The real map (Leaflet or the Google embed) is only
+          created after the guest clicks, so nothing heavy loads on scroll. */}
       <div className="relative h-52 overflow-hidden rounded-card shadow-sm sm:h-64">
         {venue ? (
           <StaticMapImage lat={venue.lat} lng={venue.lng} accentColor={accentColor} />
         ) : (
-          <>
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200" aria-hidden />
-            <iframe
-              src={embedUrl}
-              className="pointer-events-none absolute inset-0 h-full w-full border-0"
-              loading="eager"
-              title="Venue map preview"
-              tabIndex={-1}
-              aria-hidden
-            />
-          </>
+          <div
+            className="absolute inset-0 bg-gradient-to-br from-slate-50 via-gray-50 to-slate-200"
+            aria-hidden
+          />
         )}
         <button
           type="button"
@@ -216,14 +212,27 @@ export default function VenueMap({
           aria-label="Open map and get directions"
           className="absolute inset-x-0 bottom-0 top-0 w-full cursor-pointer"
         >
-          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent px-4 pb-3 pt-16 text-left">
-            <span className="block text-sm font-bold text-white drop-shadow">{label || 'Venue map'}</span>
-            {address && <span className="mt-0.5 block text-xs font-medium text-white/85 drop-shadow">{address}</span>}
+          <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+            <svg
+              className="h-8 w-8 mb-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              style={{ color: accentColor }}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            <span className="text-sm font-bold text-gray-700 px-4">{label || 'Venue map'}</span>
+            {address && <span className="mt-0.5 px-4 text-xs font-medium text-gray-500">{address}</span>}
+          </span>
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 via-black/15 to-transparent px-4 pb-3 pt-16 text-left">
             <span
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold text-white shadow-lg"
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold text-white shadow-lg"
               style={{ backgroundColor: primaryColor }}
             >
-              <Navigation size={13} /> View map &amp; directions
+              <Navigation size={13} /> Tap to view map
             </span>
           </span>
         </button>

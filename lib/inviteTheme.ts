@@ -25,7 +25,11 @@ export interface GuestPageTheme {
   themeColors: string[];
   contactPerson: string | null;
   contactPersonPhone: string | null;
+  contactPerson2: string | null;
+  contactPerson2Phone: string | null;
   masterOfCeremony: string | null;
+  /** Whether the MC card may be shown. False hides it even if a name is set. */
+  showMasterOfCeremony: boolean;
   mapUrl: string | null;
   coverHint: string;
   coverSubtitle: string;
@@ -70,6 +74,13 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
     }
     return [];
   };
+  // Tri-state on purpose: only an explicit boolean counts, so null on the event
+  // keeps inheriting the tenant's choice. Default stays on to preserve the
+  // behaviour of pages created before this switch existed.
+  const pickBool = (key: string, fallback: boolean): boolean => {
+    const v = event?.[key] ?? tenant?.[key];
+    return typeof v === 'boolean' ? v : fallback;
+  };
   return {
     primaryColor: pick('guestPagePrimaryColor', '#BE185D'),
     secondaryColor: pick('guestPageSecondaryColor', '#6D28D9'),
@@ -87,7 +98,10 @@ export function resolveGuestPageTheme(event: any, tenant: any): GuestPageTheme {
     themeColors: pickArray('themeColors'),
     contactPerson: pickNullable('contactPerson'),
     contactPersonPhone: pickNullable('contactPersonPhone'),
+    contactPerson2: pickNullable('contactPerson2'),
+    contactPerson2Phone: pickNullable('contactPerson2Phone'),
     masterOfCeremony: pickNullable('masterOfCeremony'),
+    showMasterOfCeremony: pickBool('guestPageShowMoc', true),
     mapUrl: pickNullable('mapUrl'),
     coverHint: pick('guestPageCoverHint', 'Tap anywhere to open'),
     coverSubtitle: pick('guestPageCoverSubtitle', 'your invitation awaits'),

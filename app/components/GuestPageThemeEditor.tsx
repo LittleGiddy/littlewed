@@ -27,7 +27,10 @@ interface Draft {
   themeColors: string[];
   contactPerson: string;
   contactPersonPhone: string;
+  contactPerson2: string;
+  contactPerson2Phone: string;
   masterOfCeremony: string;
+  guestPageShowMoc: boolean;
   mapUrl: string;
   guestPageCoverHint: string;
   guestPageCoverSubtitle: string;
@@ -63,7 +66,10 @@ const DEFAULTS: Draft = {
   themeColors: [],
   contactPerson: '',
   contactPersonPhone: '',
+  contactPerson2: '',
+  contactPerson2Phone: '',
   masterOfCeremony: '',
+  guestPageShowMoc: true,
   mapUrl: '',
   guestPageCoverHint: 'Tap anywhere to open',
   guestPageCoverSubtitle: 'your invitation awaits',
@@ -186,7 +192,15 @@ export default function GuestPageThemeEditor({
           themeColors: asColors(data.themeColors).length > 0 ? asColors(data.themeColors) : local.themeColors,
           contactPerson: data.contactPerson || local.contactPerson || '',
           contactPersonPhone: data.contactPersonPhone || local.contactPersonPhone || '',
+          contactPerson2: data.contactPerson2 || local.contactPerson2 || '',
+          contactPerson2Phone: data.contactPerson2Phone || local.contactPerson2Phone || '',
           masterOfCeremony: data.masterOfCeremony || local.masterOfCeremony || '',
+          guestPageShowMoc:
+            typeof data.guestPageShowMoc === 'boolean'
+              ? data.guestPageShowMoc
+              : typeof local.guestPageShowMoc === 'boolean'
+                ? local.guestPageShowMoc
+                : true,
           mapUrl: data.mapUrl || local.mapUrl || '',
           guestPageCoverHint: data.guestPageCoverHint || local.guestPageCoverHint || 'Tap anywhere to open',
           guestPageCoverSubtitle: data.guestPageCoverSubtitle || local.guestPageCoverSubtitle || 'your invitation awaits',
@@ -219,6 +233,7 @@ export default function GuestPageThemeEditor({
   }, [draft, loading, activeDraftKey]);
 
   const set = (key: keyof Draft, value: string) => setDraft(d => ({ ...d, [key]: value }));
+  const setBool = (key: keyof Draft, value: boolean) => setDraft(d => ({ ...d, [key]: value }));
 
   const addThemeColor = () => {
     if (draft.themeColors.length >= 6) { toast.error('Up to 6 theme colors'); return; }
@@ -471,7 +486,7 @@ export default function GuestPageThemeEditor({
                 <input
                   value={draft.contactPerson}
                   onChange={e => set('contactPerson', e.target.value)}
-                  placeholder="e.g. Aunt Mary, +255 712 000 000"
+                  placeholder="e.g. Aunt Mary"
                   className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">Who can guests call with questions (with phone number).</p>
@@ -489,6 +504,29 @@ export default function GuestPageThemeEditor({
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <Phone size={13} className="text-brandtext" /> Second contact person
+                </label>
+                <input
+                  value={draft.contactPerson2}
+                  onChange={e => set('contactPerson2', e.target.value)}
+                  placeholder="e.g. Uncle Joseph"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Optional. A second card is shown on the invitee page when this is filled in.</p>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
+                  <Phone size={13} className="text-brandtext" /> Second contact phone number
+                </label>
+                <input
+                  value={draft.contactPerson2Phone}
+                  onChange={e => set('contactPerson2Phone', e.target.value)}
+                  placeholder="e.g. +255 713 000 000"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
                   <MicVocal size={13} className="text-brandtext" /> Master of Ceremony (MC)
                 </label>
                 <input
@@ -497,6 +535,26 @@ export default function GuestPageThemeEditor({
                   placeholder="e.g. MC John Doe"
                   className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-tap text-sm focus:ring-2 focus:ring-brandring focus:border-brandborder outline-none transition-all"
                 />
+                <label className="mt-3 flex items-center gap-2.5 cursor-pointer select-none">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={draft.guestPageShowMoc}
+                    aria-label="Show Master of Ceremony on the invitee page"
+                    onClick={() => setBool('guestPageShowMoc', !draft.guestPageShowMoc)}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${draft.guestPageShowMoc ? 'bg-brandtext' : 'bg-gray-300'}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${draft.guestPageShowMoc ? 'left-[1.375rem]' : 'left-0.5'}`}
+                    />
+                  </button>
+                  <span className="text-xs text-gray-600">
+                    Show Master of Ceremony on the invitee page
+                    <span className="block text-[11px] text-gray-400">
+                      Turn off to hide the MC card even when a name is saved.
+                    </span>
+                  </span>
+                </label>
               </div>
               <div>
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 mb-1">
@@ -964,7 +1022,13 @@ export default function GuestPageThemeEditor({
                       <span>{draft.contactPerson}{draft.contactPersonPhone ? ` · ${draft.contactPersonPhone}` : ''}</span>
                     </div>
                   )}
-                  {draft.masterOfCeremony && (
+                  {draft.contactPerson2 && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPagePrimaryColor + '18', color: draft.guestPagePrimaryColor }}>📞</span>
+                      <span>{draft.contactPerson2}{draft.contactPerson2Phone ? ` · ${draft.contactPerson2Phone}` : ''}</span>
+                    </div>
+                  )}
+                  {draft.guestPageShowMoc && draft.masterOfCeremony && (
                     <div className="flex items-center gap-2">
                       <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: draft.guestPageSecondaryColor + '18', color: draft.guestPageSecondaryColor }}>🎤</span>
                       <span>{draft.masterOfCeremony}</span>

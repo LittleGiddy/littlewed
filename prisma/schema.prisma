@@ -10,25 +10,25 @@ datasource db {
 // ─── Users & Authentication ────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String?   // Nullable for OAuth users
-  name          String
-  role          String    @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
-  tenantId      String?
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  createdAt     DateTime  @default(now())
-  phone         String?   // optional, for admin use
-  emailVerified DateTime? // null = not verified (for email/password users)
-  isActive      Boolean   @default(false)
-  image         String?   // profile picture from Google OAuth
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String? // Nullable for OAuth users
+  name            String
+  role            String    @default("CLIENT") // "SUPER_ADMIN", "CLIENT", "STAFF"
+  tenantId        String?
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  phone           String? // optional, for admin use
+  emailVerified   DateTime? // null = not verified (for email/password users)
+  isActive        Boolean   @default(false)
+  image           String? // profile picture from Google OAuth
   activeSessionId String? // single-device login: token sid must match this for CLIENT/STAFF
 
   // NextAuth relations
-  accounts      Account[]
-  sessions      Session[]
+  accounts Account[]
+  sessions Session[]
 
-  notifications Notification[]
+  notifications     Notification[]
   pushSubscriptions PushSubscription[]
 }
 
@@ -72,163 +72,170 @@ model VerificationToken {
 // ─── Your Existing Models ────────────────────────────────────────────────
 
 model EmailVerificationToken {
-  id         String   @id @default(cuid())
-  email      String
-  otp        String   // 6-digit code
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  email     String
+  otp       String // 6-digit code
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Tenant {
-  id                 String   @id @default(cuid())
+  id                 String        @id @default(cuid())
   name               String
-  subdomain          String   @unique
-  plan               String   @default("BASIC")
-  status             String   @default("ACTIVE")
-  subscriptionStatus String   @default("inactive") // "active" | "inactive" | "cancelled"
-  maxGuests          Int      @default(200)
-  createdAt          DateTime @default(now())
-  credits            Int      @default(0)
-  creditsEnabled     Boolean  @default(true) // super admin can suspend credit usage
+  subdomain          String        @unique
+  plan               String        @default("BASIC")
+  status             String        @default("ACTIVE")
+  subscriptionStatus String        @default("inactive") // "active" | "inactive" | "cancelled"
+  maxGuests          Int           @default(200)
+  createdAt          DateTime      @default(now())
+  credits            Int           @default(0)
+  creditsEnabled     Boolean       @default(true) // super admin can suspend credit usage
   transactions       Transaction[]
-  simpleEventMode    Boolean  @default(false)
-  bypassPayment      Boolean  @default(false)
-  adminEmail         String?  // email for credit request notifications
+  simpleEventMode    Boolean       @default(false)
+  bypassPayment      Boolean       @default(false)
+  adminEmail         String? // email for credit request notifications
   templateCardUrl    String?
   qrPlacementX       Float?
   qrPlacementY       Float?
   qrSize             Int?
-  testMode           Boolean  @default(false)
+  testMode           Boolean       @default(false)
   thanksCardUrl      String?
-  whatsappTemplate      String?  @default("event_invitation")
-  whatsappAccount       String?  @default("LittleWed by Mahiri")
+  whatsappTemplate   String?       @default("event_invitation")
+  whatsappAccount    String?       @default("LittleWed by Mahiri")
 
   // ─── Guest invitation page (the /invite/<passCode> page) ───────────────
-  guestPagePrimaryColor   String?  @default("#BE185D")
-  guestPageSecondaryColor String?  @default("#6D28D9")
-  guestPageAccentColor    String?  @default("#F6C445")
-  guestPageFontFamily     String?  @default("Playfair Display")
+  guestPagePrimaryColor   String? @default("#BE185D")
+  guestPageSecondaryColor String? @default("#6D28D9")
+  guestPageAccentColor    String? @default("#F6C445")
+  guestPageFontFamily     String? @default("Playfair Display")
   guestPageHeaderImage    String?
   guestPageTitle          String?
   guestPageSubtitle       String?
-  guestPageDetailsTitle   String?  @default("The Invitation")
-  guestPageRsvpTitle      String?  @default("Will You Attend?")
-  guestPageFooterNote     String?  @default("With love")
-  guestPageThemeColor     String?  @default("#E8C46B")
+  guestPageDetailsTitle   String? @default("The Invitation")
+  guestPageRsvpTitle      String? @default("Will You Attend?")
+  guestPageFooterNote     String? @default("With love")
+  guestPageThemeColor     String? @default("#E8C46B")
   guestPageCoupleImage    String?
 
   // ─── Invitee page content defaults (events fall back to these) ────────
-  weddingTheme        String?   // e.g. "Brown & Lavender"
-  themeColors         String[]  @default([]) // colors shown as circles next to the theme name
-  contactPerson       String?   // contact person's name shown on the invitee page
-  contactPersonPhone  String?   // contact person's phone number
-  masterOfCeremony    String?   // Master of Ceremony (MC)
-  mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
+  weddingTheme        String? // e.g. "Brown & Lavender"
+  themeColors         String[] @default([]) // colors shown as circles next to the theme name
+  contactPerson       String? // contact person's name shown on the invitee page
+  contactPersonPhone  String? // contact person's phone number
+  contactPerson2      String? // optional second contact person (e.g. the other parent)
+  contactPerson2Phone String? // optional second contact person's phone number
+  masterOfCeremony    String? // Master of Ceremony (MC)
+  mapUrl              String? // Google Maps URL of the venue (embedded on the invitee page)
 
   // ─── Editable user-facing text (cover + invitee page) ──────────────────
-  guestPageCoverHint            String?  @default("Tap anywhere to open")
-  guestPageCoverSubtitle        String?  @default("your invitation awaits")
-  guestPageGreetingText         String?  @default("we would be honored to have you join us")
-  guestPageThemeLabel           String?  @default("Wedding · Ceremony Theme")
-  guestPageInvitationCardLabel  String?  @default("Your invitation card")
-  guestPageReceptionLabel       String?  @default("Reception Notes")
-  guestPageContactLabel         String?  @default("Contact Person")
-  guestPageMocLabel             String?  @default("Master of Ceremony")
-  guestPageMapLabel             String?  @default("Find the Venue")
-  guestPageWishesTitle          String?  @default("Wedding Wishes")
-  guestPageWishesHint           String?  @default("Leave a little love for the couple")
-  guestPageDateLabel            String?  @default("Date")
-  guestPageTimeLabel            String?  @default("Time")
-  guestPageVenueLabel           String?  @default("Venue")
-  guestPageRsvpHint             String?  @default("Kindly RSVP so we can plan for you")
+  guestPageCoverHint           String? @default("Tap anywhere to open")
+  guestPageCoverSubtitle       String? @default("your invitation awaits")
+  guestPageGreetingText        String? @default("we would be honored to have you join us")
+  guestPageThemeLabel          String? @default("Wedding · Ceremony Theme")
+  guestPageInvitationCardLabel String? @default("Your invitation card")
+  guestPageReceptionLabel      String? @default("Reception Notes")
+  guestPageContactLabel        String? @default("Contact Person")
+  guestPageMocLabel            String? @default("Master of Ceremony")
+  guestPageMapLabel            String? @default("Find the Venue")
+  guestPageWishesTitle         String? @default("Wedding Wishes")
+  guestPageWishesHint          String? @default("Leave a little love for the couple")
+  guestPageDateLabel           String? @default("Date")
+  guestPageTimeLabel           String? @default("Time")
+  guestPageVenueLabel          String? @default("Venue")
+  guestPageRsvpHint            String? @default("Kindly RSVP so we can plan for you")
 
-  users              User[]
-  events             Event[]
-  pendingEvents      PendingEvent[]
-  creditRequests     CreditRequest[]
-  systemLogs         SystemLog[]
+  // ─── Optional invitee page blocks ──────────────────────────────────────
+  // Nullable on purpose: null means "inherit from the event / default", so a
+  // tenant-wide switch can be turned off without every event having to opt in.
+  guestPageShowMoc Boolean? // show the Master of Ceremony card (default true)
+
+  users          User[]
+  events         Event[]
+  pendingEvents  PendingEvent[]
+  creditRequests CreditRequest[]
+  systemLogs     SystemLog[]
 }
 
 model Event {
-  id              String   @id @default(cuid())
-  name            String
-  date            DateTime
-  venue           String
-  address         String
-  total_budget    Int?
-  commission_paid Boolean  @default(false)
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  guests          Guest[]
-  rsvps           Rsvp[]
-  wishes          GuestWish[]
-  createdAt       DateTime @default(now())
-  status        String   @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
-  pausedAt      DateTime? // when the event was paused/expired
-  expiresAt     DateTime? // when the event will be permanently archived
-  resumedAt     DateTime? // when the event was last resumed (for tracking)
-  reminderSent  Boolean  @default(false) // track if 24h reminder was sent
-  manualReminderSent Boolean @default(false) // track if the manual reminder-message feature was used (once per event for non-bypassed tenants)
-  expiredNotified Boolean @default(false) // track if expiration email was sent
-  checkInStartTime  DateTime? // When check-in becomes available (defaults to event date/time)
-  qrRotation       Float?   @default(0)
+  id                 String      @id @default(cuid())
+  name               String
+  date               DateTime
+  venue              String
+  address            String
+  total_budget       Int?
+  commission_paid    Boolean     @default(false)
+  tenantId           String
+  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  guests             Guest[]
+  rsvps              Rsvp[]
+  wishes             GuestWish[]
+  createdAt          DateTime    @default(now())
+  status             String      @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
+  pausedAt           DateTime? // when the event was paused/expired
+  expiresAt          DateTime? // when the event will be permanently archived
+  resumedAt          DateTime? // when the event was last resumed (for tracking)
+  reminderSent       Boolean     @default(false) // track if 24h reminder was sent
+  manualReminderSent Boolean     @default(false) // track if the manual reminder-message feature was used (once per event for non-bypassed tenants)
+  expiredNotified    Boolean     @default(false) // track if expiration email was sent
+  checkInStartTime   DateTime? // When check-in becomes available (defaults to event date/time)
+  qrRotation         Float?      @default(0)
 
   // ─── Contribution (MCHANGO) fields ───────────────────────────────────
   // These feed the approved "Mchango" WhatsApp template and the public
   // /[eventId]/contributions tracker page.
-  eventType            String?   // template var1 - e.g. "Send-Off", "Wedding"
+  eventType            String? // template var1 - e.g. "Send-Off", "Wedding"
   contributionDeadline DateTime? // template var9 - date contributions are due
-  mpesaInstructions    String?   // template var10 - e.g. "M-Pesa: 0762208760 - MAGRETH MKUMBI"
-  airtelInstructions   String?   // template var11
-  bankInstructions     String?   // template var12 - e.g. "CRDB BANK: 0152546773500 - MAGRETH MK"
-  contributionTarget   Int?      // optional event-wide fundraising target (TZS)
+  mpesaInstructions    String? // template var10 - e.g. "M-Pesa: 0762208760 - MAGRETH MKUMBI"
+  airtelInstructions   String? // template var11
+  bankInstructions     String? // template var12 - e.g. "CRDB BANK: 0152546773500 - MAGRETH MK"
+  contributionTarget   Int? // optional event-wide fundraising target (TZS)
   contributionCurrency String?   @default("TZS")
   contributionsEnabled Boolean   @default(false) // opt-in: shows the tracker + enables status tracking
 
   // ─── Wedding-specific fields ─────────────────────────────────────────
-  hostFamily  String?  // e.g., "Mr & Mrs Allan Swai"
-  person1     String?  // e.g., "Agape"
-  person2     String?  // e.g., "Gladness"
-  time        String?  // e.g., "5:00 PM"
-  imageUrl    String?  // Header image URL
+  hostFamily String? // e.g., "Mr & Mrs Allan Swai"
+  person1    String? // e.g., "Agape"
+  person2    String? // e.g., "Gladness"
+  time       String? // e.g., "5:00 PM"
+  imageUrl   String? // Header image URL
 
   // Invitation card fields
-  templateCardUrl  String?
-  qrPlacementX     Float?
-  qrPlacementY     Float?
-  qrSize           Int?
-  includeName      Boolean? @default(false)
-  namePlacementX   Float?
-  namePlacementY   Float?
-  nameFontSize     Int?
-  nameFontColor    String?  @default("#000000")
-  customMessage    String?
-  qrColor          String?  @default("#000000")
-  qrDotStyle       String?  @default("square")
-  guestCount       Int?
-  designLayers     Json?    // array of layer objects
+  templateCardUrl String?
+  qrPlacementX    Float?
+  qrPlacementY    Float?
+  qrSize          Int?
+  includeName     Boolean? @default(false)
+  namePlacementX  Float?
+  namePlacementY  Float?
+  nameFontSize    Int?
+  nameFontColor   String?  @default("#000000")
+  customMessage   String?
+  qrColor         String?  @default("#000000")
+  qrDotStyle      String?  @default("square")
+  guestCount      Int?
+  designLayers    Json? // array of layer objects
 
   // Text overlays
-  showEventName   Boolean @default(true)
-  eventNameX      Float   @default(50)
-  eventNameY      Float   @default(15)
-  eventNameSize   Int     @default(28)
-  eventNameColor  String  @default("#ffffff")
+  showEventName  Boolean @default(true)
+  eventNameX     Float   @default(50)
+  eventNameY     Float   @default(15)
+  eventNameSize  Int     @default(28)
+  eventNameColor String  @default("#ffffff")
 
-  showDate        Boolean @default(true)
-  dateX           Float   @default(50)
-  dateY           Float   @default(25)
-  dateSize        Int     @default(18)
-  dateColor       String  @default("#ffffff")
+  showDate  Boolean @default(true)
+  dateX     Float   @default(50)
+  dateY     Float   @default(25)
+  dateSize  Int     @default(18)
+  dateColor String  @default("#ffffff")
 
-  showVenue       Boolean @default(true)
-  venueX          Float   @default(50)
-  venueY          Float   @default(32)
-  venueSize       Int     @default(16)
-  venueColor      String  @default("#ffffff")
+  showVenue  Boolean @default(true)
+  venueX     Float   @default(50)
+  venueY     Float   @default(32)
+  venueSize  Int     @default(16)
+  venueColor String  @default("#ffffff")
 
-  overlayColor    String  @default("#000000")
-  overlayOpacity  Float   @default(0.2)
+  overlayColor   String @default("#000000")
+  overlayOpacity Float  @default(0.2)
 
   eventNameFontFamily String? @default("Playfair Display")
   dateFontFamily      String? @default("DM Sans")
@@ -237,61 +244,68 @@ model Event {
 
   // ─── Guest invitation page (/invite/<passCode>) ──────────────────────
   // Per-event overrides; fall back to the owning tenant's values when null.
-  guestPagePrimaryColor   String?  @default("#BE185D")
-  guestPageSecondaryColor String?  @default("#6D28D9")
-  guestPageAccentColor    String?  @default("#F6C445")
-  guestPageThemeColor     String?  @default("#E8C46B")
-  guestPageFontFamily     String?  @default("Playfair Display")
+  guestPagePrimaryColor   String? @default("#BE185D")
+  guestPageSecondaryColor String? @default("#6D28D9")
+  guestPageAccentColor    String? @default("#F6C445")
+  guestPageThemeColor     String? @default("#E8C46B")
+  guestPageFontFamily     String? @default("Playfair Display")
   guestPageHeaderImage    String?
   guestPageCoupleImage    String?
   guestPageTitle          String?
   guestPageSubtitle       String?
-  guestPageDetailsTitle   String?  @default("The Invitation")
-  guestPageRsvpTitle      String?  @default("Will You Attend?")
-  guestPageFooterNote     String?  @default("With love")
+  guestPageDetailsTitle   String? @default("The Invitation")
+  guestPageRsvpTitle      String? @default("Will You Attend?")
+  guestPageFooterNote     String? @default("With love")
 
   // ─── Invitee page content (set per event by the tenant) ──────────────
-  weddingTheme        String?   // e.g. "Brown & Lavender"
-  themeColors         String[]  @default([]) // colors shown as circles next to the theme name
-  contactPerson       String?   // contact person's name shown on the invitee page
-  contactPersonPhone  String?   // contact person's phone number
-  masterOfCeremony    String?   // Master of Ceremony (MC)
-  mapUrl              String?   // Google Maps URL of the venue (embedded on the invitee page)
+  weddingTheme        String? // e.g. "Brown & Lavender"
+  themeColors         String[] @default([]) // colors shown as circles next to the theme name
+  contactPerson       String? // contact person's name shown on the invitee page
+  contactPersonPhone  String? // contact person's phone number
+  contactPerson2      String? // optional second contact person (e.g. the other parent)
+  contactPerson2Phone String? // optional second contact person's phone number
+  masterOfCeremony    String? // Master of Ceremony (MC)
+  mapUrl              String? // Google Maps URL of the venue (embedded on the invitee page)
 
   // ─── Editable user-facing text (cover + invitee page) ──────────────────
-  guestPageCoverHint            String?  @default("Tap anywhere to open")
-  guestPageCoverSubtitle        String?  @default("your invitation awaits")
-  guestPageGreetingText         String?  @default("we would be honored to have you join us")
-  guestPageThemeLabel           String?  @default("Wedding · Ceremony Theme")
-  guestPageInvitationCardLabel  String?  @default("Your invitation card")
-  guestPageReceptionLabel       String?  @default("Reception Notes")
-  guestPageContactLabel         String?  @default("Contact Person")
-  guestPageMocLabel             String?  @default("Master of Ceremony")
-  guestPageMapLabel             String?  @default("Find the Venue")
-  guestPageWishesTitle          String?  @default("Wedding Wishes")
-  guestPageWishesHint           String?  @default("Leave a little love for the couple")
-  guestPageDateLabel            String?  @default("Date")
-  guestPageTimeLabel            String?  @default("Time")
-  guestPageVenueLabel           String?  @default("Venue")
-  guestPageRsvpHint             String?  @default("Kindly RSVP so we can plan for you")
+  guestPageCoverHint           String? @default("Tap anywhere to open")
+  guestPageCoverSubtitle       String? @default("your invitation awaits")
+  guestPageGreetingText        String? @default("we would be honored to have you join us")
+  guestPageThemeLabel          String? @default("Wedding · Ceremony Theme")
+  guestPageInvitationCardLabel String? @default("Your invitation card")
+  guestPageReceptionLabel      String? @default("Reception Notes")
+  guestPageContactLabel        String? @default("Contact Person")
+  guestPageMocLabel            String? @default("Master of Ceremony")
+  guestPageMapLabel            String? @default("Find the Venue")
+  guestPageWishesTitle         String? @default("Wedding Wishes")
+  guestPageWishesHint          String? @default("Leave a little love for the couple")
+  guestPageDateLabel           String? @default("Date")
+  guestPageTimeLabel           String? @default("Time")
+  guestPageVenueLabel          String? @default("Venue")
+  guestPageRsvpHint            String? @default("Kindly RSVP so we can plan for you")
+
+  // ─── Optional invitee page blocks ──────────────────────────────────────
+  // Nullable on purpose: null means "inherit from the tenant default", so a
+  // tenant-wide switch can be turned off without every event having to opt in.
+  guestPageShowMoc Boolean? // show the Master of Ceremony card (default true)
 
   // Thank you card
-  thankYouCardUrl       String?
-  thankYouMessage       String?
-  thankYouMessageX      Float?   @default(50)
-  thankYouMessageY      Float?   @default(50)
-  thankYouMessageSize   Int?     @default(32)
-  thankYouMessageColor  String?  @default("#ffffff")
+  thankYouCardUrl      String?
+  thankYouMessage      String?
+  thankYouMessageX     Float?  @default(50)
+  thankYouMessageY     Float?  @default(50)
+  thankYouMessageSize  Int?    @default(32)
+  thankYouMessageColor String? @default("#ffffff")
 
   // Reminder card (WhatsApp reminder designer - uploaded background + guest name overlay)
-  reminderCardUrl           String?
-  reminderCardNameX         Float?   @default(50)
-  reminderCardNameY         Float?   @default(40)
-  reminderCardNameSize      Int?     @default(34)
-  reminderCardNameColor     String?  @default("#ffffff")
-  reminderCardNameAlign     String?  @default("center") // "left" | "center" | "right"
-  reminderCardNameFont      String?  @default("Playfair Display")
-  contributions   Contribution[]
+  reminderCardUrl       String?
+  reminderCardNameX     Float?         @default(50)
+  reminderCardNameY     Float?         @default(40)
+  reminderCardNameSize  Int?           @default(34)
+  reminderCardNameColor String?        @default("#ffffff")
+  reminderCardNameAlign String?        @default("center") // "left" | "center" | "right"
+  reminderCardNameFont  String?        @default("Playfair Display")
+  contributions         Contribution[]
 }
 
 model PendingEvent {
@@ -310,44 +324,44 @@ model PendingEvent {
 }
 
 model Guest {
-  id             String    @id @default(cuid())
-  name           String
-  email          String?
-  phone          String?
-  onWhatsApp     Boolean   @default(false)  @map("on_whatsapp")
-  attending      String    @default("pending")
-  checkedIn      Boolean   @default(false)
-  checkedInAt    DateTime?
-  invitationCard String?
-  checkInCount   Int       @default(0)
-  maxCheckIns    Int       @default(1)
-  qrToken        String?
-  routingChannel String    @default("sms") @map("routing_channel")
-  eventId        String
-  event          Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  createdAt      DateTime  @default(now())
-  invitationSentAt   DateTime?
-  smsSentAt       DateTime?   // when the SMS invitation was successfully sent
-  whatsappSentAt  DateTime?   // when the WhatsApp invitation was successfully sent
+  id                    String    @id @default(cuid())
+  name                  String
+  email                 String?
+  phone                 String?
+  onWhatsApp            Boolean   @default(false) @map("on_whatsapp")
+  attending             String    @default("pending")
+  checkedIn             Boolean   @default(false)
+  checkedInAt           DateTime?
+  invitationCard        String?
+  checkInCount          Int       @default(0)
+  maxCheckIns           Int       @default(1)
+  qrToken               String?
+  routingChannel        String    @default("sms") @map("routing_channel")
+  eventId               String
+  event                 Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt             DateTime  @default(now())
+  invitationSentAt      DateTime?
+  smsSentAt             DateTime? // when the SMS invitation was successfully sent
+  whatsappSentAt        DateTime? // when the WhatsApp invitation was successfully sent
   invitationDeliveredAt DateTime?
-  invitationOpenedAt   DateTime?
-  thanksSentAt DateTime?
-  smsThanksSentAt DateTime?   // when the SMS thanks message was successfully sent
-  reminderCount   Int      @default(0)
-  lastSendStatus String?   // "SENT" | "FAILED" | "SKIPPED_LIMIT" | "NOT_SENT" - last WhatsApp attempt outcome
-  lastSendError  String?   // error/reason for the last send attempt
-  guestType  String?   @default("SINGLE")  // SINGLE | DOUBLE | FAMILIA | WAKWE
-  guestCount Int?      // Total people for FAMILIA/WAKWE groups (determines allowed scans)
-  title          String?   @default("Mr")
-  cardNumber     String?
-  cardGroupId    String?   // Shared by guests on a multi-person (DOUBLE) card
-  waId           String?   // WhatsApp ID from Meta
-  passCode       String?   @unique
+  invitationOpenedAt    DateTime?
+  thanksSentAt          DateTime?
+  smsThanksSentAt       DateTime? // when the SMS thanks message was successfully sent
+  reminderCount         Int       @default(0)
+  lastSendStatus        String? // "SENT" | "FAILED" | "SKIPPED_LIMIT" | "NOT_SENT" - last WhatsApp attempt outcome
+  lastSendError         String? // error/reason for the last send attempt
+  guestType             String?   @default("SINGLE") // SINGLE | DOUBLE | FAMILIA | WAKWE
+  guestCount            Int? // Total people for FAMILIA/WAKWE groups (determines allowed scans)
+  title                 String?   @default("Mr")
+  cardNumber            String?
+  cardGroupId           String? // Shared by guests on a multi-person (DOUBLE) card
+  waId                  String? // WhatsApp ID from Meta
+  passCode              String?   @unique
 
   // ─── Relations ──────────────────────────────────────────────────────────
-  messageLogs MessageLog[]
-  rsvps       Rsvp[]
-  wishes      GuestWish[]
+  messageLogs  MessageLog[]
+  rsvps        Rsvp[]
+  wishes       GuestWish[]
   contribution Contribution?
 
   @@index([eventId])
@@ -364,19 +378,19 @@ model Guest {
 // amountExpected exists and amountPaid has reached it - which is what stops
 // the reminder pipeline from chasing people who have already finished.
 model Contribution {
-  id         String   @id @default(cuid())
-  eventId    String
-  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  guestId    String   @unique
-  guest      Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId String @unique
+  guest   Guest  @relation(fields: [guestId], references: [id], onDelete: Cascade)
 
-  status       String   @default("PENDING") // "PENDING" | "PARTIAL" | "PAID"
-  amountPaid   Int      @default(0)         // TZS received so far
-  amountExpected Int?                      // TZS this guest owes; null = unspecified
-  note         String?                    // free-text note from whoever updated it
-  updatedByName String?                   // "a client" on the public page, or the tenant's name
-  remindedAt   DateTime?                  // last time a contribution reminder was sent
-  remindedCount Int      @default(0)
+  status         String    @default("PENDING") // "PENDING" | "PARTIAL" | "PAID"
+  amountPaid     Int       @default(0) // TZS received so far
+  amountExpected Int? // TZS this guest owes; null = unspecified
+  note           String? // free-text note from whoever updated it
+  updatedByName  String? // "a client" on the public page, or the tenant's name
+  remindedAt     DateTime? // last time a contribution reminder was sent
+  remindedCount  Int       @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -393,8 +407,8 @@ model Rsvp {
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   guestId   String?
   guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  guestName String   // snapshot of the guest's name at submit time
-  status    String   // "yes" | "no" | "pending"
+  guestName String // snapshot of the guest's name at submit time
+  status    String // "yes" | "no" | "pending"
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
@@ -410,7 +424,7 @@ model GuestWish {
   guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
   guestName String
   message   String
-  attending String?  // snapshot of the guest's RSVP status when the wish was left
+  attending String? // snapshot of the guest's RSVP status when the wish was left
   createdAt DateTime @default(now())
 
   @@index([eventId, createdAt])
@@ -420,24 +434,24 @@ model UsageRecord {
   id        String   @id @default(cuid())
   tenantId  String
   eventId   String?
-  channel   String   // "whatsapp" or "sms"
-  cost      Int      // in same unit as credits
+  channel   String // "whatsapp" or "sms"
+  cost      Int // in same unit as credits
   createdAt DateTime @default(now())
 }
 
 model CreditRequest {
-  id              String   @id @default(cuid())
-  tenantId        String
-  userId          String
+  id               String    @id @default(cuid())
+  tenantId         String
+  userId           String
   requestedCredits Int
-  amountTZS       Int      // requestedCredits * 500
-  reason          String?
-  status          String   @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
-  reviewedBy      String?  // super admin user ID
-  reviewedAt      DateTime?
-  grantedCredits  Int?     // credits actually granted (may differ from requested)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  amountTZS        Int // requestedCredits * 500
+  reason           String?
+  status           String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  reviewedBy       String? // super admin user ID
+  reviewedAt       DateTime?
+  grantedCredits   Int? // credits actually granted (may differ from requested)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -448,8 +462,8 @@ model CreditRequest {
 model Transaction {
   id              String   @id @default(cuid())
   amount          Int
-  type            String   // "CREDIT_PURCHASE" or "COMMISSION_PAYMENT"
-  status          String   // "PENDING", "COMPLETED", "FAILED"
+  type            String // "CREDIT_PURCHASE" or "COMMISSION_PAYMENT"
+  status          String // "PENDING", "COMPLETED", "FAILED"
   stripeSessionId String?
   tenantId        String
   eventId         String?
@@ -489,7 +503,7 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String?
-  type      String   // "info", "warning", "success", "alert"
+  type      String // "info", "warning", "success", "alert"
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
@@ -511,14 +525,14 @@ model PushSubscription {
 model Template {
   id        String   @id @default(cuid())
   name      String
-  imageUrl  String   // URL to the template image
+  imageUrl  String // URL to the template image
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model IncomingEmail {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   from        String
   to          String[]
   subject     String
@@ -526,24 +540,24 @@ model IncomingEmail {
   text        String?
   messageId   String?
   repliedTo   String?
-  receivedAt  DateTime @default(now())
-  eventId     String?  // Link to the original event
-  guestId     String?  // Link to the guest who replied
+  receivedAt  DateTime  @default(now())
+  eventId     String? // Link to the original event
+  guestId     String? // Link to the guest who replied
   processedAt DateTime?
 }
 
 // ─── Message Logging Models ──────────────────────────────────────────────
 
 model MessageLog {
-  id          String   @id @default(cuid())
-  messageId   String   @unique
+  id          String    @id @default(cuid())
+  messageId   String    @unique
   guestId     String?
-  guest       Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  type        String   // WHATSAPP, SMS
+  guest       Guest?    @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  type        String // WHATSAPP, SMS
   template    String?
-  status      String   // SENT, PENDING, DELIVERED, FAILED, REJECTED
+  status      String // SENT, PENDING, DELIVERED, FAILED, REJECTED
   error       String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   deliveredAt DateTime?
   rawData     Json?
 
@@ -553,11 +567,11 @@ model MessageLog {
 }
 
 model DeliveryLog {
-  id          String   @id @default(cuid())
-  messageId   String
-  status      String
-  rawData     Json
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  messageId String
+  status    String
+  rawData   Json
+  createdAt DateTime @default(now())
 
   @@index([messageId])
   @@index([createdAt])
@@ -574,7 +588,7 @@ model SystemLog {
   tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   eventId   String?
   guestId   String?
-  type      String   // e.g. "card_generation", "send", "technical"
+  type      String // e.g. "card_generation", "send", "technical"
   level     String   @default("ERROR") // "ERROR" | "WARN" | "INFO"
   message   String
   details   Json?

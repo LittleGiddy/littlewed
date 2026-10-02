@@ -7,6 +7,7 @@ import { fontStack } from '@/lib/fonts'
 import { prisma } from '@/lib/prisma'
 import RSVPForm from '@/components/RSVPForm'
 import WishForm from '@/components/WishForm'
+import WishBubbleList, { type WishBubble } from '@/components/WishBubbleList'
 import VenueMap from '@/components/VenueMap'
 
 function formatDate(date: Date) {
@@ -40,11 +41,14 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const venueEmbedUrl = await googleMapsEmbedUrl(theme.mapUrl)
   const venueMapUrl = (await resolveMapUrl(theme.mapUrl)) || normalizeMapInput(theme.mapUrl)
 
-  const wishes = await prisma.guestWish.findMany({
-    where: { eventId: event.id },
+  // Only wishes a guest actually typed are shown. Rows with no guestId are the
+  // placeholder/sample wishes some events were seeded with, and they used to
+  // appear on the invitee page as if they were real messages.
+  const wishes = (await prisma.guestWish.findMany({
+    where: { eventId: event.id, guestId: { not: null } },
     orderBy: { createdAt: 'desc' },
     take: 50,
-  })
+  })) as WishBubble[]
 
   const couple =
     event.person1 || event.person2
@@ -288,7 +292,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         </div>
 
         {/* Reception & Contacts */}
-        {(theme.contactPerson || theme.contactPersonPhone || theme.masterOfCeremony) && (
+        {(theme.contactPerson || theme.contactPersonPhone || theme.contactPerson2 || theme.contactPerson2Phone || (theme.showMasterOfCeremony && theme.masterOfCeremony)) && (
           <div className="gp-fade-up gp-fade-up-3 mb-12">
             <div className="flex items-center justify-center gap-2 mb-4">
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
@@ -296,33 +300,40 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
               <span className="h-px w-16" style={{ backgroundColor: accentColor, opacity: 0.5 }} />
             </div>
             <div className="grid gap-3">
-              {(theme.contactPerson || theme.contactPersonPhone) && (
-                <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
-                  <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${secondaryColor}88`, color: secondaryColor }}>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h1.5a1 1 0 01.9.55l1.1 2.2a1 1 0 01-.1 1.05l-1.3 1.7a14 14 0 006.5 6.5l1.7-1.3a1 1 0 011.05-.1l2.2 1.1a1 1 0 01.55.9V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
-                    </svg>
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.contactLabel}</p>
-                    <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">
-                      {theme.contactPerson}
-                      {theme.contactPersonPhone && (
-                        <>
-                          {' · '}
-                          <a
-                            href={`tel:${theme.contactPersonPhone.replace(/[^+\d]/g, '')}`}
-                            className="font-medium text-brandtext hover:underline"
-                          >
-                            {theme.contactPersonPhone}
-                          </a>
-                        </>
-                      )}
-                    </p>
+              {[
+                { name: theme.contactPerson, phone: theme.contactPersonPhone, color: secondaryColor },
+                { name: theme.contactPerson2, phone: theme.contactPerson2Phone, color: secondaryColor },
+              ].map((contact, i) =>
+                contact.name || contact.phone ? (
+                  <div key={i} className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
+                    <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${contact.color}88`, color: contact.color }}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h1.5a1 1 0 01.9.55l1.1 2.2a1 1 0 01-.1 1.05l-1.3 1.7a14 14 0 006.5 6.5l1.7-1.3a1 1 0 011.05-.1l2.2 1.1a1 1 0 01.55.9V19a2 2 0 01-2 2h-1C9.72 21 3 14.28 3 6V5z" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-[1.5px] text-gray-400 m-0 mb-0.5">{theme.contactLabel}</p>
+                      <p className="text-sm font-semibold text-gray-800 m-0 leading-snug">
+                        {contact.name}
+                        {contact.phone && (
+                          <>
+                            {' · '}
+                            <a
+                              href={`tel:${contact.phone.replace(/[^+\d]/g, '')}`}
+                              className="font-medium text-brandtext hover:underline"
+                            >
+                              {contact.phone}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                ) : null,
               )}
-              {theme.masterOfCeremony && (
+              {/* Optional: the couple can hide the MC card entirely, even when a
+                  name is saved, via the "Show Master of Ceremony" switch. */}
+              {theme.showMasterOfCeremony && theme.masterOfCeremony && (
                 <div className="flex items-center gap-4 p-4 rounded-card border border-gray-100 bg-white shadow-sm hover:shadow-md transition">
                   <span className="gp-ornament-sm shrink-0" style={{ borderColor: `${primaryColor}88`, color: primaryColor }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
@@ -405,21 +416,16 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
 
           <WishForm guestId={guest.id} primaryColor={primaryColor} secondaryColor={secondaryColor} />
 
-          {wishes.length > 0 && (
-            <div className="mt-6 space-y-3">
-              {wishes.map(wish => (
-                <div key={wish.id} className="gp-fade-scale bg-white rounded-card border border-gray-100 p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <p className="text-sm font-bold text-gray-800" style={{ color: primaryColor }}>
-                      {wish.guestName}
-                    </p>
-                    <span className="gp-heartbeat text-xs" style={{ color: primaryColor }}>&#10084;</span>
-                  </div>
-                  <p className="text-sm text-gray-600 leading-relaxed m-0">{wish.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Chat-style bubbles, one per real guest wish, with the time it was sent */}
+          <div className="mt-6 rounded-card border border-gray-100 bg-white/60 p-3 sm:p-4">
+            <WishBubbleList
+              wishes={wishes}
+              currentGuestId={guest.id}
+              primaryColor={primaryColor}
+              accentColor={accentColor}
+              secondaryColor={secondaryColor}
+            />
+          </div>
         </div>
 
         {/* Footer */}
@@ -432,14 +438,14 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
           </p>
 
           {/* LittleWed footer */}
-          <div className="flex flex-col items-center justify-center gap-1.5 mt-4 opacity-60">
+          <div className="flex flex-col items-center justify-center gap-2 mt-6 opacity-75">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/Little Wed Logo.svg"
               alt="LittleWed"
-              className="h-10 w-auto object-contain"
+              className="h-16 sm:h-20 w-auto object-contain"
             />
-            <span className="text-[9px] uppercase tracking-[3px] text-gray-400 font-semibold">Inviting Made Easy</span>
+            <span className="text-[10px] uppercase tracking-[3px] text-gray-400 font-semibold">Inviting Made Easy</span>
           </div>
 
           <Link href={`/invite/${token}`} className="inline-block mt-4 text-[11px] uppercase tracking-[2px] font-semibold text-gray-400 hover:text-gray-600 transition">
