@@ -143,12 +143,57 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const allGroup = body?.allGroup === true;
+    const undo = body?.undo === true;
 
     const guest = await prisma.guest.findFirst({
       where: { id, event: { tenantId } },
     });
     if (!guest) {
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
+    }
+
+    // ─── UNDO: step the last scan back ────────────────────────────────
+    // Door staff scan fast and mis-scan. Undo only ever removes ONE scan from
+    // ONE guest, so it can never silently clear a whole card or a WAKWE 30.
+    if (undo) {
+      const current = guest.checkInCount || 0;
+      if (current <= 0) {
+        return NextResponse.json(
+          { error: `${guest.name} is not checked in - nothing to undo.` },
+          { status: 400 }
+        );
+      }
+      const reverted = await prisma.guest.update({
+        where: { id: guest.id },
+        data: {
+          checkInCount: current - 1,
+          // checkedIn is derived from the count, so it has to be recomputed
+          // rather than simply cleared.
+          checkedIn: current - 1 >= guestTypeMaxScans(guest.guestType, guest.guestCount),
+          checkedInAt: current - 1 > 0 ? guest.checkedInAt : null,
+        },
+      });
+      const fullName = reverted.title ? `${reverted.title} ${reverted.name}` : reverted.name;
+      sendPushToTenantRole(tenantId, 'CLIENT', {
+        title: `Check-in undone: ${fullName}`,
+        body: `${fullName} is back to ${reverted.checkInCount || 0}/${guestTypeMaxScans(reverted.guestType, reverted.guestCount)}.`,
+        url: '/client/dashboard',
+        type: 'info',
+        sound: false,
+      }).catch(() => {});
+
+      return NextResponse.json({
+        success: true,
+        undid: true,
+        guest: {
+          id: reverted.id,
+          name: reverted.name,
+          checkInCount: reverted.checkInCount || 0,
+          maxCheckIns: guestTypeMaxScans(reverted.guestType, reverted.guestCount),
+          fullyCheckedIn: Boolean(reverted.checkedIn),
+        },
+        message: `Undid the last scan for ${fullName}`,
+      });
     }
 
     // ─── Detect the group (shared DOUBLE card) ──────────────────────
@@ -166,7 +211,12 @@ export async function PATCH(
 
     const updatedGuests = [];
     for (const target of targets) {
-      const tMax = guestTypeMaxScans(target.guestType, target.guestCount);
+      // A guest on a shared card is ONE person, so their ceiling is 1 - the same
+      // rule POST /api/check-in applies when it resolves a shared scan. Using
+      // guestTypeMaxScans() here would let a shared card whose members happen to
+      // be typed DOUBLE report 2 arrivals per person, so a 2-person card would
+      // count as 4.
+      const tMax = targets.length > 1 ? 1 : guestTypeMaxScans(target.guestType, target.guestCount);
       const updated = await prisma.guest.update({
         where: { id: target.id },
         data: {
@@ -185,9 +235,16 @@ export async function PATCH(
       updatedGuests.length > 1
         ? `${updatedGuests.length} guests on the card`
         : forceFullName;
+    // "Mark as Double" reuses this route, and a push that says "force checked in"
+    // for a deliberate action reads like an error on the owner's phone.
+    const viaDouble = body?.label === 'double';
     sendPushToTenantRole(tenantId, 'CLIENT', {
-      title: `${updatedGuests.length > 1 ? 'Card' : forceFullName} force checked in`,
-      body: `${label} has been force checked in.`,
+      title: viaDouble
+        ? `${updatedGuests.length > 1 ? 'Card' : forceFullName} checked in together`
+        : `${updatedGuests.length > 1 ? 'Card' : forceFullName} force checked in`,
+      body: viaDouble
+        ? `${label} marked as arrived in one go.`
+        : `${label} has been force checked in.`,
       url: '/client/dashboard',
       type: 'success',
       sound: true,
@@ -211,6 +268,15 @@ export async function PATCH(
         fullyCheckedIn: true,
         checkedInAt: firstName.checkedInAt,
       },
+      // Everyone the action touched, so the client can update the whole card in
+      // one pass instead of refetching to discover the new state.
+      updated: updatedGuests.map((g) => ({
+        id: g.id,
+        name: g.name,
+        checkInCount: g.checkInCount || 0,
+        maxCheckIns: guestTypeMaxScans(g.guestType, g.guestCount),
+        fullyCheckedIn: Boolean(g.checkedIn),
+      })),
     });
   } catch (error: any) {
     console.error('Force check-in error:', error);

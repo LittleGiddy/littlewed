@@ -11,6 +11,7 @@ import {
   Camera,
   CheckCircle,
   CheckCheck,
+  ChevronDown,
   Key,
   Loader2,
   MapPin,
@@ -20,6 +21,7 @@ import {
   Scan,
   Search,
   Trash2,
+  Undo2,
   User,
   UserCheck,
   Users,
@@ -29,6 +31,7 @@ import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
 import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
+import { canMarkAsDouble as canMarkAsDoubleRule } from '@/lib/checkin';
 import { useReducedMotion } from '@/lib/motion';
 import {
   AppAvatar,
@@ -71,6 +74,42 @@ interface ScanResult {
 }
 
 type StatusFilter = 'all' | 'fully' | 'partial' | 'not';
+
+/**
+ * How long a just-scanned card is ignored if it is scanned again.
+ *
+ * The camera stays live after a check-in so the next guest in the queue can be
+ * scanned immediately, but that means a card still held in front of the lens
+ * decodes again on the very next animation frame. Without this lock a DOUBLE
+ * guest would be counted twice from one deliberate scan.
+ */
+const RESCAN_LOCK_MS = 8000;
+
+/** A scan the operator can see and undo, kept for the length of the session. */
+interface RecentScan {
+  key: number;
+  guestId: string;
+  name: string;
+  guestType: string | null;
+  cardNumber: string | null;
+  at: number;
+  undone: boolean;
+}
+
+// ─── Haptics ──────────────────────────────────────────────────────────
+// A busy door is loud; the operator often cannot hear the beep. Vibration is
+// the channel that still gets through. Android/Chrome only - iOS Safari has no
+// Vibration API, so this silently does nothing there.
+const playHaptic = (type: 'success' | 'fail' | 'tap') => {
+  try {
+    if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
+    if (type === 'success') navigator.vibrate([18, 60, 18]);
+    else if (type === 'fail') navigator.vibrate([45, 70, 45]);
+    else navigator.vibrate(10);
+  } catch {
+    // Never let a missing/blocked vibration API break check-in.
+  }
+};
 
 // ─── Sound effects ──────────────────────────────────────────────────────
 const playSound = (type: 'success' | 'fail') => {
@@ -141,6 +180,13 @@ function guestTypeTone(guest: Guest): AppChipTone {
   return 'neutral';
 }
 
+/**
+ * A DOUBLE card can arrive as a pair at the door, so after the first scan the
+ * operator is offered "Mark as Double" instead of having to scan the same card
+ * a second time. The rules live in lib/checkin.ts.
+ */
+const canMarkAsDouble = canMarkAsDoubleRule;
+
 const STATUS_META: Record<
   Exclude<StatusFilter, 'all'>,
   { label: string; chip: AppChipTone; active: string }
@@ -175,6 +221,14 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const [deleteTarget, setDeleteTarget] = useState<Guest | null>(null);
   const [busyAction, setBusyAction] = useState(false);
 
+  // ─── New: door-speed affordances ───────────────────────────────────
+  /** Bumped on every result so the frame flash can re-trigger. */
+  const [flash, setFlash] = useState<{ tone: 'success' | 'fail'; key: number } | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [doubleBusy, setDoubleBusy] = useState(false);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -182,6 +236,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   // The decode loop is driven by an effect, so it needs the current handler
   // rather than the one captured when the loop was scheduled.
   const scanHandlerRef = useRef<(value: string) => void>(() => {});
+  // card number -> when it was last accepted, used to ignore an immediate re-scan
+  // of the same card while it is still in front of the camera.
+  const lastScanAtRef = useRef<Record<string, number>>({});
+  const recentKeyRef = useRef(0);
+  const flashKeyRef = useRef(0);
 
   // ─── Data loading ───────────────────────────────────────────────────
   const loadEventInfo = useCallback(async () => {
@@ -300,12 +359,24 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   // ─── Check-in ───────────────────────────────────────────────────────
   const processCheckin = useCallback(
     async (value: string) => {
+      const cleanValue = value.trim().padStart(5, '0');
+
+      // Re-scan lock. The camera is restarted immediately after a check-in so
+      // the next guest can be scanned without waiting, which means a card still
+      // in frame re-decodes instantly. Ignoring the same number for a few
+      // seconds is what stops one deliberate scan counting twice.
+      const now = Date.now();
+      const previous = lastScanAtRef.current[cleanValue];
+      if (previous && now - previous < RESCAN_LOCK_MS) {
+        return;
+      }
+      lastScanAtRef.current[cleanValue] = now;
+
       setLoading(true);
       setErrorMessage('');
       setLastScan(null);
 
       try {
-        const cleanValue = value.trim().padStart(5, '0');
         const res = await fetch('/api/check-in', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -316,6 +387,9 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
         if (!res.ok) {
           playSound('fail');
+          playHaptic('fail');
+          flashKeyRef.current += 1;
+          setFlash({ tone: 'fail', key: flashKeyRef.current });
           const message = data?.error || 'Check-in failed';
           setErrorMessage(message);
           toast.error(message, { icon: <AlertCircle size={18} className="text-danger" /> });
@@ -325,6 +399,9 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         }
 
         playSound('success');
+        playHaptic('success');
+        flashKeyRef.current += 1;
+        setFlash({ tone: 'success', key: flashKeyRef.current });
         setLastScan(data as ScanResult);
 
         const { guest } = data as ScanResult;
@@ -334,16 +411,41 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
           onDismiss: () => router.refresh(),
         });
 
+        recentKeyRef.current += 1;
+        setRecentScans((prev) =>
+          [
+            {
+              key: recentKeyRef.current,
+              guestId: guest.id,
+              name: fullName(guest),
+              guestType: guest.guestType ?? null,
+              cardNumber: guest.cardNumber ?? null,
+              at: Date.now(),
+              undone: false,
+            },
+            ...prev,
+          ].slice(0, 8)
+        );
+
         loadGuests();
 
+        // Bring the camera straight back rather than holding the frozen frame
+        // for four seconds. The welcome toast already shows what was scanned,
+        // so the operator can keep the queue moving while it is still up.
+        if (activeTab === 'scan') startCamera();
+
+        // The result card stays up long enough to press "Mark as Double"; a
+        // DOUBLE card needs a longer window because it carries a decision.
+        const holdMs = canMarkAsDouble(guest) ? 9000 : 4000;
         setTimeout(() => {
-          setLastScan(null);
+          setLastScan((current) => (current?.guest.id === guest.id ? null : current));
           setErrorMessage('');
-          setCardNumber('');
-          if (activeTab === 'scan') startCamera();
-        }, 4000);
+        }, holdMs);
       } catch {
         playSound('fail');
+        playHaptic('fail');
+        flashKeyRef.current += 1;
+        setFlash({ tone: 'fail', key: flashKeyRef.current });
         setErrorMessage('Network error. Check your connection and try again.');
         if (activeTab === 'scan') setTimeout(() => startCamera(), 900);
       } finally {
@@ -402,8 +504,102 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     }
   };
 
-  const handleDeleteGuest = async (guest: Guest) => {
-    setBusyAction(true);
+  // ─── Mark as Double ─────────────────────────────────────────────────
+  // Marks the whole card arrived in one go. The server already knows how to
+  // expand a shared card group or top up a single-row DOUBLE, so this is the
+  // same endpoint the "Force in" sheet uses - only the trigger and the wording
+  // are different, because here it is the expected action, not a correction.
+  const handleMarkAsDouble = async (guest: ScanResult['guest']) => {
+    setDoubleBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'double' }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not mark as double');
+
+      playSound('success');
+      playHaptic('success');
+
+      const updated: { id: string; checkInCount?: number; fullyCheckedIn?: boolean }[] = Array.isArray(
+        data.updated
+      )
+        ? data.updated
+        : [];
+      toast.success(
+        updated.length > 1
+          ? `All ${updated.length} on this card marked as arrived`
+          : `${guest.name} marked as Double`,
+        { icon: <UserCheck size={18} className="text-success" /> }
+      );
+
+      // Reflect the change in the result card straight away instead of waiting
+      // for the guest list to come back.
+      setLastScan((current) => {
+        if (!current || current.guest.id !== guest.id) return current;
+        const byId = new Map(updated.map((u) => [u.id, u]));
+        return {
+          ...current,
+          message: data.message || current.message,
+          guest: {
+            ...current.guest,
+            fullyCheckedIn: true,
+            checkInCount: byId.get(current.guest.id)?.checkInCount ?? current.guest.maxCheckIns,
+            groupMembers: current.guest.groupMembers?.map((m) => ({
+              ...m,
+              checkedIn: byId.get(m.id)?.fullyCheckedIn ?? true,
+            })),
+          },
+        };
+      });
+      setRecentScans((prev) => prev.map((s) => (s.guestId === guest.id ? { ...s, undone: false } : s)));
+      loadGuests();
+    } catch (error) {
+      playSound('fail');
+      playHaptic('fail');
+      toast.error(error instanceof Error ? error.message : 'Network error', {
+        icon: <AlertCircle size={18} className="text-danger" />,
+      });
+    } finally {
+      setDoubleBusy(false);
+    }
+  };
+
+  // ─── Undo last scan ────────────────────────────────────────────────
+  const handleUndo = async (scan: RecentScan) => {
+    setUndoBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${scan.guestId}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ undo: true }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not undo');
+
+      playHaptic('tap');
+      setRecentScans((prev) => prev.map((s) => (s.key === scan.key ? { ...s, undone: true } : s)));
+      setLastScan((current) =>
+        current && current.guest.id === scan.guestId ? null : current
+      );
+      // Let the operator re-scan the same card straight after an undo.
+      if (scan.cardNumber) delete lastScanAtRef.current[scan.cardNumber];
+      toast.success(data.message || 'Scan undone', { icon: <Undo2 size={18} className="text-warn" /> });
+      loadGuests();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Network error', {
+        icon: <AlertCircle size={18} className="text-danger" />,
+      });
+    } finally {
+      setUndoBusy(false);
+    }
+  };
+
+  const handleDeleteGuest = async (guest: Guest) => {    setBusyAction(true);
     try {
       const res = await fetch(`/api/guests/${guest.id}`, {
         method: 'DELETE',
@@ -619,6 +815,16 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                       <p className="text-[13px] text-white/90 mt-2.5 leading-snug">
                         {cameraError || 'Starting camera…'}
                       </p>
+                      {cameraError ? (
+                        <button
+                          type="button"
+                          onClick={() => void startCamera()}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/25"
+                        >
+                          <Camera size={13} aria-hidden="true" />
+                          Try again
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -627,6 +833,21 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                   <div className="absolute inset-0 grid place-items-center bg-gray-900/70">
                     <Loader2 size={30} className="animate-spin text-white" aria-hidden="true" />
                   </div>
+                ) : null}
+
+                {/* Colour flash: a peripheral cue the operator can read without
+                    looking away from the guest. Keyed so it replays per scan. */}
+                {flash ? (
+                  <motion.div
+                    key={flash.key}
+                    initial={reducedMotion ? false : { opacity: 0 }}
+                    animate={{ opacity: [0, 0.45, 0] }}
+                    transition={{ duration: reducedMotion ? 0 : 0.55, times: [0, 0.25, 1] }}
+                    aria-hidden="true"
+                    className={`absolute inset-0 pointer-events-none ${
+                      flash.tone === 'success' ? 'bg-success' : 'bg-danger'
+                    }`}
+                  />
                 ) : null}
 
                 {/* Scan target */}
@@ -757,9 +978,115 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     </ul>
                   </div>
                 ) : null}
-              </motion.div>
+
+                {/* DOUBLE arriving together: one tap instead of a second scan. */}
+                {canMarkAsDouble(lastScan.guest) ? (
+                  <div className="pt-3 border-t border-success-border">
+                    <AppButton
+                      size="lg"
+                      fullWidth
+                      loading={doubleBusy}
+                      loadingText="Marking…"
+                      icon={<Users size={17} />}
+                      onClick={() => void handleMarkAsDouble(lastScan.guest)}
+                    >
+                      Mark as Double
+                    </AppButton>
+                    <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
+                      {lastScan.guest.sharedGroup
+                        ? 'Both people arrived together — mark the whole card in one tap instead of scanning again.'
+                        : 'Both people arrived together — mark the second person in without scanning again.'}
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Undo a mis-scan. Offered on the newest entry only, so "undo"
+                    can never mean anything ambiguous. */}
+                {recentScans[0] && recentScans[0].guestId === lastScan.guest.id ? (
+                  <button
+                    type="button"
+                    disabled={undoBusy}
+                    onClick={() => void handleUndo(recentScans[0])}
+                    className="w-full inline-flex items-center justify-center gap-1.5 pt-3 mt-1 border-t border-success-border text-[12px] font-semibold text-gray-500 transition hover:text-gray-800 disabled:opacity-50"
+                  >
+                    {undoBusy ? (
+                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Undo2 size={13} aria-hidden="true" />
+                    )}
+                    Undo this scan
+                  </button>
+                ) : null}
+                </motion.div>
             ) : null}
           </div>
+
+          {/* Recent arrivals. A door queue moves fast and a mis-scan is easy to
+              miss, so the last few scans stay on screen with their time. */}
+          {recentScans.length > 0 ? (
+            <div className="rounded-card border border-gray-100 bg-white overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowRecent((v) => !v)}
+                aria-expanded={showRecent}
+                className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left transition-colors hover:bg-gray-50"
+              >
+                <span className="flex items-center gap-2 text-[12px] font-semibold text-gray-700">
+                  <Users size={13} className="text-brand" aria-hidden="true" />
+                  Recent arrivals
+                  <span className="font-display text-gray-900">{recentScans.length}</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                  {showRecent ? 'Hide' : 'Show'}
+                  <ChevronDown
+                    size={14}
+                    aria-hidden="true"
+                    className={`transition-transform duration-200 ${showRecent ? 'rotate-180' : ''}`}
+                  />
+                </span>
+              </button>
+
+              {showRecent ? (
+                <ul className="divide-y divide-gray-50 border-t border-gray-100 max-h-56 overflow-y-auto overscroll-contain">
+                  {recentScans.map((scan) => (
+                    <li
+                      key={scan.key}
+                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-[13px]"
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                          scan.undone ? 'bg-gray-300' : 'bg-success'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span
+                        className={`min-w-0 flex-1 truncate ${
+                          scan.undone
+                            ? 'text-gray-400 line-through'
+                            : 'font-medium text-gray-800'
+                        }`}
+                      >
+                        {scan.name}
+                      </span>
+                      {scan.undone ? (
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                          Undone
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[11px] text-gray-400 tabular-nums">
+                          {new Date(scan.at).toLocaleTimeString('en-TZ', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

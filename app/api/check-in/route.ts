@@ -115,14 +115,20 @@ export async function POST(req: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const tenantId = (session.user as { tenantId?: string }).tenantId;
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
+    }
 
     const guestIdFromQuery = req.nextUrl.searchParams.get('guestId');
     let guest = null;
 
     // ─── If guestId is provided directly ──────────────────────────────
     if (guestIdFromQuery) {
-      guest = await prisma.guest.findUnique({
-        where: { id: guestIdFromQuery },
+      // Scoped to the tenant: card numbers are only unique per event, and this
+      // route was previously matching any guest row in the database.
+      guest = await prisma.guest.findFirst({
+        where: { id: guestIdFromQuery, event: { tenantId } },
       });
     } else {
       // ─── Parse request body ──────────────────────────────────────────
@@ -140,7 +146,7 @@ export async function POST(req: NextRequest) {
         const scannedCardNumber = token.trim();
         if (scannedCardNumber) {
           guest = await prisma.guest.findFirst({
-            where: { cardNumber: scannedCardNumber },
+            where: { cardNumber: scannedCardNumber, event: { tenantId } },
           });
         }
       }
@@ -150,7 +156,7 @@ export async function POST(req: NextRequest) {
         const cleanCardNumber = cardNumber.trim().padStart(5, '0');
         if (cleanCardNumber) {
           guest = await prisma.guest.findFirst({
-            where: { cardNumber: cleanCardNumber },
+            where: { cardNumber: cleanCardNumber, event: { tenantId } },
           });
         }
       }

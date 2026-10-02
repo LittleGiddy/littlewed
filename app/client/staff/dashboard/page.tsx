@@ -6,9 +6,10 @@ import Link from 'next/link';
 import {
   Search, CheckCircle, XCircle, Users, Camera, Key, Calendar,
   ChevronRight, Scan, Loader2, User, UserCheck, CheckCheck, Trash2, ArrowLeft,
-  Info, PartyPopper
+  Info, PartyPopper, Undo2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { canMarkAsDouble } from '@/lib/checkin';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
 import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
@@ -27,6 +28,17 @@ interface Guest {
   routingChannel: string;
   createdAt: string;
   cardGroupId: string | null;
+}
+
+/**
+ * Shape of `guest` in a POST /api/check-in response. Superset of the list shape
+ * from GET /api/check-in, which is why scannedGuest is tracked separately.
+ */
+interface ScannedGuest extends Guest {
+  maxCheckIns: number;
+  fullyCheckedIn: boolean;
+  sharedGroup?: boolean;
+  groupMembers?: { id: string; name: string; checkedIn: boolean }[];
 }
 
 interface Event {
@@ -104,7 +116,7 @@ export default function StaffDashboard() {
   const [loadingCheckin, setLoadingCheckin] = useState(false);
   const [message, setMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
-  const [scannedGuest, setScannedGuest] = useState<Guest | null>(null);
+  const [scannedGuest, setScannedGuest] = useState<ScannedGuest | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'fully' | 'partial' | 'not'>('all');
@@ -113,6 +125,7 @@ export default function StaffDashboard() {
   const [forceCheckinGuest, setForceCheckinGuest] = useState<Guest | null>(null);
 
   const [blockedMessage, setBlockedMessage] = useState('');
+  const [doubleBusy, setDoubleBusy] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -216,6 +229,61 @@ export default function StaffDashboard() {
     if (scanning) requestAnimationFrame(scanFrame);
   }, [scanning]);
 
+  // ─── Mark as Double: both people arrived together on one card ──────
+  // Same PATCH the tenant force-sheet uses. The server knows whether to expand
+  // a shared cardGroupId or top up a single-row DOUBLE, so the client only has
+  // to decide that the shortcut is appropriate (see lib/checkin.ts).
+  const handleMarkAsDouble = async () => {
+    if (!scannedGuest) return;
+    setDoubleBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${scannedGuest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'double' }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not mark as double');
+
+      playSound('success');
+      setMessage(data.message || 'Marked as arrived');
+      setScannedGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns || 2 } : g));
+      await loadGuests(selectedEventId);
+    } catch (err) {
+      playSound('fail');
+      toast.error(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setDoubleBusy(false);
+    }
+  };
+
+  // ─── Undo a mis-scan (removes exactly one check-in) ─────────────────
+  const handleUndoScan = async () => {
+    if (!scannedGuest) return;
+    setDoubleBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${scannedGuest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ undo: true }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not undo');
+
+      setShowSuccess(false);
+      setScannedGuest(null);
+      setMessage('');
+      setCardNumber('');
+      await loadGuests(selectedEventId);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setDoubleBusy(false);
+    }
+  };
+
   // ─── Core check-in (uses cardNumber field, matches client/check-in) ──
   const processCheckin = async (value: string) => {
     setLoadingCheckin(true);
@@ -268,6 +336,10 @@ export default function StaffDashboard() {
 
         await loadGuests(selectedEventId);
 
+        // A DOUBLE card carries a decision ("Mark as Double" / "Undo"), so give
+        // it a longer window than a plain arrival. Matches the tenant station.
+        const holdMs = canMarkAsDouble(guest) ? 9000 : 4000;
+
         setTimeout(() => {
           setShowSuccess(false);
           setScannedGuest(null);
@@ -277,7 +349,7 @@ export default function StaffDashboard() {
             startCamera();
             requestAnimationFrame(scanFrame);
           }
-        }, 4000);
+        }, holdMs);
       } else {
         playSound('fail');
         setMessage(data.error || 'Check-in failed');
@@ -580,6 +652,56 @@ export default function StaffDashboard() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Shared DOUBLE card: show who is still outstanding. */}
+                    {scannedGuest.sharedGroup && scannedGuest.groupMembers?.length ? (
+                      <ul className="mt-3 pt-3 border-t border-success-border space-y-1.5">
+                        {scannedGuest.groupMembers.map((m) => (
+                          <li key={m.id} className="flex items-center gap-2 text-xs">
+                            {m.checkedIn ? (
+                              <CheckCircle size={12} className="text-success shrink-0" />
+                            ) : (
+                              <User size={12} className="text-gray-400 shrink-0" />
+                            )}
+                            <span className={m.checkedIn ? 'text-gray-500 line-through' : 'font-medium text-gray-800'}>
+                              {m.name}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    {/* Both arrived together: one tap instead of a second scan. */}
+                    {canMarkAsDouble(scannedGuest) ? (
+                      <div className="mt-3 pt-3 border-t border-success-border">
+                        <button
+                          type="button"
+                          onClick={handleMarkAsDouble}
+                          disabled={doubleBusy}
+                          className="w-full inline-flex items-center justify-center gap-2 bg-success text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 transition hover:bg-green-700"
+                        >
+                          {doubleBusy ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Users size={16} />
+                          )}
+                          Mark as Double
+                        </button>
+                        <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
+                          Both people arrived together — mark the whole card in one tap.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={handleUndoScan}
+                      disabled={doubleBusy}
+                      className="w-full inline-flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-success-border text-[11px] font-semibold text-gray-500 transition hover:text-gray-800 disabled:opacity-50"
+                    >
+                      <Undo2 size={12} />
+                      Undo this scan
+                    </button>
                   </div>
                 )}
               </>
