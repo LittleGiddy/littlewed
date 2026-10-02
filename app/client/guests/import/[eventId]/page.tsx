@@ -52,7 +52,7 @@ export default function ImportGuestsPage() {
 
   // ─── Editing state ──────────────────────────────────────────────────
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editField, setEditField] = useState<'name' | 'title' | null>(null);
+  const [editField, setEditField] = useState<'name' | 'title' | 'cardGroupId' | null>(null);
   const [editValue, setEditValue] = useState('');
   const [detectWhatsApp, setDetectWhatsApp] = useState(true);
 
@@ -127,7 +127,7 @@ export default function ImportGuestsPage() {
   };
 
   // ─── Edit Functions ──────────────────────────────────────────────────
-  const startEditing = (index: number, field: 'name' | 'title', currentValue: string) => {
+  const startEditing = (index: number, field: 'name' | 'title' | 'cardGroupId', currentValue: string) => {
     setEditingIndex(index);
     setEditField(field);
     setEditValue(currentValue);
@@ -140,12 +140,15 @@ export default function ImportGuestsPage() {
       updated[index].name = editValue.trim() || updated[index].name;
     } else if (field === 'title') {
       updated[index].title = editValue.trim() || updated[index].title;
+    } else if (field === 'cardGroupId') {
+      // An empty value removes the guest from the shared card.
+      updated[index].cardGroupId = editValue.trim() || undefined;
     }
     setParsedGuests(updated);
     setEditingIndex(null);
     setEditField(null);
     setEditValue('');
-    toast.success(`${field === 'name' ? 'Name' : 'Title'} updated`);
+    toast.success(`${field === 'name' ? 'Name' : field === 'title' ? 'Title' : 'Card Group'} updated`);
   };
 
   const cancelEdit = () => {
@@ -1010,6 +1013,7 @@ export default function ImportGuestsPage() {
                   const originalIndex = parsedGuests.indexOf(guest);
                   const isEditingName = editingIndex === originalIndex && editField === 'name';
                   const isEditingTitle = editingIndex === originalIndex && editField === 'title';
+                  const isEditingGroup = editingIndex === originalIndex && editField === 'cardGroupId';
                   return (
                     <div key={originalIndex} className={`px-4 py-3 ${guest.isValid ? '' : 'bg-warn-soft/50'}`}>
                       <div className="flex items-start justify-between">
@@ -1112,6 +1116,51 @@ export default function ImportGuestsPage() {
                           {guest.cardNumber && (
                             <p className="text-xs text-gray-400 mt-0.5">Card: {guest.cardNumber}</p>
                           )}
+                          <div className="mt-0.5 flex items-center gap-1">
+                            {isEditingGroup ? (
+                              <div className="flex items-center gap-1 w-full">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-0.5 w-28 text-xs focus:outline-none focus:ring-2 focus:ring-brandring"
+                                  placeholder="Group id"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-danger hover:text-danger transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-xs text-warn">
+                                  Group: {guest.cardGroupId || '-'}
+                                </p>
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'cardGroupId', guest.cardGroupId || '')}
+                                  className="text-gray-400 hover:text-brandtext transition"
+                                  title="Set shared card group"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              </>
+                            )}
+                          </div>
                           <div className="mt-1">
                             {guest.isValid ? (
                               <span className="text-success text-xs font-medium flex items-center gap-1">
@@ -1141,6 +1190,7 @@ export default function ImportGuestsPage() {
                       <th className="px-4 py-2 text-left whitespace-nowrap">Email</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Type</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Card</th>
+                      <th className="px-4 py-2 text-left whitespace-nowrap">Group</th>
                       <th className="px-4 py-2 text-left whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
@@ -1149,6 +1199,7 @@ export default function ImportGuestsPage() {
                       const originalIndex = parsedGuests.indexOf(guest);
                       const isEditingName = editingIndex === originalIndex && editField === 'name';
                       const isEditingTitle = editingIndex === originalIndex && editField === 'title';
+                      const isEditingGroup = editingIndex === originalIndex && editField === 'cardGroupId';
                       return (
                         <tr key={originalIndex} className={guest.isValid ? '' : 'bg-warn-soft/50'}>
                           <td className="px-4 py-2">
@@ -1252,6 +1303,55 @@ export default function ImportGuestsPage() {
                             ) : '-'}
                           </td>
                           <td className="px-4 py-2 font-mono text-xs">{guest.cardNumber || '-'}</td>
+                          <td className="px-4 py-2">
+                            {isEditingGroup ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="border rounded px-2 py-0.5 w-24 text-xs focus:outline-none focus:ring-2 focus:ring-brandring"
+                                  placeholder="Group id"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveEdit(originalIndex);
+                                    if (e.key === 'Escape') cancelEdit();
+                                  }}
+                                />
+                                <button
+                                  onClick={() => saveEdit(originalIndex)}
+                                  className="text-[#1A7A4A] hover:text-brandtext transition"
+                                  title="Save"
+                                >
+                                  <Save size={14} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-danger hover:text-danger transition"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                {guest.cardGroupId ? (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-warn-soft text-warn whitespace-nowrap">
+                                    {guest.cardGroupId}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
+                                <button
+                                  onClick={() => startEditing(originalIndex, 'cardGroupId', guest.cardGroupId || '')}
+                                  className="text-gray-400 hover:text-brandtext transition flex-shrink-0"
+                                  title="Set shared card group"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-2">
                             {guest.isValid ? (
                               <span className="text-success text-xs font-medium flex items-center gap-1 whitespace-nowrap">

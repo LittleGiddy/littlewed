@@ -87,7 +87,7 @@ function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; a
             alt=""
             loading={i < 4 ? 'eager' : 'lazy'}
             draggable={false}
-            referrerPolicy="no-referrer"
+            referrerPolicy="origin-when-cross-origin"
             className="absolute select-none"
             style={{ left: t.px, top: t.py, width: 256, height: 256 }}
           />
@@ -126,6 +126,9 @@ function initMap(container: HTMLElement, lat: number, lng: number, accentColor: 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      // OSM enforces its tile usage policy: requests without an HTTP Referer
+      // get "Access Blocked" tiles. Send the origin so tiles load.
+      referrerPolicy: 'origin-when-cross-origin',
     }).addTo(map);
 
     L.marker([lat, lng], { icon, title: 'Venue' }).addTo(map);

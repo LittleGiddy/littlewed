@@ -72,6 +72,75 @@ const createLineLayer = (x1 = 10, y1 = 50, x2 = 90, y2 = 50) => ({
   visible: true, locked: false,
 });
 
+// ─── Range Slider Component ──────────────────────────────────────────
+// Defined at module scope so its component identity stays stable across
+// renders. Declared inside InvitationDesigner, every state update would create
+// a brand-new component type and React would remount the <input>, cancelling an
+// in-progress drag and resetting the properties panel's scroll position.
+const RangeSlider = ({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+  label,
+  suffix = '',
+  icon: Icon,
+  showInput = true,
+}: any) => (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between">
+      <label className="text-[10px] font-medium text-gray-600 flex items-center gap-1.5">
+        {Icon && <Icon size={12} className="text-brandtext" />}
+        {label}
+      </label>
+      <span className="text-[10px] font-semibold text-brandtext bg-brandbg px-2 py-0.5 rounded">
+        {value}{suffix}
+      </span>
+    </div>
+    <div className="flex items-center gap-2">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brandaccent transition-all hover:h-2"
+        style={{
+          background: `linear-gradient(to right, var(--color-brand) 0%, #0D4B4B ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
+        }}
+      />
+      {showInput && (
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
+          min={min}
+          max={max}
+        />
+      )}
+    </div>
+  </div>
+);
+
+const Section = ({ title, icon, section, collapsedSections, toggleSection, children }: any) => {
+  const isCollapsed = collapsedSections[section];
+  return (
+    <div className="border-b border-gray-100 last:border-0">
+      <button
+        onClick={() => toggleSection(section)}
+        className="w-full flex items-center justify-between p-2 text-left font-semibold text-gray-700 hover:bg-gray-50 transition text-sm"
+      >
+        <span className="flex items-center gap-2">{icon && <span className="text-brandtext">{icon}</span>}{title}</span>
+        {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {!isCollapsed && <div className="p-2 pt-0">{children}</div>}
+    </div>
+  );
+};
+
 export default function InvitationDesigner() {
   const { eventId } = useParams();
   const router = useRouter();
@@ -732,7 +801,16 @@ export default function InvitationDesigner() {
       } else if (textAlign === 'right') {
         transformX = '-100%';
       }
-      
+
+      // The server rotates the text about its anchor `(x, y)` (see textSvg's
+      // `rotate(deg, x, y)`), which is the left edge, centre, or right edge
+      // depending on alignment. Match that pivot here so rotated text doesn't
+      // drift off its anchor on the generated card.
+      const transformOrigin =
+        textAlign === 'center' ? 'center center'
+        : textAlign === 'right' ? 'right center'
+        : 'left center';
+
       return (
         <div
           key={layer.id}
@@ -744,17 +822,17 @@ export default function InvitationDesigner() {
             left: `${layer.x}%`,
             top: `${layer.y}%`,
             transform: `translate(${transformX}, -50%) rotate(${layer.rotation || 0}deg)`,
+            transformOrigin,
             fontSize: `${layer.fontSize}px`,
             fontFamily: layer.fontFamily,
             color: layer.color,
             textAlign: textAlign,
             textShadow: shadow,
             width: 'auto',
-            maxWidth: '80%',
+            maxWidth: '100%',
             fontWeight: 'bold',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            lineHeight: 1.4,
+            whiteSpace: 'nowrap',
+            lineHeight: 1,
             display: 'inline-block',
             ...(isSelected && !isLocked ? {
               boxShadow: '0 0 0 2px var(--color-brand), 0 0 0 4px rgba(13,75,75,0.1)',
@@ -893,55 +971,6 @@ export default function InvitationDesigner() {
     return null;
   };
 
-  // ─── Range Slider Component ──────────────────────────────────────────
-  const RangeSlider = ({ 
-    value, 
-    onChange, 
-    min, 
-    max, 
-    step = 1, 
-    label, 
-    suffix = '',
-    icon: Icon,
-    showInput = true
-  }: any) => (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <label className="text-[10px] font-medium text-gray-600 flex items-center gap-1.5">
-          {Icon && <Icon size={12} className="text-brandtext" />}
-          {label}
-        </label>
-        <span className="text-[10px] font-semibold text-brandtext bg-brandbg px-2 py-0.5 rounded">
-          {value}{suffix}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="range"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-brandaccent transition-all hover:h-2"
-          style={{
-            background: `linear-gradient(to right, var(--color-brand) 0%, #0D4B4B ${((value - min) / (max - min)) * 100}%, #e5e7eb ${((value - min) / (max - min)) * 100}%, #e5e7eb 100%)`
-          }}
-        />
-        {showInput && (
-          <input
-            type="number"
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-12 p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
-            min={min}
-            max={max}
-          />
-        )}
-      </div>
-    </div>
-  );
-
   // ─── Render ────────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -957,22 +986,6 @@ export default function InvitationDesigner() {
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  const Section = ({ title, icon, section, children }: any) => {
-    const isCollapsed = collapsedSections[section];
-    return (
-      <div className="border-b border-gray-100 last:border-0">
-        <button
-          onClick={() => toggleSection(section)}
-          className="w-full flex items-center justify-between p-2 text-left font-semibold text-gray-700 hover:bg-gray-50 transition text-sm"
-        >
-          <span className="flex items-center gap-2">{icon && <span className="text-brandtext">{icon}</span>}{title}</span>
-          {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-        </button>
-        {!isCollapsed && <div className="p-2 pt-0">{children}</div>}
-      </div>
-    );
   };
 
   return (
@@ -1270,7 +1283,7 @@ export default function InvitationDesigner() {
 
             {/* ─── Controls Accordion ─── */}
             <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden max-h-[60vh] overflow-y-auto">
-              <Section title="Shapes" section="addLayer" icon={<Square size={14} />}>
+              <Section title="Shapes" section="addLayer" icon={<Square size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 <div className="flex gap-2">
                   <button onClick={addRectLayer} className="flex-1 bg-gray-200 text-gray-700 px-2 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition flex items-center justify-center gap-1">
                     <Square size={12} /> Rectangle
@@ -1281,7 +1294,7 @@ export default function InvitationDesigner() {
                 </div>
               </Section>
 
-              <Section title="Layers" section="layers" icon={<Layers size={14} />}>
+              <Section title="Layers" section="layers" icon={<Layers size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 {layers.length === 0 && (
                   <div className="text-center py-4 text-gray-400 text-xs">
                     <Layers size={20} className="mx-auto mb-2 opacity-30" />
@@ -1331,7 +1344,7 @@ export default function InvitationDesigner() {
                 </div>
               </Section>
 
-              <Section title="Properties" section="properties" icon={<Settings size={14} />}>
+              <Section title="Properties" section="properties" icon={<Settings size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 {selectedLayer ? (
                   <div className="space-y-3 max-h-72 overflow-y-auto overscroll-contain">
                     {/* ─── Position Controls ─── */}
@@ -1616,7 +1629,7 @@ export default function InvitationDesigner() {
                 )}
               </Section>
 
-              <Section title="Overlay" section="overlay" icon={<Palette size={14} />}>
+              <Section title="Overlay" section="overlay" icon={<Palette size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 <div className="space-y-2">
                   <div>
                     <label className="block text-[10px] font-medium text-gray-700">Color</label>
@@ -1638,7 +1651,7 @@ export default function InvitationDesigner() {
                 </div>
               </Section>
 
-              <Section title="QR Code" section="qr" icon={<QrCode size={14} />}>
+              <Section title="QR Code" section="qr" icon={<QrCode size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 <div className="space-y-2">
                   <div>
                     <label className="block text-[10px] font-medium text-gray-700">Position</label>
