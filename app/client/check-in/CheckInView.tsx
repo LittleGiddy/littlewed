@@ -30,8 +30,8 @@ import {
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
-import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
-import { canMarkAsDouble as canMarkAsDoubleRule } from '@/lib/checkin';
+import { guestTypeBadge, guestRecordMaxScans } from '@/lib/guestTypes';
+import { canMarkAsDouble as canMarkAsDoubleRule, canMarkAllAsGroup } from '@/lib/checkin';
 import { useReducedMotion } from '@/lib/motion';
 import {
   AppAvatar,
@@ -161,11 +161,10 @@ const playSound = (type: 'success' | 'fail') => {
 const fullName = (guest: Guest) =>
   guest.title ? `${guest.title} ${guest.name}` : guest.name;
 
-const maxScansFor = (guest: Guest) =>
-  guestTypeMaxScans(guest.guestType, guest.guestCount);
+const maxScansFor = (guest: Guest, groupSize = 1) => guestRecordMaxScans(guest, groupSize);
 
-const classify = (guest: Guest): Exclude<StatusFilter, 'all'> => {
-  const max = maxScansFor(guest);
+const classify = (guest: Guest, groupSize = 1): Exclude<StatusFilter, 'all'> => {
+  const max = maxScansFor(guest, groupSize);
   const count = guest.checkInCount || 0;
   if (count >= max) return 'fully';
   if (count > 0) return 'partial';
@@ -477,6 +476,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const groupMembersFor = (guest: Guest) =>
     guest.cardGroupId ? guests.filter((g) => g.cardGroupId === guest.cardGroupId) : [];
 
+  // Rows sharing a cardGroupId are one card; the label count (if any) wins.
+  const groupSizeFor = (guest: Guest) =>
+    guest.cardGroupId ? guests.filter((g) => g.cardGroupId === guest.cardGroupId).length : 1;
+
   const handleForceCheckin = async (guest: Guest, allGroup: boolean) => {
     setBusyAction(true);
     try {
@@ -568,6 +571,66 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     }
   };
 
+  // ─── Mark all as group ──────────────────────────────────────────────
+  // Group cards ("Watu 20") and shared cards of 3+ people can be marked
+  // arrived in one tap, the same way a DOUBLE pair uses "Mark as Double".
+  const handleMarkAllAsGroup = async (guest: ScanResult['guest']) => {
+    setDoubleBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'group' }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not mark the group');
+
+      playSound('success');
+      playHaptic('success');
+
+      const updated: { id: string; checkInCount?: number; fullyCheckedIn?: boolean }[] = Array.isArray(
+        data.updated
+      )
+        ? data.updated
+        : [];
+      toast.success(
+        updated.length > 1
+          ? `All ${updated.length} on this card marked as arrived`
+          : `${guest.name}'s group marked as arrived`,
+        { icon: <UserCheck size={18} className="text-success" /> }
+      );
+
+      setLastScan((current) => {
+        if (!current || current.guest.id !== guest.id) return current;
+        const byId = new Map(updated.map((u) => [u.id, u]));
+        return {
+          ...current,
+          message: data.message || current.message,
+          guest: {
+            ...current.guest,
+            fullyCheckedIn: true,
+            checkInCount: byId.get(current.guest.id)?.checkInCount ?? current.guest.maxCheckIns,
+            groupMembers: current.guest.groupMembers?.map((m) => ({
+              ...m,
+              checkedIn: byId.get(m.id)?.fullyCheckedIn ?? true,
+            })),
+          },
+        };
+      });
+      setRecentScans((prev) => prev.map((s) => (s.guestId === guest.id ? { ...s, undone: false } : s)));
+      loadGuests();
+    } catch (error) {
+      playSound('fail');
+      playHaptic('fail');
+      toast.error(error instanceof Error ? error.message : 'Network error', {
+        icon: <AlertCircle size={18} className="text-danger" />,
+      });
+    } finally {
+      setDoubleBusy(false);
+    }
+  };
+
   // ─── Undo last scan ────────────────────────────────────────────────
   const handleUndo = async (scan: RecentScan) => {
     setUndoBusy(true);
@@ -624,11 +687,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   // ─── Derived list state ─────────────────────────────────────────────
   const stats = useMemo(() => {
     const total = guests.length;
-    const fully = guests.filter((g) => classify(g) === 'fully').length;
-    const partial = guests.filter((g) => classify(g) === 'partial').length;
+    const fully = guests.filter((g) => classify(g, groupSizeFor(g)) === 'fully').length;
+    const partial = guests.filter((g) => classify(g, groupSizeFor(g)) === 'partial').length;
     // A WAKWE 30 counts as 30 arrivals, so progress is measured in people
     // rather than records - "arrived" is what the door staff care about.
-    const expected = guests.reduce((sum, g) => sum + maxScansFor(g), 0);
+    const expected = guests.reduce((sum, g) => sum + maxScansFor(g, groupSizeFor(g)), 0);
     const arrived = guests.reduce((sum, g) => sum + (g.checkInCount || 0), 0);
     return {
       total,
@@ -644,7 +707,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const filteredGuests = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return guests.filter((guest) => {
-      if (statusFilter !== 'all' && classify(guest) !== statusFilter) return false;
+      if (statusFilter !== 'all' && classify(guest, groupSizeFor(guest)) !== statusFilter) return false;
       if (!term) return true;
       return (
         fullName(guest).toLowerCase().includes(term) ||
@@ -1000,6 +1063,25 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                   </div>
                 ) : null}
 
+                {/* Group card arriving together: mark every remaining scan at once. */}
+                {canMarkAllAsGroup(lastScan.guest) ? (
+                  <div className="pt-3 border-t border-success-border">
+                    <AppButton
+                      size="lg"
+                      fullWidth
+                      loading={doubleBusy}
+                      loadingText="Marking…"
+                      icon={<Users size={17} />}
+                      onClick={() => void handleMarkAllAsGroup(lastScan.guest)}
+                    >
+                      Mark all as group
+                    </AppButton>
+                    <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
+                      The whole group arrived together — mark every scan on this card in one tap.
+                    </p>
+                  </div>
+                ) : null}
+
                 {/* Undo a mis-scan. Offered on the newest entry only, so "undo"
                     can never mean anything ambiguous. */}
                 {recentScans[0] && recentScans[0].guestId === lastScan.guest.id ? (
@@ -1203,7 +1285,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             ) : (
               <ul className="divide-y divide-gray-100 max-h-[26rem] sm:max-h-[30rem] overflow-y-auto overscroll-contain">
                 {filteredGuests.map((guest) => {
-                  const state = classify(guest);
+                  const state = classify(guest, groupSizeFor(guest));
                   const meta = STATUS_META[state];
                   const count = guest.checkInCount || 0;
                   return (
@@ -1244,7 +1326,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                             ) : null
                           }
                         >
-                          {state === 'not' ? '—' : `${count}/${maxScansFor(guest)}`}
+                          {state === 'not' ? '—' : `${count}/${maxScansFor(guest, groupSizeFor(guest))}`}
                         </AppChip>
                       </button>
                     </li>
@@ -1316,7 +1398,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
               <div className="rounded-tap bg-gray-50 p-3">
                 <dt className="text-[11px] text-gray-400">Check-in</dt>
                 <dd className="text-sm font-semibold text-gray-900 mt-0.5 tabular-nums">
-                  {selectedGuest.checkInCount || 0}/{maxScansFor(selectedGuest)}
+                  {selectedGuest.checkInCount || 0}/{maxScansFor(selectedGuest, groupSizeFor(selectedGuest))}
                 </dd>
               </div>
               <div className="rounded-tap bg-gray-50 p-3">

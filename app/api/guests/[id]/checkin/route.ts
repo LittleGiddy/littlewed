@@ -4,7 +4,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
-import { guestTypeMaxScans } from '@/lib/guestTypes';
+import { guestTypeMaxScans, cardGroupIdCount, cardTotalScans, guestRecordMaxScans } from '@/lib/guestTypes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -152,6 +152,19 @@ export async function PATCH(
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
     }
 
+    // ─── Resolve the card group once (shared card / numeric group card) ─
+    const groupMembers = guest.cardGroupId
+      ? await prisma.guest.findMany({
+          where: { eventId: guest.eventId, cardGroupId: guest.cardGroupId },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+    const groupSize = groupMembers.length;
+    const labelCount = cardGroupIdCount(guest.cardGroupId);
+    const isNumericGroup = labelCount !== null;
+    const groupTotal = cardTotalScans(guest.cardGroupId, groupSize);
+    const guestMax = guestRecordMaxScans(guest, groupSize);
+
     // ─── UNDO: step the last scan back ────────────────────────────────
     // Door staff scan fast and mis-scan. Undo only ever removes ONE scan from
     // ONE guest, so it can never silently clear a whole card or a WAKWE 30.
@@ -169,14 +182,14 @@ export async function PATCH(
           checkInCount: current - 1,
           // checkedIn is derived from the count, so it has to be recomputed
           // rather than simply cleared.
-          checkedIn: current - 1 >= guestTypeMaxScans(guest.guestType, guest.guestCount),
+          checkedIn: current - 1 >= guestMax,
           checkedInAt: current - 1 > 0 ? guest.checkedInAt : null,
         },
       });
       const fullName = reverted.title ? `${reverted.title} ${reverted.name}` : reverted.name;
       sendPushToTenantRole(tenantId, 'CLIENT', {
         title: `Check-in undone: ${fullName}`,
-        body: `${fullName} is back to ${reverted.checkInCount || 0}/${guestTypeMaxScans(reverted.guestType, reverted.guestCount)}.`,
+        body: `${fullName} is back to ${reverted.checkInCount || 0}/${guestMax}.`,
         url: '/client/dashboard',
         type: 'info',
         sound: false,
@@ -189,34 +202,34 @@ export async function PATCH(
           id: reverted.id,
           name: reverted.name,
           checkInCount: reverted.checkInCount || 0,
-          maxCheckIns: guestTypeMaxScans(reverted.guestType, reverted.guestCount),
+          maxCheckIns: guestMax,
           fullyCheckedIn: Boolean(reverted.checkedIn),
         },
         message: `Undid the last scan for ${fullName}`,
       });
     }
 
-    // ─── Detect the group (shared DOUBLE card) ──────────────────────
-    const groupMembers = guest.cardGroupId
-      ? await prisma.guest.findMany({
-          where: { eventId: guest.eventId, cardGroupId: guest.cardGroupId },
-          orderBy: { createdAt: 'asc' },
-        })
-      : [];
-
-    const isGroup = groupMembers.length > 1;
+    // ─── Collect the card's targets (shared card / numeric group card) ─
+    const isGroup = groupSize > 1 || isNumericGroup;
     // If the caller requested "all" but the guest isn't part of a real group,
     // fall back to just this guest.
     const targets = allGroup && isGroup ? groupMembers : [guest];
+    const accumulatorId = groupMembers[0]?.id;
 
     const updatedGuests = [];
     for (const target of targets) {
-      // A guest on a shared card is ONE person, so their ceiling is 1 - the same
-      // rule POST /api/check-in applies when it resolves a shared scan. Using
-      // guestTypeMaxScans() here would let a shared card whose members happen to
-      // be typed DOUBLE report 2 arrivals per person, so a 2-person card would
-      // count as 4.
-      const tMax = targets.length > 1 ? 1 : guestTypeMaxScans(target.guestType, target.guestCount);
+      // A guest on a shared card is usually ONE person (ceiling 1). A numeric
+      // group card instead counts up to its label; that total is split across
+      // the group's rows with the remainder kept on the oldest (accumulator)
+      // row. Outside a group the guestType rules apply.
+      const others = targets.filter((t) => t.id !== accumulatorId).length;
+      const tMax = isNumericGroup
+        ? target.id === accumulatorId
+          ? Math.max(1, groupTotal - others)
+          : 1
+        : targets.length > 1
+          ? 1
+          : guestTypeMaxScans(target.guestType, target.guestCount);
       const updated = await prisma.guest.update({
         where: { id: target.id },
         data: {
@@ -238,13 +251,18 @@ export async function PATCH(
     // "Mark as Double" reuses this route, and a push that says "force checked in"
     // for a deliberate action reads like an error on the owner's phone.
     const viaDouble = body?.label === 'double';
+    const viaGroup = body?.label === 'group';
     sendPushToTenantRole(tenantId, 'CLIENT', {
       title: viaDouble
         ? `${updatedGuests.length > 1 ? 'Card' : forceFullName} checked in together`
-        : `${updatedGuests.length > 1 ? 'Card' : forceFullName} force checked in`,
+        : viaGroup
+          ? `${updatedGuests.length > 1 ? 'Group card' : forceFullName} marked as arrived`
+          : `${updatedGuests.length > 1 ? 'Card' : forceFullName} force checked in`,
       body: viaDouble
         ? `${label} marked as arrived in one go.`
-        : `${label} has been force checked in.`,
+        : viaGroup
+          ? `${label} marked as arrived as a group in one go.`
+          : `${label} has been force checked in.`,
       url: '/client/dashboard',
       type: 'success',
       sound: true,
@@ -263,10 +281,11 @@ export async function PATCH(
         cardNumber: firstName.cardNumber,
         guestType: firstName.guestType || 'SINGLE',
         guestCount: firstName.guestCount || null,
-        checkInCount: guestTypeMaxScans(firstName.guestType, firstName.guestCount),
-        maxCheckIns: guestTypeMaxScans(firstName.guestType, firstName.guestCount),
+        checkInCount: firstName.checkInCount || 0,
+        maxCheckIns: firstName.checkInCount || guestRecordMaxScans(firstName, groupSize),
         fullyCheckedIn: true,
         checkedInAt: firstName.checkedInAt,
+        cardGroupId: firstName.cardGroupId,
       },
       // Everyone the action touched, so the client can update the whole card in
       // one pass instead of refetching to discover the new state.
@@ -274,7 +293,7 @@ export async function PATCH(
         id: g.id,
         name: g.name,
         checkInCount: g.checkInCount || 0,
-        maxCheckIns: guestTypeMaxScans(g.guestType, g.guestCount),
+        maxCheckIns: g.checkInCount || guestRecordMaxScans(g, groupSize),
         fullyCheckedIn: Boolean(g.checkedIn),
       })),
     });

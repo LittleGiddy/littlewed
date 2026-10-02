@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { CircleCheck, TriangleAlert, Users, Undo2, Loader2 } from 'lucide-react'
-import { canMarkAsDouble } from '@/lib/checkin'
+import { canMarkAsDouble, canMarkAllAsGroup } from '@/lib/checkin'
 
 interface ScanGuest {
   id: string
@@ -18,6 +18,7 @@ interface ScanGuest {
   fullyCheckedIn: boolean
   sharedGroup?: boolean
   groupMembers?: { id: string; name: string; checkedIn: boolean }[]
+  cardGroupId?: string | null
 }
 
 function playHaptic(type: 'success' | 'fail') {
@@ -129,6 +130,30 @@ function CheckInContent() {
   }
 
   const offerDouble = guest ? canMarkAsDouble(guest) : false
+  const offerGroup = guest ? canMarkAllAsGroup(guest) : false
+
+  const handleMarkAllAsGroup = async () => {
+    if (!guest) return
+    setDoubleBusy(true)
+    try {
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'group' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not mark the group')
+      playHaptic('success')
+      setMessage(data.message || 'Marked as arrived')
+      setGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns } : g))
+    } catch (err) {
+      playHaptic('fail')
+      setError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setDoubleBusy(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
@@ -212,6 +237,23 @@ function CheckInContent() {
                 <p className="text-center text-xs text-gray-500 leading-snug">
                   Both people arrived together - mark the whole card in one tap instead of
                   scanning again.
+                </p>
+              </>
+            ) : null}
+
+            {offerGroup ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleMarkAllAsGroup}
+                  disabled={doubleBusy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50 transition hover:bg-green-700"
+                >
+                  {doubleBusy ? <Loader2 size={20} className="animate-spin" /> : <Users size={20} />}
+                  Mark all as group
+                </button>
+                <p className="text-center text-xs text-gray-500 leading-snug">
+                  The whole group arrived together - mark every scan on this card in one tap.
                 </p>
               </>
             ) : null}

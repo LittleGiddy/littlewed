@@ -11,6 +11,7 @@ import Papa from 'papaparse';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import RequestCreditsModal from '@/app/components/RequestCreditsModal';
+import { confirmToast } from '@/lib/confirmToast';
 
 interface ParsedGuest {
   name: string;
@@ -678,6 +679,34 @@ export default function ImportGuestsPage() {
     title: g.title || '',
     cardGroupId: g.cardGroupId,
   }));
+
+  // ─── Duplicate phone numbers: warn before importing ──────────────────
+  // One phone number can legitimately carry more than one card (a person
+  // managing several guests), so instead of silently dropping repeats we ask
+  // the user whether to import them anyway.
+  let allowDuplicates = false;
+  try {
+    const existingRes = await fetch(`/api/events/${eventId}/guests`, { credentials: 'include' });
+    if (existingRes.ok) {
+      const existing: { phone?: string | null }[] = await existingRes.json();
+      const existingPhones = new Set(existing.map(g => g.phone).filter(Boolean) as string[]);
+      const duplicates = validGuests.filter(g => existingPhones.has(g.normalizedPhone));
+      if (duplicates.length > 0) {
+        allowDuplicates = await confirmToast({
+          title: 'Guest with this number exists',
+          message:
+            duplicates.length === 1
+              ? `${duplicates[0].name} (${duplicates[0].phone}) already exists on this event. Import anyway?`
+              : `${duplicates.length} guests already exist on this event with the same phone number. Import them anyway?`,
+          confirmText: 'Import anyway',
+          cancelText: 'Skip duplicates',
+        });
+      }
+    }
+  } catch {
+    // Pre-check is best-effort: the API still skips duplicates by default.
+  }
+
   setUploading(true);
   setImportStatus('Importing guests...');
   try {
@@ -688,6 +717,7 @@ export default function ImportGuestsPage() {
         guests: guestsToImport, 
         eventId,
         detectWhatsApp, // ✅ Pass the toggle value
+        allowDuplicates,
       }),
       credentials: 'include',
     });

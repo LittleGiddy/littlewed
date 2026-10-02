@@ -3,7 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
-import { guestTypeMaxScans } from '@/lib/guestTypes';
+import { guestTypeMaxScans, cardGroupIdCount, cardTotalScans } from '@/lib/guestTypes';
 
 // ─── Helper Functions ────────────────────────────────────────────────
 
@@ -181,6 +181,10 @@ export async function POST(req: NextRequest) {
     let checkInGuest = guest;
     let isSharedGroup = false;
     let groupMembers: any[] = [];
+    // A numeric cardGroupId ("Watu 20") turns the whole card into one count-up:
+    // every scan accumulates on the group's oldest row until the number is hit.
+    let labelCount: number | null = null;
+    let groupTotal = 1;
 
     if (!guestIdFromQuery && guest.cardGroupId) {
       groupMembers = await prisma.guest.findMany({
@@ -188,21 +192,27 @@ export async function POST(req: NextRequest) {
         orderBy: { createdAt: 'asc' },
       });
 
-      if (groupMembers.length > 1) {
+      labelCount = cardGroupIdCount(guest.cardGroupId);
+      const isNumericGroup = labelCount !== null;
+
+      if (groupMembers.length > 1 || isNumericGroup) {
         isSharedGroup = true;
-        const available = groupMembers.find((m) => (m.checkInCount || 0) < 1);
-        if (!available) {
+        groupTotal = cardTotalScans(guest.cardGroupId, groupMembers.length);
+        const done = groupMembers.reduce((s, m) => s + (m.checkInCount || 0), 0);
+        if (done >= groupTotal) {
           return NextResponse.json(
             {
               error: 'Everyone on this card has already checked in.',
               checkedIn: true,
-              checkInCount: groupMembers.length,
-              maxCheckIns: groupMembers.length,
+              checkInCount: done,
+              maxCheckIns: groupTotal,
             },
             { status: 400 }
           );
         }
-        checkInGuest = available;
+        checkInGuest = isNumericGroup
+          ? groupMembers[0]
+          : groupMembers.find((m) => (m.checkInCount || 0) < 1) ?? groupMembers[0];
       }
     }
 
@@ -249,7 +259,9 @@ export async function POST(req: NextRequest) {
     // FAMILIA/WAKWE count up to guestCount scans on one row.
     const isGroupMember = isSharedGroup;
     const maxCheckIns = isGroupMember
-      ? 1
+      ? labelCount !== null
+        ? groupTotal
+        : 1
       : guestTypeMaxScans(checkInGuest.guestType, checkInGuest.guestCount);
     const currentCount = checkInGuest.checkInCount || 0;
 
@@ -283,7 +295,7 @@ export async function POST(req: NextRequest) {
     let reportTotal = maxCheckIns;
     let reportCompleted = newCount;
     if (isGroupMember) {
-      reportTotal = groupMembers.length;
+      reportTotal = groupTotal;
       const allNow = await prisma.guest.findMany({
         where: { eventId: checkInGuest.eventId, cardGroupId: checkInGuest.cardGroupId },
         select: { checkInCount: true },
@@ -333,6 +345,8 @@ export async function POST(req: NextRequest) {
           fullyCheckedIn: isGroupMember ? reportCompleted >= reportTotal : isFullyCheckedIn,
           checkedInAt: updated.checkedInAt,
           sharedGroup: isGroupMember,
+          cardGroupId: updated.cardGroupId,
+          groupTotal: isGroupMember ? groupTotal : undefined,
           groupMembers: groupMembers.map((m) => ({
             id: m.id,
             name: m.title ? `${m.title} ${m.name}` : m.name,

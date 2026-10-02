@@ -59,9 +59,19 @@ export function composeCardName(guest: any, groupMembers: any[] = []): string {
     return primaryName;
   }
 
+  // Order members deterministically (insertion order, then id) so every card
+  // generated for the same group composes the SAME name string. Previously the
+  // generating guest was forced first, so generating for Marco produced
+  // "Marco & Tumaini" and generating for Tumaini produced "Tumaini & Marco" -
+  // the two shared cards disagreed.
   const memberNames = groupMembers
     .slice()
-    .sort((a, b) => (a.id === guest.id ? -1 : b.id === guest.id ? 1 : 0))
+    .sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (ta !== tb) return ta - tb;
+      return String(a.id).localeCompare(String(b.id));
+    })
     .map((m) => getGuestFullName(m));
 
   const unique = Array.from(new Set(memberNames));

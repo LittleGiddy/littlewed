@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
-import { parseGuestType } from '@/lib/guestTypes';
+import { parseGuestType, cardGroupIdCount } from '@/lib/guestTypes';
 
 // ─── Helper: Generate a unique random card number ──────────────────────
 async function generateUniqueCardNumber(eventId: string): Promise<string> {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { guests, eventId, detectWhatsApp = false } = await req.json();
+    const { guests, eventId, detectWhatsApp = false, allowDuplicates = false } = await req.json();
 
     if (!guests || !Array.isArray(guests) || guests.length === 0 || !eventId) {
       return NextResponse.json({ error: 'Missing guests or eventId' }, { status: 400 });
@@ -116,20 +116,22 @@ export async function POST(req: NextRequest) {
     });
 
     const existingPhones = new Set(existingGuests.map(g => g.phone));
-    const duplicateNames: string[] = [];
-    const uniqueGuests = validGuests.filter((g: any) => {
-      if (existingPhones.has(g.phone)) {
-        duplicateNames.push(g.name);
-        return false;
-      }
-      return true;
-    });
+    const duplicateGuests = validGuests.filter((g: any) => existingPhones.has(g.phone));
+    const duplicateNames: string[] = duplicateGuests.map((g: any) => g.name);
+    const duplicateList = duplicateGuests.map((g: any) => ({ name: g.name, phone: g.phone }));
+    // The door only sees phones, so a repeated number is the signal we warn on.
+    // When the user confirms "import anyway" we keep every valid row.
+    const uniqueGuests = allowDuplicates
+      ? validGuests
+      : validGuests.filter((g: any) => !existingPhones.has(g.phone));
 
     if (uniqueGuests.length === 0) {
       return NextResponse.json({
         count: 0,
         skipped: validGuests.length,
-        duplicateNames: existingGuests.map(g => g.name),
+        duplicateNames: duplicateNames.length ? duplicateNames : existingGuests.map(g => g.name),
+        duplicates: duplicateList,
+        allowDuplicates,
         invalidCount,
         message: `All valid guests are duplicates. No new guests added. (${invalidCount} invalid numbers skipped)`,
       });
@@ -202,7 +204,10 @@ export async function POST(req: NextRequest) {
       const rawGroupId = typeof g.cardGroupId === 'string' ? g.cardGroupId.trim() : '';
       const isGrouped = rawGroupId.length > 0;
       const parsed = parseGuestType(g.guestType);
-      const guestType = isGrouped && parsed.type === 'SINGLE' ? 'DOUBLE' : parsed.type;
+      // A numeric group label ("Watu 20") carries its own scan count, so it is
+      // not forced into DOUBLE; a plain shared group (no number) still is.
+      const groupHasCount = cardGroupIdCount(rawGroupId) !== null;
+      const guestType = isGrouped && !groupHasCount && parsed.type === 'SINGLE' ? 'DOUBLE' : parsed.type;
       const guestCount = parsed.type === 'FAMILIA' || parsed.type === 'WAKWE' ? parsed.count : null;
 
       // ─── Card number: reuse the group's number or mint a new one ──────
@@ -265,6 +270,8 @@ export async function POST(req: NextRequest) {
 
     if (duplicateNames.length > 0) {
       responseData.duplicateNames = duplicateNames;
+      responseData.duplicates = duplicateList;
+      responseData.allowDuplicates = allowDuplicates;
     }
 
     if (result.count > 0) {

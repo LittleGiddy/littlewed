@@ -91,3 +91,50 @@ export function guestTypeMaxScans(type?: string | null, count?: number | null): 
   }
   return 1;
 }
+
+// ─── Card-group helpers ────────────────────────────────────────────────
+// A cardGroupId may carry a trailing number that defines how many times the
+// card may be scanned: "Watu 20", "Familia 20", "Wakwe 20" → 20. When the
+// label has no number the card simply holds one scan per guest row that
+// shares it (the original shared-DOUBLE behaviour).
+export function cardGroupIdCount(cardGroupId?: string | null): number | null {
+  if (!cardGroupId) return null;
+  const match = cardGroupId.trim().match(/(\d+)\s*$/);
+  if (!match) return null;
+  const n = parseInt(match[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Total scans a card allows. A numeric cardGroupId label wins; otherwise the
+// card holds one scan per guest row sharing the id.
+export function cardTotalScans(
+  cardGroupId: string | null | undefined,
+  groupSize: number
+): number {
+  const label = cardGroupIdCount(cardGroupId);
+  if (label !== null) return label;
+  return Math.max(1, groupSize);
+}
+
+/**
+ * Per-row scan ceiling used by the door and the guest tables.
+ * - Numeric cardGroupId ("Watu 20"): the number is the card total and all scans
+ *   accumulate on the group's oldest row, so that row's ceiling is the number.
+ * - Shared card (cardGroupId, no number): each row is one person → 1.
+ * - No group: the guestType rules (SINGLE 1, DOUBLE 2, FAMILIA/WAKWE count).
+ */
+export function guestRecordMaxScans(
+  guest: {
+    guestType?: string | null;
+    guestCount?: number | null;
+    cardGroupId?: string | null;
+  },
+  groupSize = 1
+): number {
+  if (guest.cardGroupId) {
+    const label = cardGroupIdCount(guest.cardGroupId);
+    if (label !== null) return label;
+    if (groupSize > 1) return 1;
+  }
+  return guestTypeMaxScans(guest.guestType, guest.guestCount);
+}

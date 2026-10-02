@@ -3,6 +3,8 @@
 // the decisions that matter (when to offer "Mark as Double") can be read and
 // tested on their own.
 
+import { cardGroupIdCount } from './guestTypes';
+
 export interface DoubleCandidate {
   fullyCheckedIn: boolean;
   guestType: string | null;
@@ -46,4 +48,41 @@ export function canMarkAsDouble(guest: DoubleCandidate): boolean {
     guest.maxCheckIns === 2 &&
     guest.checkInCount < 2
   );
+}
+
+export interface GroupCandidate extends DoubleCandidate {
+  /** The grouping label; a trailing number is the card's scan allowance. */
+  cardGroupId?: string | null;
+}
+
+/**
+ * Whether to offer "Mark all as group" for a group card.
+ *
+ * Unlike "Mark as Double" (a two-person DOUBLE card), this covers group cards
+ * whose cardGroupId carries a scan count (e.g. "Watu 20") and shared cards of
+ * three or more people. The action marks every remaining scan on the card in
+ * one tap; it returns false once the card is fully checked in.
+ */
+export function canMarkAllAsGroup(guest: GroupCandidate): boolean {
+  if (guest.fullyCheckedIn) return false;
+
+  const labelCount = cardGroupIdCount(guest.cardGroupId);
+  if (labelCount !== null && labelCount > 1) {
+    return (guest.checkInCount || 0) < labelCount;
+  }
+
+  // FAMILIA/WAKWE count-up cards ("Wakwe 30") are group cards too.
+  const type = guest.guestType?.toUpperCase();
+  if ((type === 'FAMILIA' || type === 'WAKWE') && guest.maxCheckIns > 1) {
+    return guest.checkInCount < guest.maxCheckIns;
+  }
+
+  // A shared card of 3+ people: still offer the shortcut. Two-person cards go
+  // through "Mark as Double" instead so the wording stays accurate.
+  const members = guest.groupMembers ?? [];
+  if (guest.sharedGroup && members.length > 2) {
+    return members.some((m) => !m.checkedIn);
+  }
+
+  return false;
 }

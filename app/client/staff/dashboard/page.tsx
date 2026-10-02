@@ -9,10 +9,10 @@ import {
   Info, PartyPopper, Undo2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { canMarkAsDouble } from '@/lib/checkin';
+import { canMarkAsDouble, canMarkAllAsGroup } from '@/lib/checkin';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
-import { guestTypeBadge, guestTypeMaxScans } from '@/lib/guestTypes';
+import { guestTypeBadge, guestRecordMaxScans } from '@/lib/guestTypes';
 
 interface Guest {
   id: string;
@@ -94,8 +94,7 @@ const getGuestTypeLabel = (type: string | null, count?: number | null) => {
   return guestTypeBadge(type, count);
 };
 
-const getCheckInStatus = (guest: Guest) => {
-  const max = guestTypeMaxScans(guest.guestType, guest.guestCount);
+const getCheckInStatus = (guest: Guest, max: number) => {
   const count = guest.checkInCount || 0;
   if (count >= max) return { label: 'Fully Checked In', color: 'text-success bg-success-soft', icon: CheckCheck };
   if (count > 0) return { label: `Partial (${count}/${max})`, color: 'text-warn bg-warn-soft', icon: UserCheck };
@@ -249,6 +248,32 @@ export default function StaffDashboard() {
       playSound('success');
       setMessage(data.message || 'Marked as arrived');
       setScannedGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns || 2 } : g));
+      await loadGuests(selectedEventId);
+    } catch (err) {
+      playSound('fail');
+      toast.error(err instanceof Error ? err.message : 'Network error');
+    } finally {
+      setDoubleBusy(false);
+    }
+  };
+
+  // ─── Mark all as group: group cards ("Watu 20") / 3+ person cards ──
+  const handleMarkAllAsGroup = async () => {
+    if (!scannedGuest) return;
+    setDoubleBusy(true);
+    try {
+      const res = await fetch(`/api/guests/${scannedGuest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'group' }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not mark the group');
+
+      playSound('success');
+      setMessage(data.message || 'Marked as arrived');
+      setScannedGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns || 1 } : g));
       await loadGuests(selectedEventId);
     } catch (err) {
       playSound('fail');
@@ -427,8 +452,13 @@ export default function StaffDashboard() {
   };
 
   // ─── Derived data ──────────────────────────────────────────────────
+  // Rows sharing a cardGroupId are one card; a numeric label ("Watu 20") wins.
+  const groupSizeFor = (g: Guest) =>
+    g.cardGroupId ? Math.max(1, guests.filter((x) => x.cardGroupId === g.cardGroupId).length) : 1;
+  const maxScansFor = (g: Guest) => guestRecordMaxScans(g, groupSizeFor(g));
+
   const classifyGuest = (g: Guest): 'fully' | 'partial' | 'not' => {
-    const max = guestTypeMaxScans(g.guestType, g.guestCount);
+    const max = maxScansFor(g);
     const count = g.checkInCount || 0;
     if (count >= max) return 'fully';
     if (count > 0) return 'partial';
@@ -640,7 +670,7 @@ export default function StaffDashboard() {
                           <span className="font-mono">#{scannedGuest.cardNumber}</span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
-                            guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                            (scannedGuest.maxCheckIns || 1) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
                           }`}>
                             {getGuestTypeLabel(scannedGuest.guestType, scannedGuest.guestCount)}
                           </span>
@@ -648,7 +678,7 @@ export default function StaffDashboard() {
                       </div>
                       <div className="text-right text-xs flex-shrink-0">
                         <span className="text-success font-medium">
-                          {scannedGuest.checkInCount || 1}/{guestTypeMaxScans(scannedGuest.guestType, scannedGuest.guestCount)}
+                          {scannedGuest.checkInCount || 1}/{scannedGuest.maxCheckIns || 1}
                         </span>
                       </div>
                     </div>
@@ -689,6 +719,28 @@ export default function StaffDashboard() {
                         </button>
                         <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
                           Both people arrived together — mark the whole card in one tap.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {/* Group card arrived together: mark every scan at once. */}
+                    {canMarkAllAsGroup(scannedGuest) ? (
+                      <div className="mt-3 pt-3 border-t border-success-border">
+                        <button
+                          type="button"
+                          onClick={handleMarkAllAsGroup}
+                          disabled={doubleBusy}
+                          className="w-full inline-flex items-center justify-center gap-2 bg-success text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-50 transition hover:bg-green-700"
+                        >
+                          {doubleBusy ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Users size={16} />
+                          )}
+                          Mark all as group
+                        </button>
+                        <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
+                          The whole group arrived together — mark every scan on this card in one tap.
                         </p>
                       </div>
                     ) : null}
@@ -769,9 +821,9 @@ export default function StaffDashboard() {
                   ) : (
                     <div className="divide-y divide-gray-100 max-h-[400px] sm:max-h-[500px] overflow-y-auto">
                       {filteredGuests.map(guest => {
-                        const status = getCheckInStatus(guest);
+                        const status = getCheckInStatus(guest, maxScansFor(guest));
                         const StatusIcon = status.icon;
-                        const max = guestTypeMaxScans(guest.guestType, guest.guestCount);
+                        const max = maxScansFor(guest);
                         const count = guest.checkInCount || 0;
                         const isFully = count >= max;
                         return (
@@ -786,7 +838,7 @@ export default function StaffDashboard() {
                                   <span className="font-mono text-gray-400 text-[10px] sm:text-xs">#{guest.cardNumber}</span>
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
                                     guest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
-                                    guestTypeMaxScans(guest.guestType, guest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                                    max > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
                                   }`}>
                                     {getGuestTypeLabel(guest.guestType, guest.guestCount)}
                                   </span>
@@ -829,7 +881,7 @@ export default function StaffDashboard() {
                     <span className="font-mono">#{selectedGuest.cardNumber}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                       selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
-                      guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
+                      maxScansFor(selectedGuest) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
                     }`}>
                       {getGuestTypeLabel(selectedGuest.guestType, selectedGuest.guestCount)}
                     </span>
@@ -840,7 +892,7 @@ export default function StaffDashboard() {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-[10px] text-gray-400">Check-in Status</p>
-                  <p className="font-medium text-sm">{selectedGuest.checkInCount || 0}/{guestTypeMaxScans(selectedGuest.guestType, selectedGuest.guestCount)}</p>
+                  <p className="font-medium text-sm">{selectedGuest.checkInCount || 0}/{maxScansFor(selectedGuest)}</p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-2">
                   <p className="text-[10px] text-gray-400">Channel</p>
