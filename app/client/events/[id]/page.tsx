@@ -17,7 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
-import { confirmToast } from '@/lib/confirmToast';
+import { confirmToast, isMassDelete } from '@/lib/confirmToast';
 import ThanksCardModal from '@/components/ThanksCardModal';
 import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
 
@@ -357,11 +357,16 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
 
   const deleteSelected = async () => {
     if (selectedGuests.size === 0) { toast.error('No guests selected'); return; }
+    const count = selectedGuests.size;
+    const mass = isMassDelete(count, guests.length);
     const ok = await confirmToast({
-      title: `Delete ${selectedGuests.size} selected guest${selectedGuests.size > 1 ? 's' : ''}?`,
-      message: 'This action cannot be undone.',
+      title: `Delete ${count} selected guest${count > 1 ? 's' : ''}?`,
+      message: mass
+        ? 'This permanently deletes every selected guest and cannot be undone.'
+        : 'This action cannot be undone.',
       confirmText: 'Delete',
       danger: true,
+      requireText: mass ? 'DELETE' : undefined,
     });
     if (!ok) return;
     setDeleting(true);

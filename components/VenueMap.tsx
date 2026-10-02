@@ -21,6 +21,19 @@ interface VenueMapProps {
   primaryColor?: string;
 }
 
+// ─── Tile provider ──────────────────────────────────────────────────────
+// CARTO's public basemaps (Voyager) are CDN-hosted and allow direct hot-linking
+// without an API key, unlike tile.openstreetmap.org which blocks requests that
+// don't send a Referer. Attribution is required by the tile licence.
+const TILE_SUBDOMAINS = 'abcd';
+const TILE_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+
+function tileUrl(z: number, x: number, y: number): string {
+  const s = TILE_SUBDOMAINS[(x + y) % TILE_SUBDOMAINS.length];
+  return `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}.png`;
+}
+
 function pinSvg(color: string) {
   return `<svg width="34" height="42" viewBox="0 0 34 42" xmlns="http://www.w3.org/2000/svg"><path d="M17 0C7.6 0 0 7.6 0 17c0 11.7 17 25 17 25s17-13.3 17-25C34 7.6 26.4 0 17 0z" fill="${color}"/><circle cx="17" cy="17" r="7.5" fill="#fff"/></svg>`;
 }
@@ -83,7 +96,7 @@ function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; a
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={t.x + '-' + t.y}
-            src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
+            src={tileUrl(t.z, t.x, t.y)}
             alt=""
             loading={i < 4 ? 'eager' : 'lazy'}
             draggable={false}
@@ -103,7 +116,7 @@ function StaticMapImage({ lat, lng, accentColor }: { lat: number; lng: number; a
         }}
         dangerouslySetInnerHTML={{ __html: pinSvg(accentColor) }}
       />
-      <span className="absolute bottom-1 right-2 text-[9px] font-medium text-white/90 drop-shadow">© OpenStreetMap</span>
+      <span className="absolute bottom-1 right-2 text-[9px] font-medium text-white/90 drop-shadow">© OpenStreetMap © CARTO</span>
     </div>
   );
 }
@@ -123,11 +136,10 @@ function initMap(container: HTMLElement, lat: number, lng: number, accentColor: 
     const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
     map.setView([lat, lng], 15);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      // OSM enforces its tile usage policy: requests without an HTTP Referer
-      // get "Access Blocked" tiles. Send the origin so tiles load.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      subdomains: TILE_SUBDOMAINS,
+      attribution: TILE_ATTRIBUTION,
       referrerPolicy: 'origin-when-cross-origin',
     }).addTo(map);
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, RefreshCw, MessageCircle, Phone, CheckCircle, Clock, XCircle, Trash2, Edit2, Check, X, Square, CheckSquare, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { confirmToast } from '@/lib/confirmToast';
+import { confirmToast, isMassDelete } from '@/lib/confirmToast';
 
 interface Guest {
   id: string;
@@ -120,11 +120,15 @@ export default function GuestsPage() {
       return;
     }
     const ids = Array.from(selected);
+    const mass = isMassDelete(ids.length, guests.length);
     const ok = await confirmToast({
       title: `Delete ${ids.length} selected guest${ids.length > 1 ? 's' : ''}?`,
-      message: 'This cannot be undone.',
+      message: mass
+        ? 'This permanently deletes every selected guest and cannot be undone.'
+        : 'This cannot be undone.',
       confirmText: 'Delete',
       danger: true,
+      requireText: mass ? 'DELETE' : undefined,
     });
     if (!ok) return;
 
