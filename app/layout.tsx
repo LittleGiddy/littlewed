@@ -3,6 +3,13 @@ import '@fontsource/dm-sans/400.css';
 import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/700.css';
+// 800/900 are used by font-extrabold / font-black across the app. Without these
+// the browser cannot find a real face and fakes the weight (or snaps to 700),
+// which is why heavy headings looked inconsistent between pages.
+import '@fontsource/dm-sans/800.css';
+import '@fontsource/dm-sans/900.css';
+// 400 is the fallback for any font-display heading that does not set a weight.
+import '@fontsource/playfair-display/400.css';
 import '@fontsource/playfair-display/500.css';
 import '@fontsource/playfair-display/600.css';
 import '@fontsource/playfair-display/700.css';
