@@ -22,30 +22,30 @@ interface ContentProps {
 
 function WelcomeContent({ name, subtitle, onClose }: ContentProps) {
   return (
-    <div className="relative min-w-[260px] max-w-sm text-center px-2 py-2">
+    <div className="relative text-center px-4 py-6 sm:px-6 sm:py-8 w-full max-w-md mx-auto">
       <button
         onClick={onClose}
         aria-label="Close"
-        className="absolute top-0 right-0 p-1.5 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+        className="absolute top-3 right-3 p-2 text-gray-300 hover:text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
       >
-        <X size={16} />
+        <X size={20} />
       </button>
 
       <motion.div
         initial={{ scale: 0, rotate: -30 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 16 }}
-        className="mx-auto mb-3 w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-green-100 flex items-center justify-center"
+        className="mx-auto mb-6 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-100 flex items-center justify-center shadow-lg shadow-green-100/50"
       >
-        <CheckCircle size={40} className="text-success" strokeWidth={2.5} />
+        <CheckCircle size={48} className="text-success" strokeWidth={2.5} />
       </motion.div>
 
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 mb-1">Welcome</p>
-      <p className="font-display text-2xl sm:text-3xl font-black text-gray-900 leading-tight break-words hyphens-auto">{name}</p>
-      {subtitle && <p className="text-sm font-medium text-gray-500 mt-1 break-words hyphens-auto">{subtitle}</p>}
+      <p className="text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-gray-400 mb-2">Welcome</p>
+      <p className="font-display text-3xl sm:text-4xl md:text-5xl font-black text-gray-900 leading-tight break-words hyphens-auto">{name}</p>
+      {subtitle && <p className="text-base sm:text-lg font-medium text-gray-600 mt-3 break-words hyphens-auto">{subtitle}</p>}
 
-      <div className="mt-4 flex justify-center">
-        <span className="text-[11px] font-semibold text-gray-400 animate-pulse">Auto-refreshing…</span>
+      <div className="mt-6 flex justify-center">
+        <span className="text-sm font-semibold text-gray-400 animate-pulse">Auto-refreshing…</span>
       </div>
     </div>
   );
@@ -77,17 +77,20 @@ export function showCheckInWelcome({ name, subtitle, duration = 6000, refreshAft
       position: 'top-center',
       style: {
         background: '#fff',
-        borderRadius: '20px',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+        borderRadius: '24px',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.25)',
         border: '1px solid #d1fae5',
-        padding: '20px 24px',
-        maxWidth: '90vw',
-        minWidth: '280px',
+        padding: '0',
+        maxWidth: 'min(95vw, 560px)',
+        width: 'min(95vw, 560px)',
+        minWidth: '320px',
         zIndex: 9999,
         wordBreak: 'break-word',
         overflowWrap: 'break-word',
         whiteSpace: 'normal',
+        backdropFilter: 'blur(8px)',
       },
+      className: 'backdrop-blur-lg',
     }
   );
 

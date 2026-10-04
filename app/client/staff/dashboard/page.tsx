@@ -1016,8 +1016,8 @@ export default function StaffDashboard() {
                       <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }} className="w-full py-2.5 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">
                         Force all {groupCount} guests
                       </button>
-                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-warn-soft text-warn rounded-lg font-medium hover:bg-amber-100 transition text-sm">
-                         Force just <span className="truncate">{getFullName(forceCheckinGuest)}</span>
+                      <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-warn-soft text-warn rounded-lg font-medium hover:bg-amber-100 transition text-sm flex items-center justify-center gap-1">
+                        <span className="truncate">Force just {getFullName(forceCheckinGuest)}</span>
                       </button>
                       <button onClick={() => setForceCheckinGuest(null)} className="w-full py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">
                         Cancel
