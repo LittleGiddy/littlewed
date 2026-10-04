@@ -41,8 +41,8 @@ function WelcomeContent({ name, subtitle, onClose }: ContentProps) {
       </motion.div>
 
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-gray-400 mb-1">Welcome</p>
-      <p className="font-display text-2xl sm:text-3xl font-black text-gray-900 leading-tight">{name}</p>
-      {subtitle && <p className="text-sm font-medium text-gray-500 mt-1">{subtitle}</p>}
+      <p className="font-display text-2xl sm:text-3xl font-black text-gray-900 leading-tight break-words hyphens-auto">{name}</p>
+      {subtitle && <p className="text-sm font-medium text-gray-500 mt-1 break-words hyphens-auto">{subtitle}</p>}
 
       <div className="mt-4 flex justify-center">
         <span className="text-[11px] font-semibold text-gray-400 animate-pulse">Auto-refreshing…</span>
@@ -81,6 +81,12 @@ export function showCheckInWelcome({ name, subtitle, duration = 6000, refreshAft
         boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
         border: '1px solid #d1fae5',
         padding: '20px 24px',
+        maxWidth: '90vw',
+        minWidth: '280px',
+        zIndex: 9999,
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        whiteSpace: 'normal',
       },
     }
   );

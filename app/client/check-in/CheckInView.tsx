@@ -30,7 +30,8 @@ import {
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
-import { guestTypeBadge, guestRecordMaxScans } from '@/lib/guestTypes';
+import { guestTypeBadge, guestRecordMaxScans, cardGroupIdCount, cardTotalScans } from '@/lib/guestTypes';
+import { phoneMatches } from '@/lib/phone';
 import { canMarkAsDouble as canMarkAsDoubleRule, canMarkAllAsGroup } from '@/lib/checkin';
 import { useReducedMotion } from '@/lib/motion';
 import {
@@ -158,8 +159,12 @@ const playSound = (type: 'success' | 'fail') => {
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────
-const fullName = (guest: Guest) =>
-  guest.title ? `${guest.title} ${guest.name}` : guest.name;
+const fullName = (guest: Guest) => {
+  const name = guest?.name || '';
+  const title = guest?.title || '';
+  if (!name && !title) return 'Unknown Guest';
+  return title ? `${title} ${name}`.trim() : name.trim();
+};
 
 const maxScansFor = (guest: Guest, groupSize = 1) => guestRecordMaxScans(guest, groupSize);
 
@@ -211,6 +216,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const [loadingGuests, setLoadingGuests] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'card-asc' | 'card-desc' | 'status' | 'checkin-desc'>('name-asc');
   const [eventInfo, setEventInfo] = useState<{ name: string; venue: string; date: string } | null>(
     null
   );
@@ -480,6 +486,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const groupSizeFor = (guest: Guest) =>
     guest.cardGroupId ? guests.filter((g) => g.cardGroupId === guest.cardGroupId).length : 1;
 
+  // A numeric label ("Watu 20") means the card is ONE count-up bucket, not a
+  // set of people, so force/group actions target the whole card.
+  const isNumericGroupCard = (guest: Guest) => cardGroupIdCount(guest.cardGroupId) !== null;
+  const cardTotalFor = (guest: Guest) => cardTotalScans(guest.cardGroupId, groupSizeFor(guest));
+
   const handleForceCheckin = async (guest: Guest, allGroup: boolean) => {
     setBusyAction(true);
     try {
@@ -706,16 +717,47 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
   const filteredGuests = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return guests.filter((guest) => {
+    let filtered = guests.filter((guest) => {
       if (statusFilter !== 'all' && classify(guest, groupSizeFor(guest)) !== statusFilter) return false;
       if (!term) return true;
-      return (
-        fullName(guest).toLowerCase().includes(term) ||
-        (guest.cardNumber || '').includes(term) ||
-        (guest.phone || '').replace(/\s/g, '').includes(term.replace(/\s/g, ''))
-      );
+      const nameMatch = fullName(guest).toLowerCase().includes(term);
+      const cardMatch = (guest.cardNumber || '').toLowerCase().includes(term);
+      const phoneMatch = phoneMatches(guest.phone, term);
+      const guestTypeMatch = (guest.guestType || '').toLowerCase().includes(term);
+      const titleMatch = (guest.title || '').toLowerCase().includes(term);
+      return nameMatch || cardMatch || phoneMatch || guestTypeMatch || titleMatch;
     });
-  }, [guests, searchTerm, statusFilter]);
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'name-asc':
+          return fullName(a).localeCompare(fullName(b));
+        case 'name-desc':
+          return fullName(b).localeCompare(fullName(a));
+        case 'card-asc':
+          const ca = a.cardNumber || '';
+          const cb = b.cardNumber || '';
+          return ca.localeCompare(cb);
+        case 'card-desc':
+          const cda = a.cardNumber || '';
+          const cdb = b.cardNumber || '';
+          return cdb.localeCompare(cda);
+        case 'status':
+          const sa = classify(a, groupSizeFor(a));
+          const sb = classify(b, groupSizeFor(b));
+          const order = { not: 0, partial: 1, fully: 2 };
+          return order[sb] - order[sa];
+        case 'checkin-desc':
+          const cca = a.checkInCount || 0;
+          const ccb = b.checkInCount || 0;
+          return ccb - cca;
+        default:
+          return fullName(a).localeCompare(fullName(b));
+      }
+    });
+    return filtered;
+  }, [guests, searchTerm, statusFilter, sortBy]);
 
   // ─── Missing event ──────────────────────────────────────────────────
   if (!eventId) {
@@ -792,8 +834,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             <>
               <div className="flex items-start gap-2.5">
                 <PartyPopper size={16} className="text-coral mt-0.5 shrink-0" aria-hidden="true" />
-                <h1 className="font-display text-lg font-bold text-gray-900 leading-tight min-w-0 break-words">
-                  {eventInfo.name}
+                <h1 className="font-display text-lg font-bold text-gray-900 leading-tight min-w-0 break-words hyphens-auto">
+                  {eventInfo.name || 'Event'}
                 </h1>
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-gray-500 mt-1.5">
@@ -804,7 +846,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 {eventInfo.venue ? (
                   <span className="flex items-center gap-1 min-w-0">
                     <MapPin size={11} className="shrink-0" aria-hidden="true" />
-                    <span className="truncate">{eventInfo.venue}</span>
+                    <span className="truncate break-words hyphens-auto">{eventInfo.venue}</span>
                   </span>
                 ) : null}
               </div>
@@ -991,18 +1033,18 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                     <CheckCircle size={22} className="text-success" aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 text-[15px] leading-tight truncate">
+                    <p className="font-semibold text-gray-900 text-[15px] leading-tight break-words hyphens-auto">
                       {fullName(lastScan.guest)}
                     </p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <AppChip tone={guestTypeTone(lastScan.guest)}>
                         {guestTypeBadge(lastScan.guest.guestType, lastScan.guest.guestCount)}
                       </AppChip>
-                      {lastScan.guest.cardNumber ? (
+                      {lastScan.guest.cardNumber && (
                         <span className="font-mono text-[11px] text-gray-500">
                           #{lastScan.guest.cardNumber}
                         </span>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                   {lastScan.guest.maxCheckIns > 1 ? (
@@ -1026,14 +1068,14 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                           ) : (
                             <User size={13} className="text-gray-400 shrink-0" aria-hidden="true" />
                           )}
-                          <span
+                           <span
                             className={
                               member.checkedIn
-                                ? 'text-gray-500 line-through'
-                                : 'font-medium text-gray-900'
+                                ? 'text-gray-500 line-through break-words hyphens-auto'
+                                : 'font-medium text-gray-900 break-words hyphens-auto'
                             }
                           >
-                            {member.name}
+                            {member.name || 'Guest'}
                           </span>
                           <span className="sr-only">{member.checkedIn ? 'checked in' : 'not yet'}</span>
                         </li>
@@ -1141,8 +1183,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                         }`}
                         aria-hidden="true"
                       />
-                      <span
-                        className={`min-w-0 flex-1 truncate ${
+                       <span
+                        className={`min-w-0 flex-1 break-words hyphens-auto ${
                           scan.undone
                             ? 'text-gray-400 line-through'
                             : 'font-medium text-gray-800'
@@ -1221,7 +1263,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
               type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search name, card or phone"
+              placeholder="Search name, card #, phone, type, or title"
               aria-label="Search guests"
               className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-tap text-sm placeholder:text-gray-300 focus:outline-none focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all duration-150"
             />
@@ -1237,20 +1279,39 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             ) : null}
           </div>
 
-          {statusFilter !== 'all' ? (
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 justify-between">
+            {statusFilter !== 'all' ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-gray-500">
+                  Showing {filteredGuests.length} of {stats.total}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className="text-[12px] font-semibold text-brand hover:underline"
+                >
+                  Show all
+                </button>
+              </div>
+            ) : (
               <span className="text-[12px] text-gray-500">
                 Showing {filteredGuests.length} of {stats.total}
               </span>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className="text-[12px] font-semibold text-brand hover:underline"
-              >
-                Show all
-              </button>
-            </div>
-          ) : null}
+            )}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="text-[12px] border border-gray-200 rounded-tap px-2 py-1.5 bg-white focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10"
+              aria-label="Sort guests"
+            >
+              <option value="name-asc">Name A-Z</option>
+              <option value="name-desc">Name Z-A</option>
+              <option value="card-asc">Card # Asc</option>
+              <option value="card-desc">Card # Desc</option>
+              <option value="status">Status</option>
+              <option value="checkin-desc">Check-ins Desc</option>
+            </select>
+          </div>
 
           <AppCard padded={false} className="overflow-hidden">
             {loadingGuests ? (
@@ -1297,13 +1358,15 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                       >
                         <AppAvatar name={guest.name} size="sm" />
                         <span className="min-w-0 flex-1">
-                          <span className="block font-semibold text-gray-900 text-sm truncate">
+                          <span className="block font-semibold text-gray-900 text-sm break-words hyphens-auto">
                             {fullName(guest)}
                           </span>
                           <span className="flex flex-wrap items-center gap-1.5 mt-1">
-                            <span className="font-mono text-[10px] text-gray-400">
-                              #{guest.cardNumber}
-                            </span>
+                            {guest.cardNumber && (
+                              <span className="font-mono text-[10px] text-gray-400">
+                                #{guest.cardNumber}
+                              </span>
+                            )}
                             <AppChip tone={guestTypeTone(guest)} className="!text-[9px] !px-1.5 !py-0.5">
                               {guestTypeBadge(guest.guestType, guest.guestCount)}
                             </AppChip>
@@ -1463,13 +1526,26 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         title="Force check-in"
         description={
           forceCheckinGuest
-            ? `Marks ${fullName(forceCheckinGuest)} as arrived, ignoring their card type.`
+            ? isNumericGroupCard(forceCheckinGuest)
+              ? `Marks the whole card (${cardTotalFor(forceCheckinGuest)} scans) as arrived.`
+              : `Marks ${fullName(forceCheckinGuest)} as arrived, ignoring their card type.`
             : undefined
         }
         footer={
           forceCheckinGuest ? (
             <div className="flex flex-col gap-2">
-              {groupMembersFor(forceCheckinGuest).length > 1 ? (
+              {isNumericGroupCard(forceCheckinGuest) ? (
+                <AppButton
+                  size="lg"
+                  fullWidth
+                  loading={busyAction}
+                  loadingText="Checking in…"
+                  icon={<Users size={16} />}
+                  onClick={() => handleForceCheckin(forceCheckinGuest, true)}
+                >
+                  Mark all {cardTotalFor(forceCheckinGuest)} on this card
+                </AppButton>
+              ) : groupMembersFor(forceCheckinGuest).length > 1 ? (
                 <>
                   <AppButton
                     size="lg"
@@ -1514,9 +1590,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
           <div className="flex items-center gap-3 rounded-tap bg-warn-soft p-3.5">
             <UserCheck size={20} className="text-warn shrink-0" aria-hidden="true" />
             <p className="text-[13px] text-gray-700 leading-snug">
-              {groupMembersFor(forceCheckinGuest).length > 1
-                ? `This card covers ${groupMembersFor(forceCheckinGuest).length} guests.`
-                : 'They will be recorded as fully checked in.'}
+              {isNumericGroupCard(forceCheckinGuest)
+                ? `This card allows ${cardTotalFor(forceCheckinGuest)} scans.`
+                : groupMembersFor(forceCheckinGuest).length > 1
+                  ? `This card covers ${groupMembersFor(forceCheckinGuest).length} guests.`
+                  : 'They will be recorded as fully checked in.'}
             </p>
           </div>
         ) : null}

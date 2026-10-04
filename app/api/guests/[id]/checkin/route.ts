@@ -211,23 +211,26 @@ export async function PATCH(
 
     // ─── Collect the card's targets (shared card / numeric group card) ─
     const isGroup = groupSize > 1 || isNumericGroup;
-    // If the caller requested "all" but the guest isn't part of a real group,
-    // fall back to just this guest.
-    const targets = allGroup && isGroup ? groupMembers : [guest];
+    // A numeric group card ("Watu 20") is a SINGLE count-up bucket, so any
+    // force/group action always covers the whole card. For a plain shared card
+    // "all" means the whole card and a single action means just this guest; if
+    // the caller asked for "all" on a lone guest we fall back to just them.
+    const targets = (allGroup || isNumericGroup) && isGroup ? groupMembers : [guest];
     const accumulatorId = groupMembers[0]?.id;
 
     const updatedGuests = [];
     for (const target of targets) {
-      // A guest on a shared card is usually ONE person (ceiling 1). A numeric
+      // A guest on a shared card is ONE person (ceiling 1) - even if the row is
+      // typed DOUBLE, because the card itself is what is shared. A numeric
       // group card instead counts up to its label; that total is split across
       // the group's rows with the remainder kept on the oldest (accumulator)
-      // row. Outside a group the guestType rules apply.
+      // row. Outside any group the guestType rules apply.
       const others = targets.filter((t) => t.id !== accumulatorId).length;
       const tMax = isNumericGroup
         ? target.id === accumulatorId
           ? Math.max(1, groupTotal - others)
           : 1
-        : targets.length > 1
+        : groupSize > 1
           ? 1
           : guestTypeMaxScans(target.guestType, target.guestCount);
       const updated = await prisma.guest.update({

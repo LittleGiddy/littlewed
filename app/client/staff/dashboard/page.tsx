@@ -12,7 +12,8 @@ import toast from 'react-hot-toast';
 import { canMarkAsDouble, canMarkAllAsGroup } from '@/lib/checkin';
 import jsQR from 'jsqr';
 import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
-import { guestTypeBadge, guestRecordMaxScans } from '@/lib/guestTypes';
+import { guestTypeBadge, guestRecordMaxScans, cardGroupIdCount, cardTotalScans } from '@/lib/guestTypes';
+import { phoneMatches } from '@/lib/phone';
 
 interface Guest {
   id: string;
@@ -87,7 +88,12 @@ const playSound = (type: 'success' | 'fail') => {
   }
 };
 
-const getFullName = (guest: Guest) => guest.title ? `${guest.title} ${guest.name}` : guest.name;
+  const getFullName = (guest: Guest) => {
+    const name = guest?.name || '';
+    const title = guest?.title || '';
+    if (!name && !title) return 'Unknown Guest';
+    return title ? `${title} ${name}`.trim() : name.trim();
+  };
 
 const getGuestTypeLabel = (type: string | null, count?: number | null) => {
   if (!type) return 'SINGLE';
@@ -456,6 +462,9 @@ export default function StaffDashboard() {
   const groupSizeFor = (g: Guest) =>
     g.cardGroupId ? Math.max(1, guests.filter((x) => x.cardGroupId === g.cardGroupId).length) : 1;
   const maxScansFor = (g: Guest) => guestRecordMaxScans(g, groupSizeFor(g));
+  // A numeric label means the card is ONE count-up bucket, not a set of people.
+  const isNumericGroupCard = (g: Guest) => cardGroupIdCount(g.cardGroupId) !== null;
+  const cardTotalFor = (g: Guest) => cardTotalScans(g.cardGroupId, groupSizeFor(g));
 
   const classifyGuest = (g: Guest): 'fully' | 'partial' | 'not' => {
     const max = maxScansFor(g);
@@ -465,6 +474,8 @@ export default function StaffDashboard() {
     return 'not';
   };
 
+  const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'card-asc' | 'card-desc' | 'status' | 'checkin-desc'>('name-asc');
+
   const filteredGuests = guests.filter(g => {
     const status = classifyGuest(g);
     if (statusFilter !== 'all' && status !== statusFilter) return false;
@@ -473,9 +484,31 @@ export default function StaffDashboard() {
     if (!term) return true;
 
     const name = getFullName(g).toLowerCase();
-    const card = g.cardNumber || '';
+    const card = (g.cardNumber || '').toLowerCase();
     const phone = g.phone || '';
-    return name.includes(term) || card.includes(term) || phone.replace(/\s/g, '').includes(term.replace(/\s/g, ''));
+    const guestType = (g.guestType || '').toLowerCase();
+    const title = (g.title || '').toLowerCase();
+    return name.includes(term) || card.includes(term) || phoneMatches(phone, term) || guestType.includes(term) || title.includes(term);
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'name-asc':
+        return getFullName(a).localeCompare(getFullName(b));
+      case 'name-desc':
+        return getFullName(b).localeCompare(getFullName(a));
+      case 'card-asc':
+        return (a.cardNumber || '').localeCompare(b.cardNumber || '');
+      case 'card-desc':
+        return (b.cardNumber || '').localeCompare(a.cardNumber || '');
+      case 'status':
+        const sa = classifyGuest(a);
+        const sb = classifyGuest(b);
+        const order = { not: 0, partial: 1, fully: 2 };
+        return order[sb] - order[sa];
+      case 'checkin-desc':
+        return (b.checkInCount || 0) - (a.checkInCount || 0);
+      default:
+        return getFullName(a).localeCompare(getFullName(b));
+    }
   });
 
   const totalGuests = guests.length;
@@ -659,15 +692,17 @@ export default function StaffDashboard() {
                 )}
 
                 {scannedGuest && showSuccess && (
-                  <div className="mt-3 sm:mt-4 bg-white rounded-card shadow-lg border border-success-border p-3 sm:p-4 animate-fadeInUp">
+                  <div className="mt-3 sm:mt-4 bg-success-soft rounded-card shadow-lg border border-success-border p-3 sm:p-4 animate-fadeInUp">
                     <div className="flex items-center gap-3">
                       <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                         <CheckCircle size={16} className="text-success sm:text-2xl" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-800 text-sm sm:text-base truncate">{getFullName(scannedGuest)}</p>
-                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                          <span className="font-mono">#{scannedGuest.cardNumber}</span>
+                        <p className="font-bold text-gray-900 text-sm sm:text-base break-words hyphens-auto">{getFullName(scannedGuest)}</p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+                          {scannedGuest.cardNumber && (
+                            <span className="font-mono">#{scannedGuest.cardNumber}</span>
+                          )}
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                             scannedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
                             (scannedGuest.maxCheckIns || 1) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
@@ -693,9 +728,9 @@ export default function StaffDashboard() {
                             ) : (
                               <User size={12} className="text-gray-400 shrink-0" />
                             )}
-                            <span className={m.checkedIn ? 'text-gray-500 line-through' : 'font-medium text-gray-800'}>
-                              {m.name}
-                            </span>
+                             <span className={`break-words hyphens-auto ${m.checkedIn ? 'text-gray-600 line-through' : 'font-medium text-gray-900'}`}>
+                               {m.name || 'Guest'}
+                             </span>
                           </li>
                         ))}
                       </ul>
@@ -787,7 +822,7 @@ export default function StaffDashboard() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by name, card number, or phone..."
+                    placeholder="Search by name, card number, phone, or type..."
                     className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent text-sm sm:text-base"
                   />
                   {searchTerm && (
@@ -797,17 +832,35 @@ export default function StaffDashboard() {
                   )}
                 </div>
 
-                {statusFilter !== 'all' && (
-                  <div className="flex items-center justify-between mb-2 px-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
+                  {statusFilter !== 'all' ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-gray-500">
+                        {statusFilter === 'fully' ? 'Fully checked in' : statusFilter === 'partial' ? 'Partially checked in' : 'Not checked in'}
+                        {filteredGuests.length > 0 && <span className="text-gray-400"> · {filteredGuests.length}</span>}
+                      </span>
+                      <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-brandtext hover:underline">
+                        Show all ({totalGuests})
+                      </button>
+                    </div>
+                  ) : (
                     <span className="text-xs font-medium text-gray-500">
-                      {statusFilter === 'fully' ? 'Fully checked in' : statusFilter === 'partial' ? 'Partially checked in' : 'Not checked in'}
-                      {filteredGuests.length > 0 && <span className="text-gray-400"> · {filteredGuests.length}</span>}
+                      Showing {filteredGuests.length} of {totalGuests}
                     </span>
-                    <button onClick={() => setStatusFilter('all')} className="text-xs font-semibold text-brandtext hover:underline">
-                      Show all ({totalGuests})
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    className="text-xs border border-gray-200 rounded-tap px-2 py-1.5 bg-white focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/10"
+                  >
+                    <option value="name-asc">Name A-Z</option>
+                    <option value="name-desc">Name Z-A</option>
+                    <option value="card-asc">Card # Asc</option>
+                    <option value="card-desc">Card # Desc</option>
+                    <option value="status">Status</option>
+                    <option value="checkin-desc">Check-ins Desc</option>
+                  </select>
+                </div>
 
                 <div className="bg-white rounded-tap border border-gray-200 shadow-sm overflow-hidden">
                   {loadingGuests ? (
@@ -833,9 +886,11 @@ export default function StaffDashboard() {
                                 {guest.name.charAt(0).toUpperCase()}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-800 text-xs sm:text-sm truncate">{getFullName(guest)}</p>
+                                 <p className="font-semibold text-gray-800 text-xs sm:text-sm break-words hyphens-auto">{getFullName(guest)}</p>
                                 <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs">
-                                  <span className="font-mono text-gray-400 text-[10px] sm:text-xs">#{guest.cardNumber}</span>
+                                   {guest.cardNumber && (
+                                     <span className="font-mono text-gray-400 text-[10px] sm:text-xs">#{guest.cardNumber}</span>
+                                   )}
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium ${
                                     guest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
                                     max > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
@@ -876,9 +931,11 @@ export default function StaffDashboard() {
                   {selectedGuest.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-bold text-gray-800 text-sm sm:text-base">{getFullName(selectedGuest)}</p>
+                   <p className="font-bold text-gray-800 text-sm sm:text-base break-words hyphens-auto">{getFullName(selectedGuest)}</p>
                   <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
-                    <span className="font-mono">#{selectedGuest.cardNumber}</span>
+                     {selectedGuest.cardNumber && (
+                       <span className="font-mono">#{selectedGuest.cardNumber}</span>
+                     )}
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                       selectedGuest.guestType?.toUpperCase() === 'DOUBLE' ? 'bg-purple-100 text-purple-700' :
                       maxScansFor(selectedGuest) > 1 ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'
@@ -921,10 +978,11 @@ export default function StaffDashboard() {
 
       {/* ─── Force Confirm ─── */}
       {forceCheckinGuest && (() => {
-        const { isGroup, groupCount } = (() => {
-          const members = getGroupMembers(forceCheckinGuest);
-          return { isGroup: members.length > 1, groupCount: members.length };
-        })();
+        const members = getGroupMembers(forceCheckinGuest);
+        const isGroup = members.length > 1;
+        const groupCount = members.length;
+        const numeric = isNumericGroupCard(forceCheckinGuest);
+        const cardTotal = cardTotalFor(forceCheckinGuest);
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-card shadow-xl w-full max-w-sm p-5 sm:p-6 mx-2">
@@ -932,11 +990,24 @@ export default function StaffDashboard() {
                 <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-3"><UserCheck size={24} className="text-warn" /></div>
                 <h3 className="font-bold text-gray-800 text-sm sm:text-base">Force Check-in?</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Force check-in <span className="font-semibold">{getFullName(forceCheckinGuest)}</span>?
-                  <br /><span className="text-xs text-gray-400">This will mark them as checked in regardless of card type.</span>
+                  Force check-in <span className="font-semibold break-words hyphens-auto">{getFullName(forceCheckinGuest)}</span>?
+                  <br /><span className="text-xs text-gray-400">
+                    {numeric
+                      ? `This marks the whole card (${cardTotal} scans) as checked in.`
+                      : 'This will mark them as checked in regardless of card type.'}
+                  </span>
                 </p>
 
-                {isGroup ? (
+                {numeric ? (
+                  <div className="flex flex-col gap-2 mt-4">
+                    <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, true); }} className="w-full py-2.5 bg-warn text-white rounded-lg font-medium hover:bg-amber-600 transition text-sm">
+                      Mark all {cardTotal} on this card
+                    </button>
+                    <button onClick={() => setForceCheckinGuest(null)} className="w-full py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">
+                      Cancel
+                    </button>
+                  </div>
+                ) : isGroup ? (
                   <div className="mt-4 text-left">
                     <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                       This card has {groupCount} guests
@@ -946,7 +1017,7 @@ export default function StaffDashboard() {
                         Force all {groupCount} guests
                       </button>
                       <button onClick={() => { setForceCheckinGuest(null); handleForceCheckin(forceCheckinGuest, false); }} className="w-full py-2.5 border border-amber-300 bg-warn-soft text-warn rounded-lg font-medium hover:bg-amber-100 transition text-sm">
-                        Force just {getFullName(forceCheckinGuest)}
+                         Force just <span className="truncate">{getFullName(forceCheckinGuest)}</span>
                       </button>
                       <button onClick={() => setForceCheckinGuest(null)} className="w-full py-2 border border-gray-200 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition text-sm">
                         Cancel
@@ -973,7 +1044,7 @@ export default function StaffDashboard() {
               <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3"><Trash2 size={24} className="text-danger" /></div>
               <h3 className="font-bold text-gray-800 text-sm sm:text-base">Delete Guest?</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Are you sure you want to delete <span className="font-semibold">{getFullName(selectedGuest)}</span>?
+                 Are you sure you want to delete <span className="font-semibold break-words hyphens-auto">{getFullName(selectedGuest)}</span>?
                 <br /><span className="text-xs text-danger">This action cannot be undone.</span>
               </p>
               <div className="flex gap-3 mt-4">

@@ -47,7 +47,10 @@ interface EventLike {
 }
 
 function getGuestFullName(guest: any): string {
-  return guest.title ? `${guest.title} ${guest.name}` : guest.name;
+  const name = guest?.name || '';
+  const title = guest?.title || '';
+  if (!name && !title) return 'Unknown Guest';
+  return title ? `${title} ${name}`.trim() : name.trim();
 }
 
 // Composes the display name for a card. For a shared DOUBLE card (multiple
