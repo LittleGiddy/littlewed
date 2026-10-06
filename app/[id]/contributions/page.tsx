@@ -6,11 +6,7 @@
 // this dynamic level, and Next rejects two different slug names for one path.
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import {
-  summariseContributions,
-  maskPhone,
-  parseContributionStatus,
-} from '@/lib/contributions';
+import { summariseContributions, parseContributionStatus } from '@/lib/contributions';
 import { formatSwahiliDate } from '@/lib/whatsapp/mchango';
 import ContributionTracker from './ContributionTracker';
 
@@ -49,7 +45,6 @@ export default async function ContributionsPage({
       contributionDeadline: true,
       venue: true,
       address: true,
-      hostFamily: true,
       person1: true,
       person2: true,
       contributionCurrency: true,
@@ -106,7 +101,6 @@ export default async function ContributionsPage({
       date: formatSwahiliDate(event.date),
       venue: event.venue,
       address: event.address,
-      hostFamily: event.hostFamily,
       person1: event.person1,
       person2: event.person2,
       currency,
@@ -119,8 +113,9 @@ export default async function ContributionsPage({
       id: g.contribution?.id ?? '',
       guestId: g.id,
       guestName: g.title ? `${g.title} ${g.name}` : g.name,
-      // Masked. The full number is never sent to this page.
-      phone: maskPhone(g.phone),
+      // The full number: this ledger belongs to the event owner, and they need
+      // to recognise and call the guests they are chasing.
+      phone: g.phone,
       status: parseContributionStatus(g.contribution?.status),
       amountPaid: g.contribution?.amountPaid ?? 0,
       amountExpected: g.contribution?.amountExpected ?? null,

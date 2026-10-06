@@ -162,8 +162,10 @@ export function formatTZS(amount: number | null | undefined, currency = 'TZS'): 
 }
 
 /**
- * Mask a phone number for the public tracker: 0762208760 -> 0762 *** 760.
- * The public page must never publish a full contact list.
+ * Mask a phone number for previews: 0762208760 -> 0762 *** 760.
+ * Used where a number is shown next to something it does not belong to (the
+ * tenant list's `phoneMasked`). The owner's own contribution ledger shows the
+ * full number instead, because that is the list they call from.
  */
 export function maskPhone(phone: string | null | undefined): string {
   if (!phone) return '—';

@@ -9,18 +9,20 @@
 // There is no middleware in this project, so "public" simply means this route
 // does not call getServerSession. That is fine for reads, but it also means a
 // write here is reachable by anyone holding the link. The mitigations are:
-//   - phone numbers are masked before they leave the server
+//   - the link is never published anywhere: it is handed to the owner only
 //   - every write records who made it and when, so the tenant can see changes
 //   - writes only ever move a guest between known statuses
-// The link is a capability, not an authentication. Treat it as the owner's own
-// secret: anyone who opens it can change the ledger.
+// Guest phone numbers are sent in full. This ledger is the owner's own record
+// of who has paid, so a masked number would only get in the way of calling the
+// people they are chasing. The link is a capability, not an authentication.
+// Treat it as the owner's own secret: anyone who opens it can see the guest
+// list and change the ledger.
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import {
   parseContributionStatus,
   reconcileContribution,
   summariseContributions,
-  maskPhone,
   formatTZS,
 } from '@/lib/contributions';
 import { formatSwahiliDate } from '@/lib/whatsapp/mchango';
@@ -37,7 +39,6 @@ async function loadPublicEvent(eventId: string) {
       date: true,
       venue: true,
       address: true,
-      hostFamily: true,
       person1: true,
       person2: true,
       contributionTarget: true,
@@ -91,7 +92,6 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       date: formatSwahiliDate(event.date),
       venue: event.venue,
       address: event.address,
-      hostFamily: event.hostFamily,
       person1: event.person1,
       person2: event.person2,
       currency: event.contributionCurrency || 'TZS',
@@ -106,8 +106,9 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       id: g.contribution?.id ?? '',
       guestId: g.id,
       guestName: g.title ? `${g.title} ${g.name}` : g.name,
-      // Masked only. The full number never reaches the browser on this route.
-      phone: maskPhone(g.phone),
+      // Full number, deliberately: the owner reads this list to recognise and
+      // call the guests they are chasing, and the tracker searches by it.
+      phone: g.phone,
       status: parseContributionStatus(g.contribution?.status),
       amountPaid: g.contribution?.amountPaid ?? 0,
       amountExpected: g.contribution?.amountExpected ?? null,
