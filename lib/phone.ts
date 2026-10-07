@@ -1,53 +1,55 @@
 // lib/phone.ts
 
 export interface NormalizedPhone {
-  normalized: string;      // +255XXXXXXXXX (with +)
+  normalized: string;      // +<country code><national number> (with +)
   isValid: boolean;
   original: string;
 }
 
 /**
- * Normalize a Tanzanian phone number:
+ * Minimum/maximum digits after '+' (E.164 allows up to 15).
+ * The minimum keeps out obviously bogus input while still covering
+ * every country's numbering plan.
+ */
+const MIN_PHONE_DIGITS = 8;
+const MAX_PHONE_DIGITS = 15;
+
+/**
+ * Normalize an international phone number:
  * - Must start with '+'
  * - Remove spaces, dashes, parentheses, dots
- * - Must start with '255' after removing '+'
- * - Must be 12-13 digits after '+'
+ * - Digits only after '+', any country code accepted
+ * - 8-15 digits after '+' (E.164)
  */
 export function normalizePhone(phone: string): NormalizedPhone {
   // Remove spaces, dashes, parentheses, dots
-  let cleaned = phone.replace(/[\s\-()\.]/g, '');
-  
+  const cleaned = phone.replace(/[\s\-()\.]/g, '');
+
   // Must start with '+'
   if (!cleaned.startsWith('+')) {
     return { normalized: '', isValid: false, original: phone };
   }
-  
+
   // Remove '+' and validate digits
   const digits = cleaned.substring(1);
   if (!/^\d+$/.test(digits)) {
     return { normalized: '', isValid: false, original: phone };
   }
-  
-  // Must start with '255'
-  if (!digits.startsWith('255')) {
+
+  if (digits.length < MIN_PHONE_DIGITS || digits.length > MAX_PHONE_DIGITS) {
     return { normalized: '', isValid: false, original: phone };
   }
-  
-  // Length should be 12 (255 + 9 digits) or 13 (255 + 10 digits)
-  if (digits.length < 12 || digits.length > 13) {
-    return { normalized: '', isValid: false, original: phone };
-  }
-  
+
   return { normalized: `+${digits}`, isValid: true, original: phone };
 }
 
 /**
  * Loose phone-number match for search boxes.
  *
- * Stored numbers are normalized to "+255XXXXXXXXX", but staff type local
- * forms such as "0712 345 678", "+255712345678" or just "712". A raw substring
- * comparison fails for all of those, so compare digits only and ignore the
- * local trunk "0" and the "255" country code.
+ * Stored numbers are normalized to "+<country code><number>", but staff type
+ * local forms such as "0712 345 678", "+255712345678" or just "712". A raw
+ * substring comparison fails for all of those, so compare digits only and
+ * ignore the local trunk "0" and the "255" country code when present.
  */
 export function phoneMatches(phone: string | null | undefined, query: string): boolean {
   const digits = (phone || '').replace(/\D/g, '');
@@ -60,7 +62,8 @@ export function phoneMatches(phone: string | null | undefined, query: string): b
 }
 
 /**
- * Format phone number for display (e.g., +255 712 345 678)
+ * Format phone number for display (e.g., +255 712 345 678).
+ * Tanzanian numbers get grouped; any other country code is returned as typed.
  */
 export function formatPhone(phone: string): string {
   if (!phone.startsWith('+')) return phone;

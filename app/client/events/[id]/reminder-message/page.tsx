@@ -7,10 +7,11 @@ import {
   ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, 
   MessageCircle, Phone, Info, Gift, Calendar, User,
   CreditCard, AlertCircle, CheckCircle, Bell, MessageSquare,
-  FileText, CornerDownRight, Hash
+  FileText, CornerDownRight, Hash, ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import { isContributionSettled } from '@/lib/contributions';
 
 interface Guest {
   id: string;
@@ -18,12 +19,25 @@ interface Guest {
   phone: string;
   reminderCount: number;
   routingChannel: string;
+  contribution?: {
+    status: string;
+    amountPaid: number;
+    amountExpected: number | null;
+  } | null;
 }
 
 interface Event {
   id: string;
   name: string;
   manualReminderSent?: boolean;
+  contributionsEnabled?: boolean;
+}
+
+/** Who received the most recent reminder, and how many of them have since paid. */
+interface LastReminderBatch {
+  sentAt: string;
+  total: number;
+  settledCount: number;
 }
 
 export default function ReminderMessagePage({ params }: { params: Promise<{ eventId: string }> }) {
@@ -31,6 +45,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [lastReminderBatch, setLastReminderBatch] = useState<LastReminderBatch | null>(null);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -53,6 +68,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       const data = await res.json();
       setEvent(data.event);
       setGuests(data.guests || []);
+      setLastReminderBatch(data.lastReminderBatch ?? null);
       setBypassPayment(!!data.bypassPayment);
     } catch {
       toast.error('Could not load event data');
@@ -71,11 +87,24 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
     }
   };
 
+  // Guests who have finished contributing are removed from the picker. The API
+  // enforces the same rule, so offering them would only invite a mistake.
+  const settledGuests = event?.contributionsEnabled
+    ? guests.filter((g) => isContributionSettled(g.contribution))
+    : [];
+  const remindableGuests = event?.contributionsEnabled
+    ? guests.filter((g) => !isContributionSettled(g.contribution))
+    : guests;
+
+  // How many of the guests chased in the most recent reminder have since
+  // finished contributing. These are the people this send leaves out.
+  const batchSettled = lastReminderBatch?.settledCount ?? 0;
+
   const toggleSelectAll = () => {
-    if (selectedGuests.size === guests.length) {
+    if (selectedGuests.size === remindableGuests.length) {
       setSelectedGuests(new Set());
     } else {
-      setSelectedGuests(new Set(guests.map(g => g.id)));
+      setSelectedGuests(new Set(remindableGuests.map(g => g.id)));
     }
   };
 
@@ -90,7 +119,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   // Once-per-event lock: non-bypassed tenants can use the manual reminder once.
   const alreadyUsed = !bypassPayment && !!event?.manualReminderSent;
   // Cost: first 2 reminders free, then 50 TZS each
-  const totalCost = guests
+  const totalCost = remindableGuests
     .filter(g => selectedGuests.has(g.id))
     .reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
 
@@ -112,7 +141,11 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       return;
     }
     const costText = totalCost === 0 ? 'Free' : `${totalCost} TZS`;
-    const ok = await confirmToast({ title: `Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}?`, message: `Cost: ${costText}.`, confirmText: 'Send' });
+    const omittedLine =
+      batchSettled > 0
+        ? ` ${batchSettled} guest${batchSettled > 1 ? 's' : ''} from your last reminder completed their contribution and will be omitted automatically.`
+        : '';
+    const ok = await confirmToast({ title: `Send reminder to ${selectedCount} guest${selectedCount > 1 ? 's' : ''}?`, message: `Cost: ${costText}.${omittedLine}`, confirmText: 'Send' });
     if (!ok) return;
 
     setSending(true);
@@ -136,6 +169,11 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
             console.error('Reminder errors:', data.errors);
             toast.error('Some messages did not send. Please try again or contact support.');
           }
+        }
+        if (batchSettled > 0) {
+          toast(
+            `${batchSettled} guest${batchSettled > 1 ? 's' : ''} from your last reminder ${batchSettled > 1 ? 'were' : 'was'} omitted - contributions already completed.`
+          );
         }
         router.push(`/client/events/${eventId}`);
       } else {
@@ -208,6 +246,32 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
         </div>
       ) : null}
 
+      {event.contributionsEnabled && batchSettled > 0 ? (
+        <div className="bg-success-soft border border-success-border rounded-tap p-4 mb-6 flex items-start gap-3">
+          <ShieldCheck size={20} className="text-success flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-green-800">
+              {batchSettled} guest{batchSettled > 1 ? 's' : ''} from your last reminder completed their contributions
+            </p>
+            <p className="text-sm text-success mt-0.5">
+              They will be automatically omitted, so nobody who has paid in full is reminded again.
+            </p>
+          </div>
+        </div>
+      ) : event.contributionsEnabled && settledGuests.length > 0 ? (
+        <div className="bg-success-soft border border-success-border rounded-tap p-4 mb-6 flex items-start gap-3">
+          <ShieldCheck size={20} className="text-success flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-green-800">
+              {settledGuests.length} guest{settledGuests.length > 1 ? 's have' : ' has'} already completed their contributions
+            </p>
+            <p className="text-sm text-success mt-0.5">
+              They will be automatically omitted, so nobody who has paid in full is reminded again.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="bg-white rounded-tap shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-5 border-b border-gray-100">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -217,11 +281,11 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
                 disabled={alreadyUsed}
                 className="text-sm text-gray-600 hover:text-brandtext flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {selectedGuests.size === guests.length ? <CheckSquare size={16} /> : <Square size={16} />}
-                {selectedGuests.size === guests.length ? 'Deselect All' : 'Select All'}
+                {selectedGuests.size === remindableGuests.length ? <CheckSquare size={16} /> : <Square size={16} />}
+                {selectedGuests.size === remindableGuests.length ? 'Deselect All' : 'Select All'}
               </button>
               <span className="text-sm text-gray-500">
-                {selectedCount} selected · {guests.length} total
+                {selectedCount} selected · {remindableGuests.length} total
               </span>
             </div>
             <div className="text-sm">
@@ -262,7 +326,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
           </div>
 
           <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-tap divide-y divide-gray-100">
-            {guests.map((guest) => {
+            {remindableGuests.map((guest) => {
               const isWhatsApp = guest.routingChannel === 'whatsapp';
               return (
                 <div

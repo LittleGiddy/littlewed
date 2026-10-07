@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { refundCreditsForUnsentDeleted } from '@/lib/credits';
+import { isContributionSettled } from '@/lib/contributions';
 
 // ─── GET ────────────────────────────────────────────────────────────────
 export async function GET(
@@ -76,6 +77,31 @@ export async function GET(
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    // ─── Last reminder batch ──────────────────────────────────────────
+    // Every contribution a reminder touches is stamped with the same
+    // `remindedAt` (see send-reminders), so the newest timestamp is a batch
+    // key. The reminder screens compare that batch against today's statuses to
+    // tell the tenant how many of the people they chased last time have since
+    // finished contributing and will be dropped from the next send.
+    const latest = await prisma.contribution.findFirst({
+      where: { eventId, remindedAt: { not: null } },
+      orderBy: { remindedAt: 'desc' },
+      select: { remindedAt: true },
+    });
+
+    let lastReminderBatch: { sentAt: string; total: number; settledCount: number } | null = null;
+    if (latest?.remindedAt) {
+      const batch = await prisma.contribution.findMany({
+        where: { eventId, remindedAt: latest.remindedAt },
+        select: { status: true, amountPaid: true, amountExpected: true },
+      });
+      lastReminderBatch = {
+        sentAt: latest.remindedAt.toISOString(),
+        total: batch.length,
+        settledCount: batch.filter((row) => isContributionSettled(row)).length,
+      };
+    }
+
     const { guests, tenant, rsvps, wishes, ...eventData } = event;
     const thankYouCardUrl = eventData.thankYouCardUrl || tenant.thanksCardUrl || null;
 
@@ -85,6 +111,7 @@ export async function GET(
       rsvps,
       wishes,
       bypassPayment: tenant.bypassPayment || false,
+      lastReminderBatch,
     });
   } catch (error) {
     console.error('Error fetching event:', error);

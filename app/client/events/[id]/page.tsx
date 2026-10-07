@@ -12,12 +12,13 @@ import {
   AlarmClock, AlarmClockOff, RotateCw, Pencil, Edit2, Save,
   Check, Coins, CreditCard, Hash, Loader2, MoreVertical, Compass,
   PenTool, Wand, Grid3x3, List, Eye, Share2, Printer, Link2, AlertTriangle, Lock,
-  ChevronDown, PartyPopper,
+  ChevronDown, PartyPopper, ShieldCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast, isMassDelete } from '@/lib/confirmToast';
+import { isContributionSettled } from '@/lib/contributions';
 import ThanksCardModal from '@/components/ThanksCardModal';
 import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
 
@@ -38,6 +39,11 @@ interface Guest {
   guestType?: string | null;
   cardGroupId?: string | null;
   passCode?: string | null;
+  contribution?: {
+    status: string;
+    amountPaid: number;
+    amountExpected: number | null;
+  } | null;
   event?: EventData;
 }
 
@@ -57,6 +63,14 @@ interface EventData {
   reminderSent: boolean;
   expiredNotified: boolean;
   resumedBy: string | null;
+  contributionsEnabled?: boolean;
+}
+
+/** Who received the most recent reminder, and how many of them have since paid. */
+interface LastReminderBatch {
+  sentAt: string;
+  total: number;
+  settledCount: number;
 }
 
 interface RsvpRow {
@@ -170,6 +184,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [lastReminderBatch, setLastReminderBatch] = useState<LastReminderBatch | null>(null);
   const [rsvps, setRsvps] = useState<RsvpRow[]>([]);
   const [wishes, setWishes] = useState<WishRow[]>([]);
   const [editRequests, setEditRequests] = useState<EditRequestRow[]>([]);
@@ -322,6 +337,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (!data?.event) throw new Error('Unexpected response format from server.');
       setEvent(data.event);
       setGuests(Array.isArray(data.guests) ? data.guests : []);
+      setLastReminderBatch(data.lastReminderBatch ?? null);
       setRsvps(Array.isArray(data.rsvps) ? data.rsvps : []);
       setWishes(Array.isArray(data.wishes) ? data.wishes : []);
       setCurrentPage(1);
@@ -549,10 +565,19 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     setShowManageMenu(false);
   };
 
-  const kumbushaGuests = guests.filter(g => !g.checkedIn && g.routingChannel === 'sms');
+  // Guests who finished contributing are dropped from the quick reminder too:
+  // the API enforces it, so listing them would only suggest it might work.
+  const settledGuests = event?.contributionsEnabled
+    ? guests.filter(g => isContributionSettled(g.contribution))
+    : [];
+  const kumbushaGuests = guests.filter(
+    g => !g.checkedIn && g.routingChannel === 'sms' && !isContributionSettled(event?.contributionsEnabled ? g.contribution : null)
+  );
   const kumbushaCount = kumbushaGuests.length;
   const kumbushaTotalCost = kumbushaGuests.reduce((sum, g) => sum + (g.reminderCount < 2 ? 0 : 50), 0);
   const isFree = kumbushaTotalCost === 0;
+  // The last-reminder comparison, so the smaller recipient list is explained.
+  const batchSettled = lastReminderBatch?.settledCount ?? 0;
 
   const openKumbushaModal = () => {
     if (kumbushaCount === 0) { toast.error('No SMS guests pending check-in.'); return; }
@@ -565,9 +590,12 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     if (!kumbushaMessage.trim()) { toast.error('Andika ujumbe wa kukumbusha.'); return; }
     if (kumbushaTotalCost > 0 && credits !== null && credits < kumbushaTotalCost) { toast.error(`Mikopo haitoshi. Unahitaji ${kumbushaTotalCost} TZS, una ${credits} TZS.`); return; }
     const costText = isFree ? 'bure' : `${kumbushaTotalCost} TZS`;
+    const omittedLine = batchSettled > 0
+      ? ` Wageni ${batchSettled} kutoka ukumbusho wako wa mwisho walikamilisha mchango na hawatalengwa.`
+      : '';
     const ok = await confirmToast({
       title: `Tuma ukumbusho kwa wageni ${kumbushaCount}?`,
-      message: `Gharama: ${costText}.`,
+      message: `Gharama: ${costText}.${omittedLine}`,
       confirmText: 'Tuma',
     });
     if (!ok) return;
@@ -581,6 +609,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         if (data.successCount === kumbushaGuests.length) toast.success(`Ukumbusho ulitumwa kwa wageni ${data.successCount} wote.`);
         else { toast.success(`Ukumbusho ulitumwa kwa ${data.successCount} kati ya ${kumbushaGuests.length} wageni.`); if (data.errors?.length) toast.error('Baadhi ya ujumbe haukutuma.'); }
+        if (batchSettled > 0) toast(`Wageni ${batchSettled} kutoka ukumbusho wako wa mwisho hawakujumuishwa - mchango umekamilika.`);
         fetchCredits(); fetchData(eventId!); setShowKumbushaModal(false);
       } else toast.error('Imeshindwa kutuma ukumbusho.');
     } catch { toast.error('Tatizo la mtandao. Tafadhali jaribu tena.'); }
@@ -2269,6 +2298,23 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                   {credits !== null && <p className="text-xs text-gray-400">Salio: {credits} TZS</p>}
                 </div>
               </div>
+              {batchSettled > 0 ? (
+                <div className="rounded-tap p-3 mb-4 flex items-start gap-2 bg-success-soft border border-success-border">
+                  <ShieldCheck size={16} className="text-success mt-0.5 shrink-0" />
+                  <p className="text-xs text-success leading-relaxed">
+                    Wageni {batchSettled} kutoka ukumbusho wako wa mwisho walikamilisha michango yao na
+                    hawatalengwa — hakuna anayekumbushwa akiwa amemaliza.
+                  </p>
+                </div>
+              ) : settledGuests.length > 0 ? (
+                <div className="rounded-tap p-3 mb-4 flex items-start gap-2 bg-success-soft border border-success-border">
+                  <ShieldCheck size={16} className="text-success mt-0.5 shrink-0" />
+                  <p className="text-xs text-success leading-relaxed">
+                    Wageni {settledGuests.length} wamekamilisha michango yao na hawatalengwa — hakuna
+                    anayekumbushwa akiwa amemaliza.
+                  </p>
+                </div>
+              ) : null}
               <label className="field-label">Ujumbe wa kukumbusha</label>
               <textarea
                 className="w-full p-3 border border-gray-200 rounded-tap focus:ring-2 focus:ring-brand focus:border-transparent resize-none text-sm"

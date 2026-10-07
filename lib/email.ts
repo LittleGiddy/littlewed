@@ -314,6 +314,103 @@ export async function sendCreditRequestToAdmin(  adminEmail: string,
   });
 }
 
+// ─── Guest Edit Request Emails ───────────────────────────────────────────
+
+// A visitor proposed a correction on the shared contribution tracker. The
+// planner decides, so the mail points at the event page where the request is
+// waiting. Values come from an unauthenticated visitor, so they are escaped.
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export async function sendGuestEditRequestEmail(
+  to: string,
+  params: {
+    plannerName?: string | null;
+    guestName: string;
+    currentPhone?: string | null;
+    proposedName: string;
+    proposedPhone?: string | null;
+    eventName: string;
+    eventId: string;
+  }
+) {
+  const {
+    plannerName,
+    guestName,
+    currentPhone,
+    proposedName,
+    proposedPhone,
+    eventName,
+    eventId,
+  } = params;
+
+  const row = (label: string, value: string) => `
+    <tr>
+      <td style="padding: 6px 0; color: #718096; font-size: 14px;">${label}</td>
+      <td style="padding: 6px 0; color: #1a2b3c; font-size: 14px; font-weight: 700; text-align: right;">${value}</td>
+    </tr>`;
+
+  const rows = [row('Guest', escapeHtml(guestName))];
+  if (proposedName !== guestName) {
+    rows.push(
+      row(
+        'Name',
+        `${escapeHtml(guestName)} <span style="color:#a0aec0;">→</span> ${escapeHtml(proposedName)}`
+      )
+    );
+  }
+  if (proposedPhone !== (currentPhone ?? null)) {
+    rows.push(
+      row(
+        'Phone',
+        `${currentPhone ? escapeHtml(currentPhone) : '<span style="color:#a0aec0;">—</span>'} <span style="color:#a0aec0;">→</span> ${proposedPhone ? escapeHtml(proposedPhone) : '<span style="color:#a0aec0;">—</span>'}`
+      )
+    );
+  }
+
+  await resend.emails.send({
+    from: 'LittleWed <noreply@littlewed.co.tz>',
+    to,
+    subject: `Guest details change requested - ${eventName}`,
+    html: `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 560px; margin: 0 auto;">
+        <div style="background: #0D4B4B; padding: 32px; text-align: center; border-radius: 16px 16px 0 0;">
+          <h1 style="color: white; font-size: 24px; margin: 0;">LittleWed</h1>
+        </div>
+        <div style="background: #f8fafb; padding: 32px; border: 1px solid #e8ecef; border-top: none;">
+          <h2 style="color: #1a2b3c; font-size: 20px; margin: 0 0 12px;">Hi ${escapeHtml(plannerName || 'there')},</h2>
+          <p style="color: #4a5568; font-size: 15px; line-height: 1.6; margin: 0 0 20px;">
+            Someone opened the shared tracker for <strong style="color: #0D4B4B;">${escapeHtml(eventName)}</strong> and proposed a change to a guest&apos;s details. Nothing changes until you approve it.
+          </p>
+          <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e8ecef;">
+            <table style="width: 100%; border-collapse: collapse;">
+              ${rows.join('')}
+              <tr>
+                <td style="padding: 6px 0; color: #718096; font-size: 14px;">Status</td>
+                <td style="padding: 6px 0; font-size: 14px; text-align: right;">
+                  <span style="background: #fef3cd; color: #856404; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700;">Awaiting your review</span>
+                </td>
+              </tr>
+            </table>
+          </div>
+          <div style="text-align: center; margin-top: 24px;">
+            <a href="${APP_URL}/client/events/${eventId}" style="display: inline-block; background: #0D4B4B; color: white; padding: 12px 28px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px;">Review &amp; Decide →</a>
+          </div>
+        </div>
+        <div style="padding: 16px 32px; text-align: center;">
+          <p style="color: #a0aec0; font-size: 12px; margin: 0;">LittleWed - Wedding Management Platform</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 // ─── Broadcast Email (Super Admin) ───────────────────────────────────────
 
 export async function sendBroadcastEmail(

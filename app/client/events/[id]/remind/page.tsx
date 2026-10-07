@@ -64,6 +64,13 @@ type ReminderStreamEvent =
   | ({ type: 'done' } & ReminderSummary)
   | { type: 'error'; error?: string };
 
+/** Who received the most recent reminder, and how many of them have since paid. */
+interface LastReminderBatch {
+  sentAt: string;
+  total: number;
+  settledCount: number;
+}
+
 interface Guest {
   id: string;
   name: string;
@@ -119,6 +126,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<EventData | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
+  const [lastReminderBatch, setLastReminderBatch] = useState<LastReminderBatch | null>(null);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -193,6 +201,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       const data = await res.json();
       setEvent(data.event);
       setGuests(data.guests || []);
+      setLastReminderBatch(data.lastReminderBatch ?? null);
       setBypassPayment(!!data.bypassPayment);
       if (data.event?.reminderCardUrl) {
         setCardUrl(data.event.reminderCardUrl);
@@ -275,6 +284,11 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       (g) => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q)
     );
   }, [remindableGuests, search]);
+
+  // How many of the guests chased in the most recent reminder have since
+  // finished contributing. These are the people this send leaves out, so the
+  // notice names that number instead of a vague total across the whole event.
+  const batchSettled = lastReminderBatch?.settledCount ?? 0;
 
   // Once-per-event lock: non-bypassed tenants can use the manual reminder once.
   const alreadyUsed = !bypassPayment && !!event?.manualReminderSent;
@@ -558,9 +572,15 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     // The card must be saved before we start rendering per-guest cards.
     if (channel === 'whatsapp' && !(await persistDesign())) return;
     const costText = totalCost === 0 ? 'Free' : `${totalCost} credits`;
+    // Warn before the tap, using the number of people from the last reminder
+    // who have since paid, so the smaller recipient list is never a surprise.
+    const omittedLine =
+      batchSettled > 0
+        ? ` ${batchSettled} guest${batchSettled > 1 ? 's' : ''} from your last reminder completed their contribution and will be omitted automatically.`
+        : '';
     const ok = await confirmToast({
       title: `Send ${channel === 'whatsapp' ? 'WhatsApp' : 'SMS'} reminder to ${selectedGuests.size} guest${selectedGuests.size > 1 ? 's' : ''}?`,
-      message: `Cost: ${costText}.`,
+      message: `Cost: ${costText}.${omittedLine}`,
       confirmText: 'Send',
     });
     if (!ok) return;
@@ -599,6 +619,14 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       if (skippedSettled > 0) {
         toast.success(
           `${skippedSettled} guest${skippedSettled > 1 ? 's were' : ' was'} skipped - contribution already completed.`
+        );
+      }
+
+      // The last-reminder comparison from before the send, restated in the
+      // summary so the smaller recipient list is accounted for.
+      if (batchSettled > 0) {
+        toast(
+          `${batchSettled} guest${batchSettled > 1 ? 's' : ''} from your last reminder ${batchSettled > 1 ? 'were' : 'was'} omitted - contributions already completed.`
         );
       }
 
@@ -728,17 +756,45 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
             </div>
           )}
 
-          {/* Settled guests: hidden from the picker, but never silently so. */}
-          {event?.contributionsEnabled && settledGuests.length > 0 ? (
+          {/* Last-reminder comparison: this is the notice that explains why
+              the list is smaller than the one they sent to last time. */}
+          {event?.contributionsEnabled && batchSettled > 0 ? (
             <div className="flex flex-col gap-3 rounded-card border border-success-border bg-success-soft p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-2.5">
                 <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" />
                 <div>
                   <p className="text-xs font-semibold text-success">
-                    {settledGuests.length} guest{settledGuests.length > 1 ? 's' : ''} already paid in full
+                    {batchSettled} guest{batchSettled > 1 ? 's' : ''} from your last reminder
+                    {batchSettled > 1 ? ' have' : ' has'} completed their contributions
                   </p>
                   <p className="mt-0.5 text-[0.7rem] leading-relaxed text-success/80">
-                    Hidden from this list so nobody is reminded twice.
+                    They will be automatically omitted, so nobody who has paid in full is reminded
+                    again.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href={`/client/events/${eventId}/contributions`}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-tap bg-white px-3.5 text-xs font-semibold text-success ring-1 ring-inset ring-success-border transition-colors hover:bg-success-soft"
+              >
+                <Coins size={14} aria-hidden="true" />
+                Review contributions
+              </Link>
+            </div>
+          ) : event?.contributionsEnabled && settledGuests.length > 0 ? (
+            // No last-reminder batch to compare against (e.g. paid before any
+            // reminder went out), so fall back to the event-wide count.
+            <div className="flex flex-col gap-3 rounded-card border border-success-border bg-success-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-success" />
+                <div>
+                  <p className="text-xs font-semibold text-success">
+                    {settledGuests.length} guest{settledGuests.length > 1 ? 's have' : ' has'} already
+                    completed their contributions
+                  </p>
+                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-success/80">
+                    They will be automatically omitted, so nobody who has paid in full is reminded
+                    again.
                   </p>
                 </div>
               </div>

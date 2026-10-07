@@ -72,6 +72,14 @@ export default function ImportGuestsPage() {
     cleaned = cleaned.replace(/\D/g, '');
     if (!cleaned) return { normalized: '', isValid: false, message: 'No digits found' };
 
+    // Explicit international number: any country code, 8-15 digits (E.164).
+    if (hasPlus) {
+      if (cleaned.length < 8 || cleaned.length > 15) {
+        return { normalized: '+' + cleaned, isValid: false, message: 'Invalid length (expected 8-15 digits)' };
+      }
+      return { normalized: '+' + cleaned, isValid: true };
+    }
+
     if (cleaned.startsWith('0')) {
       if (cleaned.length === 10) {
         cleaned = '255' + cleaned.substring(1);
@@ -80,12 +88,16 @@ export default function ImportGuestsPage() {
       }
     } else if (cleaned.startsWith('255')) {
       if (cleaned.length !== 12 && cleaned.length !== 13) {
-        return { normalized: '', isValid: false, message: 'Invalid length for international number' };
+        return { normalized: '+' + cleaned, isValid: false, message: 'Invalid length for international number' };
       }
     } else if (cleaned.length === 9) {
       cleaned = '255' + cleaned;
     } else if (cleaned.length === 10 && !cleaned.startsWith('255')) {
       cleaned = '255' + cleaned.substring(1);
+    } else if (cleaned.length >= 8 && cleaned.length <= 15) {
+      // No '+', but not a recognizable Tanzanian format: treat the digits as
+      // an international number with its country code already included.
+      return { normalized: '+' + cleaned, isValid: true };
     } else {
       return { normalized: '+' + cleaned, isValid: false, message: 'Unknown format, imported as is' };
     }

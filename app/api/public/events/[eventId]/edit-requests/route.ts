@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone } from '@/lib/phone';
 import { sendPushToTenantRole } from '@/lib/push';
+import { sendGuestEditRequestEmail } from '@/lib/email';
 
 type Ctx = { params: Promise<{ eventId: string }> };
 
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, contributionsEnabled: true },
-    select: { id: true, tenantId: true },
+    select: { id: true, name: true, tenantId: true },
   });
   if (!event) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     try {
       const planners = await prisma.user.findMany({
         where: { tenantId: event.tenantId, role: 'CLIENT' },
-        select: { id: true },
+        select: { id: true, name: true, email: true },
       });
       if (planners.length > 0) {
         await prisma.notification.createMany({
@@ -109,6 +110,33 @@ export async function POST(req: NextRequest, { params }: Ctx) {
             link: `/client/events/${eventId}`,
           })),
         });
+
+        // Email is a separate channel with its own failure mode: a Resend
+        // outage must not stop the in-app notification, and neither must the
+        // visitor's submission fail because we could not reach the mail
+        // provider. Each send is caught individually for that reason.
+        try {
+          await Promise.all(
+            planners
+              .filter((u) => u.email)
+              .map((u) =>
+                sendGuestEditRequestEmail(u.email, {
+                  plannerName: u.name,
+                  guestName: guest.name,
+                  currentPhone: guest.phone,
+                  proposedName: name,
+                  proposedPhone: phone,
+                  eventName: event.name,
+                  eventId,
+                }).catch((err) => {
+                  console.error('Guest edit request email failed for', u.email, err);
+                })
+              )
+          );
+        } catch (err) {
+          console.error('Guest edit request emails failed:', err);
+        }
+
         await sendPushToTenantRole(event.tenantId, 'CLIENT', {
           title: 'Guest details change requested',
           body: `${guest.name} — review it on the event page`,
