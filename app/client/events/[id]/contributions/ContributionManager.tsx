@@ -185,12 +185,19 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
           credentials: 'include',
           body: JSON.stringify({ guestId: row.guestId, ...patch }),
         });
-        if (!res.ok) throw new Error('Could not save');
+        if (!res.ok) {
+          // Validation failures (bad number, duplicate number) come back with a
+          // message worth showing; falling back to the generic copy hides why.
+          const problem = (await res.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(problem?.error || 'Could not save');
+        }
         const payload: ManagerPayload = await res.json();
         setData(payload);
         return payload;
-      } catch {
-        toast.error('Could not save that change. Try again.');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not save that change. Try again.');
         return null;
       } finally {
         setSavingId(null);
@@ -468,8 +475,10 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
           if (!editing) return;
           const payload = await patchRow(editing, patch);
           if (payload) {
+            // Prefer the rebuilt row so a rename confirms under the new name.
+            const updated = payload.rows.find((r) => r.guestId === editing.guestId);
             setEditing(null);
-            toast.success(`${editing.guestName} updated`);
+            toast.success(`${updated?.guestName ?? editing.guestName} updated`);
           }
         }}
       />
@@ -902,6 +911,8 @@ function GuestEditorSheet({
   const [amount, setAmount] = useState('');
   const [expected, setExpected] = useState('');
   const [note, setNote] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
   // Re-seed during render rather than in an effect: the sheet is keyed by
   // guestId, and deriving here means opening a row never flashes the previous
@@ -912,14 +923,35 @@ function GuestEditorSheet({
     setAmount(row.amountPaid ? String(row.amountPaid) : '');
     setExpected(row.amountExpected ? String(row.amountExpected) : '');
     setNote(row.note ?? '');
+    setName(row.name ?? '');
+    setPhone(row.phone ?? '');
   }
 
   const paid = Number(amount.replace(/[^\d]/g, '')) || 0;
   const want = Number(expected.replace(/[^\d]/g, '')) || null;
+  const guestDirty =
+    !!row && (name !== (row.name ?? '') || phone !== (row.phone ?? ''));
   const dirty =
     amount !== (row?.amountPaid ? String(row.amountPaid) : '') ||
     expected !== (row?.amountExpected ? String(row.amountExpected) : '') ||
-    note !== (row?.note ?? '');
+    note !== (row?.note ?? '') ||
+    guestDirty;
+
+  const save = () => {
+    if (!row) return;
+    if (!name.trim()) {
+      toast.error('Name is required.');
+      return;
+    }
+    // Guest details are only sent when they actually changed, so an
+    // amounts-only save never re-validates a number the tenant never touched.
+    void onSave({
+      amountPaid: paid,
+      amountExpected: want,
+      note: note.trim() || null,
+      ...(guestDirty ? { guest: { name: name.trim(), phone: phone.trim() } } : {}),
+    });
+  };
 
   return (
     <AppBottomSheet
@@ -940,9 +972,7 @@ function GuestEditorSheet({
               Cancel
             </AppButton>
             <AppButton
-              onClick={() =>
-                void onSave({ amountPaid: paid, amountExpected: want, note: note.trim() || null })
-              }
+              onClick={save}
               loading={saving}
               loadingText="Saving"
               disabled={!dirty}
@@ -957,6 +987,33 @@ function GuestEditorSheet({
     >
       {row ? (
         <div className="space-y-4">
+          <div className="space-y-3.5 rounded-tap bg-surface-2 p-3">
+            <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
+              Guest details
+            </p>
+            <AppInput
+              label="Full name"
+              hint={
+                row.title
+                  ? `Saved without the "${row.title}" title, which stays as it is.`
+                  : 'Also updates this guest on your event guest list.'
+              }
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Doe"
+              maxLength={120}
+            />
+            <AppInput
+              label="Phone number"
+              hint="Include country code, e.g. +255712345678. Leave empty if there is no number."
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+255712345678"
+            />
+          </div>
+
           <AppInput
             label={`Amount received (${currency})`}
             hint="Set 0 if nothing has arrived yet."

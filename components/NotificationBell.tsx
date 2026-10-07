@@ -90,6 +90,7 @@ export default function NotificationBell() {
       case 'CREDIT_GRANTED': return <CheckCircle className="w-4 h-4 text-brandtext" />;
       case 'CREDIT_REQUEST': return <Info className="w-4 h-4 text-warn" />;
       case 'CREDIT_REJECTED': return <XCircle className="w-4 h-4 text-danger" />;
+      case 'GUEST_EDIT_REQUEST': return <AlertTriangle className="w-4 h-4 text-warn" />;
       default: return <Info className="w-4 h-4 text-blue-500" />;
     }
   };

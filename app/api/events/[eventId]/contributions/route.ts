@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { normalizePhone } from '@/lib/phone';
 import {
   parseContributionStatus,
   reconcileContribution,
@@ -105,6 +106,10 @@ async function tenantPayload(eventId: string, tenantId: string) {
       id: c?.id ?? '',
       guestId: g.id,
       guestName: g.title ? `${g.title} ${g.name}` : g.name,
+      // Raw values for the edit form: guestName carries the title, so saving
+      // that back would grow "Mr" into "Mr Mr" after one round trip.
+      name: g.name,
+      title: g.title,
       // Tenant view shows the full number: they need it to send reminders and
       // to reconcile against a bank statement.
       phone: g.phone,
@@ -209,6 +214,61 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     });
     if (!guest || guest.event.tenantId !== auth.tenantId) {
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
+    }
+
+    // ─── Guest details (name / phone) ──────────────────────────────
+    // Written straight to the Guest row the tenant's guest list reads, so an
+    // edit here is the same edit the guest list would make - there is no copy
+    // of these fields on the Contribution row to keep in sync.
+    if (body.guest !== undefined && body.guest !== null) {
+      if (typeof body.guest !== 'object') {
+        return NextResponse.json({ error: 'Invalid guest details' }, { status: 400 });
+      }
+      const details = body.guest as Record<string, unknown>;
+      const data: { name?: string; phone?: string | null } = {};
+
+      if ('name' in details) {
+        const name = String(details.name ?? '').trim();
+        if (!name) {
+          return NextResponse.json({ error: 'Name is required' }, { status: 400 });
+        }
+        data.name = name;
+      }
+
+      if ('phone' in details) {
+        // An empty number clears it: plenty of imported guests have no line
+        // yet, and blocking the save would trap the tenant on a stale value.
+        const raw = String(details.phone ?? '').trim();
+        if (!raw) {
+          data.phone = null;
+        } else {
+          const { normalized, isValid } = normalizePhone(raw);
+          if (!isValid) {
+            return NextResponse.json(
+              {
+                error:
+                  'Invalid phone number format. Must start with "+" and include country code (e.g., +255712345678).',
+              },
+              { status: 400 }
+            );
+          }
+          const duplicate = await prisma.guest.findFirst({
+            where: { eventId, phone: normalized, id: { not: guest.id } },
+            select: { id: true },
+          });
+          if (duplicate) {
+            return NextResponse.json(
+              { error: 'A guest with this phone number already exists in this event' },
+              { status: 409 }
+            );
+          }
+          data.phone = normalized;
+        }
+      }
+
+      if (Object.keys(data).length > 0) {
+        await prisma.guest.update({ where: { id: guest.id }, data });
+      }
     }
 
     const existing = await prisma.contribution.findUnique({

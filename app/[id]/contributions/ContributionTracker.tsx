@@ -64,6 +64,7 @@ import {
   type ContributionStatus,
 } from '@/lib/contributions';
 import { motionEase, useReducedMotion, useTransition } from '@/lib/motion';
+import { confirmToast } from '@/lib/confirmToast';
 import { ProgressRing, StatTiles, buildTiles } from '@/app/client/events/[id]/contributions/widgets';
 
 interface TrackerEvent {
@@ -85,6 +86,8 @@ interface TrackerRow {
   id: string;
   guestId: string;
   guestName: string;
+  /** The guest's own name without the title — what the edit form binds to. */
+  name: string;
   /** Full number, in whatever format Event Details holds it. Null when unset. */
   phone: string | null;
   status: ContributionStatus;
@@ -92,6 +95,12 @@ interface TrackerRow {
   amountExpected: number | null;
   note: string | null;
   updatedAt: string | null;
+  /**
+   * A name/phone proposal filed from this tracker that the event planner has
+   * not answered yet. Null for everyone else - the guest list itself never
+   * changes from here, only through an accepted request.
+   */
+  pendingEdit: { name: string; phone: string | null } | null;
 }
 
 interface TrackerSummary {
@@ -257,6 +266,40 @@ export default function ContributionTracker({
       );
     },
     [patch, currency]
+  );
+
+  /**
+   * Propose a name/phone correction. The server files it as a
+   * GuestEditRequest and tells the planner; nothing here touches the guest
+   * list until they accept, so the optimistic step is only the pending chip.
+   */
+  const sendEditRequest = useCallback(
+    async (row: TrackerRow, details: { name: string; phone: string }) => {
+      try {
+        const res = await fetch(`/api/public/events/${eventId}/edit-requests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ guestId: row.guestId, ...details }),
+        });
+        const payload = (await res.json().catch(() => null)) as
+          | { error?: string; unchanged?: boolean; pendingEdit?: TrackerRow['pendingEdit'] }
+          | null;
+        if (!res.ok) throw new Error(payload?.error || 'Could not send the request');
+        if (payload?.pendingEdit) {
+          const pendingEdit = payload.pendingEdit;
+          setData((cur) => ({
+            ...cur,
+            rows: cur.rows.map((r) => (r.guestId === row.guestId ? { ...r, pendingEdit } : r)),
+          }));
+        }
+        if (!payload?.unchanged) toast.success('Sent to the event planner for approval');
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not send the request');
+        return false;
+      }
+    },
+    [eventId]
   );
 
   const refresh = useCallback(async () => {
@@ -633,7 +676,8 @@ export default function ContributionTracker({
               Guests marked completed stop receiving reminders.
             </p>
             <p className="text-[11px] leading-relaxed text-muted">
-              Every change here is saved to this event straight away.
+              Contributions are saved to this event straight away. Name and number
+              corrections go to the event planner to approve first.
             </p>
           </div>
         </AppCard>
@@ -644,11 +688,19 @@ export default function ContributionTracker({
         currency={currency}
         saving={savingId === editingLive?.guestId}
         onClose={() => setEditing(null)}
-        onSave={async (amountPaid, finished, note) => {
+        onSave={async ({ record, details }) => {
           if (!editingLive) return false;
-          const ok = await recordContribution(editingLive, amountPaid, finished, note);
-          if (ok) setEditing(null);
-          return ok;
+          // Details first: if the planner-bound proposal fails to send, the
+          // sheet stays open and the visitor never believes it went through.
+          if (details && !(await sendEditRequest(editingLive, details))) return false;
+          if (
+            record &&
+            !(await recordContribution(editingLive, record.amountPaid, record.finished, record.note))
+          ) {
+            return false;
+          }
+          setEditing(null);
+          return true;
         }}
       />
     </div>
@@ -711,6 +763,9 @@ function GuestRow({
             {row.guestName}
           </span>
           <AppChip tone={STATUS_TONE[row.status]}>{meta.label}</AppChip>
+          {row.pendingEdit ? (
+            <AppChip tone="warn">Awaiting approval</AppChip>
+          ) : null}
         </span>
 
         {/* Full number on its own line: never truncated, always readable. */}
@@ -774,13 +829,22 @@ function GuestSheet({
   currency: string;
   saving: boolean;
   onClose: () => void;
-  onSave: (amountPaid: number, finished: boolean, note: string) => Promise<boolean>;
+  onSave: (input: {
+    record: { amountPaid: number; finished: boolean; note: string } | null;
+    details: { name: string; phone: string } | null;
+  }) => Promise<boolean>;
 }) {
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   // null until the owner answers, so the sheet never presumes "settled" on
   // their behalf — that decision is the whole point of the question.
   const [finished, setFinished] = useState<boolean | null>(null);
+  // The name/phone fields bind to whatever is already proposed when a request
+  // is waiting, so a visitor resubmitting a typo sees what they sent last time
+  // rather than the stale original.
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [detailSeed, setDetailSeed] = useState({ name: '', phone: '' });
 
   // Re-seed during render rather than in an effect so opening a guest never
   // shows the previous guest's figures for a frame. Keyed by guestId so the
@@ -791,10 +855,17 @@ function GuestSheet({
     setAmount(row.amountPaid ? String(row.amountPaid) : '');
     setNote(row.note ?? '');
     setFinished(row.amountPaid > 0 ? row.status === 'PAID' : null);
+    const seedName = row.pendingEdit?.name ?? row.name ?? '';
+    const seedPhone = row.pendingEdit?.phone ?? row.phone ?? '';
+    setName(seedName);
+    setPhone(seedPhone);
+    setDetailSeed({ name: seedName, phone: seedPhone });
   }
 
   const paid = Number(amount.replace(/[^\d]/g, '')) || 0;
-  const canSave = paid > 0 && finished !== null;
+  const canRecord = paid > 0 && finished !== null;
+  const detailsDirty = !!row && (name !== detailSeed.name || phone !== detailSeed.phone);
+  const canSave = canRecord || detailsDirty;
   const expected = row?.amountExpected ?? null;
   const coversExpected = expected !== null && paid >= expected;
   const remaining = row ? remainingOf(row) : 0;
@@ -808,6 +879,39 @@ function GuestSheet({
     } catch {
       toast.error('Could not copy the number');
     }
+  };
+
+  /**
+   * One Save button for the sheet. Money records itself straight away;
+   * changed details are never applied from here — the visitor is asked first,
+   * and the proposal goes to the event planner to accept or decline.
+   */
+  const submit = () => {
+    if (!row) return;
+    if (detailsDirty && !name.trim()) {
+      toast.error('Name cannot be empty.');
+      return;
+    }
+    void (async () => {
+      if (detailsDirty) {
+        const goAhead = await confirmToast({
+          title: 'Send these details to the event planner?',
+          message:
+            'Your name and number will only change once the event planner accepts the request.',
+          confirmText: 'Send for approval',
+        });
+        if (!goAhead) return;
+      }
+      const ok = await onSave({
+        record: canRecord && finished !== null
+          ? { amountPaid: paid, finished, note: note.trim() }
+          : null,
+        details: detailsDirty && name.trim()
+          ? { name: name.trim(), phone: phone.trim() }
+          : null,
+      });
+      if (!ok) return;
+    })();
   };
 
   return (
@@ -827,7 +931,7 @@ function GuestSheet({
               Cancel
             </AppButton>
             <AppButton
-              onClick={() => finished !== null && void onSave(paid, finished, note)}
+              onClick={submit}
               loading={saving}
               loadingText="Saving"
               disabled={!canSave}
@@ -920,9 +1024,70 @@ function GuestSheet({
               </>
             ) : (
               <p className="mt-1 text-[14px] text-muted">
-                No number on file. Add one from Event Details to call this guest.
+                No number on file. Propose one below and the event planner can add it.
               </p>
             )}
+          </section>
+
+          {/* ── Details the visitor can propose a correction to ── */}
+          <section className="rounded-card border border-line bg-white p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Guest details
+            </p>
+
+            {row.pendingEdit ? (
+              <p className="mt-2 flex items-start gap-2 rounded-tap bg-warn-soft px-3 py-2.5 text-[12px] leading-relaxed text-warn">
+                <Hourglass size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words">
+                  With the event planner — awaiting approval before the list changes.
+                </span>
+              </p>
+            ) : null}
+
+            <div className="mt-3 space-y-3">
+              <div>
+                <label
+                  htmlFor="tracker-name"
+                  className="mb-1.5 block text-[13px] font-semibold text-ink"
+                >
+                  Full name
+                </label>
+                <input
+                  id="tracker-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={120}
+                  placeholder="e.g. John Doe"
+                  className="w-full rounded-tap border border-line bg-white px-3.5 py-2.5 text-sm text-ink transition-all duration-150 ease-soft placeholder:text-gray-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="tracker-phone"
+                  className="mb-1.5 block text-[13px] font-semibold text-ink"
+                >
+                  Phone number
+                </label>
+                <input
+                  id="tracker-phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+255712345678"
+                  className="w-full rounded-tap border border-line bg-white px-3.5 py-2.5 text-sm tabular-nums text-ink transition-all duration-150 ease-soft placeholder:text-gray-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/10"
+                />
+                <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
+                  Include the country code, e.g. +255712345678. Leave empty for no number.
+                </p>
+              </div>
+            </div>
+
+            <p className="mt-3 rounded-tap bg-surface-2 px-3 py-2.5 text-[12px] leading-relaxed text-muted">
+              Corrections are sent to the event planner and applied to the guest list only
+              once they accept them.
+            </p>
           </section>
 
           {/* ── Record what arrived ── */}

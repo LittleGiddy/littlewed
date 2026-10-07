@@ -73,6 +73,12 @@ export default async function ContributionsPage({
               updatedAt: true,
             },
           },
+          // Matches /api/public/.../contributions: any still-unreviewed
+          // proposal for this guest, so the first paint carries it too.
+          editRequests: {
+            where: { status: 'PENDING' },
+            select: { name: true, phone: true },
+          },
         },
         orderBy: { name: 'asc' },
       },
@@ -113,6 +119,8 @@ export default async function ContributionsPage({
       id: g.contribution?.id ?? '',
       guestId: g.id,
       guestName: g.title ? `${g.title} ${g.name}` : g.name,
+      // Raw name, without the title — the edit form binds to this.
+      name: g.name,
       // The full number: this ledger belongs to the event owner, and they need
       // to recognise and call the guests they are chasing.
       phone: g.phone,
@@ -121,6 +129,7 @@ export default async function ContributionsPage({
       amountExpected: g.contribution?.amountExpected ?? null,
       note: g.contribution?.note ?? null,
       updatedAt: g.contribution?.updatedAt?.toISOString() ?? null,
+      pendingEdit: g.editRequests[0] ?? null,
     })),
   };
 

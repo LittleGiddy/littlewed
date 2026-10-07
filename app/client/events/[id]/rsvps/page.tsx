@@ -17,7 +17,7 @@ interface RsvpRow {
   createdAt: Date;
 }
 
-export default async function EventRsvpsPage({ params }: { params: Promise<{ eventId: string }> }) {
+export default async function EventRsvpsPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return (
@@ -31,7 +31,7 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ eve
   const tenantId = (session.user as { tenantId?: string } | undefined)?.tenantId;
   if (role !== 'CLIENT' && role !== 'SUPER_ADMIN') redirect('/login');
 
-  const { eventId } = await params;
+  const { id: eventId } = await params;
 
   const event = await prisma.event.findFirst({
     where: { id: eventId, tenantId },

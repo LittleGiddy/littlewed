@@ -67,6 +67,13 @@ async function loadPublicEvent(eventId: string) {
               updatedAt: true,
             },
           },
+          // A proposal filed from this tracker that the planner has not
+          // answered yet, so the sheet can say "your change is with them"
+          // instead of quietly looking like it saved.
+          editRequests: {
+            where: { status: 'PENDING' },
+            select: { name: true, phone: true },
+          },
         },
         orderBy: { name: 'asc' },
       },
@@ -106,6 +113,9 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       id: g.contribution?.id ?? '',
       guestId: g.id,
       guestName: g.title ? `${g.title} ${g.name}` : g.name,
+      // Raw name for the edit form: guestName carries the title, and saving
+      // that back would grow "Mr" into "Mr Mr" after one round trip.
+      name: g.name,
       // Full number, deliberately: the owner reads this list to recognise and
       // call the guests they are chasing, and the tracker searches by it.
       phone: g.phone,
@@ -114,6 +124,8 @@ function publicPayload(event: NonNullable<Awaited<ReturnType<typeof loadPublicEv
       amountExpected: g.contribution?.amountExpected ?? null,
       note: g.contribution?.note ?? null,
       updatedAt: g.contribution?.updatedAt ?? null,
+      /** The guest's still-unreviewed detail proposal, if one is waiting. */
+      pendingEdit: g.editRequests[0] ?? null,
     })),
   };
 }

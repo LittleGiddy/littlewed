@@ -78,6 +78,18 @@ interface WishRow {
 
 type FlowStep = 'guests' | 'design' | 'generate' | 'send';
 
+/** A name/phone proposal filed from the shared tracker, waiting on a decision. */
+interface EditRequestRow {
+  id: string;
+  guestId: string;
+  guestName: string;
+  currentName: string;
+  currentPhone: string | null;
+  name: string;
+  phone: string | null;
+  createdAt: string;
+}
+
 const STEPS: { id: FlowStep; label: string; short: string; icon: React.ReactNode }[] = [
   { id: 'guests', label: 'Guests', short: '1', icon: <Users size={16} /> },
   { id: 'design', label: 'Design', short: '2', icon: <Palette size={16} /> },
@@ -160,6 +172,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [guests, setGuests] = useState<Guest[]>([]);
   const [rsvps, setRsvps] = useState<RsvpRow[]>([]);
   const [wishes, setWishes] = useState<WishRow[]>([]);
+  const [editRequests, setEditRequests] = useState<EditRequestRow[]>([]);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -327,6 +341,54 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     } catch { }
   };
 
+  // ─── Guest detail change requests (filed from the shared tracker) ────
+  const fetchEditRequests = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/events/${id}/edit-requests`, { credentials: 'include' });
+      if (!res.ok) return;
+      const data = await res.json();
+      setEditRequests(Array.isArray(data.requests) ? data.requests : []);
+    } catch {
+      // The banner simply stays hidden; it is not load-bearing for this page.
+    }
+  }, []);
+
+  const decideEditRequest = async (requestId: string, action: 'approve' | 'reject') => {
+    if (!eventId) return;
+    setDecidingId(requestId);
+    try {
+      const res = await fetch(`/api/events/${eventId}/edit-requests`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ requestId, action }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(data?.error || 'Could not update that request');
+        // 404 means it vanished (guest deleted, or another tab settled it).
+        if (res.status === 404) {
+          setEditRequests((prev) => prev.filter((r) => r.id !== requestId));
+        }
+        return;
+      }
+      setEditRequests(Array.isArray(data.requests) ? data.requests : []);
+      if (action === 'approve' && data.updated) {
+        const { guestId, name, phone } = data.updated;
+        const apply = (g: Guest) => (g.id === guestId ? { ...g, name, phone: phone ?? '' } : g);
+        setGuests((prev) => prev.map(apply));
+        setAllGuests((prev) => prev.map(apply));
+        toast.success(`${name} updated on the guest list`);
+      } else {
+        toast.success('Change declined');
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
   // ─── Effects ──────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -335,13 +397,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
       setEventId(id);
       fetchData(id);
       fetchCredits();
+      fetchEditRequests(id);
     }).catch((err) => {
       console.error('Failed to resolve params:', err);
       setFetchError('Could not read event ID from URL.');
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [params, fetchData]);
+  }, [params, fetchData, fetchEditRequests]);
 
   // ─── Guest Selection ──────────────────────────────────────────────────
   const toggleSelectAll = () => {
@@ -1376,6 +1439,74 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
           </div>
+
+          {/* ─── Pending guest detail changes (from the shared tracker) ─── */}
+          {editRequests.length > 0 && (
+            <div className="bg-warn-soft border border-warn-border rounded-card p-4 mb-4">
+              <div className="flex items-start gap-2.5">
+                <Bell size={16} className="text-warn mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-warn">
+                    {editRequests.length} detail change{editRequests.length > 1 ? 's' : ''} awaiting your approval
+                  </p>
+                  <p className="text-xs text-warn/80 mt-0.5">
+                    Proposed from the shared contribution tracker. The guest list changes only when you accept.
+                  </p>
+                </div>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {editRequests.map((r) => {
+                  const nameChanged = r.currentName !== r.name;
+                  const phoneChanged = (r.currentPhone ?? '') !== (r.phone ?? '');
+                  return (
+                    <li key={r.id} className="rounded-tap border border-warn-border/60 bg-white px-3 py-2.5">
+                      <p className="text-[13px] font-semibold text-gray-900">{r.guestName}</p>
+                      {nameChanged ? (
+                        <p className="mt-1 text-xs text-gray-500 break-words">
+                          Name:{' '}
+                          <span className="text-gray-700">{r.currentName}</span>
+                          <ArrowRight size={11} className="inline mx-1" />
+                          <span className="font-semibold text-gray-900">{r.name}</span>
+                        </p>
+                      ) : null}
+                      {phoneChanged ? (
+                        <p className="mt-0.5 text-xs text-gray-500 break-all">
+                          Phone:{' '}
+                          <span className="text-gray-700">{r.currentPhone || 'none'}</span>
+                          <ArrowRight size={11} className="inline mx-1" />
+                          <span className="font-semibold text-gray-900">{r.phone || 'none'}</span>
+                        </p>
+                      ) : null}
+                      <div className="mt-2.5 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void decideEditRequest(r.id, 'approve')}
+                          disabled={decidingId !== null}
+                          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-tap bg-brand text-[13px] font-semibold text-white transition active:bg-brand-800 disabled:opacity-60"
+                        >
+                          {decidingId === r.id ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Check size={14} />
+                          )}
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void decideEditRequest(r.id, 'reject')}
+                          disabled={decidingId !== null}
+                          className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-tap border border-gray-200 bg-white text-[13px] font-semibold text-gray-700 transition hover:border-gray-300 disabled:opacity-60"
+                        >
+                          <X size={14} />
+                          Decline
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {/* ─── Event Header ─── */}
           <div className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 mb-4">

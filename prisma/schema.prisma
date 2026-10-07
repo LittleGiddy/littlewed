@@ -169,6 +169,7 @@ model Event {
   guests             Guest[]
   rsvps              Rsvp[]
   wishes             GuestWish[]
+  editRequests       GuestEditRequest[]
   createdAt          DateTime    @default(now())
   status             String      @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
   pausedAt           DateTime? // when the event was paused/expired
@@ -363,6 +364,7 @@ model Guest {
   rsvps        Rsvp[]
   wishes       GuestWish[]
   contribution Contribution?
+  editRequests GuestEditRequest[]
 
   @@index([eventId])
   @@index([phone])
@@ -396,6 +398,31 @@ model Contribution {
   updatedAt DateTime @updatedAt
 
   @@index([eventId, status])
+}
+
+// ─── Guest detail change requests ─────────────────────────────────────
+// A visitor on the shared /[eventId]/contributions tracker may propose a
+// name or phone correction. Nothing is written to Guest until the tenant
+// accepts the request from their event page, so the link stays a suggestion
+// box rather than an open door to the guest list.
+// One PENDING row per guest: resubmitting replaces the proposal instead of
+// stacking requests the planner would have to clear one by one.
+model GuestEditRequest {
+  id         String    @id @default(cuid())
+  eventId    String
+  event      Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId    String
+  guest      Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  name       String // proposed name
+  phone      String? // proposed phone, normalized; null = remove the number
+  status     String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  reviewedBy String? // display name of the tenant user who decided
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([eventId, status])
+  @@index([guestId])
 }
 
 // ─── RSVP submissions & guest wishes ──────────────────────────────────

@@ -25,6 +25,7 @@ const TYPE_STYLE: Record<string, { icon: 'success' | 'warning' | 'alert' | 'info
   CREDIT_GRANTED: { icon: 'success', cls: 'text-brandtext', bg: 'bg-brandbg' },
   CREDIT_REQUEST: { icon: 'warning', cls: 'text-warn', bg: 'bg-warn-soft' },
   CREDIT_REJECTED: { icon: 'alert', cls: 'text-danger', bg: 'bg-danger-soft' },
+  GUEST_EDIT_REQUEST: { icon: 'warning', cls: 'text-warn', bg: 'bg-warn-soft' },
   info: { icon: 'info', cls: 'text-blue-600', bg: 'bg-blue-50' },
 };
 

@@ -28,7 +28,11 @@ export interface ManagerEvent {
 export interface ManagerRow {
   id: string;
   guestId: string;
+  /** Display name: title + name, e.g. "Mr John Doe". */
   guestName: string;
+  /** The guest's own name without the title - what the edit form binds to. */
+  name: string;
+  title: string | null;
   phone: string | null;
   phoneMasked: string;
   status: ContributionStatus;
