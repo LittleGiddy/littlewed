@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Send, MessageCircle, Info, ArrowRight, Image as ImageIcon, Languages } from 'lucide-react';
+import { Send, MessageCircle, Info, ArrowRight, Image as ImageIcon, Languages, CheckCircle2 } from 'lucide-react';
 import {
   INVITE_TEMPLATES,
   getFullName,
@@ -15,6 +15,7 @@ import {
   SAMPLE_GUEST,
   cardTypeLabel,
 } from '../../components/shared';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 interface WaDraft {
   template?: string;
@@ -33,48 +34,29 @@ const FIELDS = [
   { key: 'venue', label: 'Venue', placeholder: 'e.g. Galilaya Hall, Garage - Ubungo', hint: '' },
 ] as const;
 
-function readWhatsappDraft(eventId?: string): WaDraft | null {
-  if (!eventId) return null;
-  try {
-    const saved = localStorage.getItem(`whatsapp_draft_${eventId}`);
-    if (!saved) return null;
-    const parsed = JSON.parse(saved);
-    return parsed && typeof parsed.template === 'string' ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function ComposeWhatsappPage() {
   const { eventId } = useParams();
   const router = useRouter();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, whatsappPending } = useGuestData(eventId);
+  const { drafts, ready: draftsReady, set } = useMessageDrafts(id);
 
-  const [template, setTemplate] = useState(() => readWhatsappDraft(id)?.template || 'mwalikoforth');
-  const [vars, setVars] = useState<Record<string, string>>(() => readWhatsappDraft(id)?.vars || {});
-  const [contact, setContact] = useState(() => readWhatsappDraft(id)?.contact || '');
-  const [contact2, setContact2] = useState(() => readWhatsappDraft(id)?.contact2 || '');
-  const [eventType, setEventType] = useState(() => {
-    const e = readWhatsappDraft(id)?.eventType;
-    return e || 'harusi';
-  });
+  // WhatsApp drafts live on the account (Event -> tenant), so whatever is
+  // typed here reappears on any device signed into the same tenant.
+  const draft: WaDraft | null = (drafts.whatsappInviteDraft as WaDraft | null);
+  const template = draft?.template || 'mwalikoforth';
+  const vars = useMemo(() => draft?.vars ?? {}, [draft?.vars]);
+  const contact = draft?.contact || '';
+  const contact2 = draft?.contact2 || '';
+  const eventType = draft?.eventType || 'harusi';
+  const setTemplate = (value: string) => set('whatsappInviteDraft', { ...draft, template: value });
+  const setVars = (updater: (prev: Record<string, string>) => Record<string, string>) =>
+    set('whatsappInviteDraft', { ...draft, vars: updater(draft?.vars || {}) });
+  const setContact = (value: string) => set('whatsappInviteDraft', { ...draft, contact: value });
+  const setContact2 = (value: string) => set('whatsappInviteDraft', { ...draft, contact2: value });
+  const setEventType = (value: string) => set('whatsappInviteDraft', { ...draft, eventType: value });
 
   const currentTpl = INVITE_TEMPLATES[template];
-
-  // ─── Auto-save draft ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (!id) return;
-    const t = setTimeout(() => {
-      try {
-        const draft: WaDraft = { template, vars, contact, contact2, eventType };
-        localStorage.setItem(`whatsapp_draft_${id}`, JSON.stringify(draft));
-      } catch {
-        // ignore
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [template, vars, contact, contact2, eventType, id]);
 
   // ─── Effective values: event defaults, overridden by user edits ─────────
   const effectiveVars = useMemo(() => {
@@ -93,7 +75,9 @@ export default function ComposeWhatsappPage() {
     };
   }, [event, vars]);
 
-  const preview = useMemo(() => {
+  // Preview for the selected template + mini previews for every card in the
+  // picker, built from the tenant's real event details so choosing is visual.
+  const allPreviews = useMemo(() => {
     const couple =
       effectiveVars.person1 && effectiveVars.person2
         ? `${effectiveVars.person1} na ${effectiveVars.person2}`
@@ -101,51 +85,74 @@ export default function ComposeWhatsappPage() {
     const name = getFullName(SAMPLE_GUEST);
     const cardNumber = SAMPLE_GUEST.cardNumber || '';
     const cardType = cardTypeLabel(SAMPLE_GUEST);
-    if (template === 'mwalikoplus') {
+
+    const build = (key: string): string => {
+      const tpl = INVITE_TEMPLATES[key];
+      if (key === 'mwalikoplus') {
+        return [
+          `Habari ${name}`,
+          '',
+          `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'harusi'} ${couple || '...'}`,
+          `itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
+          `Ukumbi: ${effectiveVars.venue || '{venue}'}`,
+          `Muda: ${effectiveVars.time || '{time}'}`,
+          `Card No: ${cardNumber} ${cardType}`,
+          ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
+          '',
+          'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante.',
+          '',
+          'Bonyeza Link Hapa Chini kwa kwa Maelezo zaidi👇️',
+        ].join('\n');
+      }
+      if (key === 'mwalikoforth') {
+        return [
+          `Habari ${name}`,
+          '',
+          `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika ${eventType || 'harusi'} ya ${couple || '...'} itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
+          `Mahali: ${effectiveVars.venue || '{venue}'}`,
+          `Muda: Kuanzia saa ${effectiveVars.time || '{time}'}`,
+          `Card No: ${cardNumber} ${cardType}`,
+          ...(contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
+          '',
+          'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
+        ].join('\n');
+      }
+      if (key === 'mdakumbe') {
+        return [
+          'Event: KADI YA MUALIKO UKUMBINI',
+          `Mr. Mkoloma anakualika Ndg. ${SAMPLE_GUEST.name} kwenye Usiku wa Blue & White. Tutazindua Logo ya MDAKUMBE TV na BIRTHDAY PARTY NIGHT.`,
+          'Tarehe: 23/10/2026',
+          'Ukumbi: CCM HALL - MIKINDANI',
+          'Muda: Kuanzia Saa 12:30 Jioni',
+          `Card No: ${cardNumber}`,
+          'Kufika kwako ndio Mafanikio ya Mdakumbe TV, SISI NI WEWE, TUMEKUFIKIA',
+          'Mawasiliano: Whatsapp - 0716143510, Call - 0613453510',
+          'Tafadhali Tunza Kadi hii kwaajili ya Matumizi ya Ukumbini, Asante!!',
+        ].join('\n');
+      }
       return [
         `Habari ${name}`,
         '',
-        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'harusi'} ${couple || '...'}`,
-        `itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
-        `Ukumbi: ${effectiveVars.venue || '{venue}'}`,
-        `Muda: ${effectiveVars.time || '{time}'}`,
-        `Card No: ${cardNumber} ${cardType}`,
-        ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
+        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika harusi ya ${effectiveVars.person1 || '{person1}'} na ${effectiveVars.person2 || '{person2}'}`,
         '',
-        'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante.',
-        '',
-        'Bonyeza Link Hapa Chini kwa kwa Maelezo zaidi👇️',
-      ].join('\n');
-    }
-    if (template === 'mwalikoforth') {
-      return [
-        `Habari ${name}`,
-        '',
-        `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika ${eventType || 'harusi'} ya ${couple || '...'} itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
+        `itakayofanyika tarehe: ${effectiveVars.date || '{date}'}`,
         `Mahali: ${effectiveVars.venue || '{venue}'}`,
         `Muda: Kuanzia saa ${effectiveVars.time || '{time}'}`,
-        `Card No: ${cardNumber} ${cardType}`,
-        ...(contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
         '',
-        'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
+        `Card No: ${cardNumber}`,
+        `${cardType}`,
+        ...(tpl.hasContact && contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
       ].join('\n');
-    }
-    return [
-      `Habari ${name}`,
-      '',
-      `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} inakualika katika harusi ya ${effectiveVars.person1 || '{person1}'} na ${effectiveVars.person2 || '{person2}'}`,
-      '',
-      `itakayofanyika tarehe: ${effectiveVars.date || '{date}'}`,
-      `Mahali: ${effectiveVars.venue || '{venue}'}`,
-      `Muda: Kuanzia saa ${effectiveVars.time || '{time}'}`,
-      '',
-      `Card No: ${cardNumber}`,
-      `${cardType}`,
-      ...(currentTpl.hasContact && contact ? [`kwa mawasiliano zaidi: ${contact}`] : []),
-    ].join('\n');
-  }, [template, effectiveVars, contact, contact2, eventType, currentTpl]);
+    };
 
-  if (loading) return <LoadingState label="Loading WhatsApp..." />;
+    const out: Record<string, string> = {};
+    for (const key of Object.keys(INVITE_TEMPLATES)) out[key] = build(key);
+    return out;
+  }, [effectiveVars, contact, contact2, eventType]);
+
+  const preview = allPreviews[template];
+
+  if (loading || !draftsReady) return <LoadingState label="Loading WhatsApp..." />;
 
   const continueUrl = `/client/invitations/send/${id}/whatsapp/guests`;
 
@@ -161,46 +168,75 @@ export default function ComposeWhatsappPage() {
           <h2 className="font-semibold text-gray-800">Choose a template</h2>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          WhatsApp only allows pre-approved templates. Each one includes the wedding card image and a link button — guests who tap it open their unique card page.
+          WhatsApp only allows pre-approved templates. Tap one to preview it — each includes the guest&apos;s card image, and some add a link button to their unique card page.
         </p>
-        <div className="space-y-2">
-          {Object.entries(INVITE_TEMPLATES).map(([key, tpl]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTemplate(key)}
-              className={`w-full flex items-center gap-3 p-3.5 rounded-card border text-left transition ${
-                template === key
-                  ? 'border-[#25D366] bg-[#25D366]/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <span
-                className={`w-5 h-5 rounded-full border-2 grid place-items-center flex-shrink-0 ${
-                  template === key ? 'border-[#25D366]' : 'border-gray-300'
+        <div className="grid gap-3 sm:grid-cols-2">
+          {Object.entries(INVITE_TEMPLATES).map(([key, tpl]) => {
+            const selected = template === key;
+            const snippet = (allPreviews[key] || '').split('\n').slice(0, 3).join('\n');
+            return (
+              <motion.button
+                key={key}
+                type="button"
+                whileTap={{ scale: 0.985 }}
+                onClick={() => setTemplate(key)}
+                aria-pressed={selected}
+                className={`w-full text-left rounded-card border p-3.5 transition ${
+                  selected
+                    ? 'border-[#25D366] bg-[#25D366]/5 ring-2 ring-[#25D366]/15'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
-                {template === key && <span className="w-2.5 h-2.5 bg-[#25D366] rounded-full" />}
-              </span>
-              <span className="flex-1">
-                <span className="block text-sm font-semibold text-gray-900">{tpl.displayName}</span>
-                <span className="block text-[11px] text-gray-500">
-                  {tpl.hasMoreInfoButton
-                    ? 'Includes event type + More Info button (opens guest\u2019s card page)'
-                    : tpl.hasEventType
-                      ? 'Includes event type (harusi/arusi)'
-                      : tpl.hasContact
-                        ? 'Includes a contact line'
-                        : 'Extra contact info not included'}
-                </span>
-              </span>
-            </button>
-          ))}
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold text-gray-900 leading-snug">{tpl.displayName}</span>
+                  {selected && (
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#25D366] text-white grid place-items-center">
+                      <CheckCircle2 size={13} />
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={`mt-2 rounded-lg border px-2.5 py-2 text-[11px] leading-relaxed whitespace-pre-line line-clamp-3 ${
+                    selected
+                      ? 'border-[#25D366]/20 bg-white text-gray-700'
+                      : 'border-gray-100 bg-gray-50 text-gray-500'
+                  }`}
+                >
+                  {snippet}
+                </div>
+                {(tpl.hasMoreInfoButton || tpl.hasEventType || tpl.hasContact || tpl.hasContact2) && (
+                  <div className="mt-2.5 flex flex-wrap gap-1">
+                    {tpl.hasMoreInfoButton && (
+                      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+                        More Info
+                      </span>
+                    )}
+                    {tpl.hasEventType && (
+                      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+                        Event type
+                      </span>
+                    )}
+                    {tpl.hasContact && (
+                      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+                        Contact line
+                      </span>
+                    )}
+                    {tpl.hasContact2 && (
+                      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+                        2nd contact
+                      </span>
+                    )}
+                  </div>
+                )}
+              </motion.button>
+            );
+          })}
         </div>
       </Card>
 
       {/* ─── Variables ─── */}
-      <Card className="p-5 mb-4">
+      {currentTpl.hasComposeFields !== false && (
+        <Card className="p-5 mb-4">
         <div className="flex items-center gap-2 mb-1">
           <Languages size={17} className="text-brandtext" />
           <h2 className="font-semibold text-gray-800">Message details</h2>
@@ -270,7 +306,8 @@ export default function ComposeWhatsappPage() {
             </div>
           )}
         </div>
-      </Card>
+        </Card>
+      )}
 
       {/* ─── Preview ─── */}
       <Card className="p-5 mb-4">

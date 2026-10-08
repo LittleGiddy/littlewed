@@ -369,6 +369,46 @@ export async function sendWeddingInvitationPlus(
   });
 }
 
+// ─── Wedding Invitation Template: "Event" (Kadi ya Mualiko Ukumbini) ────
+// A fixed approved template for the MdaKumbe TV Blue & White night. The body
+// is static except {var1} (guest name) and {var2} (card number); it carries
+// the guest card image as its header but has NO URL button.
+
+export async function sendWeddingInvitationUkumbini(
+  phone: string,
+  data: {
+    guestName: string;      // {var1}
+    cardNumber: string;     // {var2}
+    imageUrl?: string;
+    account?: string;       // tenant's NexSMS account name
+  }
+): Promise<SendWhatsAppResult> {
+  console.log('[WhatsApp] ====== SENDING KADI YA MUALIKO UKUMBINI ======');
+  console.log('[WhatsApp] Template: Event');
+
+  const header = data.imageUrl
+    ? {
+        image: {
+          file: data.imageUrl,
+          name: 'Wedding Invitation',
+        }
+      }
+    : undefined;
+
+  const personalisation: Record<string, string> = {
+    "var1": data.guestName,
+    "var2": data.cardNumber,
+  };
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'Event',
+    account: data.account,
+    personalisation: [personalisation],
+    header,
+  });
+}
+
 // ─── Helper: Convert full URL to slug ──────────────────────────────────
 
 export function toLinkSuffix(value: string): string {

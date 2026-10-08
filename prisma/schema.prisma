@@ -306,7 +306,17 @@ model Event {
   reminderCardNameColor String?        @default("#ffffff")
   reminderCardNameAlign String?        @default("center") // "left" | "center" | "right"
   reminderCardNameFont  String?        @default("Playfair Display")
-  contributions         Contribution[]
+
+  // ─── Message drafts & settings ────────────────────────────────────────
+  // Written by the composers as the user types, so the values live on the
+  // account (Event -> tenant) instead of the browser that typed them. Any
+  // device signed into the same tenant sees the same draft.
+  smsInviteTemplate    String?  // SMS invitation message text
+  whatsappInviteDraft  Json?    // { template, vars, contact, contact2, eventType }
+  whatsappDailyLimit   Int?     // WhatsApp daily send cap for this event
+  reminderSmsMessage   String?  // reminder text typed in the remind flow
+  kumbushaMessage      String?  // reminder text typed on the Kumbusha Michango page
+  contributions        Contribution[]
 }
 
 model PendingEvent {

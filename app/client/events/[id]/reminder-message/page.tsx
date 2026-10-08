@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ArrowLeft, Send, Loader2, Users, CheckSquare, Square, X, 
-  MessageCircle, Phone, Info, Gift, Calendar, User,
-  CreditCard, AlertCircle, CheckCircle, Bell, MessageSquare,
-  FileText, CornerDownRight, Hash, ShieldCheck
+  ArrowLeft, Send, Loader2, CheckSquare, Square, X, 
+  MessageCircle, Phone, Info, Gift,
+  AlertCircle, CheckCircle, MessageSquare,
+  FileText, Hash, ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 interface Guest {
   id: string;
@@ -47,19 +48,19 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
   const [guests, setGuests] = useState<Guest[]>([]);
   const [lastReminderBatch, setLastReminderBatch] = useState<LastReminderBatch | null>(null);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [credits, setCredits] = useState<number | null>(null);
   const [bypassPayment, setBypassPayment] = useState(false);
 
-  useEffect(() => {
-    params.then(({ eventId }) => {
-      setEventId(eventId);
-      fetchEvent(eventId);
-      fetchCredits();
-    });
-  }, [params]);
+  // The typed reminder is kept on the account (Event -> tenant), so the wording
+  // follows the tenant to any device instead of living in this browser only.
+  const { drafts, ready: draftsReady, saveStatus, set } = useMessageDrafts(eventId ?? undefined);
+
+  // The typed reminder is read straight from the account copy. An emptied box
+  // clears the stored draft so a later visit starts clean.
+  const message = drafts.kumbushaMessage ?? '';
+  const setMessage = (value: string) => set('kumbushaMessage', value.trim() ? value : null);
 
   const fetchEvent = async (id: string) => {
     try {
@@ -86,6 +87,14 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
       // silent
     }
   };
+
+  useEffect(() => {
+    params.then(({ eventId }) => {
+      setEventId(eventId);
+      fetchEvent(eventId);
+      fetchCredits();
+    });
+  }, [params]);
 
   // Guests who have finished contributing are removed from the picker. The API
   // enforces the same rule, so offering them would only invite a mistake.
@@ -188,7 +197,7 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
     }
   };
 
-  if (loading) {
+  if (loading || !draftsReady) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-brandtext" />
@@ -323,6 +332,13 @@ export default function ReminderMessagePage({ params }: { params: Promise<{ even
               className="w-full p-3 border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent resize-none"
               placeholder="e.g. Habari {name}, tunakumbusha kuhusu michango yako kwa {event}. Asante."
             />
+            <p className="mt-1 text-[10px] text-gray-400">
+              {saveStatus === 'saving'
+                ? 'Saving to your account…'
+                : saveStatus === 'error'
+                  ? 'Offline — the draft will retry automatically'
+                  : 'Saved to your account'}
+            </p>
           </div>
 
           <div className="max-h-80 overflow-y-auto border border-gray-200 rounded-tap divide-y divide-gray-100">

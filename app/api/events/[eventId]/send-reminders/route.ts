@@ -72,9 +72,6 @@ export async function POST(
     return NextResponse.json({ error: 'No guests selected' }, { status: 400 });
   }
   const chan = channel === 'whatsapp' ? 'whatsapp' : 'sms';
-  if (chan === 'sms' && (!message || message.trim().length === 0)) {
-    return NextResponse.json({ error: 'Message is required' }, { status: 400 });
-  }
 
   const event = await prisma.event.findUnique({
     where: { id: eventId, tenantId },
@@ -92,6 +89,14 @@ export async function POST(
   });
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  }
+
+  // The reminder text is saved on the account, so a request that arrives
+  // without a message still sends the wording this tenant typed last.
+  const reminderMessage =
+    typeof message === 'string' && message.trim().length > 0 ? message : event.reminderSmsMessage ?? '';
+  if (chan === 'sms' && reminderMessage.trim().length === 0) {
+    return NextResponse.json({ error: 'Message is required' }, { status: 400 });
   }
 
   // ─── Once-per-event lock (non-bypassed tenants only) ───────────────
@@ -178,7 +183,7 @@ export async function POST(
   // Validated BEFORE any credits move, so an over-long SMS is rejected without
   // ever touching the balance. Bypassed tenants may send any length.
   if (chan === 'sms' && !event.tenant.bypassPayment) {
-    const sampleMessage = message
+    const sampleMessage = reminderMessage
       .replace(/\{name\}/g, 'Mr John Doe')
       .replace(/\{event\}/g, event.name);
     const sampleParts = smsPartCount(sampleMessage);
@@ -289,7 +294,7 @@ export async function POST(
             account: event.tenant.whatsappAccount,
           });
         } else {
-          const personalized = message
+          const personalized = reminderMessage
             .replace(/\{name\}/g, () => greetingNameFor(guest))
             .replace(/\{event\}/g, () => event.name);
           const parts = smsPartCount(personalized);

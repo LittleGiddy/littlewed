@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
 import { guestTypeLabel } from '@/lib/guestTypes';
 import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credits';
 
@@ -95,22 +95,99 @@ export async function POST(req: NextRequest) {
     const cardImageUrl = guest.invitationCard || guest.event?.imageUrl || '';
 
     // ─── Send WhatsApp invitation (no link button) ──────────────────────
-    // Variable values come from the user's event/guest data - no hardcoded
-    // fallbacks. Empty fields send empty values to the template.
+    // Variable values come from the composer's settings saved on the account
+    // (Event -> tenant), so a resend from another device repeats exactly what
+    // this tenant typed. Event fields still fill anything left blank.
+    const savedDraft = (guest.event?.whatsappInviteDraft ?? null) as {
+      template?: string;
+      vars?: Record<string, string>;
+      contact?: string;
+      eventType?: string;
+    } | null;
+    const savedVars = savedDraft?.vars || {};
+    const savedTemplateName =
+      savedDraft?.template && savedDraft.template !== 'mwalikoplus'
+        ? ({ mwalikoforth: 'MwalikoForth', mwaliko: 'Mwalikotemp', mwalikosecond: 'Mwalikosecond', mdakumbe: 'Event' } as Record<string, string>)[
+            savedDraft.template
+          ]
+        : undefined;
+
+    // "Event" (Kadi ya Mualiko Ukumbini) is a fixed body - only {var1} (the
+    // plain guest name, the greeting already says "Ndg.") and {var2} (card
+    // number) vary. No URL button.
+    if (savedTemplateName === 'Event') {
+      const ukumbiniResult = await sendWeddingInvitationUkumbini(guest.phone, {
+        guestName: guest.name || '',
+        cardNumber: guest.cardNumber || '',
+        imageUrl: cardImageUrl || undefined,
+        account: guest.event?.tenant?.whatsappAccount ?? undefined,
+      });
+      if (ukumbiniResult.success) {
+        if (ukumbiniResult.messageId) {
+          await prisma.messageLog.create({
+            data: {
+              messageId: ukumbiniResult.messageId,
+              guestId: guest.id,
+              type: 'WHATSAPP',
+              template: 'Event',
+              status: 'SENT',
+              rawData: ukumbiniResult.data,
+            },
+          });
+        }
+
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { invitationSentAt: new Date(), whatsappSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Invitation sent successfully!',
+          data: ukumbiniResult.data,
+          messageId: ukumbiniResult.messageId,
+          cardImageUrl,
+          remainingCredits: resendCreditInfo?.creditsAvailable,
+        });
+      }
+
+      if (ukumbiniResult.messageId) {
+        await prisma.messageLog.create({
+          data: {
+            messageId: ukumbiniResult.messageId,
+            guestId: guest.id,
+            type: 'WHATSAPP',
+            template: 'Event',
+            status: 'FAILED',
+            error: ukumbiniResult.error || 'Unknown error',
+            rawData: ukumbiniResult.data,
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: ukumbiniResult.error || 'Failed to send WhatsApp message',
+      }, { status: 500 });
+    }
+
     const result = await sendWeddingInvitation(guest.phone, {
       guestName: guestFullName,
-      hostFamily: guest.event?.hostFamily || '',
-      person1: guest.event?.person1 || '',
-      person2: guest.event?.person2 || '',
-      date: formattedDate,
-      venue: guest.event?.venue || '',
-      time: guest.event?.time || '',
+      hostFamily: savedVars.hostFamily || guest.event?.hostFamily || '',
+      person1: savedVars.person1 || guest.event?.person1 || '',
+      person2: savedVars.person2 || guest.event?.person2 || '',
+      date: savedVars.date || formattedDate,
+      venue: savedVars.venue || guest.event?.venue || '',
+      time: savedVars.time || guest.event?.time || '',
       cardNumber: guest.cardNumber || '',
       cardType: guestTypeLabel(guest.guestType, guest.guestCount),
       imageUrl: cardImageUrl || undefined,  // ✅ Card image rendered in WhatsApp (omitted if none)
       // No inviteLink - removed!
       // Use the tenant's NexSMS account; a wrong/blank account makes the
       // provider reject every send with HTTP 422.
+      templateName: savedTemplateName,
+      contact: savedDraft?.contact,
+      eventType: savedDraft?.eventType,
       account: guest.event?.tenant?.whatsappAccount ?? undefined,
     });
 

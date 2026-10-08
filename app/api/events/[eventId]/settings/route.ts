@@ -76,6 +76,11 @@ export async function GET(
       reminderCardNameColor: true,
       reminderCardNameAlign: true,
       reminderCardNameFont: true,
+      smsInviteTemplate: true,
+      whatsappInviteDraft: true,
+      whatsappDailyLimit: true,
+      reminderSmsMessage: true,
+      kumbushaMessage: true,
     },
   });
 
@@ -156,6 +161,31 @@ export async function PUT(
   if (body.reminderCardNameColor !== undefined) updateData.reminderCardNameColor = body.reminderCardNameColor;
   if (body.reminderCardNameAlign !== undefined) updateData.reminderCardNameAlign = body.reminderCardNameAlign;
   if (body.reminderCardNameFont !== undefined) updateData.reminderCardNameFont = body.reminderCardNameFont;
+
+  // ─── Message drafts & composer settings ─────────────────────────────
+  // Saved on the account (Event -> tenant), not in the browser that typed
+  // them, so any device signed into this tenant picks the draft back up.
+  if (body.smsInviteTemplate !== undefined) {
+    updateData.smsInviteTemplate = body.smsInviteTemplate === null ? null : String(body.smsInviteTemplate).slice(0, 4000);
+  }
+  if (body.reminderSmsMessage !== undefined) {
+    updateData.reminderSmsMessage = body.reminderSmsMessage === null ? null : String(body.reminderSmsMessage).slice(0, 4000);
+  }
+  if (body.kumbushaMessage !== undefined) {
+    updateData.kumbushaMessage = body.kumbushaMessage === null ? null : String(body.kumbushaMessage).slice(0, 4000);
+  }
+  if (body.whatsappDailyLimit !== undefined) {
+    const limit = body.whatsappDailyLimit === null ? null : parseInt(String(body.whatsappDailyLimit), 10);
+    updateData.whatsappDailyLimit = limit !== null && Number.isFinite(limit) && limit > 0 ? limit : null;
+  }
+  if (body.whatsappInviteDraft !== undefined) {
+    const draft = body.whatsappInviteDraft;
+    if (draft === null) {
+      updateData.whatsappInviteDraft = null;
+    } else if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
+      updateData.whatsappInviteDraft = draft;
+    }
+  }
 
   // ─── Mchango template variables (var1..var13) ───────────────────────
   // These back the reminder editor. Each one is a real Event column rather than

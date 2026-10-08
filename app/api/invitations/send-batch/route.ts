@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation, sendWeddingInvitationPlus } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendWeddingInvitationPlus, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
 import { sendSMS } from '@/lib/sms/index';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
@@ -14,6 +14,15 @@ import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credi
 const BATCH_SIZE = 5;
 const BATCH_DELAY = 2000;
 const MESSAGE_DELAY = 500;
+
+/** Composer template keys (Event.whatsappInviteDraft) → approved WhatsApp names. */
+const WA_TEMPLATE_NAMES: Record<string, string> = {
+  mwalikoforth: 'MwalikoForth',
+  mwaliko: 'Mwalikotemp',
+  mwalikosecond: 'Mwalikosecond',
+  mwalikoplus: 'Mwaliko Sixth',
+  mdakumbe: 'Event',
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,8 +85,11 @@ export async function POST(req: NextRequest) {
     // The WhatsApp API has a daily cap (a newly-registered number starts low,
     // e.g. 250). We count how many WhatsApp invitations were already accepted
     // today (status SENT) and stop sending WhatsApp once the configured limit
-    // is reached. SMS is not affected by the WhatsApp cap.
-    const limit = typeof dailyLimit === 'number' && dailyLimit > 0 ? Math.floor(dailyLimit) : null;
+    // is reached. SMS is not affected by the WhatsApp cap. When the request
+    // carries no limit, the value saved on the account (Event -> tenant) wins.
+    const savedLimit = guests[0]?.event?.whatsappDailyLimit ?? null;
+    const limit =
+      typeof dailyLimit === 'number' && dailyLimit > 0 ? Math.floor(dailyLimit) : savedLimit;
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     let waUsed = limit
@@ -268,17 +280,31 @@ export async function POST(req: NextRequest) {
             }
 
             // ─── Get WhatsApp variables ──────────────────────────────────
-            const vars = whatsappVariables || {};
+            // The composer saves its settings on the account, so a request
+            // that arrives without them still sends what this tenant typed.
+            const savedDraft = (guest.event?.whatsappInviteDraft ?? null) as {
+              template?: string;
+              vars?: Record<string, string>;
+              contact?: string;
+              contact2?: string;
+              eventType?: string;
+            } | null;
+            const vars = whatsappVariables || savedDraft?.vars || {};
+            const waTemplate =
+              whatsappTemplate || (savedDraft?.template ? WA_TEMPLATE_NAMES[savedDraft.template] : undefined);
+            const waContact = whatsappContact || savedDraft?.contact || '';
+            const waContact2 = whatsappContact2 || savedDraft?.contact2 || '';
+            const waEventType = eventType || savedDraft?.eventType || 'harusi';
 
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
-            const actualCardNumber = guest.cardNumber || vars.cardNumber || '';
-            const actualCardType = guestTypeLabel(guest.guestType, guest.guestCount) || vars.cardType || '';
+            const actualGuestCard = guest.cardNumber || vars.cardNumber || '';
+            const actualGuestType = guestTypeLabel(guest.guestType, guest.guestCount) || vars.cardType || '';
 
             // ─── Send WhatsApp ────────────────────────────────────────────
             // Variable values come from the user's inputs (whatsappVariables),
             // then the event data - no hardcoded fallbacks.
-            if (whatsappTemplate === 'Mwaliko Sixth') {
+            if (waTemplate === 'Mwaliko Sixth') {
               const person1Name = vars.person1 || guest.event?.person1 || '';
               const person2Name = vars.person2 || guest.event?.person2 || '';
               const celebrant = person1Name && person2Name
@@ -289,17 +315,27 @@ export async function POST(req: NextRequest) {
                 guestName: actualGuestName,
                 hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
                 area: vars.area || guest.event?.address || '',
-                eventType: eventType || 'harusi',
+                eventType: waEventType,
                 celebrant,
                 date: vars.date || formattedDate,
                 venue: vars.venue || guest.event?.venue || '',
                 time: vars.time || guest.event?.time || '',
-                cardNumber: actualCardNumber,
-                cardType: actualCardType,
-                contact1: whatsappContact || '',
-                contact2: whatsappContact2 || '',
+                cardNumber: actualGuestCard,
+                cardType: actualGuestType,
+                contact1: waContact,
+                contact2: waContact2,
                 imageUrl: cardImageUrl || undefined,
                 inviteLink: inviteLink,
+                account: guest.event?.tenant?.whatsappAccount ?? undefined,
+              });
+            } else if (waTemplate === 'Event') {
+              // "Kadi ya Mualiko Ukumbini" is a fixed body - only the guest
+              // name and card number vary. The body already greets with
+              // "Ndg.", so the plain name is used (no redundant title).
+              result = await sendWeddingInvitationUkumbini(guest.phone!, {
+                guestName: guest.name || '',
+                cardNumber: actualGuestCard,
+                imageUrl: cardImageUrl || undefined,
                 account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
             } else {
@@ -311,13 +347,13 @@ export async function POST(req: NextRequest) {
                 date: vars.date || formattedDate,
                 venue: vars.venue || guest.event?.venue || '',
                 time: vars.time || guest.event?.time || '',
-                cardNumber: actualCardNumber,
-                cardType: actualCardType,
+                cardNumber: actualGuestCard,
+                cardType: actualGuestType,
                 imageUrl: cardImageUrl || undefined,
                 inviteLink: inviteLink,
-                templateName: whatsappTemplate,
-                contact: whatsappContact,
-                eventType: eventType,
+                templateName: waTemplate,
+                contact: waContact,
+                eventType: waEventType,
                 account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
             }
@@ -341,6 +377,7 @@ export async function POST(req: NextRequest) {
               const smsTemplateText =
                 smsTemplate ||
                 message ||
+                guest.event?.smsInviteTemplate ||
                 `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
 
               const fallbackMap: Record<string, string> = {
@@ -429,6 +466,7 @@ export async function POST(req: NextRequest) {
             const smsTemplateText =
               smsTemplate ||
               message ||
+              guest.event?.smsInviteTemplate ||
               `Habari {fullName},\n\nFamilia ya {hostFamily} inakualika katika harusi ya {person1} na {person2} tarehe {date}.\n\nVenue: {venue}, saa {time}.\n\nCard No: {cardNumber} • {guestType}\n\nTafadhali onyesha kadi hii wakati wa kuingia.\nKaribu na ufurahie sherehe!\n\nAhsante.`;
 
             const varsMap: Record<string, string> = {

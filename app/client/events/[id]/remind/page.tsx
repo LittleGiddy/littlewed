@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -21,9 +21,7 @@ import ReminderCardDesigner, {
 import MchangoVariables from './MchangoVariables';
 import ReminderCardPreview from './ReminderCardPreview';
 import type { MchangoEventSource, MchangoFieldKey } from '@/lib/whatsapp/mchango';
-
-/** Where the typed SMS reminder is kept so it survives a reload. */
-const SMS_DRAFT_KEY = (eventId: string) => `reminder_sms_draft_${eventId}`;
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 /** The request asks for a progress stream; the route falls back to plain JSON. */
 const NDJSON_MEDIA_TYPE = 'application/x-ndjson';
@@ -128,7 +126,6 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [guests, setGuests] = useState<Guest[]>([]);
   const [lastReminderBatch, setLastReminderBatch] = useState<LastReminderBatch | null>(null);
   const [selectedGuests, setSelectedGuests] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   /** Live progress while a send is in flight. Null whenever nothing is sending. */
   const [progress, setProgress] = useState<SendProgress | null>(null);
@@ -139,6 +136,15 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [step, setStep] = useState(0);
   const [search, setSearch] = useState('');
   const [savingDesign, setSavingDesign] = useState(false);
+
+  // The typed reminder lives on the account (Event -> tenant), so the wording
+  // is waiting on any device signed into this tenant, not just this browser.
+  const { drafts, ready: draftsReady, saveStatus, set } = useMessageDrafts(eventId ?? undefined);
+
+  // The typed reminder is read straight from the account copy. An emptied box
+  // clears the stored draft so a later visit starts clean.
+  const message = drafts.reminderSmsMessage ?? '';
+  const setMessage = (value: string) => set('reminderSmsMessage', value.trim() ? value : null);
 
   // Reminder card + name placement
   const [cardUrl, setCardUrl] = useState<string | null>(null);
@@ -175,25 +181,6 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     };
   }, [event]);
 
-  // ─── Remember the SMS reminder between visits ─────────────────────────
-  // A typed reminder is expensive to recreate — the payment details, the date and
-  // the wording are all retyped — so the draft is written on every keystroke and
-  // read back on load. This follows the invitation composer's draft keys so there
-  // is one place to look for "my unsent message".
-  const draftReady = useRef(false);
-
-  useEffect(() => {
-    if (!eventId || !draftReady.current) return;
-    try {
-      // An emptied box removes the key, so a later visit starts clean rather than
-      // restoring an empty reminder.
-      if (message.trim()) window.localStorage.setItem(SMS_DRAFT_KEY(eventId), message);
-      else window.localStorage.removeItem(SMS_DRAFT_KEY(eventId));
-    } catch {
-      // Storage unavailable - the message still works, it just will not persist.
-    }
-  }, [eventId, message]);
-
   const fetchEvent = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/events/${id}`, { credentials: 'include' });
@@ -223,18 +210,6 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
           font: data.event.reminderCardNameFont ?? DEFAULT_REMINDER_DESIGN.font,
         });
       }
-
-      // The saved SMS draft is read here, with the rest of the page's data, so
-      // the textbox starts out holding what was last typed. Reading it in its own
-      // effect would set state on every mount as well as after each send refresh.
-      try {
-        const saved = window.localStorage.getItem(SMS_DRAFT_KEY(id));
-        if (saved) setMessage((current) => (current ? current : saved));
-      } catch {
-        // Private mode or a full quota: losing the draft is not worth an error.
-      }
-      // The draft has now been read, so the write effect may start saving.
-      draftReady.current = true;
     } catch {
       toast.error('Could not load event data');
     } finally {
@@ -655,7 +630,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (loading) {
+  if (loading || !draftsReady) {
     return (
       <div className="flex justify-center items-center min-h-[60vh] bg-canvas">
         <Loader2 className="w-8 h-8 animate-spin text-brand" />
@@ -912,7 +887,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
               <>
                 <StepTitle
                   title="Write your reminder"
-                  hint="Use {name} and {event} to personalise it. What you type is saved on this device, so it is here next time you come to send."
+                  hint="Use {name} and {event} to personalise it. What you type is saved to your account, so it is here on any device you sign in from."
                 />
                 <textarea
                   rows={7}
@@ -921,17 +896,24 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                   placeholder="Habari {name}, tunakumbusha kuhusu mchango wako kwa {event}. Asante."
                   className="w-full p-3 border border-gray-200 rounded-card text-[15px] focus:ring-2 focus:ring-brandring focus:border-transparent resize-none bg-gray-50/40"
                 />
+                <p className="mt-1.5 text-[10px] text-gray-400">
+                  {saveStatus === 'saving'
+                    ? 'Saving to your account…'
+                    : saveStatus === 'error'
+                      ? 'Offline — the draft will retry automatically'
+                      : 'Saved to your account'}
+                </p>
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => setMessage((m) => `${m} {name}`)}
+                    onClick={() => setMessage(message + ' {name}')}
                     className="text-[11px] font-semibold text-brand bg-brand/[0.07] rounded-lg px-2.5 py-1.5"
                   >
                     + {'{name}'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMessage((m) => `${m} {event}`)}
+                    onClick={() => setMessage(message + ' {event}')}
                     className="text-[11px] font-semibold text-brand bg-brand/[0.07] rounded-lg px-2.5 py-1.5"
                   >
                     + {'{event}'}

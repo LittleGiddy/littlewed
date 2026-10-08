@@ -11,7 +11,7 @@ import {
   SendResult,
   getFullName,
   cardTypeLabel,
-  readSmsTemplateDraft,
+  DEFAULT_SMS_TEMPLATE,
   useGuestData,
   FlowSteps,
   FlowHeader,
@@ -20,11 +20,13 @@ import {
   NeedCardsBanner,
   SendProgressCard,
 } from '../../../components/shared';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 export default function SmsGuestsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, reload, smsPending, missingCards, bypassPayment } = useGuestData(eventId);
+  const { drafts, ready: draftsReady } = useMessageDrafts(id);
 
   const [view, setView] = useState<'pending' | 'failed'>('pending');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -33,7 +35,7 @@ export default function SmsGuestsPage() {
   const [sendingTotal, setSendingTotal] = useState(0);
   const [failed, setFailed] = useState<SendResult[]>([]);
 
-  const smsTemplate = useMemo(() => readSmsTemplateDraft(id), [id]);
+  const smsTemplate = drafts.smsTemplate ?? DEFAULT_SMS_TEMPLATE;
 
   const pendingPool = useMemo(() => smsPending.filter(g => !!g.passCode), [smsPending]);
   const cardless = useMemo(() => smsPending.filter(g => !g.passCode), [smsPending]);
@@ -165,7 +167,7 @@ export default function SmsGuestsPage() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading guests..." />;
+  if (loading || !draftsReady) return <LoadingState label="Loading guests..." />;
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 sm:py-8">

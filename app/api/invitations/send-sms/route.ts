@@ -92,7 +92,10 @@ Karibu na ufurahie sherehe!
 Ahsante.`;
 
     // ─── If custom message provided, use it ─────────────────────────────
-    if (message) {
+    // A resend that arrives without a message falls back to the template
+    // saved on the account (Event -> tenant) before the generic default.
+    const customTemplate = message || guest.event?.smsInviteTemplate || null;
+    if (customTemplate) {
       // Function-based replace: guarantees full values and avoids any
       // `$&`/`$'`/`$\`` corruption that string replacement can introduce.
       const varsMap: Record<string, string> = {
@@ -113,7 +116,7 @@ Ahsante.`;
         person2: guest.event?.person2 || '',
         time: guest.event?.time || '',
       };
-      smsMessage = message.replace(
+      smsMessage = customTemplate.replace(
         /\{(title|name|fullName|guestName|cardNumber|cardType|guestType|passCode|event|date|venue|address|hostFamily|person1|person2|time)\}/g,
         (match: string, key: string) => varsMap[key] ?? match
       );

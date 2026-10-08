@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Send, Eye, EyeOff, Info, FileText, ArrowRight, Save, CheckCircle2 } from 'lucide-react';
@@ -9,8 +9,8 @@ import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
 import {
   SMS_VARIABLES,
   SAMPLE_GUEST,
+  DEFAULT_SMS_TEMPLATE,
   buildSmsMessage,
-  readSmsTemplateDraft,
   useGuestData,
   FlowSteps,
   FlowHeader,
@@ -18,29 +18,18 @@ import {
   Card,
   LoadingState,
 } from '../../components/shared';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 export default function ComposeSmsPage() {
   const { eventId } = useParams();
   const router = useRouter();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, smsPending, bypassPayment } = useGuestData(eventId);
+  const { drafts, ready: draftsReady, saveStatus, set } = useMessageDrafts(id);
 
-  const [smsTemplate, setSmsTemplate] = useState(() => readSmsTemplateDraft(id));
+  const smsTemplate = drafts.smsTemplate ?? DEFAULT_SMS_TEMPLATE;
   const [showVariables, setShowVariables] = useState(true);
   const [showPreview, setShowPreview] = useState(true);
-
-  // ─── Auto-save draft ─────────────────────────────────────────────────
-  useEffect(() => {
-    if (!id) return;
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(`sms_template_${id}`, JSON.stringify({ template: smsTemplate }));
-      } catch {
-        // ignore
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [smsTemplate, id]);
 
   const preview = useMemo(() => buildSmsMessage(smsTemplate, SAMPLE_GUEST), [smsTemplate]);
 
@@ -49,14 +38,14 @@ export default function ComposeSmsPage() {
     const start = textarea?.selectionStart ?? smsTemplate.length;
     const end = textarea?.selectionEnd ?? smsTemplate.length;
     const next = smsTemplate.slice(0, start) + variable + smsTemplate.slice(end);
-    setSmsTemplate(next);
+    set('smsTemplate', next);
     setTimeout(() => {
       textarea?.focus();
       textarea?.setSelectionRange(start + variable.length, start + variable.length);
     }, 10);
   };
 
-  if (loading) return <LoadingState label="Loading SMS..." />;
+  if (loading || !draftsReady) return <LoadingState label="Loading SMS..." />;
 
   const continueUrl = `/client/invitations/send/${id}/sms/guests`;
 
@@ -95,13 +84,18 @@ export default function ComposeSmsPage() {
         <textarea
           id="sms-template-editor"
           value={smsTemplate}
-          onChange={e => setSmsTemplate(e.target.value)}
+          onChange={e => set('smsTemplate', e.target.value)}
           className="w-full p-4 border border-gray-200 rounded-card text-sm font-mono focus:ring-2 focus:ring-brandring focus:border-transparent min-h-[220px] resize-y"
           placeholder="Write your SMS invitation here..."
         />
         <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
           <span className="flex items-center gap-1">
-            <Save size={11} className="text-green-500" /> Draft saved on this device
+            <Save size={11} className="text-green-500" />{' '}
+            {saveStatus === 'saving'
+              ? 'Saving to your account…'
+              : saveStatus === 'error'
+                ? 'Offline — will retry'
+                : 'Saved to your account'}
           </span>
           <SmsCounter text={preview} maxParts={bypassPayment ? null : MAX_SMS_PARTS_PER_GUEST} />
         </div>

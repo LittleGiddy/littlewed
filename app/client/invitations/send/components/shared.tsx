@@ -62,12 +62,16 @@ Ahsante!`;
 
 export const INVITE_TEMPLATES: Record<
   string,
-  { displayName: string; whatsappName: string; hasContact: boolean; hasEventType: boolean; hasContact2?: boolean; hasMoreInfoButton?: boolean }
+  { displayName: string; whatsappName: string; hasContact: boolean; hasEventType: boolean; hasContact2?: boolean; hasMoreInfoButton?: boolean; hasComposeFields?: boolean }
 > = {
   mwalikoforth: { displayName: 'Template 1', whatsappName: 'MwalikoForth', hasContact: true, hasEventType: true },
   mwaliko: { displayName: 'Template 2', whatsappName: 'Mwalikotemp', hasContact: false, hasEventType: false },
   mwalikosecond: { displayName: 'Template 3', whatsappName: 'Mwalikosecond', hasContact: true, hasEventType: false },
   mwalikoplus: { displayName: 'Template 4 (With More Info)', whatsappName: 'Mwaliko Sixth', hasContact: true, hasEventType: true, hasContact2: true, hasMoreInfoButton: true },
+  // Fixed "Kadi ya Mualiko Ukumbini" body for the MdaKumbe TV Blue & White
+  // night. Only {var1} (guest name) and {var2} (card number) change; there is
+  // no URL button - the guest card image is the header.
+  mdakumbe: { displayName: 'Kadi ya Mualiko Ukumbini', whatsappName: 'Event', hasContact: false, hasEventType: false, hasComposeFields: false },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -109,24 +113,6 @@ export const SAMPLE_GUEST: SendGuest = {
   smsSentAt: null,
   whatsappSentAt: null,
 };
-
-// ─── Persisted SMS draft (compose screen ↔ guests screen) ───────────────────
-
-export function readSmsTemplateDraft(eventId?: string): string {
-  if (!eventId) return DEFAULT_SMS_TEMPLATE;
-  try {
-    const saved = localStorage.getItem(`sms_template_${eventId}`);
-    if (saved) {
-      const state = JSON.parse(saved);
-      if (typeof state.template === 'string' && state.template.trim()) {
-        return state.template;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return DEFAULT_SMS_TEMPLATE;
-}
 
 // ─── Data hook: event + guests + bypass flag ────────────────────────────────
 

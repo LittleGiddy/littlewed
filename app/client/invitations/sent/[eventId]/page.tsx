@@ -10,13 +10,14 @@ import {
   SendResult,
   INVITE_TEMPLATES,
   getFullName,
-  readSmsTemplateDraft,
+  DEFAULT_SMS_TEMPLATE,
   useGuestData,
   FlowSteps,
   FlowHeader,
   Card,
   LoadingState,
 } from '../../send/components/shared';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 function formatDate(value?: string | null): string {
   if (!value) return '—';
@@ -28,27 +29,11 @@ function formatDate(value?: string | null): string {
   });
 }
 
-function readWhatsappDraftObject(eventId?: string): {
-  template?: string;
-  vars?: Record<string, string>;
-  contact?: string;
-  eventType?: string;
-} | null {
-  if (!eventId) return null;
-  try {
-    const raw = localStorage.getItem(`whatsapp_draft_${eventId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed.template === 'string' ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function SentInvitationsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, reload, smsSent, whatsappSent, bypassPayment } = useGuestData(eventId);
+  const { drafts, ready: draftsReady } = useMessageDrafts(id);
 
   const [tab, setTab] = useState<'whatsapp' | 'sms'>('whatsapp');
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -57,15 +42,8 @@ export default function SentInvitationsPage() {
   const [waUsed, setWaUsed] = useState(0);
   const [credits, setCredits] = useState<number | null>(null);
   const RESEND_COST = 1; // extra credits charged per resend for standard tenants
-  const [waLimit] = useState(() => {
-    if (!id) return 250;
-    try {
-      const saved = parseInt(localStorage.getItem(`wa_daily_limit_${id}`) || '', 10);
-      return saved > 0 ? saved : 250;
-    } catch {
-      return 250;
-    }
-  });
+  const waLimit = drafts.whatsappDailyLimit ?? 250;
+  const smsTemplate = drafts.smsTemplate ?? DEFAULT_SMS_TEMPLATE;
 
   // ─── Load today's WhatsApp usage (only used for the Resend-all cap) ─────
   useEffect(() => {
@@ -101,7 +79,7 @@ export default function SentInvitationsPage() {
     try {
       const route = channel === 'whatsapp' ? '/api/invitations/send-whatsapp' : '/api/invitations/send-sms';
       const body: Record<string, unknown> = { guestId: guest.id, eventId: id, resend: true };
-      if (channel === 'sms') body.message = readSmsTemplateDraft(id);
+      if (channel === 'sms') body.message = smsTemplate;
       const res = await fetch(route, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,9 +123,9 @@ export default function SentInvitationsPage() {
     try {
       const body: Record<string, unknown> = { eventId: id, guestIds: ids, forceChannel: tab, resend: true };
       if (tab === 'sms') {
-        body.smsTemplate = readSmsTemplateDraft(id);
+        body.smsTemplate = smsTemplate;
       } else {
-        const draft = readWhatsappDraftObject(id);
+        const draft = drafts.whatsappInviteDraft;
         const tpl = draft?.template && INVITE_TEMPLATES[draft.template] ? INVITE_TEMPLATES[draft.template] : null;
         body.whatsappTemplate = tpl ? tpl.whatsappName : undefined;
         body.whatsappContact = draft?.contact || '';
@@ -209,7 +187,7 @@ export default function SentInvitationsPage() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading sent invitations..." />;
+  if (loading || !draftsReady) return <LoadingState label="Loading sent invitations..." />;
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 sm:py-8">

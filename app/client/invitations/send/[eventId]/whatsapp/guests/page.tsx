@@ -18,6 +18,7 @@ import {
   LoadingState,
   SendProgressCard,
 } from '../../../components/shared';
+import { useMessageDrafts } from '@/lib/messageDrafts';
 
 const DEFAULT_DAILY_LIMIT = 250;
 
@@ -25,6 +26,7 @@ export default function WhatsappGuestsPage() {
   const { eventId } = useParams();
   const id = Array.isArray(eventId) ? eventId[0] : eventId;
   const { event, loading, reload, whatsappPending, bypassPayment } = useGuestData(eventId);
+  const { drafts, ready: draftsReady, set } = useMessageDrafts(id);
 
   const [view, setView] = useState<'pending' | 'failed'>('pending');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -32,26 +34,11 @@ export default function WhatsappGuestsPage() {
   const [sending, setSending] = useState(false);
   const [sendingTotal, setSendingTotal] = useState(0);
   const [failed, setFailed] = useState<SendResult[]>([]);
-  const [dailyLimit, setDailyLimit] = useState(() => {
-    try {
-      const saved = parseInt(localStorage.getItem(`wa_daily_limit_${id}`) || '', 10);
-      return saved > 0 ? saved : DEFAULT_DAILY_LIMIT;
-    } catch {
-      return DEFAULT_DAILY_LIMIT;
-    }
-  });
   const [waUsed, setWaUsed] = useState(0);
 
-  // ─── Draft (template + vars) from the compose screen ─────────────────────
-  const draft = useMemo(() => {
-    if (!id) return null;
-    try {
-      const saved = localStorage.getItem(`whatsapp_draft_${id}`);
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  }, [id]);
+  // ─── Draft (template + vars) + daily limit saved on the account ─────────
+  const draft = drafts.whatsappInviteDraft;
+  const dailyLimit = drafts.whatsappDailyLimit ?? DEFAULT_DAILY_LIMIT;
 
   // ─── Daily limit: load current WhatsApp usage today ──────────────────────
   useEffect(() => {
@@ -202,7 +189,7 @@ export default function WhatsappGuestsPage() {
     await reload();
   }
 
-  if (loading) return <LoadingState label="Loading guests..." />;
+  if (loading || !draftsReady) return <LoadingState label="Loading guests..." />;
 
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -231,12 +218,7 @@ export default function WhatsappGuestsPage() {
               value={dailyLimit}
               onChange={e => {
                 const v = parseInt(e.target.value || '0', 10);
-                setDailyLimit(v > 0 ? v : 0);
-                try {
-                  localStorage.setItem(`wa_daily_limit_${id}`, String(v));
-                } catch {
-                  // ignore
-                }
+                set('whatsappDailyLimit', v > 0 ? v : null);
               }}
               className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white"
             />
