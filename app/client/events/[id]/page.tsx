@@ -21,6 +21,7 @@ import { confirmToast, isMassDelete } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
 import ThanksCardModal from '@/components/ThanksCardModal';
 import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
+import QrPrintSheetModal from '@/app/components/QrPrintSheetModal';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 interface Guest {
@@ -203,6 +204,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [pageSize] = useState(20);
   const [searchTerm, setSearchTerm] = useState('');
   const [showBackupModal, setShowBackupModal] = useState(false);
+  const [showQrStickers, setShowQrStickers] = useState(false);
   const [allGuests, setAllGuests] = useState<Guest[]>([]);
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupSearch, setBackupSearch] = useState('');
@@ -1963,6 +1965,29 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                   </div>
 
+                  <div className="bg-white rounded-card shadow-sm border border-gray-100 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center text-brand shrink-0">
+                          <QrCode size={17} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-gray-800">QR stickers for printing</p>
+                          <p className="text-xs text-gray-400">
+                            Printable QR codes to cut out and stick onto physical cards. Scanners
+                            show them as valid at the event.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowQrStickers(true)}
+                        className="border border-brand text-brand px-4 py-2 rounded-tap text-sm font-bold hover:bg-brand/5 transition flex items-center gap-2"
+                      >
+                        <QrCode size={15} /> Open
+                      </button>
+                    </div>
+                  </div>
+
                   {guestsWithCards.length > 0 && (
                     <div className="flex items-center justify-end gap-2">
                       <button
@@ -2619,6 +2644,14 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── QR Sticker Sheets Modal ─── */}
+      {showQrStickers && (
+        <QrPrintSheetModal
+          eventId={eventId ?? ''}
+          onClose={() => setShowQrStickers(false)}
+        />
       )}
     </>
   );
