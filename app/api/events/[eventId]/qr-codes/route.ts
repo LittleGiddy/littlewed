@@ -1,158 +1,124 @@
-// app/api/events/[eventId]/qr-codes/route.ts
-//
-// Generates standalone QR "sticker" codes for an event's guests so the tenant
-// can print them, cut them out, and fix them onto physical cards. Each sticker
-// encodes exactly the guest's card number — the same value the invitation-card
-// QR encodes (lib/image-storage) — so scanning a sticker with the staff scanner
-// (POST /api/check-in) resolves the guest and marks the card VALID.
-//
-//   GET /api/events/:eventId/qr-codes                      → manifest (unique stickers)
-//   GET /api/events/:eventId/qr-codes?sheet=1&page=N       → A4 PNG sheet (20/page)
-//   GET /api/events/:eventId/qr-codes?guestId=...          → single QR PNG
-//
-// Guards match the other event APIs: tenants own their events, and staff may
-// only touch events they were explicitly granted (canAccessEvent).
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { canAccessEvent } from '@/lib/eventAccess';
-import {
-  buildQrPrintSheet,
-  generateQRFromCardNumber,
-  QR_SHEET_PAGE_SIZE,
-} from '@/lib/qr';
+import { canAccessEvent, canManageTenant } from '@/lib/eventAccess';
+import { generateQRFromCardNumber, generateExternalQrCode } from '@/lib/qr';
+
+/**
+ * Single event-level "external" QR code.
+ *
+ * Unlike the per-guest card QR (which encodes a guest cardNumber), this is ONE
+ * code per event, stored on Event.externalQrCode. It is meant to be printed on
+ * physical cards for guests who are NOT imported into the system. The staff
+ * scanner recognises it and returns VALID on every scan, without creating or
+ * matching any Guest row.
+ *
+ * GET  -> the QR as a PNG (create via POST first).
+ * POST -> create the code if missing (idempotent), or rotate it when the body
+ *         is `{ "rotate": true }` (owners only).
+ */
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
-const SHEET_QR_SIZE = 340;
-const SINGLE_QR_SIZE = 400;
+const QR_SIZE = 1024;
 
 export async function GET(
-  req: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const tenantId = (session.user as { tenantId?: string }).tenantId;
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
     }
 
     const { eventId } = await params;
     if (!(await canAccessEvent(session, eventId))) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Event not found.' }, { status: 404 });
     }
 
-    // Guests with a card number. Shared cards (cardGroupId) reuse one number,
-    // so the sheet shows a single sticker per unique card number.
-    const guests = await prisma.guest.findMany({
-      where: { eventId, cardNumber: { not: null } },
-      select: {
-        id: true,
-        name: true,
-        title: true,
-        cardNumber: true,
-        cardGroupId: true,
-      },
-      orderBy: { cardNumber: 'asc' },
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { externalQrCode: true },
     });
-
-    const { searchParams } = new URL(req.url);
-
-    // ─── Single QR for one guest ─────────────────────────────────
-    const guestId = searchParams.get('guestId');
-    if (guestId) {
-      const guest = guests.find((g) => g.id === guestId);
-      if (!guest?.cardNumber) {
-        return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
-      }
-      const qr = await generateQRFromCardNumber(guest.cardNumber, SINGLE_QR_SIZE);
-      return new NextResponse(new Uint8Array(qr), {
-        headers: {
-          'Content-Type': 'image/png',
-          'Content-Disposition': `inline; filename="qr-${guest.cardNumber}.png"`,
-          'Cache-Control': 'no-store',
-        },
-      });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found.' }, { status: 404 });
     }
-
-    // ─── Printable A4 sheet ──────────────────────────────────────
-    if (searchParams.has('sheet')) {
-      if (guests.length === 0) {
-        return NextResponse.json(
-          {
-            error:
-              'No guests have card numbers yet. Add or import guests, then try again.',
-          },
-          { status: 400 }
-        );
-      }
-
-      const rawPage = searchParams.get('page') || '1';
-      const page = Number(rawPage);
-      if (!Number.isInteger(page) || page < 1) {
-        return NextResponse.json({ error: 'Invalid page number' }, { status: 400 });
-      }
-
-      const pageCount = Math.ceil(guests.length / QR_SHEET_PAGE_SIZE);
-      if (page > pageCount) {
-        return NextResponse.json({ error: 'Page out of range' }, { status: 400 });
-      }
-
-      const slice = guests.slice(
-        (page - 1) * QR_SHEET_PAGE_SIZE,
-        page * QR_SHEET_PAGE_SIZE
+    if (!event.externalQrCode) {
+      return NextResponse.json(
+        { error: 'No QR code yet. Create one first.' },
+        { status: 404 }
       );
-      const entries = await Promise.all(
-        slice.map(async (g) => ({
-          qr: await generateQRFromCardNumber(g.cardNumber!, SHEET_QR_SIZE),
-          cardNumber: g.cardNumber!,
-          label: g.title ? `${g.title} ${g.name}` : g.name,
-        }))
-      );
-
-      const sheet = await buildQrPrintSheet(entries);
-      return new NextResponse(new Uint8Array(sheet), {
-        headers: {
-          'Content-Type': 'image/png',
-          'Content-Disposition': 'inline; filename="qr-stickers.png"',
-          'Cache-Control': 'no-store',
-        },
-      });
     }
 
-    // ─── Manifest (one sticker per unique card number) ───────────
-    const byNumber = new Map<string, (typeof guests)[number]>();
-    for (const g of guests) {
-      if (g.cardNumber && !byNumber.has(g.cardNumber)) {
-        byNumber.set(g.cardNumber, g);
-      }
-    }
-    const reps = [...byNumber.values()].map((g) => ({
-      id: g.id,
-      name: g.title ? `${g.title} ${g.name}` : g.name,
-      cardNumber: g.cardNumber as string,
-    }));
-
-    return NextResponse.json({
-      guests: reps,
-      total: reps.length,
-      perPage: QR_SHEET_PAGE_SIZE,
+    const png = await generateQRFromCardNumber(event.externalQrCode, QR_SIZE);
+    return new NextResponse(new Uint8Array(png), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'no-store',
+      },
     });
   } catch (error) {
-    console.error('[QR codes] Failed:', error);
+    console.error('Failed to render external QR code:', error);
+    return NextResponse.json({ error: 'Could not load the QR code.' }, { status: 500 });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ eventId: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { eventId } = await params;
+    if (!(await canAccessEvent(session, eventId))) {
+      return NextResponse.json({ error: 'Event not found.' }, { status: 404 });
+    }
+
+    let rotate = false;
+    try {
+      const body = await request.json();
+      rotate = body?.rotate === true;
+    } catch {
+      rotate = false;
+    }
+
+    if (rotate && !canManageTenant(session.user.role)) {
+      return NextResponse.json(
+        { error: 'Only an event owner can regenerate the QR code.' },
+        { status: 403 }
+      );
+    }
+
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { externalQrCode: true },
+    });
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found.' }, { status: 404 });
+    }
+
+    if (event.externalQrCode && !rotate) {
+      return NextResponse.json({ code: event.externalQrCode, created: false });
+    }
+
+    const code = generateExternalQrCode();
+    await prisma.event.update({
+      where: { id: eventId },
+      data: { externalQrCode: code },
+    });
+
+    return NextResponse.json({ code, created: true });
+  } catch (error) {
+    console.error('Failed to create/rotate external QR code:', error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Something went wrong generating QR codes',
-      },
+      { error: 'Could not create the QR code. Please try again.' },
       { status: 500 }
     );
   }

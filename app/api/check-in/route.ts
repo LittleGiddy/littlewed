@@ -162,6 +162,63 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ─── Single event-level external QR (guests not imported) ─────────
+      // A per-event code printed on physical cards for guests who have no
+      // Guest row. It is never persisted or counted and is VALID on every
+      // scan. Matched against Event.externalQrCode within the caller's scope.
+      if (!guest) {
+        const externalCode = (token?.trim() || cardNumber?.trim() || '');
+        if (externalCode) {
+          const externalEvent = await prisma.event.findFirst({
+            where: { externalQrCode: externalCode, ...eventScopeWhere(session) },
+            select: { id: true, name: true, date: true, checkInStartTime: true },
+          });
+
+          if (externalEvent) {
+            const availableAt = getCheckInStartTime(
+              externalEvent.date,
+              externalEvent.checkInStartTime
+            );
+
+            if (new Date() < availableAt) {
+              return NextResponse.json(
+                {
+                  error: `Check-in will be available at ${formatCheckInTime(availableAt)} (${getTimeUntil(availableAt)} from now)`,
+                  availableAt: availableAt.toISOString(),
+                },
+                { status: 403 }
+              );
+            }
+
+            sendPushToTenantRole(tenantId, 'CLIENT', {
+              title: 'External QR scanned',
+              body: `An external card was scanned for ${externalEvent.name}.`,
+              url: '/client/staff',
+            }).catch(() => {});
+
+            return NextResponse.json({
+              success: true,
+              message: `Valid — external card for ${externalEvent.name}. Unlimited scans.`,
+              guest: {
+                id: `external-${externalEvent.id}`,
+                name: externalEvent.name,
+                title: null,
+                cardNumber: externalCode,
+                guestType: 'SINGLE',
+                guestCount: null,
+                checkInCount: 1,
+                maxCheckIns: 1,
+                fullyCheckedIn: true,
+                checkedIn: true,
+                sharedGroup: false,
+                groupMembers: [],
+                external: true,
+              },
+            });
+          }
+        }
+      }
+
       if (!guest) {
         return NextResponse.json(
           { error: 'Guest not found. Please check the card number.' },

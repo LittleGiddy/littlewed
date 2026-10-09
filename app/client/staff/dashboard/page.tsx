@@ -36,10 +36,12 @@ interface Guest {
  * from GET /api/check-in, which is why scannedGuest is tracked separately.
  */
 interface ScannedGuest extends Guest {
-  maxCheckIns: number;
   fullyCheckedIn: boolean;
+  maxCheckIns: number;
   sharedGroup?: boolean;
   groupMembers?: { id: string; name: string; checkedIn: boolean }[];
+  /** True for the single event-level external QR (no Guest row; unlimited scans). */
+  external?: boolean;
 }
 
 interface Event {
@@ -122,6 +124,9 @@ export default function StaffDashboard() {
   const [message, setMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [scannedGuest, setScannedGuest] = useState<ScannedGuest | null>(null);
+  // Note: ScannedGuest may carry `external: true` for the single event-level QR
+  // (a card for a guest who has no Guest row). External scans are never
+  // persisted, so there is nothing to undo or mark as double.
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'fully' | 'partial' | 'not'>('all');
@@ -292,6 +297,14 @@ export default function StaffDashboard() {
   // ─── Undo a mis-scan (removes exactly one check-in) ─────────────────
   const handleUndoScan = async () => {
     if (!scannedGuest) return;
+    // External cards are never persisted, so there is nothing to undo.
+    if (scannedGuest.external) {
+      setShowSuccess(false);
+      setScannedGuest(null);
+      setMessage('');
+      setCardNumber('');
+      return;
+    }
     setDoubleBusy(true);
     try {
       const res = await fetch(`/api/guests/${scannedGuest.id}/checkin`, {
@@ -768,7 +781,6 @@ export default function StaffDashboard() {
                         </p>
                       </div>
                     ) : null}
-
                     {/* Group card arrived together: mark every scan at once. */}
                     {canMarkAllAsGroup(scannedGuest) ? (
                       <div className="mt-3 pt-3 border-t border-success-border">
@@ -791,15 +803,17 @@ export default function StaffDashboard() {
                       </div>
                     ) : null}
 
-                    <button
-                      type="button"
-                      onClick={handleUndoScan}
-                      disabled={doubleBusy}
-                      className="w-full inline-flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-success-border text-[11px] font-semibold text-gray-500 transition hover:text-gray-800 disabled:opacity-50"
-                    >
-                      <Undo2 size={12} />
-                      Undo this scan
-                    </button>
+                    {!scannedGuest.external && (
+                      <button
+                        type="button"
+                        onClick={handleUndoScan}
+                        disabled={doubleBusy}
+                        className="w-full inline-flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-success-border text-[11px] font-semibold text-gray-500 transition hover:text-gray-800 disabled:opacity-50"
+                      >
+                        <Undo2 size={12} />
+                        Undo this scan
+                      </button>
+                    )}
                   </div>
                 )}
               </>

@@ -71,6 +71,8 @@ interface ScanResult {
     maxCheckIns: number;
     sharedGroup?: boolean;
     groupMembers?: { id: string; name: string; checkedIn: boolean }[];
+    /** True for the single event-level external QR (no Guest row; unlimited scans). */
+    external?: boolean;
   };
 }
 
@@ -95,6 +97,8 @@ interface RecentScan {
   cardNumber: string | null;
   at: number;
   undone: boolean;
+  /** External event QR scan: never persisted, so it can't be undone. */
+  external?: boolean;
 }
 
 // ─── Haptics ──────────────────────────────────────────────────────────
@@ -427,6 +431,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
               cardNumber: guest.cardNumber ?? null,
               at: Date.now(),
               undone: false,
+              external: guest.external ?? false,
             },
             ...prev,
           ].slice(0, 8)
@@ -644,6 +649,12 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
   // ─── Undo last scan ────────────────────────────────────────────────
   const handleUndo = async (scan: RecentScan) => {
+    if (scan.external) {
+      toast('External cards are not stored, so there is nothing to undo.', {
+        icon: <AlertCircle size={18} className="text-warn" />,
+      });
+      return;
+    }
     setUndoBusy(true);
     try {
       const res = await fetch(`/api/guests/${scan.guestId}/checkin`, {
@@ -1126,7 +1137,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
                 {/* Undo a mis-scan. Offered on the newest entry only, so "undo"
                     can never mean anything ambiguous. */}
-                {recentScans[0] && recentScans[0].guestId === lastScan.guest.id ? (
+                {recentScans[0] && recentScans[0].guestId === lastScan.guest.id && !recentScans[0].external ? (
                   <button
                     type="button"
                     disabled={undoBusy}

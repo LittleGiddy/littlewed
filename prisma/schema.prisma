@@ -184,6 +184,7 @@ model Event {
   expiredNotified    Boolean     @default(false) // track if expiration email was sent
   checkInStartTime   DateTime? // When check-in becomes available (defaults to event date/time)
   qrRotation         Float?      @default(0)
+  externalQrCode     String?     @unique // single per-event QR for cards printed outside the app (guests not imported); unlimited valid scans
 
   // ─── Contribution (MCHANGO) fields ───────────────────────────────────
   // These feed the approved "Mchango" WhatsApp template and the public
