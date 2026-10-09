@@ -1972,10 +1972,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                           <QrCode size={17} />
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-800">External QR code</p>
+                          <p className="font-bold text-sm text-gray-800">Event Master QR code</p>
                           <p className="text-xs text-gray-400">
-                            One QR code for guests not imported into the system. Printed cards
-                            scan as valid, unlimited times.
+                            One universal QR for guests not on your imported list. Download it
+                            and use it on tickets or cards — it scans as valid unlimited times.
                           </p>
                         </div>
                       </div>
@@ -1983,7 +1983,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                         onClick={() => setShowEventQr(true)}
                         className="border border-brand text-brand px-4 py-2 rounded-tap text-sm font-bold hover:bg-brand/5 transition flex items-center gap-2"
                       >
-                        <QrCode size={15} /> Open
+                        <QrCode size={15} /> Generate
                       </button>
                     </div>
                   </div>

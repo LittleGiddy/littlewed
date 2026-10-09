@@ -72,9 +72,9 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
 
   const regenerate = async () => {
     const ok = await confirmToast({
-      title: 'Generate a new QR code?',
+      title: 'Generate a new master QR code?',
       message:
-        'The current code will stop working. Any cards already printed with the old code must be reprinted.',
+        'The current code will stop working. Any tickets or cards already printed with the old code must be reprinted.',
       confirmText: 'Regenerate',
       danger: true,
     });
@@ -91,7 +91,7 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Could not regenerate the QR code.');
       setQrUrl(`/api/events/${eventId}/qr-codes?v=${Date.now()}`);
-      toast.success('New QR code generated.');
+      toast.success('New master QR code generated.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not regenerate the QR code.');
     } finally {
@@ -124,7 +124,7 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="External QR code"
+      aria-label="Event Master QR code"
       className="modal-overlay"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -133,7 +133,7 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
       <div className="modal-content" style={{ maxWidth: '520px' }}>
         <div className="modal-header">
           <div className="modal-title">
-            External <span>QR Code</span>
+            Event Master <span>QR Code</span>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             <X size={16} />
@@ -166,9 +166,10 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
                   <QrCode size={17} />
                 </div>
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  One code for this whole event. Print it on cards for guests who are
-                  <strong> not imported</strong> to your list. Every scan shows as valid —
-                  it can be scanned unlimited times and never creates a guest.
+                  One universal QR for this event. Download it and use it anywhere — a ticket,
+                  a printed card, a poster. It is separate from guest card QRs, and guests
+                  who are <strong>not imported</strong> to your list scan it as valid,
+                  unlimited times. It never creates or counts a guest.
                 </p>
               </div>
 
@@ -177,7 +178,7 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
                   <div className="rounded-tap border border-gray-200 p-4 mb-4 bg-white">
                     <Image
                       src={qrUrl}
-                      alt="External event QR code"
+                      alt="Event Master QR code"
                       width={1024}
                       height={1024}
                       unoptimized
@@ -189,7 +190,7 @@ export default function EventQrCodeModal({ eventId, onClose }: EventQrCodeModalP
                   <div className="flex gap-2">
                     <a
                       href={qrUrl}
-                      download="event-qr.png"
+                      download="event-master-qr.png"
                       className="flex-1 btn-primary flex items-center justify-center gap-2"
                     >
                       <Download size={16} /> Download
