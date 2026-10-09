@@ -28,6 +28,9 @@ model User {
   accounts Account[]
   sessions Session[]
 
+  // Events a STAFF account has been granted access to by the tenant
+  eventStaffAccess EventStaffAccess[]
+
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
 }
@@ -170,6 +173,7 @@ model Event {
   rsvps              Rsvp[]
   wishes             GuestWish[]
   editRequests       GuestEditRequest[]
+  staffAccess        EventStaffAccess[]
   createdAt          DateTime    @default(now())
   status             String      @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
   pausedAt           DateTime? // when the event was paused/expired
@@ -317,6 +321,23 @@ model Event {
   reminderSmsMessage   String?  // reminder text typed in the remind flow
   kumbushaMessage      String?  // reminder text typed on the Kumbusha Michango page
   contributions        Contribution[]
+}
+
+// ─── Staff event grants ─────────────────────────────────────────────────────
+// Which events a STAFF account may access. A staff member only sees and mutates
+// events with a row here; the tenant grants and revokes access from the Staff
+// page. Nothing (not even the event name venue) leaks without an explicit grant.
+model EventStaffAccess {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId])
 }
 
 model PendingEvent {

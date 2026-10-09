@@ -713,6 +713,153 @@ function StaffRow({
 
 /* ── Detail sheet body ───────────────────────────────────────────────── */
 
+/**
+ * Lets the tenant pick exactly which events a staff member may access. Baked
+ * straight into the staff detail sheet so the grant (and its revocation) lives
+ * next to the person's account — no separate screen to forget about.
+ */
+function EventAccessManager({ memberId, disabled }: { memberId: string; disabled: boolean }) {
+  const [events, setEvents] = useState<
+    { id: string; name: string; date: string; granted: boolean }[] | null
+  >(null);
+  const [toggled, setToggled] = useState<string[]>([]);
+  const [saved, setSaved] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/staff/${memberId}/events`, { credentials: 'include' });
+      if (!res.ok) {
+        setError('Could not load events');
+        setEvents([]);
+        return;
+      }
+      const data = await res.json();
+      const list = Array.isArray(data.events) ? data.events : [];
+      const granted = list.filter((e: any) => e.granted).map((e: any) => e.id);
+      setEvents(list);
+      setToggled(granted);
+      setSaved(granted);
+    } catch {
+      setError('Network error');
+      setEvents([]);
+    }
+  }, [memberId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggle = (id: string) => {
+    setToggled((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const isDirty = toggled.length !== saved.length || toggled.some((id) => !saved.includes(id));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/staff/${memberId}/events`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ eventIds: toggled }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSaved(toggled);
+        toast.success('Event access updated');
+      } else {
+        toast.error(data.error || 'Save failed');
+        void load();
+      }
+    } catch {
+      toast.error('Network error');
+    }
+    setSaving(false);
+  };
+
+  if (events === null) {
+    return (
+      <div className="rounded-tap border border-gray-100 p-4">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+          <ShieldCheck size={14} className="text-brand" /> What they can access
+        </p>
+        <p className="text-xs text-gray-400 animate-pulse">
+          {error || 'Loading events…'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-tap border border-gray-100 overflow-hidden">
+      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-gray-100">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+          <ShieldCheck size={14} className="text-brand" /> What they can access
+        </p>
+        <span className="text-[11px] font-semibold text-brand">
+          {toggled.length} of {events.length}
+        </span>
+      </div>
+
+      {events.length === 0 ? (
+        <div className="px-3.5 py-4">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Event access is granted per event. Create an event first, then come back — this staff
+            member can sign in, but won't see any event until you grant one.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="max-h-52 overflow-y-auto divide-y divide-gray-50">
+            {events.map((e) => {
+              const checked = toggled.includes(e.id);
+              return (
+                <label
+                  key={e.id}
+                  className="flex items-start gap-2.5 px-3.5 py-2.5 cursor-pointer hover:bg-gray-50 transition"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(e.id)}
+                    disabled={disabled || saving}
+                    className="mt-0.5 accent-brand"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-medium text-gray-800 truncate">{e.name}</span>
+                    <span className="block text-[11px] text-gray-400">
+                      {new Date(e.date).toLocaleDateString('en-TZ', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="px-3.5 py-3 border-t border-gray-100">
+            <AppButton
+              size="sm"
+              fullWidth
+              disabled={!isDirty || saving || disabled}
+              loading={saving}
+              loadingText="Saving…"
+              onClick={save}
+            >
+              {isDirty ? 'Save access' : 'All saved'}
+            </AppButton>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StaffDetail({
   member,
   busy,
@@ -778,6 +925,8 @@ function StaffDetail({
       <AppButton variant="outline" fullWidth icon={<Pencil size={15} />} onClick={onEdit}>
         Edit details or reset password
       </AppButton>
+
+      <EventAccessManager memberId={member.id} disabled={busy} />
 
       <div className="space-y-2">
         <ActionRow

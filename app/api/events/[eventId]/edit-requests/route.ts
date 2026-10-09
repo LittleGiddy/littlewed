@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { canAccessEvent } from '@/lib/eventAccess';
 
 type Ctx = { params: Promise<{ eventId: string }> };
 
@@ -20,16 +21,22 @@ async function requireTenantSession() {
   }
   const tenantId = (session.user as { tenantId?: string }).tenantId;
   if (!tenantId) return { error: 'No tenant', status: 403 } as const;
-  return { tenantId, userName: (session.user as { name?: string }).name || null } as const;
+  return {
+    tenantId,
+    id: (session.user as { id?: string }).id,
+    role,
+    userName: (session.user as { name?: string }).name || null,
+  } as const;
 }
 
 /** Pending proposals for this event, newest first. */
-async function pendingList(eventId: string, tenantId: string) {
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, tenantId },
-    select: { id: true },
-  });
-  if (!event) return null;
+async function pendingList(
+  eventId: string,
+  auth: { id?: string; role: string; tenantId: string }
+) {
+  // Staff only see requests for events they were granted access to.
+  const canAccess = await canAccessEvent({ user: auth }, eventId);
+  if (!canAccess) return null;
 
   const rows = await prisma.guestEditRequest.findMany({
     where: { eventId, status: 'PENDING' },
@@ -60,7 +67,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { eventId } = await params;
 
-  const requests = await pendingList(eventId, auth.tenantId);
+  const requests = await pendingList(eventId, auth);
   if (!requests) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   return NextResponse.json({ requests });
 }
@@ -78,12 +85,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   }
 
   // Tenant check first: an eventId outside this tenant 404s before the
-  // request id is ever looked at, so foreign requests cannot be probed.
-  const event = await prisma.event.findFirst({
-    where: { id: eventId, tenantId: auth.tenantId },
-    select: { id: true },
-  });
-  if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  // request id is ever looked at, so foreign requests cannot be probed. Staff
+  // additionally need a grant on this event.
+  const canAccess = await canAccessEvent({ user: auth }, eventId);
+  if (!canAccess) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   const request = await prisma.guestEditRequest.findFirst({
     where: { id: requestId, eventId },
@@ -108,7 +113,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       where: { id: request.id },
       data: { status: 'REJECTED', reviewedBy: auth.userName ?? 'Planner', reviewedAt: new Date() },
     });
-    const requests = await pendingList(eventId, auth.tenantId);
+    const requests = await pendingList(eventId, auth);
     return NextResponse.json({ ok: true, action: 'REJECTED', requests });
   }
 
@@ -124,7 +129,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       where: { id: request.id },
       data: { status: 'REJECTED', reviewedBy: auth.userName ?? 'Planner', reviewedAt: new Date() },
     });
-    const remaining = await pendingList(eventId, auth.tenantId);
+    const remaining = await pendingList(eventId, auth);
     return NextResponse.json(
       { ok: true, action: 'REJECTED', requests: remaining, error: 'That guest no longer exists' },
       { status: 409 }
@@ -158,7 +163,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }),
   ]);
 
-  const requests = await pendingList(eventId, auth.tenantId);
+  const requests = await pendingList(eventId, auth);
   return NextResponse.json({
     ok: true,
     action: 'APPROVED',

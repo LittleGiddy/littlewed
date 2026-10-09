@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
 import { guestTypeMaxScans, cardGroupIdCount, cardTotalScans, guestRecordMaxScans } from '@/lib/guestTypes';
+import { eventScopeWhere, canAccessEvent } from '@/lib/eventAccess';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
       const scannedCardNumber = token.trim();
       if (scannedCardNumber) {
         guest = await prisma.guest.findFirst({
-          where: { cardNumber: scannedCardNumber },
+          where: { cardNumber: scannedCardNumber, event: eventScopeWhere(session) },
         });
       }
     }
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
       const cleanCardNumber = cardNumber.trim().padStart(5, '0');
       if (cleanCardNumber) {
         guest = await prisma.guest.findFirst({
-          where: { cardNumber: cleanCardNumber },
+          where: { cardNumber: cleanCardNumber, event: eventScopeWhere(session) },
         });
       }
     }
@@ -44,10 +45,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Tenant scoping: guest's event must belong to caller's tenant ───
-    const tenantId = (session.user as any).tenantId;
+    // ─── Tenant scoping: guest's event must be in the caller's events ───────────
     const event = await prisma.event.findFirst({
-      where: { id: guest.eventId, tenantId },
+      where: { id: guest.eventId, ...eventScopeWhere(session) },
       select: { id: true, name: true },
     });
     if (!event) {
@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
     });
 
     // ─── Notify the tenant owner(s) of the check-in (fire & forget) ──
+    const tenantId = (session.user as any).tenantId;
     const fullName = updated.title ? `${updated.title} ${updated.name}` : updated.name;
     sendPushToTenantRole(tenantId, 'CLIENT', {
       title: `${fullName} checked in`,
@@ -146,7 +147,7 @@ export async function PATCH(
     const undo = body?.undo === true;
 
     const guest = await prisma.guest.findFirst({
-      where: { id, event: { tenantId } },
+      where: { id, event: eventScopeWhere(session) },
     });
     if (!guest) {
       return NextResponse.json({ error: 'Guest not found' }, { status: 404 });
@@ -324,9 +325,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event ID required' }, { status: 400 });
     }
 
-    const tenantId = (session.user as any).tenantId;
-    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
-    if (!event) {
+    // Verify the caller may access this event (tenant owner, or staff with a
+    // grant row for this specific event).
+    const canAccess = await canAccessEvent(session, eventId);
+    if (!canAccess) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 

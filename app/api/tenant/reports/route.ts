@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { eventScopeWhere } from '@/lib/eventAccess';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,14 +46,17 @@ export async function GET(_req: NextRequest) {
     const monthStart = months[0].start;
     const monthEnd = months[months.length - 1].end;
 
+    // Staff reports only cover events they were explicitly granted access to.
+    const scope = eventScopeWhere(session);
+
     const [events, guests, transactions] = await Promise.all([
       prisma.event.findMany({
-        where: { tenantId, createdAt: { gte: monthStart, lte: monthEnd } },
+        where: { ...scope, createdAt: { gte: monthStart, lte: monthEnd } },
         select: { id: true, createdAt: true, guestCount: true },
       }),
       prisma.guest.findMany({
         where: {
-          event: { tenantId },
+          event: scope,
           createdAt: { gte: monthStart, lte: monthEnd },
         },
         select: { id: true, checkedIn: true, invitationSentAt: true, createdAt: true, eventId: true },

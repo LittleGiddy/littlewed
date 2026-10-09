@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone } from '@/lib/phone';
+import { canAccessEvent } from '@/lib/eventAccess';
 import {
   parseContributionStatus,
   reconcileContribution,
@@ -24,7 +25,12 @@ async function requireTenantSession() {
   }
   const tenantId = (session.user as { tenantId?: string }).tenantId;
   if (!tenantId) return { error: 'No tenant', status: 403 } as const;
-  return { tenantId, userName: (session.user as { name?: string }).name || null } as const;
+  return {
+    tenantId,
+    id: (session.user as { id?: string }).id,
+    role,
+    userName: (session.user as { name?: string }).name || null,
+  } as const;
 }
 
 /** Fields the tenant is allowed to change on the event itself. */
@@ -51,9 +57,16 @@ const EVENT_FIELDS = [
  * `hasContribution` distinguishes a real tracked row from a guest who is
  * simply included by virtue of being on the list.
  */
-async function tenantPayload(eventId: string, tenantId: string) {
+async function tenantPayload(
+  eventId: string,
+  auth: { id?: string; role: string; tenantId: string }
+) {
+  // Staff only reach events they were explicitly granted access to.
+  const canAccess = await canAccessEvent({ user: auth }, eventId);
+  if (!canAccess) return null;
+
   const event = await prisma.event.findFirst({
-    where: { id: eventId, tenantId },
+    where: { id: eventId },
     select: {
       id: true,
       name: true,
@@ -153,7 +166,7 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { eventId } = await params;
 
-  const payload = await tenantPayload(eventId, auth.tenantId);
+  const payload = await tenantPayload(eventId, auth);
   if (!payload) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   return NextResponse.json(payload);
@@ -163,6 +176,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   const auth = await requireTenantSession();
   if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
   const { eventId } = await params;
+
+  // Authorisation for the whole PATCH: staff need a grant on this event, and
+  // the event-level + per-guest writes below all happen against that scope.
+  const canAccess = await canAccessEvent({ user: auth }, eventId);
+  if (!canAccess) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
@@ -323,7 +341,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   // Rebuilt through the same helper as GET, so a settings save can never return
   // a narrower event object than a plain read. The client keeps this payload
   // as its state, and a partial event was blanking the page title.
-  const payload = await tenantPayload(eventId, auth.tenantId);
+  const payload = await tenantPayload(eventId, auth);
   if (!payload) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
   return NextResponse.json(payload);

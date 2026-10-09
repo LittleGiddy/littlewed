@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { eventScopeWhere, canAccessEvent } from '@/lib/eventAccess';
 
 // Returns how many WhatsApp invitation messages were successfully accepted
 // today (since local midnight). This powers the daily-send-limit UI so the
@@ -22,11 +23,8 @@ export async function GET(req: NextRequest) {
     const eventId = url.searchParams.get('eventId');
 
     if (eventId) {
-      const event = await prisma.event.findFirst({
-        where: { id: eventId, tenantId },
-        select: { id: true },
-      });
-      if (!event) {
+      const canAccess = await canAccessEvent(session, eventId);
+      if (!canAccess) {
         return NextResponse.json({ error: 'Event not found' }, { status: 404 });
       }
     }
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest) {
       type: 'WHATSAPP',
       status: 'SENT',
       createdAt: { gte: startOfToday },
-      guest: eventId ? { eventId } : { event: { tenantId } },
+      guest: eventId ? { eventId } : { event: eventScopeWhere(session) },
     };
 
     const todayCount = await prisma.messageLog.count({ where });

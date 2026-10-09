@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { canAccessEvent } from '@/lib/eventAccess';
 
 export async function GET(
   req: NextRequest,
@@ -19,14 +20,11 @@ export async function GET(
     if (role !== 'CLIENT' && role !== 'STAFF' && role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    const tenantId = (session.user as any).tenantId;
-    if (!tenantId) {
-      return NextResponse.json({ error: 'Missing tenant context' }, { status: 400 });
-    }
 
-    // Verify the event belongs to the caller's tenant.
-    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
-    if (!event) {
+    // Verify the caller may access this event (tenant owner, or staff with a
+    // grant row for this specific event).
+    const canAccess = await canAccessEvent(session, eventId);
+    if (!canAccess) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 

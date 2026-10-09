@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { canAccessEvent } from '@/lib/eventAccess';
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event ID is required' }, { status: 400 });
     }
 
-    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
-    if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    const canAccess = await canAccessEvent(session, eventId);
+    if (!canAccess) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
 
     const limit = Math.min(Number(url.searchParams.get('limit')) || 200, 500);
 

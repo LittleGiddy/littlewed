@@ -16,9 +16,11 @@ cloudinary.config({
 
 // ─── Constants ──────────────────────────────────────────────────────────
 /**
- * The canvas width the card designers lay out against. Name sizes are stored
+ * The canvas width the card designers lay out against. Font sizes are stored
  * in these units and scaled to the real card width at render time, so the same
- * design works for an 800px upload and a 1080px one.
+ * design works for an 800px upload and a 1080px one. The designer's canvas
+ * height follows the template's aspect ratio, so width-only scaling keeps the
+ * generated card pixel-identical to what the tenant sees on screen.
  */
 export const DESIGNER_WIDTH = 800;
 const DESIGNER_HEIGHT = 1200;
@@ -105,6 +107,7 @@ async function renderTextSvg(
     rotation: number;
     shadow?: boolean;
     textAlign?: 'left' | 'center' | 'right';
+    maxWidth?: number;
   }
 ): Promise<Buffer> {
   const svg = textSvg({
@@ -119,6 +122,7 @@ async function renderTextSvg(
     rotation: options.rotation,
     shadow: options.shadow,
     textAlign: options.textAlign,
+    maxWidth: options.maxWidth,
   });
 
   return await sharp(Buffer.from(svg)).png().toBuffer();
@@ -206,9 +210,11 @@ export async function generateCardForGuest(
   const actualHeight = metadata.height || 1200;
 
   // ─── 2. Calculate scale factor ──────────────────────────────────────
-  const scaleX = actualWidth / DESIGNER_WIDTH;
-  const scaleY = actualHeight / DESIGNER_HEIGHT;
-  const scaleFactor = Math.min(scaleX, scaleY);
+  // Cards are designed on an 800px-wide canvas whose height follows the
+  // template's aspect ratio, so font sizes scale by WIDTH alone. That makes
+  // the rendered text the same size the designer shows at DESIGNER_WIDTH, for
+  // any template ratio. Vertical positions are percentages and need no scale.
+  const scaleFactor = actualWidth / DESIGNER_WIDTH;
 
   console.log('[CardGen] Scaling:', {
     designerSize: `${DESIGNER_WIDTH}x${DESIGNER_HEIGHT}`,
@@ -326,6 +332,10 @@ export async function generateCardForGuest(
           rotation: layer.rotation || 0,
           shadow: !!layer.shadow,
           textAlign: textAlign,
+          // Long guest names (or a shared DOUBLE card joined with " & ") are
+          // capped at 96% of the card width and shrink in font size, so the
+          // run is never clipped at the card edge.
+          maxWidth: actualWidth * 0.96,
         });
 
         textComposites.push({

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sendPushToTenantRole } from '@/lib/push';
 import { guestTypeMaxScans, cardGroupIdCount, cardTotalScans } from '@/lib/guestTypes';
+import { eventScopeWhere, canAccessEvent } from '@/lib/eventAccess';
 
 // ─── Helper Functions ────────────────────────────────────────────────
 
@@ -71,9 +72,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event ID required' }, { status: 400 });
     }
 
-    // Verify the event belongs to the caller's tenant.
-    const event = await prisma.event.findFirst({ where: { id: eventId, tenantId } });
-    if (!event) {
+    // Verify the caller may access this event (tenant owner, or staff with a
+    // grant row for this specific event).
+    const canAccess = await canAccessEvent(session, eventId);
+    if (!canAccess) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
@@ -125,10 +127,9 @@ export async function POST(req: NextRequest) {
 
     // ─── If guestId is provided directly ──────────────────────────────
     if (guestIdFromQuery) {
-      // Scoped to the tenant: card numbers are only unique per event, and this
-      // route was previously matching any guest row in the database.
+      // Scoped to the caller's events (staff: only explicitly granted events).
       guest = await prisma.guest.findFirst({
-        where: { id: guestIdFromQuery, event: { tenantId } },
+        where: { id: guestIdFromQuery, event: eventScopeWhere(session) },
       });
     } else {
       // ─── Parse request body ──────────────────────────────────────────
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
         const scannedCardNumber = token.trim();
         if (scannedCardNumber) {
           guest = await prisma.guest.findFirst({
-            where: { cardNumber: scannedCardNumber, event: { tenantId } },
+            where: { cardNumber: scannedCardNumber, event: eventScopeWhere(session) },
           });
         }
       }
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
         const cleanCardNumber = cardNumber.trim().padStart(5, '0');
         if (cleanCardNumber) {
           guest = await prisma.guest.findFirst({
-            where: { cardNumber: cleanCardNumber, event: { tenantId } },
+            where: { cardNumber: cleanCardNumber, event: eventScopeWhere(session) },
           });
         }
       }
@@ -218,7 +219,7 @@ export async function POST(req: NextRequest) {
 
     // ─── TIME VALIDATION: Check if event has started ──────────────────
     const event = await prisma.event.findFirst({
-      where: { id: checkInGuest.eventId, tenantId: (session.user as any).tenantId },
+      where: { id: checkInGuest.eventId, ...eventScopeWhere(session) },
       select: {
         id: true,
         name: true,

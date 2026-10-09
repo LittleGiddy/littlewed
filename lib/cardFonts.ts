@@ -71,6 +71,9 @@ export interface TextSvgOptions {
   textAlign?: 'left' | 'center' | 'right';
   width?: number;
   height?: number;
+  /** Hard cap on the rendered run width (px). Longer runs shrink their font
+   *  size proportionally instead of overflowing the card edge. */
+  maxWidth?: number;
 }
 
 /** Advance width of one character, in px. A character with no glyph in the face
@@ -139,6 +142,7 @@ export function textSvg(options: TextSvgOptions): string {
     textAlign = 'left',
     width = 100,
     height = 100,
+    maxWidth,
   } = options;
 
   // Leading/trailing whitespace is trimmed rather than measured. CSS collapses
@@ -157,17 +161,27 @@ export function textSvg(options: TextSvgOptions): string {
   const family = resolveFontFamily(options.fontFamily);
   const face = faceFor(family);
 
+  // Auto-fit: if the run at the designed size would be wider than `maxWidth`
+  // (a long guest name combined with a decorative face), shrink the font
+  // proportionally so the whole run stays on the card. The anchor `(x, y)`
+  // stays put, so centred text shrinks in both directions without drifting.
+  let effectiveFontSize = fontSize;
+  const runWidthAt = (px: number) => measureTextRun(text, face, px);
+  if (maxWidth && maxWidth > 0 && runWidthAt(effectiveFontSize) > maxWidth) {
+    effectiveFontSize = Math.max(8, effectiveFontSize * (maxWidth / runWidthAt(effectiveFontSize)));
+  }
+
   // The anchor is the text's visual centre, so the baseline sits half the
   // ascent/descent difference below it. `baselineOffsetEm` is the same
   // expression the browser derives from its own metrics.
-  const baselineY = y + baselineOffsetEm(family) * fontSize;
+  const baselineY = y + baselineOffsetEm(family) * effectiveFontSize;
 
-  const runWidth = measureTextRun(text, face, fontSize);
+  const runWidth = runWidthAt(effectiveFontSize);
   let startX = x;
   if (textAlign === 'center') startX = x - runWidth / 2;
   else if (textAlign === 'right') startX = x - runWidth;
 
-  const d = buildPathData(text, face, fontSize, fontSize / face.unitsPerEm, baselineY, startX);
+  const d = buildPathData(text, face, effectiveFontSize, effectiveFontSize / face.unitsPerEm, baselineY, startX);
 
   const shadowFilter = shadow
     ? `<filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.5"/></filter>`

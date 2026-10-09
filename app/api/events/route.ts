@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { eventScopeWhere } from '@/lib/eventAccess';
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -21,8 +22,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No tenant associated' }, { status: 400 });
   }
 
+  // Staff only see the events the tenant explicitly granted them access to.
   const events = await prisma.event.findMany({
-    where: { tenantId },
+    where: eventScopeWhere(session),
     orderBy: { date: 'asc' },
     include: { _count: { select: { guests: true } } },
   });

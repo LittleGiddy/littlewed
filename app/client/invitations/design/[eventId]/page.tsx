@@ -16,7 +16,9 @@ import { CARD_FONTS } from '@/lib/card-fonts.shared';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
-const DESIGNER_HEIGHT = 1200;
+// The canvas HEIGHT follows the loaded template's real aspect ratio
+// (templateAspect state), so a 2:3 template renders 800x1200 and any other
+// ratio renders its own proportions — no letterboxing, no layer drift.
 
 // Photoshop-style neutral gutter (px) shown all around the card on the stage
 // so the uploaded card/image never swallows the whole canvas area.
@@ -177,6 +179,13 @@ export default function InvitationDesigner() {
   const [isFullPreview, setIsFullPreview] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // ─── Final-card preview ───────────────────────────────────────────────
+  const [previewing, setPreviewing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [sampleName, setSampleName] = useState('Juma & Amina Hassan');
+  const [sampleCardNumber, setSampleCardNumber] = useState('00025');
+  const [sampleGuestType, setSampleGuestType] = useState('DOUBLE');
+
   // ─── Debounce timer for history ──────────────────────────────────────
   const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -199,16 +208,33 @@ export default function InvitationDesigner() {
   const [containerSize, setContainerSize] = useState({ width: 400, height: 600 });
   const fitScaleRef = useRef(0.5);
 
+  // Height/width ratio of the active template background, read from the image
+  // itself when it loads. The canvas height follows it so non-2:3 templates
+  // are NOT letterboxed, which keeps every percentage-based layer and the QR
+  // code in the exact same spot on the generated card.
+  const [templateAspect, setTemplateAspect] = useState(1.5);
+
+  // Called when the template background finishes loading. Updates the canvas
+  // height to the image's real aspect ratio and re-fits the stage.
+  const handleTemplateLoaded = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const ratio = img.naturalHeight / img.naturalWidth;
+      setTemplateAspect(ratio);
+      computeCanvasSize(ratio);
+    }
+  };
+
   // Fit the card into the panel with a Photoshop-style gutter around it, so
   // the uploaded card/image floats on the neutral stage instead of filling
   // every pixel of the canvas area.
-  const computeCanvasSize = useCallback(() => {
+  const computeCanvasSize = useCallback((aspect?: number) => {
     const container = canvasContainerRef.current;
     if (!container) return;
     const containerWidth = container.clientWidth;
     if (containerWidth <= 0) return;
 
-    const aspectRatio = DESIGNER_HEIGHT / DESIGNER_WIDTH;
+    const aspectRatio = aspect || templateAspect;
     const maxHeight = window.innerHeight * 0.65;
 
     let stageWidth = containerWidth;
@@ -220,26 +246,26 @@ export default function InvitationDesigner() {
 
     const scale = Math.min(
       (stageWidth - STAGE_GUTTER * 2) / DESIGNER_WIDTH,
-      (stageHeight - STAGE_GUTTER * 2) / DESIGNER_HEIGHT,
+      (stageHeight - STAGE_GUTTER * 2) / (DESIGNER_WIDTH * aspectRatio),
       0.8
     );
     const clamped = Math.max(0.12, scale);
     fitScaleRef.current = clamped;
     setContainerSize({ width: stageWidth, height: stageHeight });
     setCanvasScale(clamped);
-  }, []);
+  }, [templateAspect]);
 
   useEffect(() => {
     const container = canvasContainerRef.current;
     if (!container) return;
 
     computeCanvasSize();
-    const ro = new ResizeObserver(computeCanvasSize);
+    const ro = new ResizeObserver(() => computeCanvasSize());
     ro.observe(container);
-    window.addEventListener('resize', computeCanvasSize);
+    window.addEventListener('resize', () => computeCanvasSize());
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', computeCanvasSize);
+      window.removeEventListener('resize', () => computeCanvasSize());
     };
   }, [computeCanvasSize]);
 
@@ -436,6 +462,50 @@ export default function InvitationDesigner() {
       toast.error('Network error');
     }
     setSaving(false);
+  };
+
+  // Render the FINAL card (real fonts, layers, QR) for the current design with
+  // a sample guest, without generating any real card. Uses the same server
+  // compositor as a real generation, so what you see is exactly what a guest
+  // receives — including the auto-fit for long names.
+  const handlePreview = async () => {
+    if (!templateUrl) {
+      toast.error('Select a template or upload a background first');
+      return;
+    }
+    setPreviewing(true);
+    setPreviewUrl(null);
+    try {
+      const res = await fetch(`/api/events/${eventId}/preview-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateCardUrl: templateUrl,
+          overlayColor,
+          overlayOpacity,
+          qrPlacementX: qrX,
+          qrPlacementY: qrY,
+          qrSize,
+          qrColor,
+          qrRotation,
+          designLayers: layers,
+          guest: {
+            name: sampleName,
+            cardNumber: sampleCardNumber,
+            guestType: sampleGuestType,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setPreviewUrl(data.url);
+      } else {
+        toast.error(data.error || 'Preview failed');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+    setPreviewing(false);
   };
 
   // ─── Layer operations with history ──────────────────────────────────
@@ -1132,7 +1202,7 @@ export default function InvitationDesigner() {
                 className="absolute top-1/2 left-1/2 origin-center bg-white"
                 style={{
                   width: DESIGNER_WIDTH,
-                  height: DESIGNER_HEIGHT,
+                  height: DESIGNER_WIDTH * templateAspect,
                   transform: `translate(-50%, -50%) scale(${canvasScale})`,
                   transformOrigin: 'center center',
                   boxShadow: '0 18px 45px rgba(13,75,75,0.2), 0 2px 8px rgba(0,0,0,0.12)',
@@ -1141,7 +1211,12 @@ export default function InvitationDesigner() {
               >
                 {templateUrl ? (
                   <>
-                    <img src={templateUrl} alt="Card preview" className="w-full h-full object-contain" />
+                    <img
+                      src={templateUrl}
+                      alt="Card preview"
+                      className="w-full h-full object-contain"
+                      onLoad={handleTemplateLoaded}
+                    />
                     <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
 
                     {layers.map((layer, idx) => renderLayer(layer, idx))}
@@ -1220,7 +1295,7 @@ export default function InvitationDesigner() {
                 </button>
                 <button
                   type="button"
-                  onClick={computeCanvasSize}
+                  onClick={() => computeCanvasSize()}
                   className="w-11 h-7 rounded-md text-[10px] font-semibold tabular-nums text-gray-600 hover:bg-gray-200 hover:text-brandtext transition"
                   title="Reset to fit"
                 >
@@ -1726,6 +1801,62 @@ export default function InvitationDesigner() {
               </Section>
             </div>
 
+            {/* ─── Final Card Preview ─── */}
+            <div className="bg-white rounded-card shadow-sm border border-gray-100 p-3 space-y-2">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Eye size={14} className="text-brandtext" /> Final Card Preview
+              </p>
+              <p className="text-[10px] text-gray-500 leading-relaxed">
+                See exactly what a guest will receive — real fonts, layers, shadow and QR — before any card is generated.
+              </p>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Sample name</label>
+                  <input
+                    value={sampleName}
+                    onChange={(e) => setSampleName(e.target.value)}
+                    placeholder="e.g. Juma & Amina Hassan"
+                    className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-brandring focus:border-transparent"
+                  />
+                </div>
+                <div className="w-24">
+                  <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Card no.</label>
+                  <input
+                    value={sampleCardNumber}
+                    onChange={(e) => setSampleCardNumber(e.target.value)}
+                    placeholder="e.g. 00025"
+                    className="w-full p-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-brandring focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">Sample guest type</label>
+                <select
+                  value={sampleGuestType}
+                  onChange={(e) => setSampleGuestType(e.target.value)}
+                  className="w-full p-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:ring-2 focus:ring-brandring focus:border-transparent"
+                >
+                  {[
+                    { v: 'SINGLE', label: 'Single' },
+                    { v: 'DOUBLE', label: 'Double' },
+                    { v: 'FAMILIA', label: 'Familia (30)' },
+                    { v: 'WAKWE', label: 'Wakwe' },
+                  ].map((opt) => (
+                    <option key={opt.v} value={opt.v}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={handlePreview}
+                disabled={previewing || !templateUrl}
+                className="w-full border-2 border-brandtext text-brandtext py-2.5 rounded-tap font-semibold hover:bg-brandbg hover:text-white transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              >
+                {previewing ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
+                {previewing ? 'Rendering...' : 'Preview Final Card'}
+              </button>
+            </div>
+
             {/* ─── Save Button ─── */}
             <button
               onClick={handleSave}
@@ -1771,6 +1902,52 @@ export default function InvitationDesigner() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Final Card Preview Modal ─── */}
+      {previewUrl && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-card max-w-lg w-full p-6 shadow-2xl animate-fadeInUp my-8">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h2 className="font-display text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Eye size={18} className="text-brandtext" /> Final Card Preview
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">This is exactly what a guest receives — the QR scans at check-in. No real card was generated.</p>
+              </div>
+              <button
+                onClick={() => setPreviewUrl(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+                title="Close preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="rounded-tap overflow-hidden border border-gray-200 bg-gray-50">
+              <img src={previewUrl} alt="Final card preview" className="w-full max-h-[55vh] object-contain" />
+            </div>
+            <div className="bg-white rounded-tap border border-gray-200 border-t-0 p-3 text-xs text-gray-600 flex items-center gap-2">
+              <User size={13} className="text-brandtext shrink-0" />
+              Sample: {sampleName || 'Juma & Amina Hassan'} · Card #{sampleCardNumber || '00025'}
+              <span className="ml-auto flex items-center gap-1.5">
+                <button
+                  onClick={handlePreview}
+                  disabled={previewing}
+                  className="text-brandtext font-semibold hover:underline flex items-center gap-1 disabled:opacity-50"
+                >
+                  {previewing && <Loader2 size={12} className="animate-spin" />}
+                  Regenerate
+                </button>
+              </span>
+            </div>
+            <button
+              onClick={() => setPreviewUrl(null)}
+              className="mt-4 w-full bg-brandbg text-white py-2.5 rounded-tap font-semibold hover:bg-brand-deepbg transition"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}

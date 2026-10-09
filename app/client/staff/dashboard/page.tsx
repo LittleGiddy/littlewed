@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Search, CheckCircle, XCircle, Users, Camera, Key, Calendar,
   ChevronRight, Scan, Loader2, User, UserCheck, CheckCheck, Trash2, ArrowLeft,
-  Info, PartyPopper, Undo2
+  Info, PartyPopper, Undo2, Lock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { canMarkAsDouble, canMarkAllAsGroup } from '@/lib/checkin';
@@ -575,13 +575,24 @@ export default function StaffDashboard() {
           </select>
         </div>
 
-        {/* ─── No event selected ─── */}
-        {!selectedEventId && (
+        {/* ─── No granted events ─── */}
+        {events.length === 0 ? (
+          <div className="text-center py-12">
+            <Lock size={36} className="mx-auto mb-2 text-gray-300" />
+            <p className="font-medium text-gray-600">No events assigned yet</p>
+            <p className="text-sm text-gray-400 mt-1 max-w-[260px] mx-auto">
+              Your event organiser hasn't granted you access to an event. Check back once check-in opens.
+            </p>
+            <Link href="/client/dashboard" className="inline-flex items-center gap-1.5 text-sm font-bold text-brandtext bg-white border border-brand/20 rounded-tap px-3 py-1.5 transition hover:bg-brand/10 mt-4">
+              <ArrowLeft size={14} /> Back to dashboard
+            </Link>
+          </div>
+        ) : !selectedEventId ? (
           <div className="text-center py-12 text-gray-500">
             <PartyPopper size={36} className="mx-auto mb-2 text-gray-300" />
             <p className="font-medium">Select an event to start checking in guests</p>
           </div>
-        )}
+        ) : null}
 
         {selectedEventId && (
           <>
