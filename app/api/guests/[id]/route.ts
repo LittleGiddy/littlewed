@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone } from '@/lib/phone';
+import { normalizeGuestTitle } from '@/lib/guestTypes';
 import { refundCreditsForUnsentDeleted } from '@/lib/credits';
 
 // ─── DELETE ─────────────────────────────────────────────────────────────
@@ -42,13 +43,14 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'CLIENT') {
+    const role = (session?.user as any)?.role;
+    if (!session || !['CLIENT', 'SUPER_ADMIN'].includes(role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const tenantId = (session.user as any).tenantId;
     const { id } = await params;
-    const { name, phone } = await req.json();
+    const { name, phone, title } = await req.json();
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -65,8 +67,9 @@ export async function PUT(
       );
     }
 
+    const scope = role === 'SUPER_ADMIN' ? { id } : { id, event: { tenantId } };
     const existingGuest = await prisma.guest.findFirst({
-      where: { id, event: { tenantId } },
+      where: scope,
     });
 
     if (!existingGuest) {
@@ -93,6 +96,7 @@ export async function PUT(
       data: {
         name: name.trim(),
         phone: normalized,
+        ...(title !== undefined ? { title: normalizeGuestTitle(title) } : {}),
       },
     });
 
@@ -113,23 +117,41 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || (session.user as any).role !== 'CLIENT') {
+    const role = (session?.user as any)?.role;
+    if (!session || !['CLIENT', 'SUPER_ADMIN'].includes(role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const tenantId = (session.user as any).tenantId;
     const { id } = await params;
-    const { routingChannel } = await req.json();
+    const { routingChannel, title } = await req.json();
 
-    if (!routingChannel || !['whatsapp', 'sms'].includes(routingChannel)) {
+    const data: { routingChannel?: string; title?: string | null } = {};
+
+    if (routingChannel !== undefined) {
+      if (!['whatsapp', 'sms'].includes(routingChannel)) {
+        return NextResponse.json(
+          { error: 'Invalid routing channel' },
+          { status: 400 }
+        );
+      }
+      data.routingChannel = routingChannel;
+    }
+
+    if (title !== undefined) {
+      data.title = normalizeGuestTitle(title);
+    }
+
+    if (Object.keys(data).length === 0) {
       return NextResponse.json(
-        { error: 'Invalid routing channel' },
+        { error: 'No valid fields to update' },
         { status: 400 }
       );
     }
 
+    const scope = role === 'SUPER_ADMIN' ? { id } : { id, event: { tenantId } };
     const guest = await prisma.guest.findFirst({
-      where: { id, event: { tenantId } },
+      where: scope,
     });
 
     if (!guest) {
@@ -138,7 +160,7 @@ export async function PATCH(
 
     const updatedGuest = await prisma.guest.update({
       where: { id },
-      data: { routingChannel },
+      data,
     });
 
     return NextResponse.json({ success: true, guest: updatedGuest });

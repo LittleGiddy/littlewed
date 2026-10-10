@@ -3,6 +3,35 @@
 export const GUEST_TYPES = ['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE'] as const;
 export type GuestTypeValue = (typeof GUEST_TYPES)[number];
 
+// ─── Guest titles ───────────────────────────────────────────────────────
+// Selectable honorifics. A guest may also have no title at all (stored as
+// NULL) - the UI offers a blank option for that.
+export const GUEST_TITLES = ['Mr', 'Mrs', 'Ms', 'Miss', 'Dr', 'Prof', 'Mr & Mrs'] as const;
+export type GuestTitleValue = (typeof GUEST_TITLES)[number];
+
+// Values that mean "no title". Treated as NULL rather than an error so that
+// blank cells in imports and the explicit "No title" option both clear it.
+const EMPTY_TITLE_TOKENS = new Set(['', '-', '--', '?', 'n/a', 'na', 'nil', 'none', 'null', 'undefined']);
+
+// Normalises a raw title: trims it, maps blank/placeholder values to NULL, and
+// otherwise returns the text as-is (imports may carry titles outside the list,
+// e.g. "Sir").
+export function normalizeGuestTitle(raw?: string | null): string | null {
+  if (raw === null || raw === undefined) return null;
+  const trimmed = raw.trim();
+  if (EMPTY_TITLE_TOKENS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+}
+
+// Options for a title <select>, guaranteeing the guest's current title is
+// present even when it is a free-form value that is not in GUEST_TITLES.
+export function guestTitleOptions(current?: string | null): string[] {
+  const known = GUEST_TITLES as readonly string[];
+  const value = current?.trim();
+  if (value && !known.includes(value)) return [value, ...known];
+  return [...known];
+}
+
 export interface GuestTypeInfo {
   type: GuestTypeValue;
   count: number | null;

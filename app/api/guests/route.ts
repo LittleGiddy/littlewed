@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
 import { generateUniquePassCode } from '@/lib/utils';
+import { normalizeGuestTitle } from '@/lib/guestTypes';
 
 async function getNextCardNumber(eventId: string): Promise<string> {
   const guests = await prisma.guest.findMany({
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
       const [guest1, createdGuest2] = await prisma.$transaction([
         prisma.guest.create({
           data: {
-            title: title || 'Mr',
+            title: title === undefined ? 'Mr' : normalizeGuestTitle(title),
             name: name.trim(),
             phone: phone1.normalized,
             cardNumber: finalCardNumber,
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest) {
         }),
         prisma.guest.create({
           data: {
-            title: guest2.title || 'Mr',
+            title: guest2.title === undefined ? 'Mr' : normalizeGuestTitle(guest2.title),
             name: guest2.name.trim(),
             phone: phone2.normalized,
             cardNumber: finalCardNumber,

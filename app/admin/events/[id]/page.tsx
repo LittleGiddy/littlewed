@@ -9,6 +9,7 @@ import {
   RefreshCw, ExternalLink, TrendingUp, BarChart3, AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { guestTitleOptions } from '@/lib/guestTypes';
 
 interface EventDetails {
   id: string;
@@ -55,6 +56,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [guestSearch, setGuestSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [savingTitleId, setSavingTitleId] = useState<string | null>(null);
 
   const fetchEvent = async () => {
     try {
@@ -65,6 +67,28 @@ export default function EventDetailPage() {
       toast.error('Failed to load event');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateGuestTitle = async (guestId: string, title: string) => {
+    if (!event) return;
+    const previous = event.guests.find(g => g.id === guestId)?.title ?? null;
+    setSavingTitleId(guestId);
+    setEvent(prev => prev ? { ...prev, guests: prev.guests.map(g => g.id === guestId ? { ...g, title: title || null } : g) } : prev);
+    try {
+      const res = await fetch(`/api/guests/${guestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed');
+      toast.success('Title updated');
+    } catch {
+      setEvent(prev => prev ? { ...prev, guests: prev.guests.map(g => g.id === guestId ? { ...g, title: previous } : g) } : prev);
+      toast.error('Failed to update title');
+    } finally {
+      setSavingTitleId(null);
     }
   };
 
@@ -233,7 +257,23 @@ export default function EventDetailPage() {
                       <td className="px-4 py-2.5">
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{g.name}</p>
-                          <p className="text-[10px] text-gray-400">{g.guestType} &middot; {g.title || 'Mr'}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] font-medium text-gray-400 uppercase">{g.guestType || 'SINGLE'}</span>
+                            <span className="text-[10px] text-gray-300">&middot;</span>
+                            <select
+                              value={g.title ?? ''}
+                              onChange={(e) => updateGuestTitle(g.id, e.target.value)}
+                              disabled={savingTitleId === g.id}
+                              title="Edit title"
+                              aria-label={`Title for ${g.name}`}
+                              className="text-[10px] border border-gray-200 rounded px-1 py-0.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-[#0D4B4B]/30 disabled:opacity-50"
+                            >
+                              <option value="">No title</option>
+                              {guestTitleOptions(g.title).map(t => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-2.5">

@@ -37,6 +37,13 @@ export default function AppBottomSheet({
 }: AppBottomSheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  // Keep the latest onClose without making it an effect dependency, otherwise a
+  // new callback identity on every parent render (e.g. on each keystroke in a
+  // controlled form) would re-run focus management mid-typing and steal focus.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   const reduced = useReducedMotion();
 
   useEffect(() => {
@@ -47,7 +54,7 @@ export default function AppBottomSheet({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab' || !panelRef.current) return;
@@ -87,7 +94,7 @@ export default function AppBottomSheet({
       window.clearTimeout(timer);
       restoreFocusRef.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (typeof document === 'undefined') return null;
 

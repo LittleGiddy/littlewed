@@ -8,8 +8,8 @@ import {
   AlertCircle, Info, RotateCw, Users, UserPlus 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { GUEST_TITLES } from '@/lib/guestTypes';
 
-const TITLES = ['Mr', 'Miss', 'Mrs', 'Dr', 'Ms', 'Prof'];
 const GUEST_TYPES = ['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE']; // FAMILIA/WAKWE are group types with a guestCount
 const GROUP_TYPES = new Set(['FAMILIA', 'WAKWE']);
 
@@ -281,7 +281,8 @@ export default function AddGuestPage() {
                 onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
               >
-                {TITLES.map(title => (
+                <option value="">No title (NULL)</option>
+                {GUEST_TITLES.map(title => (
                   <option key={title} value={title}>{title}</option>
                 ))}
               </select>
@@ -406,7 +407,8 @@ export default function AddGuestPage() {
                     onChange={e => setGuest2(prev => ({ ...prev, title: e.target.value }))}
                     className="w-full p-2.5 text-sm border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
                   >
-                    {TITLES.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="">No title (NULL)</option>
+                    {GUEST_TITLES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
 

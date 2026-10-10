@@ -19,6 +19,7 @@ import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast, isMassDelete } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
+import { guestTitleOptions } from '@/lib/guestTypes';
 import ThanksCardModal from '@/components/ThanksCardModal';
 import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
 import EventQrCodeModal from '@/app/components/EventQrCodeModal';
@@ -218,7 +219,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const [editing, setEditing] = useState(false);
   const [showEditGuestModal, setShowEditGuestModal] = useState(false);
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
-  const [editGuestForm, setEditGuestForm] = useState({ name: '', phone: '' });
+  const [editGuestForm, setEditGuestForm] = useState({ name: '', phone: '', title: '' });
   const [savingGuest, setSavingGuest] = useState(false);
   const [cardView, setCardView] = useState<'grid' | 'list'>('grid');
   const [selectedCardGuest, setSelectedCardGuest] = useState<Guest | null>(null);
@@ -476,11 +477,11 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   // ─── Edit Guest ──────────────────────────────────────────────────────
   const openEditGuestModal = (guest: Guest) => {
     setEditingGuest(guest);
-    setEditGuestForm({ name: guest.name, phone: guest.phone });
+    setEditGuestForm({ name: guest.name, phone: guest.phone, title: guest.title ?? '' });
     setShowEditGuestModal(true);
   };
 
-  const handleEditGuestChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditGuestChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setEditGuestForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -491,13 +492,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
     try {
       const res = await fetch(`/api/guests/${editingGuest.id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() }),
+        body: JSON.stringify({ name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim(), title: editGuestForm.title }),
         credentials: 'include',
       });
       const data = await res.json();
       if (res.ok) {
         toast.success('Guest updated successfully!');
-        setGuests(prev => prev.map(g => g.id === editingGuest.id ? { ...g, name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim() } : g));
+        setGuests(prev => prev.map(g => g.id === editingGuest.id ? { ...g, name: editGuestForm.name.trim(), phone: editGuestForm.phone.trim(), title: editGuestForm.title || null } : g));
         setShowEditGuestModal(false);
         setEditingGuest(null);
         fetchData(eventId!);
@@ -2493,6 +2494,20 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="modal-body">
               <div className="space-y-4">
+                <div>
+                  <label className="field-label">Title</label>
+                  <select
+                    name="title"
+                    value={editGuestForm.title}
+                    onChange={handleEditGuestChange}
+                    className="field-input"
+                  >
+                    <option value="">No title (NULL)</option>
+                    {guestTitleOptions(editGuestForm.title).map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="field-label">Full Name</label>
                   <input
