@@ -216,6 +216,34 @@ body {
   outline-offset: 2px;
 }
 
+/* ==========================================================================
+   Cursor affordance
+   Tailwind v4's preflight leaves buttons with the browser default arrow, so
+   every control needs an explicit pointer. The `cursor` property is ignored on
+   touch devices, so this is applied everywhere. Lives in `base` so an explicit
+   utility like `cursor-default` / `cursor-not-allowed` still overrides it.
+   ========================================================================== */
+@layer base {
+  :where(
+    a[href],
+    button,
+    [role="button"],
+    summary,
+    select,
+    label[for],
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="file"]
+  ):not(:disabled):not([aria-disabled="true"]):not([disabled]) {
+    cursor: pointer;
+  }
+
+  :where(button, select, input, [role="button"]):disabled,
+  :where([aria-disabled="true"]) {
+    cursor: not-allowed;
+  }
+}
+
 /* Range sliders: teal thumb, larger hit area for touch. */
 input[type="range"] {
   -webkit-appearance: none;
