@@ -51,6 +51,14 @@ const GROUP_ICONS: Record<string, typeof Users> = {
 type Overrides = Partial<Record<MchangoFieldKey, string>>;
 
 /**
+ * Sentinel the announcement select uses for its "write your own" entry. It is
+ * not a real value: picking it swaps the select for a free-text box, and the
+ * text typed there is what gets stored. A literal that could collide with a real
+ * option would round-trip as an occasion nobody typed.
+ */
+const CUSTOM_OPTION = '__custom__';
+
+/**
  * Copies each override through untouched, KEEPING the empty ones.
  *
  * An absent key means "never touched, fall back to the event"; an empty key
@@ -105,6 +113,12 @@ export default function MchangoVariables({
   saving,
 }: Props) {
   const clean = useMemo(() => normaliseOverrides(overrides), [overrides]);
+
+  // Which dropdown slots are in "write your own" mode. Held in state (rather
+  // than derived from the value alone) because clearing the custom box must not
+  // snap the select back to an event value mid-type: an empty custom value and
+  // an untouched slot both look like "no text" to a value-only check.
+  const [customSelects, setCustomSelects] = useState<Set<MchangoFieldKey>>(new Set());
 
   const previewGuest = useMemo(
     () => guests.find((g) => g.id === previewGuestId) ?? null,
@@ -174,6 +188,21 @@ export default function MchangoVariables({
                   // A per-guest slot has nothing to clear or restore: it is filled
                   // from the guest list at send time, not typed here.
                   const isPerGuest = field.kind === 'guest';
+
+                  // ─── Dropdown "write your own" escape hatch ──────────────
+                  // A value the list has never heard of — a genuinely custom
+                  // occasion, or an eventType saved before the list existed — is
+                  // shown as custom text rather than a hidden "(from event)"
+                  // option, so the tenant can read and edit it. The slot is in
+                  // custom mode when they picked Custom here, or when the value
+                  // is non-empty and not one of the listed options.
+                  const options = field.options ?? [];
+                  const customText = hasOverride ? (clean[field.key] ?? '') : current;
+                  const customActive =
+                    field.kind === 'select' &&
+                    (customSelects.has(field.key) ||
+                      (customText !== '' && !options.includes(customText)));
+                  const selectValue = customActive ? CUSTOM_OPTION : current;
 
                   return (
                     <div key={field.key} className={field.kind === 'text' && field.placeholder.length > 30 ? 'sm:col-span-2' : ''}>
@@ -250,24 +279,46 @@ export default function MchangoVariables({
                               onSelect={onPreviewGuestChange}
                             />
                           ) : field.kind === 'select' ? (
-                            <AppSelect
-                              id={id}
-                              value={current}
-                              onChange={(e) => setField(field.key, e.target.value)}
-                            >
-                              <option value="">Not set</option>
-                              {/* An eventType stored before this list existed would
-                                  otherwise render as a blank select and read as
-                                  "missing" while the send still used it. */}
-                              {current && !field.options?.includes(current) ? (
-                                <option value={current}>{current} (from event)</option>
+                            <>
+                              <AppSelect
+                                id={id}
+                                value={selectValue}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  if (v === CUSTOM_OPTION) {
+                                    setCustomSelects((prev) => new Set(prev).add(field.key));
+                                    // Keep whatever text is already there so
+                                    // switching to Custom does not wipe a value
+                                    // that was merely not in the list.
+                                    if (!customActive) setField(field.key, customText);
+                                  } else {
+                                    setCustomSelects((prev) => {
+                                      const next = new Set(prev);
+                                      next.delete(field.key);
+                                      return next;
+                                    });
+                                    setField(field.key, v);
+                                  }
+                                }}
+                              >
+                                <option value="">Not set</option>
+                                {options.map((o) => (
+                                  <option key={o} value={o}>
+                                    {o}
+                                  </option>
+                                ))}
+                                <option value={CUSTOM_OPTION}>Custom… (write your own)</option>
+                              </AppSelect>
+                              {customActive ? (
+                                <AppInput
+                                  value={customText}
+                                  onChange={(e) => setField(field.key, e.target.value)}
+                                  placeholder={field.placeholder}
+                                  fieldClassName="mt-2"
+                                  aria-label={`${field.label} custom text`}
+                                />
                               ) : null}
-                              {field.options?.map((o) => (
-                                <option key={o} value={o}>
-                                  {o}
-                                </option>
-                              ))}
-                            </AppSelect>
+                            </>
                           ) : (
                             <AppInput
                               id={id}
