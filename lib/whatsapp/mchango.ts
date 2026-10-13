@@ -608,7 +608,7 @@ export function missingMchangoFields(values: MchangoValues): MchangoFieldKey[] {
 }
 
 /** NexSMS template name for the approved contribution reminder. */
-export const MCHANGO_TEMPLATE_DEFAULT = 'Mchango';
+export const MCHANGO_TEMPLATE_DEFAULT = 'MchangoMpya';
 
 export function getMchangoTemplate(): string {
   return process.env.REMINDER_WHATSAPP_TEMPLATE || MCHANGO_TEMPLATE_DEFAULT;
