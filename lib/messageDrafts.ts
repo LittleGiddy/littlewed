@@ -24,6 +24,7 @@ export interface MessageDrafts {
   whatsappDailyLimit: number | null;
   reminderSmsMessage: string | null;
   kumbushaMessage: string | null;
+  reminderMchangoOverrides: Record<string, string> | null;
 }
 
 export type DraftKey = keyof MessageDrafts;
@@ -35,6 +36,7 @@ const EMPTY: MessageDrafts = {
   whatsappDailyLimit: null,
   reminderSmsMessage: null,
   kumbushaMessage: null,
+  reminderMchangoOverrides: null,
 };
 
 const FIELD_BY_KEY: Record<DraftKey, string> = {
@@ -43,6 +45,7 @@ const FIELD_BY_KEY: Record<DraftKey, string> = {
   whatsappDailyLimit: 'whatsappDailyLimit',
   reminderSmsMessage: 'reminderSmsMessage',
   kumbushaMessage: 'kumbushaMessage',
+  reminderMchangoOverrides: 'reminderMchangoOverrides',
 };
 
 const SAVE_DEBOUNCE_MS = 450;
@@ -151,6 +154,13 @@ export function useMessageDrafts(eventId?: string) {
           }
           if (typeof data.reminderSmsMessage === 'string') fromServer.reminderSmsMessage = data.reminderSmsMessage;
           if (typeof data.kumbushaMessage === 'string') fromServer.kumbushaMessage = data.kumbushaMessage;
+          if (
+            data.reminderMchangoOverrides &&
+            typeof data.reminderMchangoOverrides === 'object' &&
+            !Array.isArray(data.reminderMchangoOverrides)
+          ) {
+            fromServer.reminderMchangoOverrides = data.reminderMchangoOverrides as Record<string, string>;
+          }
         }
       } catch {
         // Offline: still show whatever this device remembers.

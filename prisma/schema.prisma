@@ -321,6 +321,7 @@ model Event {
   whatsappDailyLimit   Int?     // WhatsApp daily send cap for this event
   reminderSmsMessage   String?  // reminder text typed in the remind flow
   kumbushaMessage      String?  // reminder text typed on the Kumbusha Michango page
+  reminderMchangoOverrides Json? // { fieldKey: value } typed in the WhatsApp reminder variable editor
   contributions        Contribution[]
 }
 

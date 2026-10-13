@@ -77,6 +77,8 @@ interface Guest {
   reminderCount: number;
   routingChannel: string;
   cardNumber?: string | null;
+  /** When the guest was added, used to sort the picker by time added. */
+  createdAt: string;
   /** Present when contribution tracking is on for this event. */
   contribution?: {
     status: string;
@@ -137,6 +139,10 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [search, setSearch] = useState('');
   const [savingDesign, setSavingDesign] = useState(false);
 
+  /** How the guest picker orders the list on the final step. */
+  type GuestSort = 'name-asc' | 'name-desc' | 'added-new' | 'added-old';
+  const [guestSort, setGuestSort] = useState<GuestSort>('name-asc');
+
   // The typed reminder lives on the account (Event -> tenant), so the wording
   // is waiting on any device signed into this tenant, not just this browser.
   const { drafts, ready: draftsReady, saveStatus, set } = useMessageDrafts(eventId ?? undefined);
@@ -150,11 +156,28 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   const [cardUrl, setCardUrl] = useState<string | null>(null);
   const [design, setDesign] = useState<ReminderDesign>(DEFAULT_REMINDER_DESIGN);
 
-  // Tenant-typed Mchango variable overrides. Only keys the tenant actually
-  // changed are held here, so everything else tracks the event row live.
-  const [mchangoOverrides, setMchangoOverrides] = useState<
-    Partial<Record<MchangoFieldKey, string>>
-  >({});
+  // Tenant-typed Mchango variable overrides, held on the account through the
+  // same drafts hook that saves the SMS wording. A keystroke is flushed a
+  // moment later (and on unmount), so stepping away from the screen without
+  // pressing Next no longer empties the fields on the next visit — and the
+  // values are waiting on any device signed into this tenant. Only keys the
+  // tenant actually changed are kept here, so everything else tracks the event
+  // row live.
+  const mchangoOverrides = useMemo(
+    () =>
+      (drafts.reminderMchangoOverrides ?? {}) as Partial<
+        Record<MchangoFieldKey, string>
+      >,
+    [drafts.reminderMchangoOverrides]
+  );
+  const setMchangoOverrides = useCallback(
+    (next: Partial<Record<MchangoFieldKey, string>>) =>
+      set(
+        'reminderMchangoOverrides',
+        Object.keys(next).length ? (next as Record<string, string>) : null
+      ),
+    [set]
+  );
   const [savingVariables, setSavingVariables] = useState(false);
 
   /** Which guest the message preview greets by name. */
@@ -254,11 +277,34 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
   const filteredGuests = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return remindableGuests;
-    return remindableGuests.filter(
-      (g) => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q)
-    );
-  }, [remindableGuests, search]);
+    const matched = !q
+      ? remindableGuests
+      : remindableGuests.filter(
+          (g) => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q)
+        );
+
+    // "Time added" is the reminder-specific view: newly imported guests tend to
+    // be the ones still owed a contribution, so newest-first is the default
+    // target of a nudge. The API hands the list back name-sorted already, so
+    // name-asc needs no pass, but re-sorting a copy keeps every path explicit.
+    const sorted = [...matched];
+    if (guestSort === 'added-new') {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    } else if (guestSort === 'added-old') {
+      sorted.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    } else if (guestSort === 'name-desc') {
+      sorted.sort((a, b) => b.name.localeCompare(a.name));
+    } else {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return sorted;
+  }, [remindableGuests, search, guestSort]);
 
   // How many of the guests chased in the most recent reminder have since
   // finished contributing. These are the people this send leaves out, so the
@@ -965,14 +1011,27 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
 
-                <div className="relative mb-2">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search name or number"
-                    className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-tap text-sm focus:bg-white focus:ring-2 focus:ring-brandring focus:border-transparent"
-                  />
+                <div className="mb-2 flex items-stretch gap-2">
+                  <div className="relative flex-1">
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search name or number"
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-tap text-sm focus:bg-white focus:ring-2 focus:ring-brandring focus:border-transparent"
+                    />
+                  </div>
+                  <select
+                    value={guestSort}
+                    onChange={(e) => setGuestSort(e.target.value as GuestSort)}
+                    aria-label="Sort guests"
+                    className="shrink-0 rounded-tap border border-gray-200 bg-gray-50 px-2.5 text-sm text-gray-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brandring focus:border-transparent"
+                  >
+                    <option value="name-asc">Name A–Z</option>
+                    <option value="name-desc">Name Z–A</option>
+                    <option value="added-new">Newest added</option>
+                    <option value="added-old">Oldest added</option>
+                  </select>
                 </div>
 
                 {remindableGuests.length === 0 ? (

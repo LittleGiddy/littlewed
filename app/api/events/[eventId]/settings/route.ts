@@ -81,6 +81,7 @@ export async function GET(
       whatsappDailyLimit: true,
       reminderSmsMessage: true,
       kumbushaMessage: true,
+      reminderMchangoOverrides: true,
     },
   });
 
@@ -184,6 +185,14 @@ export async function PUT(
       updateData.whatsappInviteDraft = null;
     } else if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
       updateData.whatsappInviteDraft = draft;
+    }
+  }
+  if (body.reminderMchangoOverrides !== undefined) {
+    const draft = body.reminderMchangoOverrides;
+    if (draft === null) {
+      updateData.reminderMchangoOverrides = null;
+    } else if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
+      updateData.reminderMchangoOverrides = draft;
     }
   }
 
