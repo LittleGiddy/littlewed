@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Calendar, Users, Plus, Coins, Upload, Palette, Send,
-  ChevronRight, Grid3x3, Eye, CalendarDays, UserCheck,
-  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock, QrCode, PartyPopper,
+  Calendar, Plus, Coins, Upload, Palette, Send,
+  ChevronRight, Grid3x3, Eye, CalendarDays,
+  CheckCircle, MapPin, Download, Trash2, ArrowUpRight, Clock, QrCode,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -22,9 +22,6 @@ import { useReducedMotion } from '@/lib/motion';
 interface DashboardContentProps {
   firstName: string;
   credits: number;
-  totalGuests: number;
-  checkedIn: number;
-  responded: number;
   events: {
     id: string;
     name: string;
@@ -165,9 +162,6 @@ function CompactDeleteButton({ eventId }: { eventId: string }) {
 export default function DashboardContent({
   firstName,
   credits,
-  totalGuests,
-  checkedIn,
-  responded,
   events,
   newEventUrl,
 }: DashboardContentProps) {
@@ -186,9 +180,6 @@ export default function DashboardContent({
   // amber only means "needs attention". No decorative rainbow.
   const stats = [
     { label: 'Credits', value: credits, icon: Coins, tone: 'brand', isCredits: true },
-    { label: 'Total Guests', value: totalGuests, icon: Users, tone: 'brand', isCredits: false },
-    { label: 'RSVPs', value: responded, icon: PartyPopper, tone: 'brand', isCredits: false },
-    { label: 'Checked In', value: checkedIn, icon: UserCheck, tone: 'success', isCredits: false },
     { label: 'Events', value: events.length, icon: CalendarDays, tone: 'brand', isCredits: false },
   ] as const;
 
@@ -309,13 +300,16 @@ export default function DashboardContent({
         )}
 
         {/* ─── Stats ─── */}
-        <motion.div variants={containerVariants} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <motion.div
+          variants={containerVariants}
+          className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6"
+        >
           {stats.map((stat) => (
             <motion.div
               key={stat.label}
               variants={itemVariants}
               whileTap={reducedMotion ? undefined : { scale: 0.97 }}
-              className="bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 flex flex-col justify-between"
+              className="lg:col-span-3 bg-white rounded-card border border-gray-200/80 shadow-elev-1 p-4 flex flex-col justify-between"
             >
               <div className="flex items-start justify-between gap-2 mb-3">
                 <span className={`w-10 h-10 rounded-tap grid place-items-center shrink-0 ${statTones[stat.tone].tile}`}>

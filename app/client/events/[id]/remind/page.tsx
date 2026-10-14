@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
+import { phoneMatches } from '@/lib/phone';
 import { AppSegmentedControl, AppProgressBar, ShareLinkButton } from '@/components/ui';
 import SmsCounter from '@/components/SmsCounter';
 import { MAX_SMS_PARTS_PER_GUEST } from '@/lib/sms/units';
@@ -142,6 +143,21 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
   /** How the guest picker orders the list on the final step. */
   type GuestSort = 'name-asc' | 'name-desc' | 'added-new' | 'added-old';
   const [guestSort, setGuestSort] = useState<GuestSort>('name-asc');
+
+  /** Quick filters for the guest picker. "Time added" is the one tenants ask
+   *  for most when chasing a freshly imported list; the rest narrow by the
+   *  reminder state or the channel the guest is normally reached on. */
+  type GuestFilter =
+    | 'all'
+    | 'added-today'
+    | 'added-week'
+    | 'added-month'
+    | 'not-reminded'
+    | 'reminded'
+    | 'free-left'
+    | 'whatsapp'
+    | 'sms';
+  const [guestFilter, setGuestFilter] = useState<GuestFilter>('all');
 
   // The typed reminder lives on the account (Event -> tenant), so the wording
   // is waiting on any device signed into this tenant, not just this browser.
@@ -277,10 +293,48 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
 
   const filteredGuests = useMemo(() => {
     const q = search.trim().toLowerCase();
+
+    // "Time added" filters compare against the guest's createdAt. Ranges are
+    // rolling (last 24h / 7 days / 30 days) so the list stays useful no matter
+    // when the event was created.
+    const now = Date.now();
+    const within = (createdAt: string, ms: number) => {
+      const t = new Date(createdAt).getTime();
+      return !Number.isNaN(t) && now - t <= ms;
+    };
+    const DAY = 24 * 60 * 60 * 1000;
+
+    const byFilter = remindableGuests.filter((g) => {
+      switch (guestFilter) {
+        case 'added-today':
+          return within(g.createdAt, DAY);
+        case 'added-week':
+          return within(g.createdAt, 7 * DAY);
+        case 'added-month':
+          return within(g.createdAt, 30 * DAY);
+        case 'not-reminded':
+          return (g.reminderCount || 0) === 0;
+        case 'reminded':
+          return (g.reminderCount || 0) > 0;
+        case 'free-left':
+          return (g.reminderCount || 0) < FREE_REMINDERS_PER_GUEST;
+        case 'whatsapp':
+          return g.routingChannel === 'whatsapp';
+        case 'sms':
+          return g.routingChannel !== 'whatsapp';
+        default:
+          return true;
+      }
+    });
+
     const matched = !q
-      ? remindableGuests
-      : remindableGuests.filter(
-          (g) => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q)
+      ? byFilter
+      : byFilter.filter(
+          (g) =>
+            g.name.toLowerCase().includes(q) ||
+            (g.title ?? '').toLowerCase().includes(q) ||
+            (g.cardNumber ?? '').toLowerCase().includes(q) ||
+            phoneMatches(g.phone, q)
         );
 
     // "Time added" is the reminder-specific view: newly imported guests tend to
@@ -304,7 +358,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
       sorted.sort((a, b) => a.name.localeCompare(b.name));
     }
     return sorted;
-  }, [remindableGuests, search, guestSort]);
+  }, [remindableGuests, search, guestSort, guestFilter]);
 
   // How many of the guests chased in the most recent reminder have since
   // finished contributing. These are the people this send leaves out, so the
@@ -353,6 +407,7 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
     setChannel(c);
     setSelectedGuests(new Set());
     setSearch('');
+    setGuestFilter('all');
     setStep(0);
   };
 
@@ -1011,27 +1066,51 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
 
-                <div className="mb-2 flex items-stretch gap-2">
-                  <div className="relative flex-1">
+                <div className="mb-2 space-y-2">
+                  <div className="relative">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search name or number"
+                      placeholder="Search name, number or card #"
                       className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-tap text-sm focus:bg-white focus:ring-2 focus:ring-brandring focus:border-transparent"
                     />
                   </div>
-                  <select
-                    value={guestSort}
-                    onChange={(e) => setGuestSort(e.target.value as GuestSort)}
-                    aria-label="Sort guests"
-                    className="shrink-0 rounded-tap border border-gray-200 bg-gray-50 px-2.5 text-sm text-gray-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brandring focus:border-transparent"
-                  >
-                    <option value="name-asc">Name A–Z</option>
-                    <option value="name-desc">Name Z–A</option>
-                    <option value="added-new">Newest added</option>
-                    <option value="added-old">Oldest added</option>
-                  </select>
+                  <div className="flex items-stretch gap-2">
+                    <select
+                      value={guestFilter}
+                      onChange={(e) => setGuestFilter(e.target.value as GuestFilter)}
+                      aria-label="Filter guests"
+                      className="min-w-0 flex-1 rounded-tap border border-gray-200 bg-gray-50 px-2.5 py-2 text-sm text-gray-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brandring focus:border-transparent"
+                    >
+                      <option value="all">All guests</option>
+                      <optgroup label="Time added">
+                        <option value="added-today">Added today</option>
+                        <option value="added-week">Added this week</option>
+                        <option value="added-month">Added this month</option>
+                      </optgroup>
+                      <optgroup label="Reminder status">
+                        <option value="not-reminded">Not reminded yet</option>
+                        <option value="reminded">Already reminded</option>
+                        <option value="free-left">Free reminders left</option>
+                      </optgroup>
+                      <optgroup label="Channel">
+                        <option value="whatsapp">WhatsApp guests</option>
+                        <option value="sms">SMS guests</option>
+                      </optgroup>
+                    </select>
+                    <select
+                      value={guestSort}
+                      onChange={(e) => setGuestSort(e.target.value as GuestSort)}
+                      aria-label="Sort guests"
+                      className="shrink-0 rounded-tap border border-gray-200 bg-gray-50 px-2.5 py-2 text-sm text-gray-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brandring focus:border-transparent"
+                    >
+                      <option value="name-asc">Name A–Z</option>
+                      <option value="name-desc">Name Z–A</option>
+                      <option value="added-new">Newest added</option>
+                      <option value="added-old">Oldest added</option>
+                    </select>
+                  </div>
                 </div>
 
                 {remindableGuests.length === 0 ? (
@@ -1042,7 +1121,23 @@ export default function RemindGuestsPage({ params }: { params: Promise<{ id: str
                 ) : filteredGuests.length === 0 ? (
                   <div className="text-center py-10">
                     <Search size={24} className="text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No guest matches “{search}”.</p>
+                    <p className="text-sm text-gray-500">
+                      {search
+                        ? `No guest matches “${search}”.`
+                        : 'No guest matches this filter.'}
+                    </p>
+                    {guestFilter !== 'all' || search ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGuestFilter('all');
+                          setSearch('');
+                        }}
+                        className="mt-2 text-xs font-semibold text-brand hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    ) : null}
                   </div>
                 ) : (
                   <ul className="divide-y divide-gray-100 max-h-[52vh] overflow-y-auto -mx-3 sm:-mx-4 px-3 sm:px-4">

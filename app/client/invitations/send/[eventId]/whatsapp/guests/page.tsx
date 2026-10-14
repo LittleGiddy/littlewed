@@ -19,6 +19,7 @@ import {
   SendProgressCard,
 } from '../../../components/shared';
 import { useMessageDrafts } from '@/lib/messageDrafts';
+import { phoneMatches } from '@/lib/phone';
 
 const DEFAULT_DAILY_LIMIT = 250;
 
@@ -66,7 +67,7 @@ export default function WhatsappGuestsPage() {
     if (!query.trim()) return pool;
     const q = query.toLowerCase();
     return pool.filter(
-      g => g.name.toLowerCase().includes(q) || (g.phone || '').includes(q) || (g.cardNumber || '').includes(q)
+      g => g.name.toLowerCase().includes(q) || phoneMatches(g.phone, q) || (g.cardNumber || '').includes(q)
     );
   }, [view, pendingPool, query]);
 

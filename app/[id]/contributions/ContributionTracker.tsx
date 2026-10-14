@@ -65,6 +65,7 @@ import {
 } from '@/lib/contributions';
 import { motionEase, useReducedMotion, useTransition } from '@/lib/motion';
 import { confirmToast } from '@/lib/confirmToast';
+import { phoneMatches } from '@/lib/phone';
 import { ProgressRing, StatTiles, buildTiles } from '@/app/client/events/[id]/contributions/widgets';
 
 interface TrackerEvent {
@@ -160,11 +161,6 @@ function remainingOf(row: TrackerRow) {
   return row.amountExpected && row.amountExpected > row.amountPaid
     ? row.amountExpected - row.amountPaid
     : 0;
-}
-
-/** Digits only, so "0762 208 760", "+255 762 208 760" and "762208760" all match. */
-function digitsOf(value: string | null | undefined) {
-  return (value ?? '').replace(/\D/g, '');
 }
 
 function reducedInitial(transition: { duration: number }) {
@@ -328,7 +324,6 @@ export default function ContributionTracker({
 
   const visibleRows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const qDigits = digitsOf(q);
 
     const filtered = data.rows.filter((r) => {
       if (filter !== 'ALL' && r.status !== filter) return false;
@@ -336,9 +331,10 @@ export default function ContributionTracker({
       if (notedOnly && !r.note) return false;
       if (!q) return true;
       const byName = r.guestName.toLowerCase().includes(q);
-      // Phone search is digit-based, so punctuation and country codes in the
-      // query never stop a match.
-      const byPhone = qDigits.length > 0 && digitsOf(r.phone).includes(qDigits);
+      // Phone search understands local ("0712…"), international ("+255…") and
+      // bare national forms, so the way the owner types the number never
+      // decides whether the guest is found.
+      const byPhone = phoneMatches(r.phone, query);
       return byName || byPhone;
     });
 

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { phoneMatches } from '@/lib/phone';
 import {
   ArrowLeft,
   CalendarCheck,
@@ -289,7 +290,7 @@ export default function StaffPage() {
       return (
         s.name.toLowerCase().includes(term) ||
         s.email.toLowerCase().includes(term) ||
-        (s.phone ?? '').toLowerCase().includes(term)
+        phoneMatches(s.phone, term)
       );
     });
   }, [staff, search, filter]);

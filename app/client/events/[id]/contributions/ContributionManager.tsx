@@ -43,6 +43,7 @@ import {
   type ContributionStatus,
 } from '@/components/ui';
 import { MCHANGO_OCCASIONS } from '@/lib/whatsapp/mchango';
+import { phoneMatches } from '@/lib/phone';
 import { useTransition } from '@/lib/motion';
 import { buildTiles, ProgressRing, StatTiles } from './widgets';
 import type {
@@ -272,7 +273,7 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
       if (!q) return true;
       return (
         r.guestName.toLowerCase().includes(q) ||
-        (r.phone ?? '').includes(q) ||
+        phoneMatches(r.phone, q) ||
         (r.phoneMasked ?? '').includes(q)
       );
     });

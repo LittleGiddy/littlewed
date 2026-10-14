@@ -1,25 +1,11 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
-import { motion } from 'framer-motion'
-import { CircleCheck, TriangleAlert, Users, Undo2, Loader2 } from 'lucide-react'
-import { canMarkAsDouble, canMarkAllAsGroup } from '@/lib/checkin'
-
-interface ScanGuest {
-  id: string
-  name: string
-  cardNumber: string | null
-  guestType: string | null
-  guestCount: number | null
-  checkInCount: number
-  maxCheckIns: number
-  fullyCheckedIn: boolean
-  sharedGroup?: boolean
-  groupMembers?: { id: string; name: string; checkedIn: boolean }[]
-  cardGroupId?: string | null
-}
+import { AnimatePresence } from 'framer-motion'
+import { CircleCheck, TriangleAlert, Loader2 } from 'lucide-react'
+import ScanResultCard, { type ScanResultCardGuest } from '@/app/components/ScanResultCard'
+import { useReducedMotion } from '@/lib/motion'
 
 function playHaptic(type: 'success' | 'fail') {
   try {
@@ -33,15 +19,23 @@ function playHaptic(type: 'success' | 'fail') {
 function CheckInContent() {
   const searchParams = useSearchParams()
   const eventId = searchParams.get('event')
+  const reducedMotion = useReducedMotion()
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const [code, setCode] = useState('')
-  const [message, setMessage] = useState('')
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [isSuccess, setIsSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [guest, setGuest] = useState<ScanGuest | null>(null)
+  const [guest, setGuest] = useState<ScanResultCardGuest | null>(null)
   const [doubleBusy, setDoubleBusy] = useState(false)
-  const [undone, setUndone] = useState(false)
+
+  // Dismiss the result card and hand the operator straight back to the input so
+  // the next card number can be typed without a tap.
+  const closeResult = useCallback(() => {
+    setGuest(null)
+    setError('')
+    inputRef.current?.focus()
+  }, [])
 
   const handleCheckIn = useCallback(
     async (e: React.FormEvent) => {
@@ -49,9 +43,8 @@ function CheckInContent() {
       if (!code) return
 
       setLoading(true)
-      setMessage('')
+      setNotice('')
       setError('')
-      setUndone(false)
 
       const res = await fetch('/api/check-in', {
         method: 'POST',
@@ -66,14 +59,11 @@ function CheckInContent() {
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         playHaptic('success')
-        setIsSuccess(true)
         setGuest(data.guest)
-        setMessage(data.message || `Checked in: ${data.guest.name}`)
         setCode('')
         new Audio('/beep.mp3').play().catch(() => {})
       } else {
         playHaptic('fail')
-        setIsSuccess(false)
         setGuest(null)
         setError(data.error || 'Check-in failed')
       }
@@ -96,8 +86,31 @@ function CheckInContent() {
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Could not mark as double')
       playHaptic('success')
-      setMessage(data.message || 'Marked as arrived')
-      setGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns } : g))
+      setNotice(data.message || 'Marked as arrived')
+      closeResult()
+    } catch (err) {
+      playHaptic('fail')
+      setError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setDoubleBusy(false)
+    }
+  }
+
+  const handleMarkAllAsGroup = async () => {
+    if (!guest) return
+    setDoubleBusy(true)
+    try {
+      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'group' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not mark the group')
+      playHaptic('success')
+      setNotice(data.message || 'Marked as arrived')
+      closeResult()
     } catch (err) {
       playHaptic('fail')
       setError(err instanceof Error ? err.message : 'Network error')
@@ -118,37 +131,9 @@ function CheckInContent() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || 'Could not undo')
-      setUndone(true)
-      setGuest(null)
-      setMessage('')
-      setError('')
+      setNotice(data.message || 'Scan undone')
+      closeResult()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network error')
-    } finally {
-      setDoubleBusy(false)
-    }
-  }
-
-  const offerDouble = guest ? canMarkAsDouble(guest) : false
-  const offerGroup = guest ? canMarkAllAsGroup(guest) : false
-
-  const handleMarkAllAsGroup = async () => {
-    if (!guest) return
-    setDoubleBusy(true)
-    try {
-      const res = await fetch(`/api/guests/${guest.id}/checkin`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ checkedIn: true, allGroup: true, label: 'group' }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error || 'Could not mark the group')
-      playHaptic('success')
-      setMessage(data.message || 'Marked as arrived')
-      setGuest((g) => (g ? { ...g, fullyCheckedIn: true, checkInCount: g.maxCheckIns } : g))
-    } catch (err) {
-      playHaptic('fail')
       setError(err instanceof Error ? err.message : 'Network error')
     } finally {
       setDoubleBusy(false)
@@ -167,6 +152,7 @@ function CheckInContent() {
               Enter the 5-digit card number
             </label>
             <input
+              ref={inputRef}
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
@@ -201,74 +187,27 @@ function CheckInContent() {
           </div>
         )}
 
-        {message && !error && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`mt-6 p-4 rounded-xl text-center font-medium ${
-              isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`}
-          >
-            {message}
-          </motion.div>
-        )}
-
-        {guest && !undone && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 space-y-3"
-          >
-            <p className="text-center text-gray-600">
-              Welcome, <span className="font-semibold">{guest.name}</span>!
-            </p>
-
-            {offerDouble ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMarkAsDouble}
-                  disabled={doubleBusy}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50 transition hover:bg-green-700"
-                >
-                  {doubleBusy ? <Loader2 size={20} className="animate-spin" /> : <Users size={20} />}
-                  Mark as Double
-                </button>
-                <p className="text-center text-xs text-gray-500 leading-snug">
-                  Both people arrived together - mark the whole card in one tap instead of
-                  scanning again.
-                </p>
-              </>
-            ) : null}
-
-            {offerGroup ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleMarkAllAsGroup}
-                  disabled={doubleBusy}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-xl font-semibold text-lg disabled:opacity-50 transition hover:bg-green-700"
-                >
-                  {doubleBusy ? <Loader2 size={20} className="animate-spin" /> : <Users size={20} />}
-                  Mark all as group
-                </button>
-                <p className="text-center text-xs text-gray-500 leading-snug">
-                  The whole group arrived together - mark every scan on this card in one tap.
-                </p>
-              </>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={handleUndo}
-              disabled={doubleBusy}
-              className="w-full inline-flex items-center justify-center gap-2 text-gray-500 text-sm font-semibold py-2 disabled:opacity-50 transition hover:text-gray-800"
-            >
-              <Undo2 size={16} /> Undo this scan
-            </button>
-          </motion.div>
+        {notice && !error && (
+          <div className="mt-6 p-4 rounded-xl text-center font-medium bg-green-100 text-green-800">
+            {notice}
+          </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {guest ? (
+          <ScanResultCard
+            key={guest.id}
+            guest={guest}
+            reducedMotion={reducedMotion}
+            doubleBusy={doubleBusy}
+            onClose={closeResult}
+            onMarkDouble={() => void handleMarkAsDouble()}
+            onMarkGroup={() => void handleMarkAllAsGroup()}
+            onUndo={() => void handleUndo()}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   )
 }

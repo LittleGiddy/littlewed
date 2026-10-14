@@ -8,6 +8,7 @@ import {
   Copy, Check, Filter
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { phoneMatches } from '@/lib/phone';
 
 interface Guest {
   id: string;
@@ -52,7 +53,7 @@ export default function BackupGuestsPage() {
     const term = search.trim().toLowerCase();
     return guests.filter(g =>
       g.name.toLowerCase().includes(term) ||
-      (g.phone && g.phone.includes(term)) ||
+      phoneMatches(g.phone, term) ||
       (g.event?.name?.toLowerCase().includes(term))
     );
   }, [guests, search]);

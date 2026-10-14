@@ -56,19 +56,12 @@ export default async function ClientDashboard() {
   const simpleEventMode = tenant?.simpleEventMode ?? false;
   const newEventUrl = simpleEventMode ? '/client/events/new-simple' : '/client/events/new';
 
-  const totalGuests = await prisma.guest.count({ where: { event: { tenantId } } });
-  const checkedIn = await prisma.guest.count({ where: { event: { tenantId }, checkedIn: true } });
-  const totalResponded = (await prisma.rsvp.count({ where: { event: { tenantId } } })) as number;
-
   const firstName = session.user.name?.split(' ')[0] ?? 'there';
 
   return (
     <DashboardContent
       firstName={firstName}
       credits={tenant?.credits ?? 0}
-      totalGuests={totalGuests}
-      checkedIn={checkedIn}
-      responded={totalResponded}
       events={transformedEvents}
       newEventUrl={newEventUrl}
     />

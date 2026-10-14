@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { confirmToast } from '@/lib/confirmToast';
+import { phoneMatches } from '@/lib/phone';
 import Papa from 'papaparse';
 import { jsPDF } from 'jspdf';
 
@@ -196,7 +197,7 @@ export default function TenantDetailPage() {
   const filteredGuests = guests.filter(g => {
     if (!guestSearch) return true;
     const q = guestSearch.toLowerCase();
-    return g.name?.toLowerCase().includes(q) || g.phone?.includes(q) || g.email?.toLowerCase().includes(q) || g.cardNumber?.includes(q);
+    return g.name?.toLowerCase().includes(q) || phoneMatches(g.phone, guestSearch) || g.email?.toLowerCase().includes(q) || g.cardNumber?.includes(guestSearch);
   });
 
   // ─── Export helpers (guest list) ────────────────────────────────────

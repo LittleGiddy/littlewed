@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { guestTitleOptions } from '@/lib/guestTypes';
+import { phoneMatches } from '@/lib/phone';
 
 interface EventDetails {
   id: string;
@@ -110,7 +111,7 @@ export default function EventDetailPage() {
   const filteredGuests = event.guests.filter(g => {
     const matchesSearch = !guestSearch ||
       g.name?.toLowerCase().includes(guestSearch.toLowerCase()) ||
-      g.phone?.includes(guestSearch) ||
+      phoneMatches(g.phone, guestSearch) ||
       g.cardNumber?.includes(guestSearch);
     const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'checked-in' && g.checkedIn) ||

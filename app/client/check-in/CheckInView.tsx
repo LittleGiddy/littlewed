@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertCircle,
   ArrowLeft,
@@ -29,10 +28,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import jsQR from 'jsqr';
-import { showCheckInWelcome } from '@/app/components/CheckInWelcomeToast';
 import { guestTypeBadge, guestRecordMaxScans, cardGroupIdCount, cardTotalScans } from '@/lib/guestTypes';
+import ScanResultCard from '@/app/components/ScanResultCard';
 import { phoneMatches } from '@/lib/phone';
-import { canMarkAsDouble as canMarkAsDoubleRule, canMarkAllAsGroup } from '@/lib/checkin';
 import { useReducedMotion } from '@/lib/motion';
 import {
   AppAvatar,
@@ -188,13 +186,6 @@ function guestTypeTone(guest: Guest): AppChipTone {
   return 'neutral';
 }
 
-/**
- * A DOUBLE card can arrive as a pair at the door, so after the first scan the
- * operator is offered "Mark as Double" instead of having to scan the same card
- * a second time. The rules live in lib/checkin.ts.
- */
-const canMarkAsDouble = canMarkAsDoubleRule;
-
 const STATUS_META: Record<
   Exclude<StatusFilter, 'all'>,
   { label: string; chip: AppChipTone; active: string }
@@ -205,7 +196,6 @@ const STATUS_META: Record<
 };
 
 export default function CheckInView({ eventId }: { eventId: string | null }) {
-  const router = useRouter();
   const reducedMotion = useReducedMotion();
 
   const [activeTab, setActiveTab] = useState<'scan' | 'data'>('scan');
@@ -365,6 +355,16 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     return () => cancelAnimationFrame(frame);
   }, [scanning]);
 
+  // Dismiss the scan-result card and hand the camera back so the queue can
+  // keep moving. Every close path (auto-close, the X button, "Done", marking a
+  // double/group or undoing) funnels through here so the camera can never be
+  // left frozen on the frame that was scanned.
+  const closeResult = useCallback(() => {
+    setLastScan(null);
+    setErrorMessage('');
+    if (activeTab === 'scan') startCamera();
+  }, [activeTab, startCamera]);
+
   // ─── Check-in ───────────────────────────────────────────────────────
   const processCheckin = useCallback(
     async (value: string) => {
@@ -414,11 +414,6 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         setLastScan(data as ScanResult);
 
         const { guest } = data as ScanResult;
-        showCheckInWelcome({
-          name: fullName(guest),
-          subtitle: guest.maxCheckIns > 1 ? `Checked in ${guest.checkInCount}/${guest.maxCheckIns}` : undefined,
-          onDismiss: () => router.refresh(),
-        });
 
         recentKeyRef.current += 1;
         setRecentScans((prev) =>
@@ -439,18 +434,10 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
         loadGuests();
 
-        // Bring the camera straight back rather than holding the frozen frame
-        // for four seconds. The welcome toast already shows what was scanned,
-        // so the operator can keep the queue moving while it is still up.
-        if (activeTab === 'scan') startCamera();
-
-        // The result card stays up long enough to press "Mark as Double"; a
-        // DOUBLE card needs a longer window because it carries a decision.
-        const holdMs = canMarkAsDouble(guest) ? 9000 : 4000;
-        setTimeout(() => {
-          setLastScan((current) => (current?.guest.id === guest.id ? null : current));
-          setErrorMessage('');
-        }, holdMs);
+        // The scan-result card now owns the screen while it is up (it carries
+        // the guest's details, the "Mark as Double" decision and its own
+        // auto-close), so the camera is held on the scanned frame until the
+        // card closes. closeResult() restarts it.
       } catch {
         playSound('fail');
         playHaptic('fail');
@@ -462,7 +449,7 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         setLoading(false);
       }
     },
-    [activeTab, loadGuests, router, startCamera]
+    [activeTab, loadGuests, startCamera]
   );
 
   useEffect(() => {
@@ -576,6 +563,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       });
       setRecentScans((prev) => prev.map((s) => (s.guestId === guest.id ? { ...s, undone: false } : s)));
       loadGuests();
+      // The decision is made - close the card and bring the camera back.
+      closeResult();
     } catch (error) {
       playSound('fail');
       playHaptic('fail');
@@ -636,6 +625,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       });
       setRecentScans((prev) => prev.map((s) => (s.guestId === guest.id ? { ...s, undone: false } : s)));
       loadGuests();
+      // The decision is made - close the card and bring the camera back.
+      closeResult();
     } catch (error) {
       playSound('fail');
       playHaptic('fail');
@@ -668,13 +659,11 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
       playHaptic('tap');
       setRecentScans((prev) => prev.map((s) => (s.key === scan.key ? { ...s, undone: true } : s)));
-      setLastScan((current) =>
-        current && current.guest.id === scan.guestId ? null : current
-      );
       // Let the operator re-scan the same card straight after an undo.
       if (scan.cardNumber) delete lastScanAtRef.current[scan.cardNumber];
       toast.success(data.message || 'Scan undone', { icon: <Undo2 size={18} className="text-warn" /> });
       loadGuests();
+      closeResult();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Network error', {
         icon: <AlertCircle size={18} className="text-danger" />,
@@ -1023,7 +1012,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
             </form>
           </AppCard>
 
-          {/* Result is announced to screen readers on every scan. */}
+          {/* Errors are announced to screen readers; the success result is a
+              dedicated card (ScanResultCard) rendered further down. */}
           <div aria-live="polite" aria-atomic="true">
             {errorMessage ? (
               <div className="flex items-start gap-2.5 rounded-card border border-danger-border bg-danger-soft px-4 py-3">
@@ -1031,130 +1021,8 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 <p className="text-[13px] font-medium text-danger leading-snug">{errorMessage}</p>
               </div>
             ) : null}
-
-            {lastScan ? (
-              <motion.div
-                initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-card border border-success-border bg-success-soft px-4 py-3.5 space-y-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-10 h-10 rounded-full bg-success/12 grid place-items-center shrink-0">
-                    <CheckCircle size={22} className="text-success" aria-hidden="true" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 text-[15px] leading-tight break-words hyphens-auto">
-                      {fullName(lastScan.guest)}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                      <AppChip tone={guestTypeTone(lastScan.guest)}>
-                        {guestTypeBadge(lastScan.guest.guestType, lastScan.guest.guestCount)}
-                      </AppChip>
-                      {lastScan.guest.cardNumber && (
-                        <span className="font-mono text-[11px] text-gray-500">
-                          #{lastScan.guest.cardNumber}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {lastScan.guest.maxCheckIns > 1 ? (
-                    <AppChip tone="success" solid className="bg-success text-white shrink-0">
-                      {lastScan.guest.checkInCount}/{lastScan.guest.maxCheckIns}
-                    </AppChip>
-                  ) : null}
-                </div>
-
-                {/* Shared DOUBLE cards: show who is still outstanding. */}
-                {lastScan.guest.sharedGroup && lastScan.guest.groupMembers?.length ? (
-                  <div className="pt-3 border-t border-success-border">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-success mb-2">
-                      On this card
-                    </p>
-                    <ul className="space-y-1.5">
-                      {lastScan.guest.groupMembers.map((member) => (
-                        <li key={member.id} className="flex items-center gap-2 text-[13px]">
-                          {member.checkedIn ? (
-                            <CheckCheck size={13} className="text-success shrink-0" aria-hidden="true" />
-                          ) : (
-                            <User size={13} className="text-gray-400 shrink-0" aria-hidden="true" />
-                          )}
-                           <span
-                            className={
-                              member.checkedIn
-                                ? 'text-gray-500 line-through break-words hyphens-auto'
-                                : 'font-medium text-gray-900 break-words hyphens-auto'
-                            }
-                          >
-                            {member.name || 'Guest'}
-                          </span>
-                          <span className="sr-only">{member.checkedIn ? 'checked in' : 'not yet'}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {/* DOUBLE arriving together: one tap instead of a second scan. */}
-                {canMarkAsDouble(lastScan.guest) ? (
-                  <div className="pt-3 border-t border-success-border">
-                    <AppButton
-                      size="lg"
-                      fullWidth
-                      loading={doubleBusy}
-                      loadingText="Marking…"
-                      icon={<Users size={17} />}
-                      onClick={() => void handleMarkAsDouble(lastScan.guest)}
-                    >
-                      Mark as Double
-                    </AppButton>
-                    <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
-                      {lastScan.guest.sharedGroup
-                        ? 'Both people arrived together — mark the whole card in one tap instead of scanning again.'
-                        : 'Both people arrived together — mark the second person in without scanning again.'}
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* Group card arriving together: mark every remaining scan at once. */}
-                {canMarkAllAsGroup(lastScan.guest) ? (
-                  <div className="pt-3 border-t border-success-border">
-                    <AppButton
-                      size="lg"
-                      fullWidth
-                      loading={doubleBusy}
-                      loadingText="Marking…"
-                      icon={<Users size={17} />}
-                      onClick={() => void handleMarkAllAsGroup(lastScan.guest)}
-                    >
-                      Mark all as group
-                    </AppButton>
-                    <p className="mt-1.5 text-center text-[11px] text-gray-500 leading-snug">
-                      The whole group arrived together — mark every scan on this card in one tap.
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* Undo a mis-scan. Offered on the newest entry only, so "undo"
-                    can never mean anything ambiguous. */}
-                {recentScans[0] && recentScans[0].guestId === lastScan.guest.id && !recentScans[0].external ? (
-                  <button
-                    type="button"
-                    disabled={undoBusy}
-                    onClick={() => void handleUndo(recentScans[0])}
-                    className="w-full inline-flex items-center justify-center gap-1.5 pt-3 mt-1 border-t border-success-border text-[12px] font-semibold text-gray-500 transition hover:text-gray-800 disabled:opacity-50"
-                  >
-                    {undoBusy ? (
-                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Undo2 size={13} aria-hidden="true" />
-                    )}
-                    Undo this scan
-                  </button>
-                ) : null}
-                </motion.div>
-            ) : null}
           </div>
+
 
           {/* Recent arrivals. A door queue moves fast and a mis-scan is easy to
               miss, so the last few scans stay on screen with their time. */}
@@ -1653,6 +1521,31 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
           </div>
         ) : null}
       </AppBottomSheet>
+
+      {/* ─── Scan result (success) ─── */}
+      <AnimatePresence>
+        {lastScan ? (
+          <ScanResultCard
+            key={lastScan.guest.id}
+            guest={lastScan.guest}
+            reducedMotion={reducedMotion}
+            doubleBusy={doubleBusy}
+            undoBusy={undoBusy}
+            onClose={closeResult}
+            onMarkDouble={() => void handleMarkAsDouble(lastScan.guest)}
+            onMarkGroup={() => void handleMarkAllAsGroup(lastScan.guest)}
+            onUndo={
+              recentScans[0] &&
+              recentScans[0].guestId === lastScan.guest.id &&
+              !recentScans[0].external
+                ? () => void handleUndo(recentScans[0])
+                : null
+            }
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
+
+

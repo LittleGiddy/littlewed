@@ -1014,6 +1014,33 @@ export default function LoginPage() {
           .mobile-menu-btn { display: none; }
           .mobile-menu { display: none !important; }
         }
+
+        /* Large devices: give the form more room and scale the type/controls so
+           the heading, inputs and buttons share one consistent column width
+           instead of a small card floating in a wide panel. The card + footer
+           stay centred together as a single block. */
+        @media (min-width: 1024px) {
+          .right { justify-content: flex-start; padding: clamp(16px, 4vh, 40px) 56px; }
+          .right-inner { max-width: 480px; margin: auto 0; }
+
+          .card { border-radius: 24px; }
+          .card-bar { height: 5px; }
+
+          .form-body { padding: 32px 36px 26px; }
+          .eyebrow { font-size: 11px; }
+          .form-title { font-size: 24px; }
+          .form-sub { font-size: 13.5px; }
+
+          .field { margin-bottom: 15px; }
+          .flabel { font-size: 15px; }
+          .finput { padding: 15px 17px; }
+
+          .btn { padding: 15px; font-size: 15px; }
+          .btn-google { padding: 13px; font-size: 14px; }
+          .divider { margin-top: 16px; }
+
+          .card-footer { padding: 14px 36px 18px; font-size: 13px; }
+        }
       `}</style>
 
       <div className="page">

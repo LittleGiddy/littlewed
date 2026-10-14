@@ -19,6 +19,7 @@ import { format, formatDistanceToNow, differenceInHours } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirmToast, isMassDelete } from '@/lib/confirmToast';
 import { isContributionSettled } from '@/lib/contributions';
+import { phoneMatches } from '@/lib/phone';
 import { guestTitleOptions } from '@/lib/guestTypes';
 import ThanksCardModal from '@/components/ThanksCardModal';
 import GuestPageThemeEditor from '@/app/components/GuestPageThemeEditor';
@@ -515,7 +516,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const filteredGuests = useMemo(() => {
     if (!searchTerm.trim()) return guests;
     const term = searchTerm.trim().toLowerCase();
-    return guests.filter(g => g.name.toLowerCase().includes(term) || (g.phone && g.phone.includes(term)));
+    return guests.filter(g => g.name.toLowerCase().includes(term) || phoneMatches(g.phone, term));
   }, [guests, searchTerm]);
 
   const totalPages = Math.ceil(filteredGuests.length / pageSize);
@@ -548,7 +549,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
   const filteredBackup = useMemo(() => {
     if (!backupSearch.trim()) return allGuests;
     const term = backupSearch.trim().toLowerCase();
-    return allGuests.filter(g => g.name.toLowerCase().includes(term) || (g.phone && g.phone.includes(term)));
+    return allGuests.filter(g => g.name.toLowerCase().includes(term) || phoneMatches(g.phone, term));
   }, [allGuests, backupSearch]);
 
   const backupTotalPages = Math.ceil(filteredBackup.length / pageSize);
