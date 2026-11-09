@@ -128,6 +128,36 @@ async function renderTextSvg(
   return await sharp(Buffer.from(svg)).png().toBuffer();
 }
 
+/** Parse a CSS-ish colour (hex or rgb/rgba) into sharp's RGBA form. */
+function parseColorToRgba(input: string): { r: number; g: number; b: number; alpha: number } {
+  const str = (input || '').trim();
+
+  const hex = str.match(/^#?([0-9a-f]{3,8})$/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length <= 4) h = h.split('').map((c) => c + c).join('');
+    return {
+      r: parseInt(h.slice(0, 2), 16) || 0,
+      g: parseInt(h.slice(2, 4), 16) || 0,
+      b: parseInt(h.slice(4, 6), 16) || 0,
+      alpha: h.length >= 8 ? (parseInt(h.slice(6, 8), 16) || 0) / 255 : 1,
+    };
+  }
+
+  const rgb = str.match(/rgba?\(([^)]+)\)/i);
+  if (rgb) {
+    const parts = rgb[1].split(',').map((s) => parseFloat(s.trim()));
+    return {
+      r: Math.min(255, Math.max(0, parts[0] || 0)),
+      g: Math.min(255, Math.max(0, parts[1] || 0)),
+      b: Math.min(255, Math.max(0, parts[2] || 0)),
+      alpha: parts.length > 3 && !isNaN(parts[3]) ? Math.min(1, Math.max(0, parts[3])) : 1,
+    };
+  }
+
+  return { r: 0, g: 0, b: 0, alpha: 1 };
+}
+
 async function applyOverlay(
   cardBuffer: Buffer,
   overlayColor: string,
@@ -141,12 +171,18 @@ async function applyOverlay(
   const width = metadata.width || 800;
   const height = metadata.height || 1200;
 
+  // Honour the opacity slider. Previously the overlay was always composited at
+  // full strength, so the designer preview and the generated card disagreed.
+  const base = parseColorToRgba(overlayColor);
   const overlayBuffer = await sharp({
     create: {
       width: width,
       height: height,
       channels: 4,
-      background: overlayColor,
+      background: {
+        ...base,
+        alpha: base.alpha * Math.min(1, Math.max(0, overlayOpacity)),
+      },
     },
   })
     .png()
@@ -364,22 +400,25 @@ export async function generateCardForGuest(
   const qrRotation = event.qrRotation || 0;
   const cardNumber = guest.cardNumber || '00000';
 
-  const qrTopLeftX = ((qrX) / 100) * actualWidth - qrSize / 2;
-  const qrTopLeftY = ((qrY) / 100) * actualHeight - qrSize / 2;
-
+  const qrCenterX = (qrX / 100) * actualWidth;
+  const qrCenterY = (qrY / 100) * actualHeight;
   const margin = Math.round(20 * scaleFactor);
-  const clampedX = Math.max(margin, Math.min(actualWidth - qrSize - margin, qrTopLeftX));
-  const clampedY = Math.max(margin, Math.min(actualHeight - qrSize - margin, qrTopLeftY));
+
+  // Place a box of `size` so its centre lands on `center`, keeping it inside
+  // the card. If it is bigger than the usable card it is centred instead of
+  // clamped to a corner.
+  const clampTopLeft = (center: number, size: number, max: number) => {
+    if (size + margin * 2 >= max) return (max - size) / 2;
+    return Math.min(max - size - margin, Math.max(margin, center - size / 2));
+  };
 
   console.log('[CardGen] QR:', {
     designerSize: event.qrSize || 150,
     scaledSize: qrSize,
     qrX: qrX,
     qrY: qrY,
-    topLeftX: Math.round(qrTopLeftX),
-    topLeftY: Math.round(qrTopLeftY),
-    clampedX: Math.round(clampedX),
-    clampedY: Math.round(clampedY)
+    centerX: Math.round(qrCenterX),
+    centerY: Math.round(qrCenterY),
   });
 
   let finalBuffer = processedBuffer;
@@ -397,20 +436,30 @@ export async function generateCardForGuest(
     }
 
     let qrToComposite = qrBuffer;
+    let qrWidth = qrSize;
+    let qrHeight = qrSize;
     try {
       if (qrRotation !== 0) {
+        // Rotate around the centre (transparent padding) so the QR pivots on
+        // the same point the designer preview uses.
         qrToComposite = await sharp(qrBuffer)
-          .rotate(qrRotation)
+          .rotate(qrRotation, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
           .png()
           .toBuffer();
+        const rotatedMeta = await sharp(qrToComposite).metadata();
+        qrWidth = rotatedMeta.width || qrSize;
+        qrHeight = rotatedMeta.height || qrSize;
       }
+
+      const left = clampTopLeft(qrCenterX, qrWidth, actualWidth);
+      const top = clampTopLeft(qrCenterY, qrHeight, actualHeight);
 
       finalBuffer = await sharp(processedBuffer)
         .composite([
           {
             input: qrToComposite,
-            top: Math.round(clampedY),
-            left: Math.round(clampedX),
+            top: Math.round(top),
+            left: Math.round(left),
           },
         ])
         .png()

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Phone, MessageCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Phone, MessageCircle, Check } from 'lucide-react';
 import { guestTypeLabel } from '@/lib/guestTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -215,31 +215,39 @@ export const FLOW_STEPS = [
 
 export function FlowSteps({ current }: { current: number }) {
   return (
-    <div className="flex items-center gap-2 mb-5 w-full max-w-md mx-auto">
+    <div className="mb-5 flex w-full items-center gap-1 rounded-full border border-gray-100 bg-white/80 p-1.5 shadow-elev-1 backdrop-blur">
       {FLOW_STEPS.map((s, i) => {
         const stepNum = i + 1;
         const isDone = stepNum < current;
         const isActive = stepNum === current;
         return (
-          <div key={s.label} className="flex items-center gap-2 flex-1">
-            <div className="flex flex-col items-center gap-1 flex-1">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  isDone
-                    ? 'bg-[#1A7A4A] text-white'
-                    : isActive
-                      ? 'bg-brandbg text-white ring-4 ring-brandring'
+          <div key={s.label} className="flex min-w-0 flex-1 items-center gap-1">
+            <div
+              className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 transition-all duration-200 ease-soft ${
+                isActive ? 'bg-brand text-white shadow-sm' : ''
+              }`}
+            >
+              <span
+                className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold transition-colors ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : isDone
+                      ? 'bg-success text-white'
                       : 'bg-gray-100 text-gray-400'
                 }`}
               >
-                {isDone ? <CheckCircle2 size={14} /> : s.short}
-              </div>
-              <span className={`text-[10px] font-semibold ${isActive ? 'text-gray-800' : 'text-gray-400'}`}>
+                {isDone ? <Check size={11} strokeWidth={3} /> : s.short}
+              </span>
+              <span
+                className={`truncate text-[11px] font-semibold ${
+                  isActive ? 'text-white' : isDone ? 'text-success' : 'text-gray-400'
+                }`}
+              >
                 {s.label}
               </span>
             </div>
-            {stepNum < FLOW_STEPS.length && (
-              <div className={`h-px flex-1 mb-4 ${isDone ? 'bg-[#1A7A4A]/40' : 'bg-gray-100'}`} />
+            {i < FLOW_STEPS.length - 1 && (
+              <span className={`h-px w-2 shrink-0 ${isDone ? 'bg-success/40' : 'bg-gray-200'}`} />
             )}
           </div>
         );
@@ -260,16 +268,19 @@ export function FlowHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 mb-6">
+    <div className="mb-5 flex items-center gap-3">
       <Link
         href={backUrl}
-        className="flex-shrink-0 w-9 h-9 rounded-tap border border-gray-200 bg-white flex items-center justify-center text-gray-600 hover:text-brandtext hover:border-brandborder transition"
+        aria-label="Go back"
+        className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-tap border border-gray-200 bg-white text-gray-600 shadow-elev-1 transition-all duration-150 ease-soft hover:border-brand/30 hover:text-brand active:scale-95"
       >
-        <ArrowLeft size={17} />
+        <ArrowLeft size={18} />
       </Link>
-      <div className="min-w-0">
-        <h1 className="font-display text-xl sm:text-2xl font-black text-gray-900 truncate leading-tight">{title}</h1>
-        {subtitle && <p className="text-xs sm:text-sm text-gray-500 truncate">{subtitle}</p>}
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate font-display text-[22px] font-black leading-tight text-gray-900 sm:text-2xl">
+          {title}
+        </h1>
+        {subtitle && <p className="mt-0.5 truncate text-xs text-gray-500">{subtitle}</p>}
       </div>
     </div>
   );

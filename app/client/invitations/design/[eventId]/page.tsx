@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ModernColorPicker from '@/app/components/ModernColorPicker';
-import { CARD_FONTS } from '@/lib/card-fonts.shared';
+import { CARD_FONTS, isCardFontRegularOnly, resolveCardFont } from '@/lib/card-fonts.shared';
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const DESIGNER_WIDTH = 800;
@@ -262,10 +262,11 @@ export default function InvitationDesigner() {
     computeCanvasSize();
     const ro = new ResizeObserver(() => computeCanvasSize());
     ro.observe(container);
-    window.addEventListener('resize', () => computeCanvasSize());
+    const onWindowResize = () => computeCanvasSize();
+    window.addEventListener('resize', onWindowResize);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', () => computeCanvasSize());
+      window.removeEventListener('resize', onWindowResize);
     };
   }, [computeCanvasSize]);
 
@@ -310,6 +311,17 @@ export default function InvitationDesigner() {
   // ─── Keyboard shortcuts ──────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Never hijack keys while the tenant is typing in a form field.
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
       else if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
       else if (e.key === 'Delete' && selectedLayerIndex !== null) {
@@ -719,8 +731,16 @@ export default function InvitationDesigner() {
     newY = Math.min(Math.max(0, newY), 100);
 
     if (dragging.type === 'qr') {
-      setQrX(newX);
-      setQrY(newY);
+      // Keep the whole QR (plus the 20px design margin the server enforces)
+      // inside the card so what the tenant drags is what gets generated.
+      const qrMargin = 20;
+      const halfWidthPct = ((qrSize / 2 + qrMargin) / DESIGNER_WIDTH) * 100;
+      const canvasHeight = DESIGNER_WIDTH * templateAspect;
+      const halfHeightPct = ((qrSize / 2 + qrMargin) / canvasHeight) * 100;
+      const clampAxis = (value: number, half: number) =>
+        half >= 50 ? 50 : Math.min(100 - half, Math.max(half, value));
+      setQrX(clampAxis(newX, halfWidthPct));
+      setQrY(clampAxis(newY, halfHeightPct));
       return;
     }
 
@@ -850,7 +870,6 @@ export default function InvitationDesigner() {
       position: 'absolute' as const,
       pointerEvents: 'auto' as const,
       touchAction: 'none' as const,
-      border: isSelected && !isLocked ? '2px solid var(--color-brand)' : 'none',
       borderRadius: '2px',
       opacity: isLocked ? 0.6 : 1,
     };
@@ -894,21 +913,34 @@ export default function InvitationDesigner() {
             transform: `translate(${transformX}, -50%) rotate(${layer.rotation || 0}deg)`,
             transformOrigin,
             fontSize: `${layer.fontSize}px`,
-            fontFamily: layer.fontFamily,
+            fontFamily: `'${resolveCardFont(layer.fontFamily)}', Georgia, serif`,
             color: layer.color,
             textAlign: textAlign,
             textShadow: shadow,
+            // The run must be the glyph advances only, because the server
+            // anchors center/right on the naive advance sum (see
+            // lib/cardFonts.ts). Kerning, ligatures and letter-spacing all
+            // change the browser's inline width and would drag the text off
+            // its anchor, so they are disabled here exactly like the reminder
+            // designer does it.
+            letterSpacing: 0,
+            fontKerning: 'none',
+            fontVariantLigatures: 'none',
+            fontFeatureSettings: '"liga" 0, "clig" 0, "kern" 0, "calt" 0',
+            // Match the server face selection: families with a single weight
+            // must not be synthetically emboldened.
+            fontWeight: isCardFontRegularOnly(layer.fontFamily) ? 400 : 700,
             width: 'auto',
-            maxWidth: '100%',
-            fontWeight: 'bold',
             whiteSpace: 'nowrap',
             lineHeight: 1,
             display: 'inline-block',
             ...(isSelected && !isLocked ? {
+              // Highlight ONLY the box outline. Adding padding/margin here
+              // would change the border-box width that translate(-50%/-100%)
+              // and transform-origin measure against, which made the text jump
+              // sideways the moment it was selected.
               boxShadow: '0 0 0 2px var(--color-brand), 0 0 0 4px rgba(13,75,75,0.1)',
               borderRadius: '4px',
-              padding: '4px 8px',
-              margin: '-4px -8px',
               backgroundColor: 'rgba(13,75,75,0.05)',
               cursor: 'grab',
             } : {}),
@@ -1053,6 +1085,26 @@ export default function InvitationDesigner() {
 
   const selectedLayer = selectedLayerIndex !== null ? layers[selectedLayerIndex] : null;
   const isTextLayer = selectedLayer?.type === 'text';
+
+  // QR snap grid: positions that keep the QR fully on the card with the same
+  // 20px design margin the server enforces, so a snapped QR never gets nudged
+  // at generation time.
+  const qrMargin = 20;
+  const qrHalfWidthPct = Math.min(((qrSize / 2 + qrMargin) / DESIGNER_WIDTH) * 100, 50);
+  const qrHalfHeightPct = Math.min(
+    ((qrSize / 2 + qrMargin) / (DESIGNER_WIDTH * templateAspect)) * 100,
+    50
+  );
+  const qrAlignColumns = [
+    { key: 'left', x: qrHalfWidthPct, label: 'Align left' },
+    { key: 'center', x: 50, label: 'Align center' },
+    { key: 'right', x: 100 - qrHalfWidthPct, label: 'Align right' },
+  ];
+  const qrAlignRows = [
+    { key: 'top', y: qrHalfHeightPct, label: 'Align top' },
+    { key: 'middle', y: 50, label: 'Align middle' },
+    { key: 'bottom', y: 100 - qrHalfHeightPct, label: 'Align bottom' },
+  ];
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -1217,7 +1269,14 @@ export default function InvitationDesigner() {
                       className="w-full h-full object-contain"
                       onLoad={handleTemplateLoaded}
                     />
-                    <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: overlayColor, opacity: overlayOpacity }} />
+                    <div
+                      className="absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundColor: overlayColor,
+                        opacity: overlayOpacity,
+                        mixBlendMode: 'overlay',
+                      }}
+                    />
 
                     {layers.map((layer, idx) => renderLayer(layer, idx))}
 
@@ -1578,8 +1637,8 @@ export default function InvitationDesigner() {
                             </button>
                           </div>
                           <p className="text-[8px] text-gray-400 mt-0.5">
-                            {selectedLayer.textAlign === 'center' ? 'Text centered at this position' :
-                             selectedLayer.textAlign === 'right' ? 'Text ends at this position' :
+                            {(selectedLayer.textAlign || 'left') === 'center' ? 'Text centered at this position' :
+                             (selectedLayer.textAlign || 'left') === 'right' ? 'Text ends at this position' :
                              'Text starts at this position'}
                           </p>
                         </div>
@@ -1729,27 +1788,56 @@ export default function InvitationDesigner() {
               <Section title="QR Code" section="qr" icon={<QrCode size={14} />} collapsedSections={collapsedSections} toggleSection={toggleSection}>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-700">Position</label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={Math.round(qrX)}
-                        onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
-                        placeholder="X"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={Math.round(qrY)}
-                        onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
-                        className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
-                        placeholder="Y"
-                      />
+                    <label className="block text-[10px] font-medium text-gray-700 mb-1">Quick align</label>
+                    <div className="flex items-center gap-2">
+                      <div className="grid grid-cols-3 gap-1" style={{ width: 84 }}>
+                        {qrAlignRows.map((row) =>
+                          qrAlignColumns.map((col) => {
+                            const active =
+                              Math.abs(qrX - col.x) < 0.5 && Math.abs(qrY - row.y) < 0.5;
+                            return (
+                              <button
+                                key={`${row.key}-${col.key}`}
+                                type="button"
+                                title={`${row.label} · ${col.label}`}
+                                onClick={() => {
+                                  setQrX(col.x);
+                                  setQrY(row.y);
+                                }}
+                                className={`flex h-6 items-center justify-center rounded-md border transition ${
+                                  active
+                                    ? 'border-brandbg bg-brandbg text-white'
+                                    : 'border-gray-200 bg-gray-50 text-gray-300 hover:border-brandborder hover:text-brandtext'
+                                }`}
+                              >
+                                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                      <div className="flex-1 grid grid-cols-2 gap-1.5">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={Math.round(qrX)}
+                          onChange={e => setQrX(Math.min(100, Math.max(0, Number(e.target.value))))}
+                          className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
+                          placeholder="X"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={Math.round(qrY)}
+                          onChange={e => setQrY(Math.min(100, Math.max(0, Number(e.target.value))))}
+                          className="w-full p-1 border border-gray-200 rounded-lg text-xs text-center focus:ring-2 focus:ring-brandring focus:border-transparent"
+                          placeholder="Y"
+                        />
+                      </div>
                     </div>
+                    <p className="mt-1 text-[8px] text-gray-400">Snaps the QR inside the card edges.</p>
                   </div>
                   <RangeSlider
                     label="Size"
