@@ -39,7 +39,7 @@ export default async function ClientDashboard() {
   const rsvpCounts = await prisma.rsvp.groupBy({
     by: ['eventId'],
     _count: { id: true },
-    where: { event: { tenantId } },
+    where: { event: { tenantId }, isCurrent: true },
   });
   const rsvpCountMap = new Map(rsvpCounts.map(r => [r.eventId, r._count.id]));
 

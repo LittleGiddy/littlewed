@@ -14,6 +14,7 @@ interface RsvpRow {
   id: string;
   guestName: string;
   status: string;
+  channel: string;
   createdAt: Date;
 }
 
@@ -37,7 +38,8 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ id:
     where: { id: eventId, tenantId },
     include: {
       rsvps: {
-        select: { id: true, guestId: true, guestName: true, status: true, createdAt: true },
+        where: { isCurrent: true },
+        select: { id: true, guestId: true, guestName: true, status: true, channel: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
         take: 500,
       },
@@ -159,7 +161,7 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ id:
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-800 truncate">{r.guestName}</p>
                     <p className="text-[11px] text-gray-400">
-                      {format(new Date(r.createdAt), 'MMM d, yyyy · h:mm a')} · {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })}
+                      {format(new Date(r.createdAt), 'MMM d, yyyy · h:mm a')} · {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })} · {r.channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'}
                     </p>
                   </div>
                   <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full ring-1 shrink-0 ${chip.cls}`}>

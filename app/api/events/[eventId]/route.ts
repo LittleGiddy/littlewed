@@ -61,7 +61,8 @@ export async function GET(
           },
         },
         rsvps: {
-          select: { id: true, guestId: true, guestName: true, status: true, createdAt: true },
+          where: { isCurrent: true },
+          select: { id: true, guestId: true, guestName: true, status: true, channel: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
           take: 200,
         },

@@ -160,31 +160,31 @@ model Tenant {
 }
 
 model Event {
-  id                 String      @id @default(cuid())
+  id                 String             @id @default(cuid())
   name               String
   date               DateTime
   venue              String
   address            String
   total_budget       Int?
-  commission_paid    Boolean     @default(false)
+  commission_paid    Boolean            @default(false)
   tenantId           String
-  tenant             Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   guests             Guest[]
   rsvps              Rsvp[]
   wishes             GuestWish[]
   editRequests       GuestEditRequest[]
   staffAccess        EventStaffAccess[]
-  createdAt          DateTime    @default(now())
-  status             String      @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
+  createdAt          DateTime           @default(now())
+  status             String             @default("DRAFT") // "DRAFT" | "ACTIVE" | "LIVE" | "EXPIRED" | "ARCHIVED"
   pausedAt           DateTime? // when the event was paused/expired
   expiresAt          DateTime? // when the event will be permanently archived
   resumedAt          DateTime? // when the event was last resumed (for tracking)
-  reminderSent       Boolean     @default(false) // track if 24h reminder was sent
-  manualReminderSent Boolean     @default(false) // track if the manual reminder-message feature was used (once per event for non-bypassed tenants)
-  expiredNotified    Boolean     @default(false) // track if expiration email was sent
+  reminderSent       Boolean            @default(false) // track if 24h reminder was sent
+  manualReminderSent Boolean            @default(false) // track if the manual reminder-message feature was used (once per event for non-bypassed tenants)
+  expiredNotified    Boolean            @default(false) // track if expiration email was sent
   checkInStartTime   DateTime? // When check-in becomes available (defaults to event date/time)
-  qrRotation         Float?      @default(0)
-  externalQrCode     String?     @unique // single per-event QR for cards printed outside the app (guests not imported); unlimited valid scans
+  qrRotation         Float?             @default(0)
+  externalQrCode     String?            @unique // single per-event QR for cards printed outside the app (guests not imported); unlimited valid scans
 
   // ─── Contribution (MCHANGO) fields ───────────────────────────────────
   // These feed the approved "Mchango" WhatsApp template and the public
@@ -305,24 +305,24 @@ model Event {
 
   // Reminder card (WhatsApp reminder designer - uploaded background + guest name overlay)
   reminderCardUrl       String?
-  reminderCardNameX     Float?         @default(50)
-  reminderCardNameY     Float?         @default(40)
-  reminderCardNameSize  Int?           @default(34)
-  reminderCardNameColor String?        @default("#ffffff")
-  reminderCardNameAlign String?        @default("center") // "left" | "center" | "right"
-  reminderCardNameFont  String?        @default("Playfair Display")
+  reminderCardNameX     Float?  @default(50)
+  reminderCardNameY     Float?  @default(40)
+  reminderCardNameSize  Int?    @default(34)
+  reminderCardNameColor String? @default("#ffffff")
+  reminderCardNameAlign String? @default("center") // "left" | "center" | "right"
+  reminderCardNameFont  String? @default("Playfair Display")
 
   // ─── Message drafts & settings ────────────────────────────────────────
   // Written by the composers as the user types, so the values live on the
   // account (Event -> tenant) instead of the browser that typed them. Any
   // device signed into the same tenant sees the same draft.
-  smsInviteTemplate    String?  // SMS invitation message text
-  whatsappInviteDraft  Json?    // { template, vars, contact, contact2, eventType }
-  whatsappDailyLimit   Int?     // WhatsApp daily send cap for this event
-  reminderSmsMessage   String?  // reminder text typed in the remind flow
-  kumbushaMessage      String?  // reminder text typed on the Kumbusha Michango page
+  smsInviteTemplate        String? // SMS invitation message text
+  whatsappInviteDraft      Json? // { template, vars, contact, contact2, eventType }
+  whatsappDailyLimit       Int? // WhatsApp daily send cap for this event
+  reminderSmsMessage       String? // reminder text typed in the remind flow
+  kumbushaMessage          String? // reminder text typed on the Kumbusha Michango page
   reminderMchangoOverrides Json? // { fieldKey: value } typed in the WhatsApp reminder variable editor
-  contributions        Contribution[]
+  contributions            Contribution[]
 }
 
 // ─── Staff event grants ─────────────────────────────────────────────────────
@@ -462,17 +462,23 @@ model GuestEditRequest {
 // Each RSVP submission is recorded so tenants can review a live feed of
 // "who replied when" on their dashboard.
 model Rsvp {
-  id        String   @id @default(cuid())
-  eventId   String
-  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  guestId   String?
-  guest     Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
-  guestName String // snapshot of the guest's name at submit time
-  status    String // "yes" | "no" | "pending"
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  eventId    String
+  event      Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  guestId    String?
+  guest      Guest?   @relation(fields: [guestId], references: [id], onDelete: SetNull)
+  guestName  String // snapshot of the guest's name at submit time
+  status     String // "yes" | "no" | "pending"
+  channel    String   @default("WEB") // "WEB" | "WHATSAPP"
+  messageId  String?
+  rawPayload Json?
+  isCurrent  Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
 
-  @@index([eventId, createdAt])
+  @@index([eventId, isCurrent, createdAt])
+  @@index([guestId, isCurrent])
+  @@index([messageId])
 }
 
 // A wish left by a guest for the couple / ceremony (shown on the invitee page).

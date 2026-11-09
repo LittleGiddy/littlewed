@@ -13,25 +13,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
   }
 
-  await prisma.guest.update({
-    where: { id: guestId },
-    data: {
-      attending: status,
-      // You'd add dietary and plusOne fields to schema
-    },
-  })
-
-  // Record the submission so tenants can review who replied, when.
-  // One current row per guest: drop any previous reply, keep the latest.
-  await prisma.rsvp.deleteMany({ where: { eventId: guest.eventId, guestId } })
-  await prisma.rsvp.create({
-    data: {
-      eventId: guest.eventId,
-      guestId: guest.id,
-      guestName: guest.name,
-      status,
-    },
-  })
+  await prisma.$transaction([
+    prisma.guest.update({
+      where: { id: guestId },
+      data: { attending: status },
+    }),
+    prisma.rsvp.updateMany({
+      where: { eventId: guest.eventId, guestId, isCurrent: true },
+      data: { isCurrent: false },
+    }),
+    prisma.rsvp.create({
+      data: {
+        eventId: guest.eventId,
+        guestId: guest.id,
+        guestName: guest.name,
+        status,
+        channel: 'WEB',
+        isCurrent: true,
+      },
+    }),
+  ])
 
   return NextResponse.json({ success: true })
 }

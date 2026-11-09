@@ -117,6 +117,19 @@ export default function ComposeWhatsappPage() {
           'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
         ].join('\n');
       }
+      if (key === 'sendofftemp') {
+        return [
+          `Ndugu ${SAMPLE_GUEST.name}`,
+          `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'Send-Off'} ${couple || '...'}`,
+          `itakayofanyika tarehe ${effectiveVars.date || '{date}'}`,
+          `Ukumbi: ${effectiveVars.venue || '{venue}'}`,
+          `Muda: ${effectiveVars.time || '{time}'}`,
+          `Card No: ${cardNumber} ${cardType}`,
+          ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
+          '',
+          'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Thibitisha ushiriki wako hapa chini au bonyeza link kwa maelezo zaidi👇️',
+        ].join('\n');
+      }
       if (key === 'mdakumbe') {
         return [
           'Event: KADI YA MUALIKO UKUMBINI',
@@ -204,11 +217,16 @@ export default function ComposeWhatsappPage() {
                 >
                   {snippet}
                 </div>
-                {(tpl.hasMoreInfoButton || tpl.hasEventType || tpl.hasContact || tpl.hasContact2) && (
+                {(tpl.hasMoreInfoButton || tpl.hasQuickReply || tpl.hasEventType || tpl.hasContact || tpl.hasContact2) && (
                   <div className="mt-2.5 flex flex-wrap gap-1">
                     {tpl.hasMoreInfoButton && (
                       <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
                         More Info
+                      </span>
+                    )}
+                    {tpl.hasQuickReply && (
+                      <span className="text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5">
+                        Quick reply
                       </span>
                     )}
                     {tpl.hasEventType && (
@@ -258,7 +276,7 @@ export default function ComposeWhatsappPage() {
             </div>
           ))}
 
-          {currentTpl.hasMoreInfoButton && (
+          {(currentTpl.hasMoreInfoButton || currentTpl.hasArea) && (
             <div>
               <label className="text-xs font-medium text-gray-600">Area / Location</label>
               <input
@@ -331,9 +349,20 @@ export default function ComposeWhatsappPage() {
           >
             {preview}
           </div>
-          <div className="mt-2 rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3 inline-block">
-            {template === 'mwalikoplus' ? 'Maelezo Zaidi' : 'Confirm'}
-          </div>
+          {template === 'sendofftemp' ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <div className="rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3">
+                Nitashiriki
+              </div>
+              <div className="rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3">
+                Sitashiriki
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3 inline-block">
+              {template === 'mwalikoplus' ? 'Maelezo Zaidi' : 'Confirm'}
+            </div>
+          )}
         </div>
       </Card>
 

@@ -21,7 +21,16 @@ export interface SendWhatsAppTemplateOptions {
   };
   button?: {
     personalisation: {
-      url_link: {
+      url_link?: {
+        parameters: string[];
+      };
+      quick_reply?: {
+        parameters: Record<string, string[]>;
+      };
+      copy_code?: {
+        parameters: string[];
+      };
+      copy_otp_code?: {
         parameters: string[];
       };
     };
@@ -366,6 +375,84 @@ export async function sendWeddingInvitationPlus(
     personalisation: [personalisation],
     header,
     button,
+  });
+}
+
+// ─── Send-Off RSVP Template (Quick Reply) ──────────────────────────────
+
+export async function sendSendOffRsvpRequest(
+  phone: string,
+  data: {
+    guestName: string;
+    hostFamily: string;
+    area: string;
+    eventType: string;
+    celebrant: string;
+    date: string;
+    venue: string;
+    time: string;
+    cardNumber: string;
+    cardType: string;
+    contact1: string;
+    contact2: string;
+    imageUrl?: string;
+    inviteLink?: string;
+    account?: string;
+    templateName?: string;
+    attendingPayload: string;
+    declinedPayload: string;
+  }
+): Promise<SendWhatsAppResult> {
+  const header = data.imageUrl
+    ? {
+        image: {
+          file: data.imageUrl,
+          name: 'Wedding Invitation',
+        },
+      }
+    : undefined;
+
+  const buttonPersonalisation: NonNullable<
+    NonNullable<SendWhatsAppTemplateOptions['button']>['personalisation']
+  > = {
+    quick_reply: {
+      parameters: {
+        '0': [data.attendingPayload],
+        '1': [data.declinedPayload],
+      },
+    },
+  };
+
+  if (data.inviteLink) {
+    buttonPersonalisation.url_link = {
+      parameters: [toLinkSuffix(data.inviteLink)],
+    };
+  }
+
+  const personalisation: Record<string, string> = {
+    var1: data.guestName,
+    var2: data.hostFamily,
+    var3: data.area,
+    var4: data.eventType,
+    var5: data.celebrant,
+    var6: data.date,
+    var7: data.venue,
+    var8: data.time,
+    Var9: data.cardNumber,
+    var10: data.cardType,
+    var11: data.contact1,
+    var12: data.contact2,
+  };
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: data.templateName || 'SendOffTemp',
+    account: data.account,
+    personalisation: [personalisation],
+    header,
+    button: {
+      personalisation: buttonPersonalisation,
+    },
   });
 }
 

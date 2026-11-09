@@ -1,6 +1,4 @@
 // app/privacy-policy/page.tsx
-import Link from 'next/link';
-
 export const metadata = {
   title: 'Privacy Policy - LittleWed',
   description: 'Privacy policy for LittleWed wedding management platform',
@@ -136,14 +134,14 @@ export default function PrivacyPolicyPage() {
           We use cookies to enhance your experience, remember your preferences, and analyse site traffic. You can control cookie settings in your browser preferences.
         </p>
 
-        <h2>8. Children's Privacy</h2>
+        <h2>8. Children&apos;s Privacy</h2>
         <p>
           Our services are not intended for children under 13, and we do not knowingly collect data from children. If you believe we have collected data from a child, please contact us immediately.
         </p>
 
         <h2>9. Changes to This Policy</h2>
         <p>
-          We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page and updating the "Last Updated" date.
+          We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy on this page and updating the &quot;Last Updated&quot; date.
         </p>
 
         <div className="contact-box">

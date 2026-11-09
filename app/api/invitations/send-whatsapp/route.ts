@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendSendOffRsvpRequest, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { createRsvpPayload, RSVP_ACTIONS } from '@/lib/rsvp';
 import { guestTypeLabel } from '@/lib/guestTypes';
 import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credits';
 
@@ -102,15 +103,94 @@ export async function POST(req: NextRequest) {
       template?: string;
       vars?: Record<string, string>;
       contact?: string;
+      contact2?: string;
       eventType?: string;
     } | null;
     const savedVars = savedDraft?.vars || {};
     const savedTemplateName =
       savedDraft?.template && savedDraft.template !== 'mwalikoplus'
-        ? ({ mwalikoforth: 'MwalikoForth', mwaliko: 'Mwalikotemp', mwalikosecond: 'Mwalikosecond', mdakumbe: 'Event' } as Record<string, string>)[
+        ? ({ mwalikoforth: 'MwalikoForth', mwaliko: 'Mwalikotemp', mwalikosecond: 'Mwalikosecond', sendofftemp: 'SendOffTemp', mdakumbe: 'Event' } as Record<string, string>)[
             savedDraft.template
           ]
         : undefined;
+
+    if (savedTemplateName === 'SendOffTemp') {
+      const person1Name = savedVars.person1 || guest.event?.person1 || '';
+      const person2Name = savedVars.person2 || guest.event?.person2 || '';
+      const celebrant = person1Name && person2Name
+        ? `${person1Name} na ${person2Name}`
+        : person1Name || person2Name || '';
+
+      const attendingPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.ATTENDING);
+      const declinedPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.DECLINED);
+
+      const sendOffResult = await sendSendOffRsvpRequest(guest.phone, {
+        guestName: guest.name || '',
+        hostFamily: savedVars.hostFamily || guest.event?.hostFamily || '',
+        area: savedVars.area || guest.event?.address || '',
+        eventType: savedDraft?.eventType || 'Send-Off',
+        celebrant,
+        date: savedVars.date || formattedDate,
+        venue: savedVars.venue || guest.event?.venue || '',
+        time: savedVars.time || guest.event?.time || '',
+        cardNumber: guest.cardNumber || '',
+        cardType: guestTypeLabel(guest.guestType, guest.guestCount),
+        contact1: savedDraft?.contact || '',
+        contact2: savedDraft?.contact2 || '',
+        imageUrl: cardImageUrl || undefined,
+        account: guest.event?.tenant?.whatsappAccount ?? undefined,
+        attendingPayload,
+        declinedPayload,
+      });
+
+      if (sendOffResult.success) {
+        if (sendOffResult.messageId) {
+          await prisma.messageLog.create({
+            data: {
+              messageId: sendOffResult.messageId,
+              guestId: guest.id,
+              type: 'WHATSAPP',
+              template: 'SendOffTemp',
+              status: 'SENT',
+              rawData: sendOffResult.data,
+            },
+          });
+        }
+
+        await prisma.guest.update({
+          where: { id: guest.id },
+          data: { invitationSentAt: new Date(), whatsappSentAt: new Date(), lastSendStatus: 'SENT', lastSendError: null },
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: 'Invitation sent successfully!',
+          data: sendOffResult.data,
+          messageId: sendOffResult.messageId,
+          cardImageUrl,
+          remainingCredits: resendCreditInfo?.creditsAvailable,
+        });
+      }
+
+      if (sendOffResult.messageId) {
+        await prisma.messageLog.create({
+          data: {
+            messageId: sendOffResult.messageId,
+            guestId: guest.id,
+            type: 'WHATSAPP',
+            template: 'SendOffTemp',
+            status: 'FAILED',
+            error: sendOffResult.error || 'Unknown error',
+            rawData: sendOffResult.data,
+          },
+        });
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: sendOffResult.error || 'Failed to send WhatsApp message',
+      }, { status: 500 });
+    }
 
     // "Event" (Kadi ya Mualiko Ukumbini) is a fixed body - only {var1} (the
     // plain guest name, the greeting already says "Ndg.") and {var2} (card

@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation, sendWeddingInvitationPlus, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendWeddingInvitationPlus, sendSendOffRsvpRequest, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { createRsvpPayload, RSVP_ACTIONS } from '@/lib/rsvp';
 import { sendSMS } from '@/lib/sms/index';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
 import { generateAndStoreCardForGuest } from '@/lib/image-storage';
@@ -21,6 +22,7 @@ const WA_TEMPLATE_NAMES: Record<string, string> = {
   mwaliko: 'Mwalikotemp',
   mwalikosecond: 'Mwalikosecond',
   mwalikoplus: 'Mwaliko Sixth',
+  sendofftemp: 'SendOffTemp',
   mdakumbe: 'Event',
 };
 
@@ -210,6 +212,7 @@ export async function POST(req: NextRequest) {
           const inviteLink = `https://littlewed.co.tz/invite/${guest.passCode}`;
 
           let result;
+          let sentTemplate = 'swahili_invitation';
 
           // ─── Channel selection ────────────────────────────────────────
           // By default each guest is sent on their stored routing channel.
@@ -294,7 +297,10 @@ export async function POST(req: NextRequest) {
               whatsappTemplate || (savedDraft?.template ? WA_TEMPLATE_NAMES[savedDraft.template] : undefined);
             const waContact = whatsappContact || savedDraft?.contact || '';
             const waContact2 = whatsappContact2 || savedDraft?.contact2 || '';
-            const waEventType = eventType || savedDraft?.eventType || 'harusi';
+            const waEventType =
+              eventType ||
+              savedDraft?.eventType ||
+              (waTemplate === 'SendOffTemp' ? 'Send-Off' : 'harusi');
 
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
@@ -305,6 +311,7 @@ export async function POST(req: NextRequest) {
             // Variable values come from the user's inputs (whatsappVariables),
             // then the event data - no hardcoded fallbacks.
             if (waTemplate === 'Mwaliko Sixth') {
+              sentTemplate = 'Mwaliko Sixth';
               const person1Name = vars.person1 || guest.event?.person1 || '';
               const person2Name = vars.person2 || guest.event?.person2 || '';
               const celebrant = person1Name && person2Name
@@ -328,7 +335,44 @@ export async function POST(req: NextRequest) {
                 inviteLink: inviteLink,
                 account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
+            } else if (waTemplate === 'SendOffTemp') {
+              sentTemplate = 'SendOffTemp';
+              const person1Name = vars.person1 || guest.event?.person1 || '';
+              const person2Name = vars.person2 || guest.event?.person2 || '';
+              const celebrant = person1Name && person2Name
+                ? `${person1Name} na ${person2Name}`
+                : person1Name || person2Name || '';
+
+              try {
+                const attendingPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.ATTENDING);
+                const declinedPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.DECLINED);
+
+                result = await sendSendOffRsvpRequest(guest.phone!, {
+                  guestName: guest.name || '',
+                  hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+                  area: vars.area || guest.event?.address || '',
+                  eventType: waEventType,
+                  celebrant,
+                  date: vars.date || formattedDate,
+                  venue: vars.venue || guest.event?.venue || '',
+                  time: vars.time || guest.event?.time || '',
+                  cardNumber: actualGuestCard,
+                  cardType: actualGuestType,
+                  contact1: waContact,
+                  contact2: waContact2,
+                  imageUrl: cardImageUrl || undefined,
+                  account: guest.event?.tenant?.whatsappAccount ?? undefined,
+                  attendingPayload,
+                  declinedPayload,
+                });
+              } catch (error: unknown) {
+                result = {
+                  success: false,
+                  error: error instanceof Error ? error.message : 'Failed to create RSVP payload',
+                };
+              }
             } else if (waTemplate === 'Event') {
+              sentTemplate = 'Event';
               // "Kadi ya Mualiko Ukumbini" is a fixed body - only the guest
               // name and card number vary. The body already greets with
               // "Ndg.", so the plain name is used (no redundant title).
@@ -339,6 +383,7 @@ export async function POST(req: NextRequest) {
                 account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
             } else {
+              sentTemplate = waTemplate || 'swahili_invitation';
               result = await sendWeddingInvitation(guest.phone!, {
                 guestName: actualGuestName,
                 hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
@@ -566,7 +611,7 @@ export async function POST(req: NextRequest) {
                   messageId: result.messageId,
                   guestId: guest.id,
                   type: sentChannel === 'whatsapp' ? 'WHATSAPP' : 'SMS',
-                  template: sentChannel === 'whatsapp' ? 'swahili_invitation' : 'custom',
+                  template: sentChannel === 'whatsapp' ? sentTemplate : 'custom',
                   status: 'SENT',
                   rawData: result.data || {},
                 },
