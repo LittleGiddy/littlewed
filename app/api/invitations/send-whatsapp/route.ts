@@ -109,12 +109,12 @@ export async function POST(req: NextRequest) {
     const savedVars = savedDraft?.vars || {};
     const savedTemplateName =
       savedDraft?.template && savedDraft.template !== 'mwalikoplus'
-        ? ({ mwalikoforth: 'MwalikoForth', mwaliko: 'Mwalikotemp', mwalikosecond: 'Mwalikosecond', sendofftemp: 'SendOffTemp', mdakumbe: 'Event' } as Record<string, string>)[
+        ? ({ mwalikoforth: 'MwalikoForth', mwaliko: 'Mwalikotemp', mwalikosecond: 'Mwalikosecond', sendofftemp: 'SandOffTemp', mdakumbe: 'Event' } as Record<string, string>)[
             savedDraft.template
           ]
         : undefined;
 
-    if (savedTemplateName === 'SendOffTemp') {
+    if (savedTemplateName === 'SandOffTemp') {
       const person1Name = savedVars.person1 || guest.event?.person1 || '';
       const person2Name = savedVars.person2 || guest.event?.person2 || '';
       const celebrant = person1Name && person2Name
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
               messageId: sendOffResult.messageId,
               guestId: guest.id,
               type: 'WHATSAPP',
-              template: 'SendOffTemp',
+              template: 'SandOffTemp',
               status: 'SENT',
               rawData: sendOffResult.data,
             },
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
             messageId: sendOffResult.messageId,
             guestId: guest.id,
             type: 'WHATSAPP',
-            template: 'SendOffTemp',
+            template: 'SandOffTemp',
             status: 'FAILED',
             error: sendOffResult.error || 'Unknown error',
             rawData: sendOffResult.data,

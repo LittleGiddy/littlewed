@@ -446,7 +446,7 @@ export async function sendSendOffRsvpRequest(
 
   return sendWhatsAppTemplate({
     to: phone,
-    template: data.templateName || 'SendOffTemp',
+    template: data.templateName || 'SandOffTemp',
     account: data.account,
     personalisation: [personalisation],
     header,

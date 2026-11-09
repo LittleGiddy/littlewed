@@ -185,7 +185,7 @@ async function handleButtonReply(body: WhatsAppCallback, messageId?: string) {
     return NextResponse.json({ success: true, received: true });
   }
 
-  if (!verified && messageLog?.template !== 'SendOffTemp') {
+  if (!verified && messageLog?.template !== 'SandOffTemp') {
     console.error('[Webhook] ❌ Unsigned button reply is not from an RSVP template', {
       messageId,
       template: messageLog?.template,

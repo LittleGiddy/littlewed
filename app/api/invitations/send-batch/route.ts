@@ -22,7 +22,7 @@ const WA_TEMPLATE_NAMES: Record<string, string> = {
   mwaliko: 'Mwalikotemp',
   mwalikosecond: 'Mwalikosecond',
   mwalikoplus: 'Mwaliko Sixth',
-  sendofftemp: 'SendOffTemp',
+  sendofftemp: 'SandOffTemp',
   mdakumbe: 'Event',
 };
 
@@ -300,7 +300,7 @@ export async function POST(req: NextRequest) {
             const waEventType =
               eventType ||
               savedDraft?.eventType ||
-              (waTemplate === 'SendOffTemp' ? 'Send-Off' : 'harusi');
+              (waTemplate === 'SandOffTemp' ? 'Send-Off' : 'harusi');
 
             // ─── Replace with actual guest data ──────────────────────────
             const actualGuestName = guestFullName;
@@ -335,8 +335,8 @@ export async function POST(req: NextRequest) {
                 inviteLink: inviteLink,
                 account: guest.event?.tenant?.whatsappAccount ?? undefined,
               });
-            } else if (waTemplate === 'SendOffTemp') {
-              sentTemplate = 'SendOffTemp';
+            } else if (waTemplate === 'SandOffTemp') {
+              sentTemplate = 'SandOffTemp';
               const person1Name = vars.person1 || guest.event?.person1 || '';
               const person2Name = vars.person2 || guest.event?.person2 || '';
               const celebrant = person1Name && person2Name

@@ -68,7 +68,7 @@ export const INVITE_TEMPLATES: Record<
   mwaliko: { displayName: 'Template 2', whatsappName: 'Mwalikotemp', hasContact: false, hasEventType: false },
   mwalikosecond: { displayName: 'Template 3', whatsappName: 'Mwalikosecond', hasContact: true, hasEventType: false },
   mwalikoplus: { displayName: 'Template 4 (With More Info)', whatsappName: 'Mwaliko Sixth', hasContact: true, hasEventType: true, hasContact2: true, hasMoreInfoButton: true },
-  sendofftemp: { displayName: 'Send-Off RSVP (Quick Reply)', whatsappName: 'SendOffTemp', hasContact: true, hasEventType: true, hasContact2: true, hasArea: true, hasQuickReply: true },
+  sendofftemp: { displayName: 'Send-Off RSVP (Quick Reply)', whatsappName: 'SandOffTemp', hasContact: true, hasEventType: true, hasContact2: true, hasArea: true, hasQuickReply: true },
   // Fixed "Kadi ya Mualiko Ukumbini" body for the MdaKumbe TV Blue & White
   // night. Only {var1} (guest name) and {var2} (card number) change; there is
   // no URL button - the guest card image is the header.
