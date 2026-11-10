@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { normalizePhone } from '@/lib/phone';
-import { parseGuestType, cardGroupIdCount } from '@/lib/guestTypes';
+import { parseGuestType, cardGroupIdCount, normalizeGuestTitle } from '@/lib/guestTypes';
 
 // ─── Helper: Generate a unique random card number ──────────────────────
 async function generateUniqueCardNumber(eventId: string): Promise<string> {
@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
       guestsToInsert.push({
         name: g.name.trim(),
         phone: g.phone,
-        title: g.title || '',
+        title: normalizeGuestTitle(g.title),
         cardNumber: cardNumber,
         guestType: guestType,
         guestCount: guestCount,

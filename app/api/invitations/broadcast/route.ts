@@ -7,8 +7,7 @@ import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/
 
 // ─── Helper: Get formatted guest name ──────────────────────────────────
 function getGuestFullName(guest: any): string {
-  const title = guest.title || 'Mr';
-  return `${title} ${guest.name}`;
+  return guest.title ? `${guest.title} ${guest.name}` : guest.name;
 }
 
 export async function POST(req: NextRequest) {

@@ -22,7 +22,7 @@ export default async function GuestPage({ params }: { params: Promise<{ token: s
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-card shadow-xl p-6">
         <h1 className="font-display text-2xl font-bold text-brandtext">
-          Welcome, {guest.title || 'Mr'} {guest.name}!
+          Welcome, {guest.title ? `${guest.title} ` : ''}{guest.name}!
         </h1>
         <p className="text-gray-500 text-sm">Event Details</p>
         

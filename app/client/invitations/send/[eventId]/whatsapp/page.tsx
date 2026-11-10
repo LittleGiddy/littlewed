@@ -117,7 +117,7 @@ export default function ComposeWhatsappPage() {
           'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
         ].join('\n');
       }
-      if (key === 'sendofftemp') {
+      if (key === 'sendofftemp' || key === 'sendofftempnew') {
         return [
           `Ndugu ${SAMPLE_GUEST.name}`,
           `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'Send-Off'} ${couple || '...'}`,
@@ -349,7 +349,7 @@ export default function ComposeWhatsappPage() {
           >
             {preview}
           </div>
-          {template === 'sendofftemp' ? (
+          {currentTpl?.hasQuickReply ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <div className="rounded-lg bg-[#25D366] text-white text-center text-xs font-semibold py-1.5 px-3">
                 Nitashiriki

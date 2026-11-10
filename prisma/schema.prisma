@@ -386,7 +386,7 @@ model Guest {
   lastSendError         String? // error/reason for the last send attempt
   guestType             String?   @default("SINGLE") // SINGLE | DOUBLE | FAMILIA | WAKWE
   guestCount            Int? // Total people for FAMILIA/WAKWE groups (determines allowed scans)
-  title                 String?   @default("Mr")
+  title                 String? // honorific, e.g. "Mr" — NULL when the guest has no title
   cardNumber            String?
   cardGroupId           String? // Shared by guests on a multi-person (DOUBLE) card
   waId                  String? // WhatsApp ID from Meta

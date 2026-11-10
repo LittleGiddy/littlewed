@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
       const [guest1, createdGuest2] = await prisma.$transaction([
         prisma.guest.create({
           data: {
-            title: title === undefined ? 'Mr' : normalizeGuestTitle(title),
+            title: normalizeGuestTitle(title),
             name: name.trim(),
             phone: phone1.normalized,
             cardNumber: finalCardNumber,
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
         }),
         prisma.guest.create({
           data: {
-            title: guest2.title === undefined ? 'Mr' : normalizeGuestTitle(guest2.title),
+            title: normalizeGuestTitle(guest2.title),
             name: guest2.name.trim(),
             phone: phone2.normalized,
             cardNumber: finalCardNumber,
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
 
     const guest = await prisma.guest.create({
       data: {
-        title: title || 'Mr',
+        title: normalizeGuestTitle(title),
         name: name.trim(),
         phone: phone1.normalized,
         cardNumber: finalCardNumber,

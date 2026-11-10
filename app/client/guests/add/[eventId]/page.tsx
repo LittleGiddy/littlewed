@@ -21,7 +21,7 @@ export default function AddGuestPage() {
   const [checkingWhatsApp, setCheckingWhatsApp] = useState(false);
   const [whatsappStatus, setWhatsappStatus] = useState<{ hasWhatsApp: boolean; waId?: string; status?: string } | null>(null);
   const [form, setForm] = useState({
-    title: 'Mr',
+    title: '',
     name: '',
     phone: '',
     cardNumber: '',
@@ -30,7 +30,7 @@ export default function AddGuestPage() {
     guestCount: 2,
   });
   const [guest2, setGuest2] = useState({
-    title: 'Mr',
+    title: '',
     name: '',
     phone: '',
     email: '',
@@ -158,8 +158,9 @@ export default function AddGuestPage() {
       const data = await res.json();
       if (res.ok) {
         const channel = data.routingChannel === 'whatsapp' ? 'WhatsApp' : 'SMS';
+        const nameWith = (title: string, name: string) => (title ? `${title} ${name}` : name);
         if (isSharedDouble && data.sharedGuest) {
-          toast.success(`Shared double card added: ${form.title} ${form.name} & ${guest2.title} ${guest2.name} (${channel})`, {
+          toast.success(`Shared double card added: ${nameWith(form.title, form.name)} & ${nameWith(guest2.title, guest2.name)} (${channel})`, {
             icon: <UserCheck size={18} className="text-success" />,
             duration: 5000,
           });
@@ -169,7 +170,7 @@ export default function AddGuestPage() {
             : data.guestType === 'DOUBLE'
               ? 'Double'
               : 'Single';
-          toast.success(`Guest "${form.title} ${form.name}" added (${guestTypeLabel}, ${channel})`, {
+          toast.success(`Guest "${nameWith(form.title, form.name)}" added (${guestTypeLabel}, ${channel})`, {
             icon: <UserCheck size={18} className="text-success" />,
           });
         }
