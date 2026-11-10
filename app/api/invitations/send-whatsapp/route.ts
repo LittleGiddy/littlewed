@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation, sendSendOffRsvpRequest, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendSendOffRsvpRequest, sendSendOffRsvpRequestNew, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
 import { createRsvpPayload, RSVP_ACTIONS } from '@/lib/rsvp';
 import { guestTypeLabel } from '@/lib/guestTypes';
 import { checkAndChargeResendCredits, type ResendCreditCheck } from '@/lib/credits';
@@ -124,10 +124,8 @@ export async function POST(req: NextRequest) {
       const attendingPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.ATTENDING);
       const declinedPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.DECLINED);
 
-      const sendOffResult = await sendSendOffRsvpRequest(guest.phone, {
+      const rsvpData = {
         guestName: guest.name || '',
-        hostFamily: savedVars.hostFamily || guest.event?.hostFamily || '',
-        area: savedVars.area || guest.event?.address || '',
         eventType: savedDraft?.eventType || 'Send-Off',
         celebrant,
         date: savedVars.date || formattedDate,
@@ -139,10 +137,18 @@ export async function POST(req: NextRequest) {
         contact2: savedDraft?.contact2 || '',
         imageUrl: cardImageUrl || undefined,
         account: guest.event?.tenant?.whatsappAccount ?? undefined,
-        templateName: savedTemplateName,
         attendingPayload,
         declinedPayload,
-      });
+      };
+
+      const sendOffResult =
+        savedTemplateName === 'SendOffTempNew'
+          ? await sendSendOffRsvpRequestNew(guest.phone, rsvpData)
+          : await sendSendOffRsvpRequest(guest.phone, {
+              ...rsvpData,
+              hostFamily: savedVars.hostFamily || guest.event?.hostFamily || '',
+              area: savedVars.area || guest.event?.address || '',
+            });
 
       if (sendOffResult.success) {
         if (sendOffResult.messageId) {

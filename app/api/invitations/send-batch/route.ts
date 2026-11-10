@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { sendWeddingInvitation, sendWeddingInvitationPlus, sendSendOffRsvpRequest, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
+import { sendWeddingInvitation, sendWeddingInvitationPlus, sendSendOffRsvpRequest, sendSendOffRsvpRequestNew, sendWeddingInvitationUkumbini } from '@/lib/whatsapp/index';
 import { createRsvpPayload, RSVP_ACTIONS } from '@/lib/rsvp';
 import { sendSMS } from '@/lib/sms/index';
 import { smsPartCount, MAX_SMS_PARTS_PER_GUEST, smsPartsError } from '@/lib/sms/units';
@@ -348,10 +348,8 @@ export async function POST(req: NextRequest) {
                 const attendingPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.ATTENDING);
                 const declinedPayload = createRsvpPayload(guest.id, RSVP_ACTIONS.DECLINED);
 
-                result = await sendSendOffRsvpRequest(guest.phone!, {
+                const rsvpData = {
                   guestName: guest.name || '',
-                  hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
-                  area: vars.area || guest.event?.address || '',
                   eventType: waEventType,
                   celebrant,
                   date: vars.date || formattedDate,
@@ -363,10 +361,18 @@ export async function POST(req: NextRequest) {
                   contact2: waContact2,
                   imageUrl: cardImageUrl || undefined,
                   account: guest.event?.tenant?.whatsappAccount ?? undefined,
-                  templateName: waTemplate,
                   attendingPayload,
                   declinedPayload,
-                });
+                };
+
+                result =
+                  waTemplate === 'SendOffTempNew'
+                    ? await sendSendOffRsvpRequestNew(guest.phone!, rsvpData)
+                    : await sendSendOffRsvpRequest(guest.phone!, {
+                        ...rsvpData,
+                        hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
+                        area: vars.area || guest.event?.address || '',
+                      });
               } catch (error: unknown) {
                 result = {
                   success: false,

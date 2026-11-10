@@ -117,7 +117,7 @@ export default function ComposeWhatsappPage() {
           'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Ahsante',
         ].join('\n');
       }
-      if (key === 'sendofftemp' || key === 'sendofftempnew') {
+      if (key === 'sendofftemp') {
         return [
           `Ndugu ${SAMPLE_GUEST.name}`,
           `Familia ya ${effectiveVars.hostFamily || '{hostFamily}'} wa ${effectiveVars.area || '{area}'} inakualika katika ${eventType || 'Send-Off'} ${couple || '...'}`,
@@ -128,6 +128,19 @@ export default function ComposeWhatsappPage() {
           ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
           '',
           'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini. Thibitisha ushiriki wako hapa chini au bonyeza link kwa maelezo zaidi👇️',
+        ].join('\n');
+      }
+      if (key === 'sendofftempnew') {
+        return [
+          `Habari ${SAMPLE_GUEST.name} 👋🏽`,
+          `Tunapenda kukujulisha kuwa umealikwa kuhudhuria ${eventType || 'Send-Off'} ${couple || '...'} itakayofanyika`,
+          `📆 Tarehe: ${effectiveVars.date || '{date}'}`,
+          `🏛️ Ukumbi: ${effectiveVars.venue || '{venue}'}`,
+          `🕠️ Muda: ${effectiveVars.time || '{time}'}`,
+          `*Card No: ${cardNumber} ${cardType}`,
+          ...(contact ? [`kwa mawasiliano zaidi: ${contact}${contact2 ? ` | ${contact2}` : ''}`] : []),
+          'Tafadhali hakikisha unatunza kadi hii kwaajili ya matumizi ya ukumbini.',
+          'Thibitisha ushiriki wako hapa chini au bonyeza link kwa maelezo zaidi👇️',
         ].join('\n');
       }
       if (key === 'mdakumbe') {
@@ -264,7 +277,7 @@ export default function ComposeWhatsappPage() {
         </p>
 
         <div className="space-y-3">
-          {FIELDS.map(f => (
+          {FIELDS.filter(f => f.key !== 'hostFamily' || currentTpl.hasHostFamily !== false).map(f => (
             <div key={f.key}>
               <label className="text-xs font-medium text-gray-600">{f.label}</label>
               <input

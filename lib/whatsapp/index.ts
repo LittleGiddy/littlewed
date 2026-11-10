@@ -456,6 +456,79 @@ export async function sendSendOffRsvpRequest(
   });
 }
 
+// ─── Send-Off RSVP Template "SendOffTempNew" (Quick Reply) ─────────────
+// Same quick-reply RSVP buttons as SandOffTemp but a different approved
+// body, so the personalisation slots map to different values:
+//   Habari {var1} 👋🏽 Tunapenda kukujulisha kuwa umealikwa kuhudhuria
+//   {var2} {var3} itakayofanyika 📆 Tarehe: {var4} 🏛️ Ukumbi: {var5}
+//   🕝️ Muda: {var6} *Card No: {Var7} {var8} kwa mawasiliano zaidi:
+//   {var9} | {var10}. ...
+// Note {Var7} has a capital V (like SandOffTemp's {Var9}).
+
+export async function sendSendOffRsvpRequestNew(
+  phone: string,
+  data: {
+    guestName: string;
+    eventType: string;
+    celebrant: string;
+    date: string;
+    venue: string;
+    time: string;
+    cardNumber: string;
+    cardType: string;
+    contact1: string;
+    contact2: string;
+    imageUrl?: string;
+    account?: string;
+    attendingPayload: string;
+    declinedPayload: string;
+  }
+): Promise<SendWhatsAppResult> {
+  const header = data.imageUrl
+    ? {
+        image: {
+          file: data.imageUrl,
+          name: 'Wedding Invitation',
+        },
+      }
+    : undefined;
+
+  const buttonPersonalisation: NonNullable<
+    NonNullable<SendWhatsAppTemplateOptions['button']>['personalisation']
+  > = {
+    quick_reply: {
+      parameters: {
+        '0': [data.attendingPayload],
+        '1': [data.declinedPayload],
+      },
+    },
+  };
+
+  const personalisation: Record<string, string> = {
+    var1: data.guestName,
+    var2: data.eventType,
+    var3: data.celebrant,
+    var4: data.date,
+    var5: data.venue,
+    var6: data.time,
+    Var7: data.cardNumber,
+    var8: data.cardType,
+    var9: data.contact1,
+    var10: data.contact2,
+  };
+
+  return sendWhatsAppTemplate({
+    to: phone,
+    template: 'SendOffTempNew',
+    account: data.account,
+    personalisation: [personalisation],
+    header,
+    button: {
+      personalisation: buttonPersonalisation,
+    },
+  });
+}
+
 // ─── Wedding Invitation Template: "Event" (Kadi ya Mualiko Ukumbini) ────
 // A fixed approved template for the MdaKumbe TV Blue & White night. The body
 // is static except {var1} (guest name) and {var2} (card number); it carries
