@@ -143,7 +143,10 @@ export async function POST(req: NextRequest) {
 
       const sendOffResult =
         savedTemplateName === 'SendOffTempNew'
-          ? await sendSendOffRsvpRequestNew(guest.phone, rsvpData)
+          ? await sendSendOffRsvpRequestNew(guest.phone, {
+              ...rsvpData,
+              inviteLink: guest.passCode ? `https://littlewed.co.tz/invite/${guest.passCode}` : undefined,
+            })
           : await sendSendOffRsvpRequest(guest.phone, {
               ...rsvpData,
               hostFamily: savedVars.hostFamily || guest.event?.hostFamily || '',

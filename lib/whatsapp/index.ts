@@ -479,6 +479,7 @@ export async function sendSendOffRsvpRequestNew(
     contact1: string;
     contact2: string;
     imageUrl?: string;
+    inviteLink?: string;
     account?: string;
     attendingPayload: string;
     declinedPayload: string;
@@ -503,6 +504,16 @@ export async function sendSendOffRsvpRequestNew(
       },
     },
   };
+
+  // SendOffTempNew's approved body carries a URL button ("bonyeza link kwa
+  // maelezo zaidi") alongside the quick replies. The provider rejects the
+  // whole send (HTTP 422) when its parameter is missing, so it is only set
+  // when an invite link is available.
+  if (data.inviteLink) {
+    buttonPersonalisation.url_link = {
+      parameters: [toLinkSuffix(data.inviteLink)],
+    };
+  }
 
   const personalisation: Record<string, string> = {
     var1: data.guestName,

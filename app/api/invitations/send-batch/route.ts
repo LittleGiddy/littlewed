@@ -367,7 +367,7 @@ export async function POST(req: NextRequest) {
 
                 result =
                   waTemplate === 'SendOffTempNew'
-                    ? await sendSendOffRsvpRequestNew(guest.phone!, rsvpData)
+                    ? await sendSendOffRsvpRequestNew(guest.phone!, { ...rsvpData, inviteLink })
                     : await sendSendOffRsvpRequest(guest.phone!, {
                         ...rsvpData,
                         hostFamily: vars.hostFamily || guest.event?.hostFamily || '',
