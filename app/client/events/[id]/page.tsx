@@ -1766,7 +1766,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ id: stri
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-gray-800">Add a single guest</p>
                         <p className="text-xs text-gray-400">
-                          Enter one guest by hand (add a plus-one to share a card)
+                          Enter one guest, a shared plus-one, or a double card scanned twice
                         </p>
                       </div>
                       <ArrowRight size={16} className="text-gray-300 flex-shrink-0" />

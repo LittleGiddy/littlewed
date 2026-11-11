@@ -10,7 +10,13 @@ import {
 import toast from 'react-hot-toast';
 import { GUEST_TITLES } from '@/lib/guestTypes';
 
-const GUEST_TYPES = ['SINGLE', 'DOUBLE', 'FAMILIA', 'WAKWE']; // FAMILIA/WAKWE are group types with a guestCount
+const CARD_CHOICES = [
+  { value: 'SINGLE', label: 'Single (1 person)' },
+  { value: 'DOUBLE_SHARED', label: 'Double (2 people, shared card)' },
+  { value: 'DOUBLE_SINGLE', label: 'Double (1 guest, card scanned twice)' },
+  { value: 'FAMILIA', label: 'Familia (group card)' },
+  { value: 'WAKWE', label: 'Wakwe (group card)' },
+];
 const GROUP_TYPES = new Set(['FAMILIA', 'WAKWE']);
 
 export default function AddGuestPage() {
@@ -37,12 +43,17 @@ export default function AddGuestPage() {
   });
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
 
+  const isSharedDouble = form.guestType === 'DOUBLE_SHARED';
+  const isSingleDouble = form.guestType === 'DOUBLE_SINGLE';
+  const baseGuestType = isSharedDouble || isSingleDouble ? 'DOUBLE' : form.guestType;
+  const isGroupType = GROUP_TYPES.has(form.guestType);
+
   // Auto-generate card number on load
   useEffect(() => {
     generateCardNumber();
   }, []);
 
-  const generateCardNumber = async () => {
+  async function generateCardNumber() {
     setIsGeneratingCard(true);
     try {
       const res = await fetch('/api/guests/next-card-number', { 
@@ -63,7 +74,7 @@ export default function AddGuestPage() {
     } finally {
       setIsGeneratingCard(false);
     }
-  };
+  }
 
   // ─── Check WhatsApp Number via NexSMS ────────────────────────────────
   const checkWhatsApp = async () => {
@@ -120,23 +131,22 @@ export default function AddGuestPage() {
       return;
     }
 
-    const isSharedDouble = form.guestType === 'DOUBLE' && guest2.name.trim() && guest2.phone.trim();
     if (isSharedDouble && (!guest2.name.trim() || !guest2.phone.trim())) {
-      setError('Both guests must have a name and phone number');
+      setError('Enter the second guest name and phone number, or choose "Double (1 guest, card scanned twice)"');
       setLoading(false);
       return;
     }
 
     try {
-      const payload: Record<string, any> = {
+      const payload: Record<string, unknown> = {
         title: form.title,
         name: form.name.trim(),
         phone: form.phone.trim(),
         cardNumber: form.cardNumber.trim() || undefined,
         email: form.email.trim() || undefined,
         eventId,
-        guestType: form.guestType,
-        guestCount: GROUP_TYPES.has(form.guestType) ? form.guestCount : undefined,
+        guestType: baseGuestType,
+        guestCount: isGroupType ? form.guestCount : undefined,
       };
 
       if (isSharedDouble) {
@@ -165,11 +175,13 @@ export default function AddGuestPage() {
             duration: 5000,
           });
         } else {
-          const guestTypeLabel = GROUP_TYPES.has(data.guestType)
-            ? `${data.guestType === 'FAMILIA' ? 'Familia' : 'Wakwe'} ${data.guestCount || ''}`
-            : data.guestType === 'DOUBLE'
-              ? 'Double'
-              : 'Single';
+          const guestTypeLabel = isGroupType
+            ? `${form.guestType === 'FAMILIA' ? 'Familia' : 'Wakwe'} ${form.guestCount || ''}`
+            : isSharedDouble
+              ? 'Double (shared card)'
+              : isSingleDouble
+                ? 'Double (scanned twice)'
+                : 'Single';
           toast.success(`Guest "${nameWith(form.title, form.name)}" added (${guestTypeLabel}, ${channel})`, {
             icon: <UserCheck size={18} className="text-success" />,
           });
@@ -353,17 +365,17 @@ export default function AddGuestPage() {
                 onChange={e => setForm(prev => ({ ...prev, guestType: e.target.value }))}
                 className="w-full p-2.5 text-sm sm:text-base border border-gray-300 rounded-tap focus:ring-2 focus:ring-brandring focus:border-transparent bg-white"
               >
-                {GUEST_TYPES.map(type => (
-                  <option key={type} value={type}>
-                    {type === 'SINGLE' ? 'Single (1 person)' : type === 'DOUBLE' ? 'Double (2 people)' : type === 'FAMILIA' ? 'Familia (group card)' : 'Wakwe (group card)'}
-                  </option>
+                {CARD_CHOICES.map(choice => (
+                  <option key={choice.value} value={choice.value}>{choice.label}</option>
                 ))}
               </select>
               <p className="text-xs text-gray-400 mt-1">
-                {GROUP_TYPES.has(form.guestType) ? (
+                {isGroupType ? (
                   <>Select FAMILIA or WAKWE for group cards — every member scans the same card, up to the number of people set below.</>
-                ) : form.guestType === 'DOUBLE' ? (
-                  <>Select DOUBLE to add a plus-one who shares the same card number — both phone numbers will receive the invitation card.</>
+                ) : isSharedDouble ? (
+                  <>Two guests share one card number — both phone numbers receive the invitation card (2 credits).</>
+                ) : isSingleDouble ? (
+                  <>One guest, one phone number — the card can be scanned twice for the guest and their companion (1 credit).</>
                 ) : (
                   <>A single guest receives one invitation card and the QR is scanned once.</>
                 )}
@@ -371,7 +383,7 @@ export default function AddGuestPage() {
             </div>
 
             {/* ─── Guest Count (only for FAMILIA / WAKWE group types) ─── */}
-            {GROUP_TYPES.has(form.guestType) && (
+            {isGroupType && (
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
                   <Users size={14} className="sm:text-base" />
@@ -391,7 +403,7 @@ export default function AddGuestPage() {
             )}
 
             {/* ─── Second Guest (only for shared DOUBLE card) ─── */}
-            {form.guestType === 'DOUBLE' && (
+            {isSharedDouble && (
               <div className="border border-warn-border bg-warn-soft/50 rounded-tap p-3 sm:p-4 space-y-3 sm:space-y-4">
                 <p className="text-xs font-bold text-warn uppercase tracking-wider flex items-center gap-1.5">
                   <UserPlus size={13} /> Second Guest (shared card)

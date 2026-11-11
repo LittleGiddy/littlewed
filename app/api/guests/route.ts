@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // SINGLE GUEST (or DOUBLE without companion — legacy behaviour)
+    // SINGLE GUEST (or DOUBLE without companion — one guest, card scanned twice)
     // ═══════════════════════════════════════════════════════════════════
     const passCode = await generateUniquePassCode(prisma);
 
