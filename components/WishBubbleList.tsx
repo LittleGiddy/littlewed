@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
 
 // components/WishBubbleList.tsx
@@ -26,6 +27,11 @@ interface Props {
   secondaryColor?: string;
   /** 'guest' = the time of day, 'tenant' = date + time + "how long ago". */
   variant?: 'guest' | 'tenant';
+  /**
+   * Optional per-wish control rendered under the bubble. The tenant RSVPs
+   * page uses it for the delete button; guest-facing pages pass nothing.
+   */
+  renderAction?: (wish: WishBubble) => ReactNode;
 }
 
 function initialOf(name: string): string {
@@ -52,6 +58,7 @@ export default function WishBubbleList({
   accentColor,
   secondaryColor,
   variant = 'guest',
+  renderAction,
 }: Props) {
   if (wishes.length === 0) return null;
 
@@ -140,6 +147,8 @@ export default function WishBubbleList({
                     {STATUS_LABEL[wish.attending]}
                   </span>
                 )}
+
+                {renderAction?.(wish)}
               </div>
             </div>
           );

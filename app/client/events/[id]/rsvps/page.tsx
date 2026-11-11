@@ -3,20 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from '@/lib/authGuard';
 import { authOptions } from '@/lib/auth';
-import { format, formatDistanceToNow } from 'date-fns';
-import {
-  ArrowLeft, Calendar, MapPin, PartyPopper, Heart, CheckCircle,
-  XCircle, CircleHelp, MessageSquareHeart,
-} from 'lucide-react';
-import WishBubbleList, { type WishBubble } from '@/components/WishBubbleList';
-
-interface RsvpRow {
-  id: string;
-  guestName: string;
-  status: string;
-  channel: string;
-  createdAt: Date;
-}
+import RsvpWishesClient from './RsvpWishesClient';
 
 export default async function EventRsvpsPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -68,136 +55,29 @@ export default async function EventRsvpsPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const rsvps = event.rsvps as RsvpRow[];
-  const wishes = event.wishes as WishBubble[];
-
-  const attendingCount = rsvps.filter(r => r.status === 'yes').length;
-  const declinedCount = rsvps.filter(r => r.status === 'no').length;
-  const maybeCount = rsvps.filter(r => r.status === 'pending').length;
-
-  const statusChip = (status: string) => {
-    if (status === 'yes') return { label: 'Attending', cls: 'bg-success-soft text-success ring-green-200', Icon: CheckCircle };
-    if (status === 'no') return { label: 'Declined', cls: 'bg-danger-soft text-danger ring-red-200', Icon: XCircle };
-    return { label: 'Maybe', cls: 'bg-warn-soft text-warn ring-amber-200', Icon: CircleHelp };
-  };
-
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
-      {/* ─── Header ─── */}
-      <div className="mb-6">
-        <Link
-          href={`/client/events/${eventId}`}
-          className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-brandtext transition mb-4"
-        >
-          <ArrowLeft size={16} /> Back to event
-        </Link>
-        <h1 className="font-display text-3xl sm:text-4xl font-black text-gray-900 leading-tight">RSVPs &amp; Wishes</h1>
-        <p className="text-sm text-gray-400 mt-1">{event.name}</p>
-        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
-          <span className="flex items-center gap-1.5">
-            <Calendar size={15} className="text-brandtext" />
-            {format(new Date(event.date), 'PPP')}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <MapPin size={15} className="text-brandtext" />
-            {event.venue}
-          </span>
-        </div>
-      </div>
-
-      {/* ─── Stats ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
-        <div className="bg-white rounded-tap border border-gray-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-gray-900">{rsvps.length}</p>
-          <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Total Responses</p>
-        </div>
-        <div className="bg-white rounded-tap border border-gray-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-success">{attendingCount}</p>
-          <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Attending</p>
-        </div>
-        <div className="bg-white rounded-tap border border-gray-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-danger">{declinedCount}</p>
-          <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Declined</p>
-        </div>
-        <div className="bg-white rounded-tap border border-gray-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-warn">{maybeCount}</p>
-          <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Maybe</p>
-        </div>
-        <div className="bg-white rounded-tap border border-gray-100 p-4 text-center shadow-sm">
-          <p className="text-2xl font-bold text-brandtext">{wishes.length}</p>
-          <p className="text-[10px] md:text-xs font-medium text-gray-400 uppercase tracking-wider">Wishes</p>
-        </div>
-      </div>
-
-      {rsvps.length === 0 && wishes.length === 0 && (
-        <div className="bg-white rounded-card border border-gray-100 shadow-sm py-16 text-center text-gray-400">
-          <MessageSquareHeart size={40} className="mx-auto mb-3 opacity-30" />
-          <p>No RSVPs or wishes yet.</p>
-          <p className="text-sm">Once guests open their invitation and respond, their replies will appear here.</p>
-        </div>
-      )}
-
-      {/* ─── RSVP list ─── */}
-      {rsvps.length > 0 && (
-        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden mb-8">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-tap bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <PartyPopper size={18} />
-              </div>
-              <div>
-                <p className="font-bold text-sm text-gray-800">RSVP Responses</p>
-                <p className="text-xs text-gray-400">
-                  {rsvps.length} response{rsvps.length !== 1 ? 's' : ''} · {attendingCount} attending
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-50 max-h-[32rem] overflow-y-auto">
-            {rsvps.map(r => {
-              const chip = statusChip(r.status);
-              return (
-                <div key={r.id} className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{r.guestName}</p>
-                    <p className="text-[11px] text-gray-400">
-                      {format(new Date(r.createdAt), 'MMM d, yyyy · h:mm a')} · {formatDistanceToNow(new Date(r.createdAt), { addSuffix: true })} · {r.channel === 'WHATSAPP' ? 'WhatsApp' : 'Web'}
-                    </p>
-                  </div>
-                  <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full ring-1 shrink-0 ${chip.cls}`}>
-                    <chip.Icon size={13} /> {chip.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ─── Wishes list ─── */}
-      {wishes.length > 0 && (
-        <div className="bg-white rounded-card shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-tap bg-brandbg/[0.07] text-brandtext flex items-center justify-center shrink-0">
-                <Heart size={18} />
-              </div>
-              <div>
-                <p className="font-bold text-sm text-gray-800">Guest Wishes</p>
-                <p className="text-xs text-gray-400">{wishes.length} wish{wishes.length !== 1 ? 'es' : ''}</p>
-              </div>
-            </div>
-          </div>
-          <div className="max-h-[32rem] overflow-y-auto p-4 sm:p-5">
-            <WishBubbleList
-              wishes={wishes}
-              primaryColor="#BE185D"
-              accentColor="#F6C445"
-              variant="tenant"
-            />
-          </div>
-        </div>
-      )}
-    </div>
+    <RsvpWishesClient
+      event={{
+        id: event.id,
+        name: event.name,
+        date: event.date.toISOString(),
+        venue: event.venue,
+      }}
+      rsvps={event.rsvps.map(r => ({
+        id: r.id,
+        guestName: r.guestName,
+        status: r.status,
+        channel: r.channel,
+        createdAt: r.createdAt.toISOString(),
+      }))}
+      wishes={event.wishes.map(w => ({
+        id: w.id,
+        guestId: w.guestId,
+        guestName: w.guestName,
+        message: w.message,
+        attending: w.attending,
+        createdAt: w.createdAt.toISOString(),
+      }))}
+    />
   );
 }
