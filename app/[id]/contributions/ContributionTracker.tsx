@@ -4,48 +4,20 @@
 // owner, not to the guests: they open it to record what they have actually
 // received from each guest and watch the totals move.
 //
-// That changes the voice of the whole screen. The earlier version was written
-// for guests, so every control spoke to the visitor ("I have sent my
-// contribution", "How much did you send?", "Asante, Neema!"). A guest is never
-// the person filling this in, so that copy is gone and each action is named
-// from the owner's side of the transaction: record, receive, received.
-//
-// Payment instructions were removed for the same reason — the owner already has
-// those numbers in their Event Details and the ledger has no reason to restate
-// them. Editing them belongs on the event, not here.
-//
-// The hero carries only what identifies the event: its name, its type, the
-// date and the venue. The host family line went back to Event Details, where
-// it belongs.
-//
-// Layout is phone-first. The status filter is a scrolling chip row rather than
-// a segmented bar (four labelled segments plus counts overflowed a 360px
-// screen), the per-row action is the row itself instead of a full-width
-// button, and tapping a guest opens a sheet with their complete details —
-// full, unmasked phone number, amounts, note and history — before the form.
-//
-// Visual language is shared with the tenant-side manager (widgets.tsx) so the
-// two screens do not drift apart.
+// The hero, headline card and guest list come from the shared contribution
+// shell (app/client/events/[id]/contributions/shell.tsx), which is also used by
+// the signed-in tenant manager. Only the recording sheet and the name/number
+// approval flow are specific to this shared link.
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useCallback, useState } from 'react';
 import {
-  ArrowUpDown,
-  CalendarClock,
   Check,
   CheckCircle2,
-  ChevronRight,
   Copy,
   Hourglass,
-  MapPin,
-  PartyPopper,
   Phone,
-  RefreshCw,
-  Search,
-  Users,
   Wallet,
-  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -53,20 +25,27 @@ import {
   AppBottomSheet,
   AppButton,
   AppCard,
-  AppCardTitle,
   AppChip,
-  AppEmptyState,
-  AppInput,
 } from '@/components/ui';
 import {
   CONTRIBUTION_STATUS_META,
   formatTZS,
   type ContributionStatus,
 } from '@/lib/contributions';
-import { motionEase, useReducedMotion, useTransition } from '@/lib/motion';
 import { confirmToast } from '@/lib/confirmToast';
-import { phoneMatches } from '@/lib/phone';
-import { ProgressRing, StatTiles, buildTiles } from '@/app/client/events/[id]/contributions/widgets';
+import {
+  ContributionHero,
+  ContributionSummaryCard,
+  DetailTile,
+  LedgerCard,
+  QUICK_ADD,
+  QuickAmountButton,
+  STATUS_TONE,
+  formatDate,
+  remainingOf,
+  type LedgerRow,
+  type LedgerSummary,
+} from '@/app/client/events/[id]/contributions/shell';
 
 interface TrackerEvent {
   id: string;
@@ -82,20 +61,7 @@ interface TrackerEvent {
   target: number | null;
 }
 
-interface TrackerRow {
-  /** Empty for a guest who has no Contribution row yet. */
-  id: string;
-  guestId: string;
-  guestName: string;
-  /** The guest's own name without the title — what the edit form binds to. */
-  name: string;
-  /** Full number, in whatever format Event Details holds it. Null when unset. */
-  phone: string | null;
-  status: ContributionStatus;
-  amountPaid: number;
-  amountExpected: number | null;
-  note: string | null;
-  updatedAt: string | null;
+interface TrackerRow extends LedgerRow {
   /**
    * A name/phone proposal filed from this tracker that the event planner has
    * not answered yet. Null for everyone else - the guest list itself never
@@ -104,67 +70,10 @@ interface TrackerRow {
   pendingEdit: { name: string; phone: string | null } | null;
 }
 
-interface TrackerSummary {
-  total: number;
-  pending: number;
-  partial: number;
-  paid: number;
-  settled: number;
-  outstanding: number;
-  collected: number;
-  target: number | null;
-  currency: string;
-}
-
 interface TrackerPayload {
   event: TrackerEvent;
-  summary: TrackerSummary;
+  summary: LedgerSummary;
   rows: TrackerRow[];
-}
-
-type Filter = 'ALL' | ContributionStatus;
-type SortKey = 'NAME' | 'OUTSTANDING' | 'RECENT';
-
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'ALL', label: 'All' },
-  { value: 'PENDING', label: 'Not started' },
-  { value: 'PARTIAL', label: 'Part paid' },
-  { value: 'PAID', label: 'Completed' },
-];
-
-const SORTS: { value: SortKey; label: string }[] = [
-  { value: 'NAME', label: 'Name A–Z' },
-  { value: 'OUTSTANDING', label: 'Most outstanding' },
-  { value: 'RECENT', label: 'Recently updated' },
-];
-
-const QUICK_ADD = 50_000;
-
-const STATUS_TONE: Record<ContributionStatus, 'success' | 'warn' | 'neutral'> = {
-  PAID: 'success',
-  PARTIAL: 'warn',
-  PENDING: 'neutral',
-};
-
-const CHEVRON =
-  "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280' stroke-width='2'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3e%3c/svg%3e\")";
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-function remainingOf(row: TrackerRow) {
-  return row.amountExpected && row.amountExpected > row.amountPaid
-    ? row.amountExpected - row.amountPaid
-    : 0;
-}
-
-function reducedInitial(transition: { duration: number }) {
-  return transition.duration === 0 ? { opacity: 0 } : { opacity: 0, y: 10 };
 }
 
 export default function ContributionTracker({
@@ -183,16 +92,9 @@ export default function ContributionTracker({
     setData(initialData);
   }
 
-  const [filter, setFilter] = useState<Filter>('ALL');
-  const [sort, setSort] = useState<SortKey>('NAME');
-  const [recordedOnly, setRecordedOnly] = useState(false);
-  const [notedOnly, setNotedOnly] = useState(false);
-  const [query, setQuery] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<TrackerRow | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const transition = useTransition();
-  const reduced = useReducedMotion();
 
   const currency = data.event.currency || data.summary.currency || 'TZS';
 
@@ -312,57 +214,6 @@ export default function ContributionTracker({
     }
   }, [eventId]);
 
-  const counts = useMemo(
-    () => ({
-      ALL: data.rows.length,
-      PENDING: data.summary.pending,
-      PARTIAL: data.summary.partial,
-      PAID: data.summary.paid,
-    }),
-    [data.rows.length, data.summary]
-  );
-
-  const visibleRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    const filtered = data.rows.filter((r) => {
-      if (filter !== 'ALL' && r.status !== filter) return false;
-      if (recordedOnly && !r.id) return false;
-      if (notedOnly && !r.note) return false;
-      if (!q) return true;
-      const byName = r.guestName.toLowerCase().includes(q);
-      // Phone search understands local ("0712…"), international ("+255…") and
-      // bare national forms, so the way the owner types the number never
-      // decides whether the guest is found.
-      const byPhone = phoneMatches(r.phone, query);
-      return byName || byPhone;
-    });
-
-    return filtered.sort((a, b) => {
-      if (sort === 'OUTSTANDING') {
-        const diff = remainingOf(b) - remainingOf(a);
-        if (diff !== 0) return diff;
-      }
-      if (sort === 'RECENT') {
-        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        if (aTime !== bTime) return bTime - aTime;
-      }
-      return a.guestName.localeCompare(b.guestName);
-    });
-  }, [data.rows, filter, query, recordedOnly, notedOnly, sort]);
-
-  const filtersActive =
-    filter !== 'ALL' || sort !== 'NAME' || recordedOnly || notedOnly || query.trim() !== '';
-
-  const clearFilters = () => {
-    setFilter('ALL');
-    setSort('NAME');
-    setRecordedOnly(false);
-    setNotedOnly(false);
-    setQuery('');
-  };
-
   const progressPct =
     data.summary.target && data.summary.target > 0
       ? Math.min(100, Math.round((data.summary.collected / data.summary.target) * 100))
@@ -374,11 +225,6 @@ export default function ContributionTracker({
   const eventName = data.event.name || 'Contributions';
   const venue = data.event.venue || data.event.address;
 
-  const details = [
-    { icon: CalendarClock, label: 'Event date', value: data.event.date },
-    { icon: MapPin, label: 'Venue', value: venue || 'Not set' },
-  ];
-
   // The server echo replaces `rows`, so the open sheet reads the fresh copy
   // rather than the snapshot it was opened with.
   const editingLive = editing
@@ -387,283 +233,29 @@ export default function ContributionTracker({
 
   return (
     <div className="min-h-dvh bg-canvas pb-16">
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <header className="relative overflow-hidden bg-brand text-white">
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[0.16]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.16 }}
-          transition={{ duration: reduced ? 0 : 0.8 }}
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 18% 12%, #ffffff 0, transparent 42%), radial-gradient(circle at 88% 82%, #7fb5b4 0, transparent 46%)',
-          }}
-        />
-        <div className="relative mx-auto w-full max-w-3xl px-4 pb-14 pt-9 sm:px-6 sm:pb-16 sm:pt-14">
-          <motion.div
-            initial={reducedInitial(transition)}
-            animate={{ opacity: 1, y: 0 }}
-            transition={transition}
-          >
-            <p className="flex items-center gap-2 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-brand-200">
-              <PartyPopper className="size-3.5 shrink-0" aria-hidden="true" />
-              Contributions
-            </p>
-            {/* The event's own name from Event Details. */}
-            <h1 className="mt-2.5 break-words font-display text-[27px] leading-[1.15] sm:text-4xl">
-              {eventName}
-            </h1>
-            {data.event.eventType ? (
-              <p className="mt-1.5 break-words text-sm text-brand-100">{data.event.eventType}</p>
-            ) : null}
-          </motion.div>
-
-          <motion.dl
-            className="mt-5 grid gap-2 sm:grid-cols-2"
-            initial="hidden"
-            animate="shown"
-            variants={{
-              hidden: {},
-              shown: { transition: { staggerChildren: reduced ? 0 : 0.06 } },
-            }}
-          >
-            {details.map((item) => (
-              <motion.div
-                key={item.label}
-                variants={{
-                  hidden: reduced ? { opacity: 0 } : { opacity: 0, y: 10 },
-                  shown: { opacity: 1, y: 0 },
-                }}
-                transition={transition}
-                className="rounded-card bg-white/10 px-3.5 py-3 ring-1 ring-inset ring-white/15"
-              >
-                <dt className="flex items-center gap-1.5 text-[0.7rem] uppercase tracking-wide text-brand-200">
-                  <item.icon className="size-3.5 shrink-0" aria-hidden="true" />
-                  {item.label}
-                </dt>
-                {/* Wraps rather than truncates: a long venue stays readable. */}
-                <dd className="mt-1 break-words text-sm font-semibold leading-snug">{item.value}</dd>
-              </motion.div>
-            ))}
-          </motion.dl>
-        </div>
-      </header>
+      <ContributionHero
+        name={eventName}
+        eventType={data.event.eventType}
+        date={data.event.date}
+        venue={venue}
+      />
 
       <main className="relative mx-auto -mt-8 w-full max-w-3xl space-y-4 px-4 sm:px-6">
-        {/* ── Progress ────────────────────────────────────────────────────── */}
-        <AppCard>
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
-            <ProgressRing
-              pct={progressPct ?? (data.summary.collected > 0 ? 100 : 0)}
-              collected={data.summary.collected}
-              target={data.summary.target}
-              currency={currency}
-            />
-            <div className="w-full min-w-0 flex-1">
-              <StatTiles
-                tiles={buildTiles({
-                  collected: data.summary.collected,
-                  currency,
-                  total: data.summary.total,
-                  pending: data.summary.pending,
-                  partial: data.summary.partial,
-                  paid: data.summary.paid,
-                  outstanding: data.summary.outstanding,
-                })}
-              />
-              {progressPct !== null ? (
-                <p className="mt-3 text-center text-[12px] leading-relaxed text-muted sm:text-left">
-                  <span className="font-semibold text-ink">{progressPct}%</span> of the target
-                  collected
-                  {data.summary.outstanding > 0
-                    ? ` · ${formatTZS(data.summary.outstanding, currency)} still outstanding`
-                    : ' · nothing outstanding'}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </AppCard>
+        <ContributionSummaryCard
+          summary={data.summary}
+          currency={currency}
+          progressPct={progressPct}
+        />
 
-        {/* ── Guest ledger ────────────────────────────────────────────────── */}
-        <AppCard padded={false}>
-          <div className="space-y-3 border-b border-line p-4">
-            <div className="flex items-start justify-between gap-3">
-              <AppCardTitle
-                title="Guest contributions"
-                subtitle="Tap a guest to see their full details and record what you received."
-              />
-              <button
-                type="button"
-                onClick={() => void refresh()}
-                disabled={refreshing}
-                aria-label="Refresh"
-                className="grid size-9 shrink-0 place-items-center rounded-tap text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={refreshing ? 'animate-spin' : undefined}
-                  size={16}
-                  aria-hidden="true"
-                />
-              </button>
-            </div>
-
-            {/* Search: name or phone, punctuation-insensitive on the number. */}
-            <div className="relative">
-              <Search
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                aria-hidden="true"
-              />
-              <AppInput
-                type="search"
-                inputMode="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name or phone number"
-                aria-label="Search guests by name or phone number"
-                className="pl-9 pr-9 [&::-webkit-search-cancel-button]:hidden"
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery('')}
-                  aria-label="Clear search"
-                  className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-2"
-                >
-                  <X size={14} />
-                </button>
-              ) : null}
-            </div>
-
-            {/* Status chips scroll sideways instead of squeezing four labelled
-                segments into a phone-width bar. */}
-            <div
-              className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              role="group"
-              aria-label="Filter contributions by status"
-            >
-              {FILTERS.map((option) => {
-                const active = filter === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setFilter(option.value)}
-                    className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${
-                      active
-                        ? 'border-brand bg-brand text-white shadow-brand-sm'
-                        : 'border-line bg-surface text-muted hover:border-brand/40 hover:text-ink'
-                    }`}
-                  >
-                    {option.label}
-                    <span
-                      className={`text-[11px] font-bold tabular-nums ${
-                        active ? 'text-white/75' : 'text-gray-400'
-                      }`}
-                    >
-                      {counts[option.value]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Secondary rules: sort order plus two record-based filters. */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <ArrowUpDown
-                  size={13}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-                  aria-hidden="true"
-                />
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
-                  aria-label="Sort guests"
-                  className="h-9 appearance-none rounded-full border border-line bg-surface py-0 pl-8 pr-8 text-[13px] font-semibold text-ink transition-colors hover:border-brand/40"
-                  style={{ backgroundImage: CHEVRON, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.65rem center', backgroundSize: '14px' }}
-                >
-                  {SORTS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <ToggleChip
-                label="With record"
-                active={recordedOnly}
-                onClick={() => setRecordedOnly((v) => !v)}
-              />
-              <ToggleChip
-                label="With note"
-                active={notedOnly}
-                onClick={() => setNotedOnly((v) => !v)}
-              />
-            </div>
-
-            <p className="text-[12px] text-muted" aria-live="polite">
-              Showing <span className="font-semibold text-ink">{visibleRows.length}</span> of{' '}
-              {data.summary.total} guest{data.summary.total === 1 ? '' : 's'}
-              {filtersActive ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="ml-2 font-semibold text-brand underline underline-offset-2"
-                >
-                  Clear
-                </button>
-              ) : null}
-            </p>
-          </div>
-
-          {visibleRows.length === 0 ? (
-            <AppEmptyState
-              icon={<Users size={20} />}
-              size="sm"
-              title={
-                data.rows.length === 0 ? 'No guests on this event yet' : 'No guests match'
-              }
-              description={
-                data.rows.length === 0
-                  ? 'Once guests are added to the event they will appear here.'
-                  : 'Try a different name, phone number, or filter.'
-              }
-              action={
-                filtersActive && data.rows.length > 0 ? (
-                  <AppButton size="sm" variant="secondary" onClick={clearFilters}>
-                    Clear filters
-                  </AppButton>
-                ) : undefined
-              }
-            />
-          ) : (
-            <ul className="divide-y divide-line">
-              <AnimatePresence initial={false} mode="popLayout">
-                {visibleRows.map((row) => (
-                  <motion.li
-                    key={row.guestId}
-                    layout={!reduced}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: reduced ? 0 : 0.18, ease: motionEase }}
-                  >
-                    <GuestRow
-                      row={row}
-                      currency={currency}
-                      busy={savingId === row.guestId}
-                      onOpen={() => setEditing(row)}
-                    />
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
-          )}
-        </AppCard>
+        <LedgerCard
+          rows={data.rows}
+          summary={data.summary}
+          currency={currency}
+          onOpenRow={setEditing}
+          onRefresh={() => void refresh()}
+          refreshing={refreshing}
+          busyGuestId={savingId}
+        />
 
         <AppCard tone="tinted">
           <div className="space-y-1.5 text-center">
@@ -700,103 +292,6 @@ export default function ContributionTracker({
         }}
       />
     </div>
-  );
-}
-
-/** Rounded filter toggle, same footprint as the status chips. */
-function ToggleChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${
-        active
-          ? 'border-brand bg-brand text-white shadow-brand-sm'
-          : 'border-line bg-surface text-muted hover:border-brand/40 hover:text-ink'
-      }`}
-    >
-      {active ? <Check size={13} aria-hidden="true" /> : null}
-      {label}
-    </button>
-  );
-}
-
-function GuestRow({
-  row,
-  currency,
-  busy,
-  onOpen,
-}: {
-  row: TrackerRow;
-  currency: string;
-  busy: boolean;
-  onOpen: () => void;
-}) {
-  const meta = CONTRIBUTION_STATUS_META[row.status];
-  const remaining = remainingOf(row);
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      disabled={busy}
-      aria-label={`Open ${row.guestName}'s contribution`}
-      className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/70 active:bg-surface-2 disabled:opacity-60"
-    >
-      <AppAvatar name={row.guestName} size="md" className="mt-0.5" />
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span className="min-w-0 break-words text-[14px] font-semibold leading-snug text-ink">
-            {row.guestName}
-          </span>
-          <AppChip tone={STATUS_TONE[row.status]}>{meta.label}</AppChip>
-          {row.pendingEdit ? (
-            <AppChip tone="warn">Awaiting approval</AppChip>
-          ) : null}
-        </span>
-
-        {/* Full number on its own line: never truncated, always readable. */}
-        {row.phone ? (
-          <span className="mt-1 flex items-center gap-1.5 text-[13px] text-muted">
-            <Phone size={12} className="shrink-0" aria-hidden="true" />
-            <span className="break-all tabular-nums">{row.phone}</span>
-          </span>
-        ) : (
-          <span className="mt-1 block text-[13px] text-muted">No phone number</span>
-        )}
-
-        {row.amountPaid > 0 || row.amountExpected ? (
-          <span className="mt-1 block text-[12px] tabular-nums text-ink">
-            {formatTZS(row.amountPaid, currency)} received
-            {row.amountExpected ? (
-              <span className="text-muted"> of {formatTZS(row.amountExpected, currency)}</span>
-            ) : null}
-            {remaining > 0 ? <span className="text-warn"> · {formatTZS(remaining, currency)} left</span> : null}
-          </span>
-        ) : null}
-
-        {row.note ? (
-          <span className="mt-1 block break-words text-[12px] italic leading-snug text-muted">
-            “{row.note}”
-          </span>
-        ) : null}
-
-        {row.updatedAt ? (
-          <span className="mt-1 block text-[11px] text-muted">Updated {formatDate(row.updatedAt)}</span>
-        ) : null}
-      </span>
-
-      <ChevronRight size={16} className="mt-1.5 shrink-0 text-gray-300" aria-hidden="true" />
-    </button>
   );
 }
 
@@ -1224,36 +719,5 @@ function GuestSheet({
         </div>
       ) : null}
     </AppBottomSheet>
-  );
-}
-
-function DetailTile({
-  label,
-  value,
-  className = '',
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div className="rounded-tap bg-white px-3 py-2 ring-1 ring-inset ring-line">
-      <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted">{label}</dt>
-      <dd className={`mt-0.5 break-words text-[13px] font-semibold tabular-nums ${className}`}>
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function QuickAmountButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex h-8 items-center rounded-full bg-surface-2 px-3 text-[12px] font-semibold text-ink transition hover:bg-line"
-    >
-      {label}
-    </button>
   );
 }

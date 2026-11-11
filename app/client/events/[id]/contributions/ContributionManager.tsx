@@ -1,27 +1,24 @@
 // app/client/events/[id]/contributions/ContributionManager.tsx
 // Tenant-facing contribution tracking.
 //
-// Three screens rather than one long scroll: Overview for the numbers, Guests
-// for the per-person records, Settings for the template and payment details.
+// The layout is deliberately the same as the shared tracker: brand hero,
+// headline progress card, then one searchable guest ledger. Settings and the
+// per-guest editor live in bottom sheets so the main view stays identical to
+// the link the tenant sends to their client.
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  ArrowRight,
   Bell,
   Check,
+  Copy,
   ExternalLink,
-  LayoutDashboard,
   Loader2,
   Phone,
-  RefreshCw,
-  Search,
   Settings2,
   SlidersHorizontal,
-  Users,
   Wallet,
-  X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -34,7 +31,6 @@ import {
   AppChip,
   AppEmptyState,
   AppInput,
-  AppPageHeader,
   AppSegmentedControl,
   AppSelect,
   ShareLinkButton,
@@ -42,17 +38,25 @@ import {
   CONTRIBUTION_STATUS_META,
   type ContributionStatus,
 } from '@/components/ui';
-import { MCHANGO_OCCASIONS } from '@/lib/whatsapp/mchango';
-import { phoneMatches } from '@/lib/phone';
+import { MCHANGO_OCCASIONS, formatSwahiliDate } from '@/lib/whatsapp/mchango';
 import { useTransition } from '@/lib/motion';
-import { buildTiles, ProgressRing, StatTiles } from './widgets';
+import {
+  ContributionHero,
+  ContributionSummaryCard,
+  DetailTile,
+  HeroIconButton,
+  LedgerCard,
+  QUICK_ADD,
+  QuickAmountButton,
+  STATUS_TONE,
+  formatDate,
+  remainingOf,
+} from './shell';
 import type {
   ManagerPayload,
   ManagerRow,
   ManagerSummary,
-  Screen,
   SettingsForm,
-  StatusFilter,
 } from './types';
 
 const EMPTY_SUMMARY: ManagerSummary = {
@@ -67,32 +71,33 @@ const EMPTY_SUMMARY: ManagerSummary = {
   currency: 'TZS',
 };
 
-const SCREENS: { key: Screen; label: string; icon: typeof Wallet }[] = [
-  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { key: 'guests', label: 'Guests', icon: Users },
-  { key: 'settings', label: 'Settings', icon: Settings2 },
-];
-
-/** Only the "Mark full" shortcut knows the expected amount; without one the
- *  quick action adds a round figure instead of guessing a target. */
-const QUICK_ADD = 50_000;
+function settingsFromPayload(data: ManagerPayload): SettingsForm {
+  return {
+    contributionsEnabled: data.event.contributionsEnabled,
+    eventType: data.event.eventType ?? '',
+    contributionTarget: data.event.contributionTarget
+      ? String(data.event.contributionTarget)
+      : '',
+    contributionCurrency: data.event.contributionCurrency || 'TZS',
+    mpesaInstructions: data.event.mpesaInstructions ?? '',
+    airtelInstructions: data.event.airtelInstructions ?? '',
+    bankInstructions: data.event.bankInstructions ?? '',
+  };
+}
 
 export default function ContributionManager({ eventId }: { eventId: string }) {
   const router = useRouter();
-  const transition = useTransition();
 
   const [data, setData] = useState<ManagerPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [screen, setScreen] = useState<Screen>('overview');
-  const [filter, setFilter] = useState<StatusFilter>('ALL');
-  const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<ManagerRow | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [form, setForm] = useState<SettingsForm | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const summary = data?.summary ?? EMPTY_SUMMARY;
   const currency = summary.currency || 'TZS';
@@ -162,17 +167,7 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
   const [seeded, setSeeded] = useState<ManagerPayload | null>(null);
   if (data && !form && seeded !== data) {
     setSeeded(data);
-    setForm({
-      contributionsEnabled: data.event.contributionsEnabled,
-      eventType: data.event.eventType ?? '',
-      contributionTarget: data.event.contributionTarget
-        ? String(data.event.contributionTarget)
-        : '',
-      contributionCurrency: data.event.contributionCurrency || 'TZS',
-      mpesaInstructions: data.event.mpesaInstructions ?? '',
-      airtelInstructions: data.event.airtelInstructions ?? '',
-      bankInstructions: data.event.bankInstructions ?? '',
-    });
+    setForm(settingsFromPayload(data));
   }
 
   // ─── Mutations ──────────────────────────────────────────────────────────
@@ -207,27 +202,6 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
     [eventId]
   );
 
-  const setStatus = useCallback(
-    async (row: ManagerRow, status: ContributionStatus) => {
-      if (row.status === status) return;
-      const payload = await patchRow(row, { status });
-      if (payload) {
-        const updated = payload.rows.find((r) => r.guestId === row.guestId);
-        if (updated) {
-          toast.success(
-            updated.status === 'PAID'
-              ? `${row.guestName} marked completed`
-              : `${row.guestName} marked ${CONTRIBUTION_STATUS_META[updated.status].label.toLowerCase()}`
-          );
-        }
-        // Moving the last outstanding guest to completed should not strand the
-        // tenant on a screen that no longer shows them.
-        if (status === 'PAID' && filter === 'PAID') setQuery((q) => q);
-      }
-    },
-    [patchRow, filter]
-  );
-
   const saveSettings = useCallback(async () => {
     if (!form) return;
     setSavingSettings(true);
@@ -251,8 +225,8 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
       if (!res.ok) throw new Error('Could not save settings');
       setData(await res.json());
       setForm(null);
+      setSettingsOpen(false);
       toast.success('Settings saved.');
-      setScreen('overview');
     } catch {
       toast.error('Could not save settings.');
     } finally {
@@ -260,43 +234,28 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
     }
   }, [eventId, form]);
 
+  const closeSettings = useCallback(() => {
+    // Cancel means discard: the sheet is a form, not a persistent draft.
+    if (data) setForm(settingsFromPayload(data));
+    setSettingsOpen(false);
+  }, [data]);
+
   // ─── Derived ────────────────────────────────────────────────────────────
   const progressPct =
     summary.target && summary.target > 0
       ? Math.min(100, Math.round((summary.collected / summary.target) * 100))
       : null;
 
-  const visibleRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return (data?.rows ?? []).filter((r) => {
-      if (filter !== 'ALL' && r.status !== filter) return false;
-      if (!q) return true;
-      return (
-        r.guestName.toLowerCase().includes(q) ||
-        phoneMatches(r.phone, q) ||
-        (r.phoneMasked ?? '').includes(q)
-      );
-    });
-  }, [data?.rows, filter, query]);
-
-  /** Guests who still owe money, worst first - the actionable shortlist. */
-  const needsAttention = useMemo(
-    () =>
-      (data?.rows ?? [])
-        .filter((r) => r.status !== 'PAID')
-        .sort((a, b) => {
-          const aShort = a.amountExpected ? a.amountExpected - a.amountPaid : Infinity;
-          const bShort = b.amountExpected ? b.amountExpected - b.amountPaid : Infinity;
-          return aShort - bShort || a.guestName.localeCompare(b.guestName);
-        })
-        .slice(0, 6),
-    [data?.rows]
-  );
+  // The server echo replaces `rows`, so the open sheet reads the fresh copy
+  // rather than the snapshot it was opened with.
+  const editingLive = editing
+    ? (data?.rows.find((r) => r.guestId === editing.guestId) ?? editing)
+    : null;
 
   // ─── States ─────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-canvas">
+      <div className="grid min-h-[60vh] place-items-center">
         <Loader2 className="size-7 animate-spin text-brand" aria-label="Loading" />
       </div>
     );
@@ -304,7 +263,7 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
 
   if (error || !data) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-canvas px-6">
+      <div className="grid min-h-[60vh] place-items-center px-6">
         <AppEmptyState
           icon={<Wallet size={22} />}
           title="Could not load contributions"
@@ -325,39 +284,39 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
   }
 
   const event = data.event;
+  const venue = event.venue || event.address || null;
 
   return (
-    <div className="min-h-dvh bg-canvas pb-[calc(4rem+var(--app-nav-safe))]">
-      <AppPageHeader
-        compact
-        eyebrow="Contributions"
-        title={event.name}
-        description="Track who has paid, and share the tracker with your guests."
+    <div className="-mx-4 -mt-5 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8">
+      <ContributionHero
+        name={event.name}
+        eventType={event.eventType}
+        date={formatSwahiliDate(event.date)}
+        venue={venue}
         actions={
-          <div className="flex items-center gap-2">
-            <AppButton
-              variant="secondary"
-              size="sm"
-              icon={<RefreshCw size={14} className={refreshing ? 'animate-spin' : undefined} />}
-              onClick={() => void refresh()}
-              loading={refreshing}
-              aria-label="Refresh"
+          <>
+            {trackerUrl ? (
+              <ShareLinkButton
+                url={trackerUrl}
+                title={`${event.name} contributions`}
+                text="Track who has completed their contribution."
+                label="Share"
+                variant="ghost"
+                size="sm"
+                className="!bg-white/10 !text-white ring-1 ring-inset ring-white/20 hover:!bg-white/20"
+              />
+            ) : null}
+            <HeroIconButton
+              label="Contribution settings"
+              onClick={() => setSettingsOpen(true)}
             >
-              Refresh
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              size="sm"
-              icon={<Settings2 size={14} />}
-              onClick={() => setScreen('settings')}
-            >
-              Settings
-            </AppButton>
-          </div>
+              <Settings2 size={16} aria-hidden="true" />
+            </HeroIconButton>
+          </>
         }
       />
 
-      <main className="mx-auto w-full max-w-4xl space-y-4 px-4 pb-10 sm:px-6">
+      <main className="relative mx-auto -mt-8 w-full max-w-3xl space-y-4 px-4 pb-8 sm:px-6">
         {!event.contributionsEnabled ? (
           <AppCard tone="tinted" className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
@@ -374,7 +333,7 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
               size="sm"
               onClick={() => {
                 setForm((f) => (f ? { ...f, contributionsEnabled: true } : f));
-                setScreen('settings');
+                setSettingsOpen(true);
               }}
             >
               Turn on tracking
@@ -382,517 +341,68 @@ export default function ContributionManager({ eventId }: { eventId: string }) {
           </AppCard>
         ) : null}
 
-        {/* ─── Screen switcher ─── */}
-        <div
-          role="tablist"
-          aria-label="Contribution screens"
-          className="grid grid-cols-3 gap-1 rounded-blob bg-surface-2 p-1"
-        >
-          {SCREENS.map((s) => {
-            const active = screen === s.key;
-            return (
-              <button
-                key={s.key}
-                role="tab"
-                type="button"
-                aria-selected={active}
-                onClick={() => setScreen(s.key)}
-                className={`relative flex items-center justify-center gap-1.5 rounded-tap px-3 py-2.5 text-[13px] font-semibold transition-colors ${
-                  active ? 'text-white' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {active ? (
-                  <motion.span
-                    layoutId="contribution-tab"
-                    className="absolute inset-0 rounded-tap bg-brand shadow-elev-1"
-                    transition={transition}
-                  />
-                ) : null}
-                <s.icon size={14} className="relative z-10" aria-hidden="true" />
-                <span className="relative z-10">{s.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <ContributionSummaryCard
+          summary={summary}
+          currency={currency}
+          progressPct={progressPct}
+        />
 
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={screen}
-            initial={reducedInitial(transition)}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={transition}
-            className="space-y-4"
-          >
-            {screen === 'overview' ? (
-              <OverviewScreen
-                summary={summary}
-                currency={currency}
-                progressPct={progressPct}
-                trackerUrl={trackerUrl}
-                eventName={event.name}
-                needsAttention={needsAttention}
-                savingId={savingId}
-                onOpenRow={setEditing}
-                onSetStatus={setStatus}
-                onGoToGuests={() => setScreen('guests')}
-              />
-            ) : null}
+        <LedgerCard
+          rows={data.rows}
+          summary={summary}
+          currency={currency}
+          onOpenRow={setEditing}
+          onRefresh={() => void refresh()}
+          refreshing={refreshing}
+          busyGuestId={savingId}
+          showReminded
+          showTracked
+          subtitle="Tap a guest to edit their details, amounts, or status."
+        />
 
-            {screen === 'guests' ? (
-              <GuestsScreen
-                rows={visibleRows}
-                summary={summary}
-                filter={filter}
-                query={query}
-                savingId={savingId}
-                enabled={event.contributionsEnabled}
-                onFilter={setFilter}
-                onQuery={setQuery}
-                onOpenRow={setEditing}
-                onSetStatus={setStatus}
-              />
-            ) : null}
-
-            {screen === 'settings' ? (
-              <SettingsScreen
-                form={form}
-                saving={savingSettings}
-                onChange={setForm}
-                onSave={saveSettings}
-                onCancel={() => setScreen('overview')}
-              />
-            ) : null}
-          </motion.div>
-        </AnimatePresence>
+        <AppCard tone="tinted">
+          <div className="space-y-1.5 text-center">
+            <p className="flex items-center justify-center gap-2 text-[13px] font-medium text-ink">
+              <Check size={14} className="shrink-0 text-brand" aria-hidden="true" />
+              Guests marked completed stop receiving reminders.
+            </p>
+            <p className="text-[11px] leading-relaxed text-muted">
+              Tap any guest to record what arrived, set an expected amount, or correct their
+              name and number.
+            </p>
+          </div>
+        </AppCard>
       </main>
 
       <GuestEditorSheet
-        row={editing}
+        row={editingLive}
         currency={currency}
-        saving={savingId === editing?.guestId}
+        saving={savingId === editingLive?.guestId}
         onClose={() => setEditing(null)}
         onSave={async (patch) => {
-          if (!editing) return;
-          const payload = await patchRow(editing, patch);
+          if (!editingLive) return;
+          const payload = await patchRow(editingLive, patch);
           if (payload) {
             // Prefer the rebuilt row so a rename confirms under the new name.
-            const updated = payload.rows.find((r) => r.guestId === editing.guestId);
+            const updated = payload.rows.find((r) => r.guestId === editingLive.guestId);
             setEditing(null);
-            toast.success(`${updated?.guestName ?? editing.guestName} updated`);
+            toast.success(`${updated?.guestName ?? editingLive.guestName} updated`);
           }
         }}
+      />
+
+      <SettingsSheet
+        open={settingsOpen}
+        form={form}
+        saving={savingSettings}
+        trackerUrl={trackerUrl}
+        onChange={setForm}
+        onSave={saveSettings}
+        onClose={closeSettings}
       />
     </div>
   );
 }
-
-function reducedInitial(transition: { duration: number }) {
-  return transition.duration === 0 ? { opacity: 0 } : { opacity: 0, y: 10 };
-}
-
-// ─── Overview ─────────────────────────────────────────────────────────────
-
-interface OverviewProps {
-  summary: ManagerSummary;
-  currency: string;
-  progressPct: number | null;
-  trackerUrl: string;
-  eventName: string;
-  needsAttention: ManagerRow[];
-  savingId: string | null;
-  onOpenRow: (row: ManagerRow) => void;
-  onSetStatus: (row: ManagerRow, status: ContributionStatus) => void;
-  onGoToGuests: () => void;
-}
-
-function OverviewScreen({
-  summary,
-  currency,
-  progressPct,
-  trackerUrl,
-  eventName,
-  needsAttention,
-  savingId,
-  onOpenRow,
-  onSetStatus,
-  onGoToGuests,
-}: OverviewProps) {
-  return (
-    <>
-      <AppCard>
-        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-6">
-          <ProgressRing
-            pct={progressPct ?? (summary.collected > 0 ? 100 : 0)}
-            collected={summary.collected}
-            target={summary.target}
-            currency={currency}
-          />
-          <div className="w-full min-w-0 flex-1">
-            <StatTiles
-              tiles={buildTiles({
-                collected: summary.collected,
-                currency,
-                total: summary.total,
-                pending: summary.pending,
-                partial: summary.partial,
-                paid: summary.paid,
-                outstanding: summary.outstanding,
-              })}
-            />
-            {progressPct !== null ? (
-              <p className="mt-3 text-center text-[12px] text-muted sm:text-left">
-                <span className="font-semibold text-ink">{progressPct}%</span> of the target
-                collected
-                {summary.outstanding > 0
-                  ? ` · ${formatTZS(summary.outstanding, currency)} still owed`
-                  : ' · nothing outstanding'}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </AppCard>
-
-      <AppCard>
-        <AppCardTitle
-          title="Share the tracker"
-          subtitle="Guests can mark their own contribution, or record what they paid you offline."
-          action={
-            trackerUrl ? (
-              <a
-                href={trackerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 text-[13px] font-semibold text-brand"
-              >
-                Open <ExternalLink size={13} />
-              </a>
-            ) : null
-          }
-        />
-        {trackerUrl ? (
-          <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-            <ShareLinkButton
-              url={trackerUrl}
-              title={`${eventName} contributions`}
-              text="Track who has completed their contribution."
-              label="Share link"
-              variant="primary"
-              size="md"
-            />
-            <code className="min-w-0 flex-1 truncate rounded-tap bg-surface-2 px-3 py-2.5 text-[12px] text-muted">
-              {trackerUrl}
-            </code>
-          </div>
-        ) : null}
-      </AppCard>
-
-      <AppCard>
-        <AppCardTitle
-          title="Needs a reminder"
-          subtitle={
-            needsAttention.length
-              ? `${needsAttention.length} guest${needsAttention.length > 1 ? 's have' : ' has'} money still outstanding. Reminders only ever go to these.`
-              : 'Everyone has completed their contribution, so reminders will skip them all.'
-          }
-          action={
-            needsAttention.length ? (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onGoToGuests}
-                  className="flex items-center gap-1 text-[13px] font-semibold text-brand"
-                >
-                  All guests <ArrowRight size={13} />
-                </button>
-              </div>
-            ) : null
-          }
-        />
-        {needsAttention.length === 0 ? (
-          <div className="mt-2 flex items-center gap-2 rounded-tap bg-success-soft px-3 py-3 text-[13px] text-success">
-            <Check size={15} />
-            Nothing outstanding.
-          </div>
-        ) : (
-          <ul className="mt-2 divide-y divide-line">
-            {needsAttention.map((row) => (
-              <li key={row.guestId} className="flex items-center gap-3 py-2.5">
-                <AppAvatar name={row.guestName} size="sm" />
-                <button
-                  type="button"
-                  onClick={() => onOpenRow(row)}
-                  className="min-w-0 flex-1 text-left"
-                >
-                  <span className="block truncate text-[13px] font-semibold text-ink">
-                    {row.guestName}
-                  </span>
-                  <span className="block truncate text-[11px] text-muted">
-                    {row.amountPaid > 0
-                      ? `${formatTZS(row.amountPaid, currency)} of ${formatTZS(row.amountExpected ?? 0, currency)}`
-                      : row.amountExpected
-                        ? `owes ${formatTZS(row.amountExpected, currency)}`
-                        : 'no amount set'}
-                  </span>
-                </button>
-                <QuickComplete
-                  row={row}
-                  currency={currency}
-                  busy={savingId === row.guestId}
-                  onComplete={() => onSetStatus(row, 'PAID')}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </AppCard>
-    </>
-  );
-}
-
-function QuickComplete({
-  row,
-  currency,
-  busy,
-  onComplete,
-}: {
-  row: ManagerRow;
-  currency: string;
-  busy: boolean;
-  onComplete: () => void;
-}) {
-  if (row.status === 'PAID') return null;
-  return (
-    <AppButton
-      size="sm"
-      variant="secondary"
-      loading={busy}
-      onClick={onComplete}
-      className="shrink-0"
-      aria-label={`Mark ${row.guestName} completed`}
-    >
-      {row.amountExpected ? formatTZS(row.amountExpected, currency) : 'Mark done'}
-    </AppButton>
-  );
-}
-
-// ─── Guests ───────────────────────────────────────────────────────────────
-
-interface GuestsProps {
-  rows: ManagerRow[];
-  summary: ManagerSummary;
-  filter: StatusFilter;
-  query: string;
-  savingId: string | null;
-  enabled: boolean;
-  onFilter: (f: StatusFilter) => void;
-  onQuery: (q: string) => void;
-  onOpenRow: (row: ManagerRow) => void;
-  onSetStatus: (row: ManagerRow, status: ContributionStatus) => void;
-}
-
-function GuestsScreen({
-  rows,
-  summary,
-  filter,
-  query,
-  savingId,
-  enabled,
-  onFilter,
-  onQuery,
-  onOpenRow,
-  onSetStatus,
-}: GuestsProps) {
-  return (
-    <>
-      <AppCard padded={false}>
-        <div className="space-y-3 border-b border-line p-4">
-          <AppSegmentedControl
-            label="Filter contributions by status"
-            value={filter}
-            onChange={(v) => onFilter(v as StatusFilter)}
-            options={[
-              { value: 'ALL', label: `All ${summary.total}` },
-              { value: 'PENDING', label: `Not started ${summary.pending}` },
-              { value: 'PARTIAL', label: `Partial ${summary.partial}` },
-              { value: 'PAID', label: `Done ${summary.paid}` },
-            ]}
-          />
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <AppInput
-              type="search"
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder="Search name or number"
-              aria-label="Search guests"
-              className="pl-9"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => onQuery('')}
-                aria-label="Clear search"
-                className="absolute right-2.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-muted hover:bg-surface-2"
-              >
-                <X size={13} />
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {rows.length === 0 ? (
-          <AppEmptyState
-            icon={<Users size={20} />}
-            size="sm"
-            title={summary.total === 0 ? 'No guests on this event yet' : 'No guests match'}
-            description={
-              summary.total === 0
-                ? 'Add guests to the event and they will appear here ready to track.'
-                : 'Try a different name, number, or status filter.'
-            }
-          />
-        ) : (
-          <ul className="divide-y divide-line">
-            {rows.map((row) => (
-              <GuestRow
-                key={row.guestId}
-                row={row}
-                currency={summary.currency || 'TZS'}
-                busy={savingId === row.guestId}
-                enabled={enabled}
-                onOpen={() => onOpenRow(row)}
-                onSetStatus={(status) => onSetStatus(row, status)}
-              />
-            ))}
-          </ul>
-        )}
-      </AppCard>
-    </>
-  );
-}
-
-function GuestRow({
-  row,
-  currency,
-  busy,
-  enabled,
-  onOpen,
-  onSetStatus,
-}: {
-  row: ManagerRow;
-  currency: string;
-  busy: boolean;
-  enabled: boolean;
-  onOpen: () => void;
-  onSetStatus: (status: ContributionStatus) => void;
-}) {
-  const transition = useTransition();
-  const [tapped, setTapped] = useState<ContributionStatus | null>(null);
-  const meta = CONTRIBUTION_STATUS_META[row.status];
-
-  const press = (status: ContributionStatus) => {
-    setTapped(status);
-    // Cleared on the next frame-ish tick so the pulse reads as feedback on the
-    // button rather than as a stuck loading state if the request is slow.
-    window.setTimeout(() => setTapped(null), 320);
-    onSetStatus(status);
-  };
-
-  return (
-    <li className="px-4 py-3">
-      <div className="flex items-start gap-3">
-        <AppAvatar name={row.guestName} size="md" />
-        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-          <span className="flex items-center gap-1.5">
-            <span className="truncate text-[14px] font-semibold text-ink">{row.guestName}</span>
-            <AppChip tone={row.status === 'PAID' ? 'success' : row.status === 'PARTIAL' ? 'warn' : 'neutral'}>
-              {meta.label}
-            </AppChip>
-          </span>
-          <span className="mt-0.5 block truncate text-[12px] text-muted">
-            {row.phone ?? 'No number'}
-            {row.remindedCount > 0 ? ` · reminded ${row.remindedCount}x` : ' · not reminded'}
-          </span>
-          {row.amountPaid > 0 || row.amountExpected ? (
-            <span className="mt-1 block text-[12px] text-ink tabular-nums">
-              {formatTZS(row.amountPaid, currency)}
-              {row.amountExpected ? ` of ${formatTZS(row.amountExpected, currency)}` : ''}
-            </span>
-          ) : null}
-          {!row.hasContribution ? (
-            <span className="mt-1 inline-flex">
-              <AppChip tone="outline">Not tracked yet</AppChip>
-            </span>
-          ) : null}
-        </button>
-      </div>
-
-      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-        {(['PENDING', 'PARTIAL', 'PAID'] as ContributionStatus[]).map((status) => {
-          const on = row.status === status;
-          const spinning = busy && on;
-          return (
-            <motion.button
-              key={status}
-              type="button"
-              whileTap={{ scale: 0.96 }}
-              transition={transition}
-              disabled={!enabled || busy}
-              aria-pressed={on}
-              aria-label={`Mark ${row.guestName} as ${CONTRIBUTION_STATUS_META[status].label}`}
-              onClick={() => press(status)}
-              className={`relative flex h-9 items-center justify-center gap-1 overflow-hidden rounded-tap text-[12px] font-semibold transition-colors disabled:opacity-50 ${
-                on ? 'text-white' : 'bg-surface-2 text-muted hover:text-ink'
-              }`}
-            >
-              {on ? (
-                <motion.span
-                  layoutId={`row-bg-${row.guestId}`}
-                  className={`absolute inset-0 ${STATUS_BG[status]}`}
-                  transition={transition}
-                />
-              ) : null}
-              {tapped === status ? (
-                <motion.span
-                  className="absolute inset-0 bg-white/25"
-                  initial={{ opacity: 0.9 }}
-                  animate={{ opacity: 0 }}
-                  transition={{ duration: 0.32 }}
-                />
-              ) : null}
-              <span className="relative z-10 inline-flex items-center gap-1">
-                {spinning ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <span
-                    className={`size-1.5 rounded-full ${on ? 'bg-white/80' : STATUS_DOT[status]}`}
-                  />
-                )}
-                {CONTRIBUTION_STATUS_META[status].label}
-              </span>
-            </motion.button>
-          );
-        })}
-      </div>
-    </li>
-  );
-}
-
-const STATUS_BG: Record<ContributionStatus, string> = {
-  PENDING: 'bg-muted',
-  PARTIAL: 'bg-warn',
-  PAID: 'bg-success',
-};
-
-const STATUS_DOT: Record<ContributionStatus, string> = {
-  PENDING: 'bg-muted',
-  PARTIAL: 'bg-warn',
-  PAID: 'bg-success',
-};
 
 // ─── Guest editor sheet ────────────────────────────────────────────────────
 
@@ -914,6 +424,7 @@ function GuestEditorSheet({
   const [note, setNote] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [status, setStatus] = useState<ContributionStatus>('PENDING');
 
   // Re-seed during render rather than in an effect: the sheet is keyed by
   // guestId, and deriving here means opening a row never flashes the previous
@@ -926,17 +437,31 @@ function GuestEditorSheet({
     setNote(row.note ?? '');
     setName(row.name ?? '');
     setPhone(row.phone ?? '');
+    setStatus(row.status);
   }
 
   const paid = Number(amount.replace(/[^\d]/g, '')) || 0;
   const want = Number(expected.replace(/[^\d]/g, '')) || null;
-  const guestDirty =
-    !!row && (name !== (row.name ?? '') || phone !== (row.phone ?? ''));
-  const dirty =
-    amount !== (row?.amountPaid ? String(row.amountPaid) : '') ||
-    expected !== (row?.amountExpected ? String(row.amountExpected) : '') ||
-    note !== (row?.note ?? '') ||
-    guestDirty;
+  const guestDirty = !!row && (name !== (row.name ?? '') || phone !== (row.phone ?? ''));
+  const amountsDirty =
+    !!row &&
+    (amount !== (row.amountPaid ? String(row.amountPaid) : '') ||
+      expected !== (row.amountExpected ? String(row.amountExpected) : '') ||
+      note !== (row.note ?? ''));
+  const statusDirty = !!row && status !== row.status;
+  const dirty = amountsDirty || statusDirty || guestDirty;
+  const remaining = row ? remainingOf(row) : 0;
+  const meta = row ? CONTRIBUTION_STATUS_META[row.status] : null;
+
+  const copyPhone = async () => {
+    if (!row?.phone) return;
+    try {
+      await navigator.clipboard.writeText(row.phone);
+      toast.success('Number copied');
+    } catch {
+      toast.error('Could not copy the number');
+    }
+  };
 
   const save = () => {
     if (!row) return;
@@ -944,14 +469,19 @@ function GuestEditorSheet({
       toast.error('Name is required.');
       return;
     }
+    // Send only what changed. A status-only change must not rewrite the amounts,
+    // and an amounts-only change lets the server reconcile the status.
+    const patch: Record<string, unknown> = {};
+    if (amountsDirty) {
+      patch.amountPaid = paid;
+      patch.amountExpected = want;
+      patch.note = note.trim() || null;
+    }
+    if (statusDirty) patch.status = status;
     // Guest details are only sent when they actually changed, so an
     // amounts-only save never re-validates a number the tenant never touched.
-    void onSave({
-      amountPaid: paid,
-      amountExpected: want,
-      note: note.trim() || null,
-      ...(guestDirty ? { guest: { name: name.trim(), phone: phone.trim() } } : {}),
-    });
+    if (guestDirty) patch.guest = { name: name.trim(), phone: phone.trim() };
+    void onSave(patch);
   };
 
   return (
@@ -960,10 +490,8 @@ function GuestEditorSheet({
       onClose={onClose}
       title={row?.guestName}
       description={
-        row
-          ? `${row.phone ?? 'No number'}${
-              row.updatedByName ? ` · last updated by ${row.updatedByName}` : ''
-            }`
+        row && meta
+          ? `${meta.label}${row.updatedByName ? ` · last updated by ${row.updatedByName}` : ''}`
           : undefined
       }
       footer={
@@ -987,225 +515,354 @@ function GuestEditorSheet({
       }
     >
       {row ? (
-        <div className="space-y-4">
-          <div className="space-y-3.5 rounded-tap bg-surface-2 p-3">
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
+        <div className="space-y-5">
+          {/* ── Full details ── */}
+          <section className="rounded-card border border-line bg-surface-2 p-3.5">
+            <div className="flex items-center gap-3">
+              <AppAvatar name={row.guestName} size="lg" />
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-[15px] font-semibold leading-snug text-ink">
+                  {row.guestName}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <AppChip tone={STATUS_TONE[row.status]}>{meta?.label}</AppChip>
+                  {row.updatedAt ? (
+                    <span className="text-[11px] text-muted">
+                      Updated {formatDate(row.updatedAt)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <dl className="mt-3 grid grid-cols-2 gap-2">
+              <DetailTile
+                label="Received"
+                value={formatTZS(row.amountPaid, currency)}
+                className="text-brand"
+              />
+              <DetailTile
+                label="Expected"
+                value={row.amountExpected ? formatTZS(row.amountExpected, currency) : 'Not set'}
+              />
+              <DetailTile
+                label="Remaining"
+                value={remaining > 0 ? formatTZS(remaining, currency) : 'Nothing left'}
+                className={remaining > 0 ? 'text-warn' : 'text-success'}
+              />
+              <DetailTile
+                label="Last updated"
+                value={row.updatedAt ? formatDate(row.updatedAt) : 'Not yet'}
+              />
+            </dl>
+
+            {row.note ? (
+              <p className="mt-2.5 break-words text-[12px] italic leading-snug text-muted">
+                “{row.note}”
+              </p>
+            ) : null}
+          </section>
+
+          {/* ── Phone: complete, tappable, copyable ── */}
+          <section className="rounded-card border border-line bg-white p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Phone number
+            </p>
+            {row.phone ? (
+              <>
+                <p className="mt-1 break-all text-[17px] font-bold leading-tight tabular-nums text-ink">
+                  {row.phone}
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a
+                    href={`tel:${row.phone}`}
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-tap bg-brand text-[13px] font-semibold text-white shadow-brand-sm transition active:bg-brand-800"
+                  >
+                    <Phone size={14} aria-hidden="true" />
+                    Call
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => void copyPhone()}
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-tap border border-line bg-surface text-[13px] font-semibold text-ink transition hover:border-brand/40"
+                  >
+                    <Copy size={14} aria-hidden="true" />
+                    Copy
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="mt-1 text-[14px] text-muted">
+                No number on file. Add one below so reminders and calls can reach this guest.
+              </p>
+            )}
+          </section>
+
+          {/* ── Guest details ── */}
+          <section className="rounded-card border border-line bg-white p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
               Guest details
             </p>
-            <AppInput
-              label="Full name"
-              hint={
-                row.title
-                  ? `Saved without the "${row.title}" title, which stays as it is.`
-                  : 'Also updates this guest on your event guest list.'
-              }
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. John Doe"
-              maxLength={120}
-            />
-            <AppInput
-              label="Phone number"
-              hint="Include country code, e.g. +255712345678. Leave empty if there is no number."
-              type="tel"
-              inputMode="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+255712345678"
-            />
-          </div>
-
-          <AppInput
-            label={`Amount received (${currency})`}
-            hint="Set 0 if nothing has arrived yet."
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-          />
-
-          <AppInput
-            label={`Amount expected (${currency})`}
-            hint="Optional. Reaching this marks the guest completed automatically."
-            inputMode="numeric"
-            value={expected}
-            onChange={(e) => setExpected(e.target.value)}
-            placeholder="e.g. 500000"
-          />
-
-          <div className="flex flex-wrap gap-2">
-            <QuickAmountButton
-              label={`+${formatTZS(QUICK_ADD, currency)}`}
-              onClick={() => setAmount(String(paid + QUICK_ADD))}
-            />
-            {want ? (
-              <QuickAmountButton
-                label={`Full ${formatTZS(want, currency)}`}
-                onClick={() => setAmount(String(want))}
+            <div className="mt-3 space-y-3.5">
+              <AppInput
+                label="Full name"
+                hint={
+                  row.title
+                    ? `Saved without the "${row.title}" title, which stays as it is.`
+                    : 'Also updates this guest on your event guest list.'
+                }
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. John Doe"
+                maxLength={120}
               />
-            ) : null}
-            {paid > 0 ? (
-              <QuickAmountButton label="Clear" onClick={() => setAmount('')} />
-            ) : null}
-          </div>
+              <AppInput
+                label="Phone number"
+                hint="Include country code, e.g. +255712345678. Leave empty if there is no number."
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+255712345678"
+              />
+            </div>
+          </section>
 
-          <AppInput
-            label="Note"
-            hint="Optional. Visible to the tenant only."
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={200}
-            placeholder="e.g. Paid via bank, confirmed 12 Nov"
-          />
-
-          {want && paid >= want ? (
-            <p className="flex items-center gap-2 rounded-tap bg-success-soft px-3 py-2.5 text-[13px] text-success">
-              <Check size={14} />
-              This will be marked completed automatically.
+          {/* ── Amounts ── */}
+          <section className="rounded-card border border-line bg-white p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Contribution
             </p>
-          ) : null}
+            <div className="mt-3 space-y-3.5">
+              <AppInput
+                label={`Amount received (${currency})`}
+                hint="Set 0 if nothing has arrived yet."
+                inputMode="numeric"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+              />
 
-          {row.phone ? (
-            <a
-              href={`tel:${row.phone}`}
-              className="flex items-center justify-center gap-2 rounded-tap border border-line bg-surface py-2.5 text-[13px] font-semibold text-ink"
-            >
-              <Phone size={14} />
-              Call {row.guestName.split(' ')[0]}
-            </a>
-          ) : null}
+              <AppInput
+                label={`Amount expected (${currency})`}
+                hint="Optional. Reaching this marks the guest completed automatically."
+                inputMode="numeric"
+                value={expected}
+                onChange={(e) => setExpected(e.target.value)}
+                placeholder="e.g. 500000"
+              />
+
+              <div className="flex flex-wrap gap-2">
+                <QuickAmountButton
+                  label={`+${formatTZS(QUICK_ADD, currency)}`}
+                  onClick={() => setAmount(String(paid + QUICK_ADD))}
+                />
+                {want ? (
+                  <QuickAmountButton
+                    label={`Full ${formatTZS(want, currency)}`}
+                    onClick={() => setAmount(String(want))}
+                  />
+                ) : null}
+                {paid > 0 ? (
+                  <QuickAmountButton label="Clear" onClick={() => setAmount('')} />
+                ) : null}
+              </div>
+
+              <div>
+                <p className="mb-2 text-[13px] font-semibold text-ink">Status</p>
+                <AppSegmentedControl
+                  label="Contribution status"
+                  value={status}
+                  onChange={(value) => setStatus(value as ContributionStatus)}
+                  options={[
+                    {
+                      value: 'PENDING',
+                      label: 'Not started',
+                      activeClassName: 'bg-muted',
+                    },
+                    {
+                      value: 'PARTIAL',
+                      label: 'Part paid',
+                      activeClassName: 'bg-warn',
+                    },
+                    {
+                      value: 'PAID',
+                      label: 'Completed',
+                      activeClassName: 'bg-success',
+                    },
+                  ]}
+                />
+                <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
+                  Any amount above zero records part payment. Reaching the expected target marks
+                  the guest completed.
+                </p>
+              </div>
+
+              {want && paid >= want ? (
+                <p className="flex items-center gap-2 rounded-tap bg-success-soft px-3 py-2.5 text-[13px] text-success">
+                  <Check size={14} />
+                  This will be marked completed automatically.
+                </p>
+              ) : null}
+
+              <AppInput
+                label="Note"
+                hint="Optional. Visible to the tenant only."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                maxLength={200}
+                placeholder="e.g. Paid via bank, confirmed 12 Nov"
+              />
+            </div>
+          </section>
         </div>
       ) : null}
     </AppBottomSheet>
   );
 }
 
-function QuickAmountButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-tap bg-surface-2 px-3 py-2 text-[12px] font-semibold text-ink"
-    >
-      {label}
-    </button>
-  );
-}
+// ─── Settings sheet ────────────────────────────────────────────────────────
 
-// ─── Settings ─────────────────────────────────────────────────────────────
-
-function SettingsScreen({
+function SettingsSheet({
+  open,
   form,
   saving,
+  trackerUrl,
   onChange,
   onSave,
-  onCancel,
+  onClose,
 }: {
+  open: boolean;
   form: SettingsForm | null;
   saving: boolean;
+  trackerUrl: string;
   onChange: (f: SettingsForm) => void;
   onSave: () => void;
-  onCancel: () => void;
+  onClose: () => void;
 }) {
-  if (!form) {
-    return (
-      <div className="grid place-items-center py-10">
-        <Loader2 className="size-6 animate-spin text-brand" />
-      </div>
-    );
-  }
+  if (!form) return null;
 
   const set = <K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) =>
     onChange({ ...form, [key]: value });
 
   return (
-    <>
-      <AppCard>
-        <AppCardTitle title="Tracking" subtitle="Controls what the shared tracker can do." />
-        <div className="mt-3 space-y-3">
-          <Toggle
-            label="Enable tracking"
-            description="Publishes the shared page and stops reminders going to guests who have paid in full."
-            checked={form.contributionsEnabled}
-            onChange={(v) => set('contributionsEnabled', v)}
-          />
-        </div>
-      </AppCard>
-
-      <AppCard>
-        <AppCardTitle
-          title="Template details"
-          subtitle="These fill the approved Mchango WhatsApp template."
-        />
-        <div className="mt-3 space-y-3.5">
-          <AppSelect
-            label="Occasion"
-            hint="Template var1"
-            value={form.eventType}
-            onChange={(e) => set('eventType', e.target.value)}
-          >
-            <option value="">Not set</option>
-            {MCHANGO_OCCASIONS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </AppSelect>
-
-          <AppInput
-            inputMode="numeric"
-            label="Target amount"
-            hint="Optional. Drives the progress ring and the outstanding figure."
-            value={form.contributionTarget}
-            onChange={(e) => set('contributionTarget', e.target.value)}
-            placeholder="e.g. 5000000"
-          />
-
-          <div className="grid gap-3.5 sm:grid-cols-2">
-            <AppInput
-              label="M-Pesa"
-              hint="Template var10"
-              value={form.mpesaInstructions}
-              onChange={(e) => set('mpesaInstructions', e.target.value)}
-              placeholder="Name, number, what to write"
-            />
-            <AppInput
-              label="Airtel Money"
-              hint="Template var11"
-              value={form.airtelInstructions}
-              onChange={(e) => set('airtelInstructions', e.target.value)}
-              placeholder="Name, number, what to write"
-            />
-          </div>
-
-          <AppInput
-            label="Bank"
-            hint="Template var12"
-            value={form.bankInstructions}
-            onChange={(e) => set('bankInstructions', e.target.value)}
-            placeholder="Bank, account name, number"
-          />
-
-          <p className="flex items-start gap-2 rounded-tap bg-brand-soft px-3 py-2.5 text-[12px] leading-relaxed text-brand">
-            <SlidersHorizontal size={14} className="mt-0.5 shrink-0" />
-            <span>
-              Greetings, names, venue, address, the payment deadline and the contact number come
-              from the event itself. Edit those from the reminder screen, where you can preview the
-              finished message.
-            </span>
-          </p>
-        </div>
-
-        <div className="mt-4 flex gap-2">
-          <AppButton variant="ghost" onClick={onCancel} fullWidth>
+    <AppBottomSheet
+      open={open}
+      onClose={onClose}
+      title="Contribution settings"
+      description="Controls what the shared tracker can do."
+      footer={
+        <div className="flex gap-2">
+          <AppButton variant="ghost" onClick={onClose} fullWidth>
             Cancel
           </AppButton>
           <AppButton onClick={onSave} loading={saving} loadingText="Saving" fullWidth>
             Save settings
           </AppButton>
         </div>
-      </AppCard>
-    </>
+      }
+    >
+      <div className="space-y-4">
+        <section className="rounded-card border border-line bg-surface-2 p-3.5">
+          <AppCardTitle
+            title="Tracking"
+            subtitle="Publish the shared page and keep reminders accurate."
+          />
+          <div className="mt-3">
+            <Toggle
+              label="Enable tracking"
+              description="Publishes the shared page and stops reminders going to guests who have paid in full."
+              checked={form.contributionsEnabled}
+              onChange={(v) => set('contributionsEnabled', v)}
+            />
+          </div>
+        </section>
+
+        <section className="rounded-card border border-line bg-white p-3.5">
+          <AppCardTitle
+            title="Template details"
+            subtitle="These fill the approved Mchango WhatsApp template."
+          />
+          <div className="mt-3 space-y-3.5">
+            <AppSelect
+              label="Occasion"
+              hint="Template var1"
+              value={form.eventType}
+              onChange={(e) => set('eventType', e.target.value)}
+            >
+              <option value="">Not set</option>
+              {MCHANGO_OCCASIONS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </AppSelect>
+
+            <AppInput
+              inputMode="numeric"
+              label="Target amount"
+              hint="Optional. Drives the progress ring and the outstanding figure."
+              value={form.contributionTarget}
+              onChange={(e) => set('contributionTarget', e.target.value)}
+              placeholder="e.g. 5000000"
+            />
+
+            <div className="grid gap-3.5 sm:grid-cols-2">
+              <AppInput
+                label="M-Pesa"
+                hint="Template var10"
+                value={form.mpesaInstructions}
+                onChange={(e) => set('mpesaInstructions', e.target.value)}
+                placeholder="Name, number, what to write"
+              />
+              <AppInput
+                label="Airtel Money"
+                hint="Template var11"
+                value={form.airtelInstructions}
+                onChange={(e) => set('airtelInstructions', e.target.value)}
+                placeholder="Name, number, what to write"
+              />
+            </div>
+
+            <AppInput
+              label="Bank"
+              hint="Template var12"
+              value={form.bankInstructions}
+              onChange={(e) => set('bankInstructions', e.target.value)}
+              placeholder="Bank, account name, number"
+            />
+          </div>
+        </section>
+
+        {trackerUrl ? (
+          <section className="rounded-card border border-line bg-white p-3.5">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+              Shared tracker
+            </p>
+            <code className="mt-1 block break-all rounded-tap bg-surface-2 px-3 py-2.5 text-[12px] leading-relaxed text-muted">
+              {trackerUrl}
+            </code>
+            <a
+              href={trackerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-brand"
+            >
+              Open tracker <ExternalLink size={13} aria-hidden="true" />
+            </a>
+          </section>
+        ) : null}
+
+        <p className="flex items-start gap-2 rounded-tap bg-brand-soft px-3 py-2.5 text-[12px] leading-relaxed text-brand">
+          <SlidersHorizontal size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Greetings, names, venue, address, the payment deadline and the contact number come
+            from the event itself. Edit those from the reminder screen, where you can preview the
+            finished message.
+          </span>
+        </p>
+      </div>
+    </AppBottomSheet>
   );
 }
 

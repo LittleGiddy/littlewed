@@ -73,6 +73,3 @@ export interface SettingsForm {
   airtelInstructions: string;
   bankInstructions: string;
 }
-
-export type Screen = 'overview' | 'guests' | 'settings';
-export type StatusFilter = 'ALL' | ContributionStatus;
