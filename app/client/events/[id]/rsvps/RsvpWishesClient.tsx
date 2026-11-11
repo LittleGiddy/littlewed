@@ -189,7 +189,9 @@ export default function RsvpWishesClient({ event, rsvps, wishes }: Props) {
 
       drawPageHeader();
 
-      rsvpRows.forEach((row, index) => {
+      let serial = 0;
+      rsvpRows.forEach((row) => {
+        serial += 1;
         const nameLines = doc.splitTextToSize(row.guestName || '—', colWidths[1] - 6);
         const rowHeight = Math.max(8, nameLines.length * 4.6 + 3);
 
@@ -199,7 +201,7 @@ export default function RsvpWishesClient({ event, rsvps, wishes }: Props) {
           drawPageHeader();
         }
 
-        if (index % 2 === 0) {
+        if (serial % 2 === 1) {
           doc.setFillColor(248, 250, 252);
           doc.rect(margin, y, tableWidth, rowHeight, 'F');
         }
@@ -207,7 +209,7 @@ export default function RsvpWishesClient({ event, rsvps, wishes }: Props) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(107, 114, 128);
-        doc.text(String(index + 1), margin + 3, y + 5);
+        doc.text(String(serial), margin + 3, y + 5);
 
         doc.setTextColor(17, 24, 39);
         doc.text(nameLines, margin + colWidths[0] + 3, y + 5);
