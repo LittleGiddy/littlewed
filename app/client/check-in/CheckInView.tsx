@@ -195,7 +195,19 @@ const STATUS_META: Record<
   not: { label: 'Not in', chip: 'neutral', active: 'bg-gray-500 text-white border-gray-500' },
 };
 
-export default function CheckInView({ eventId }: { eventId: string | null }) {
+interface CheckInViewProps {
+  eventId: string | null;
+  /** Where the "Back to event" link points. Pass null to hide it. */
+  backHref?: string | null;
+  /** Event header supplied by the caller (staff portal) to skip an extra fetch. */
+  eventInfo?: { name: string; venue: string; date: string } | null;
+}
+
+export default function CheckInView({
+  eventId,
+  backHref,
+  eventInfo: initialEventInfo,
+}: CheckInViewProps) {
   const reducedMotion = useReducedMotion();
 
   const [activeTab, setActiveTab] = useState<'scan' | 'data'>('scan');
@@ -212,11 +224,13 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'card-asc' | 'card-desc' | 'status' | 'checkin-desc'>('name-asc');
   const [eventInfo, setEventInfo] = useState<{ name: string; venue: string; date: string } | null>(
-    null
+    initialEventInfo ?? null
   );
 
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
   const [forceCheckinGuest, setForceCheckinGuest] = useState<Guest | null>(null);
+  const [forceAnother, setForceAnother] = useState(false);
+  const [forceCard, setForceCard] = useState<{ count: number; total: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Guest | null>(null);
   const [busyAction, setBusyAction] = useState(false);
 
@@ -263,25 +277,30 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
     }
   }, [eventId]);
 
-  const loadGuests = useCallback(async () => {
-    if (!eventId) return;
+  const loadGuests = useCallback(async (): Promise<Guest[] | null> => {
+    if (!eventId) return null;
     setLoadingGuests(true);
     try {
       const res = await fetch(`/api/check-in?eventId=${eventId}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Request failed');
       const data = await res.json();
-      if (Array.isArray(data)) setGuests(data);
+      if (Array.isArray(data)) {
+        setGuests(data);
+        return data;
+      }
+      return null;
     } catch {
       toast.error('Could not load the guest list');
+      return null;
     } finally {
       setLoadingGuests(false);
     }
   }, [eventId]);
 
   useEffect(() => {
-    void loadEventInfo();
     void loadGuests();
-  }, [loadEventInfo, loadGuests]);
+    if (!initialEventInfo) void loadEventInfo();
+  }, [loadEventInfo, loadGuests, initialEventInfo]);
 
   // ─── Camera ─────────────────────────────────────────────────────────
   const stopCamera = useCallback(() => {
@@ -471,36 +490,106 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
   };
 
   // ─── Guest actions ──────────────────────────────────────────────────
-  const groupMembersFor = (guest: Guest) =>
-    guest.cardGroupId ? guests.filter((g) => g.cardGroupId === guest.cardGroupId) : [];
+  const groupMembersFor = (guest: Guest, list: Guest[] = guests) =>
+    guest.cardGroupId ? list.filter((g) => g.cardGroupId === guest.cardGroupId) : [];
 
   // Rows sharing a cardGroupId are one card; the label count (if any) wins.
-  const groupSizeFor = (guest: Guest) =>
-    guest.cardGroupId ? guests.filter((g) => g.cardGroupId === guest.cardGroupId).length : 1;
+  const groupSizeFor = (guest: Guest, list: Guest[] = guests) =>
+    guest.cardGroupId ? list.filter((g) => g.cardGroupId === guest.cardGroupId).length : 1;
 
   // A numeric label ("Watu 20") means the card is ONE count-up bucket, not a
   // set of people, so force/group actions target the whole card.
   const isNumericGroupCard = (guest: Guest) => cardGroupIdCount(guest.cardGroupId) !== null;
-  const cardTotalFor = (guest: Guest) => cardTotalScans(guest.cardGroupId, groupSizeFor(guest));
+  const cardTotalFor = (guest: Guest, list: Guest[] = guests) =>
+    cardTotalScans(guest.cardGroupId, groupSizeFor(guest, list));
 
-  const handleForceCheckin = async (guest: Guest, allGroup: boolean) => {
+  const isGuestFully = (guest: Guest, list: Guest[] = guests) =>
+    (guest.checkInCount || 0) >= maxScansFor(guest, groupSizeFor(guest, list));
+
+  const isCardFully = (guest: Guest, list: Guest[] = guests) => {
+    const members = groupMembersFor(guest, list);
+    if (members.length > 1 || isNumericGroupCard(guest)) {
+      const count = members.reduce((sum, member) => sum + (member.checkInCount || 0), 0);
+      return count >= cardTotalFor(guest, list);
+    }
+    return isGuestFully(guest, list);
+  };
+
+  const cardProgressFor = (guest: Guest, list: Guest[] = guests) => {
+    const members = groupMembersFor(guest, list);
+    if (members.length > 1 || isNumericGroupCard(guest)) {
+      return {
+        count: members.reduce((sum, member) => sum + (member.checkInCount || 0), 0),
+        total: cardTotalFor(guest, list),
+      };
+    }
+    return {
+      count: guest.checkInCount || 0,
+      total: maxScansFor(guest, groupSizeFor(guest, list)),
+    };
+  };
+
+  // After a force, keep the sheet open on the next person who still has a
+  // scan available. Completed guests are skipped so a fully checked-in guest
+  // can never be forced again.
+  const nextForceTarget = (anchor: Guest, list: Guest[]): Guest | null => {
+    const fresh = list.find((g) => g.id === anchor.id) ?? anchor;
+    if (!isGuestFully(fresh, list)) return fresh;
+
+    const candidates = groupMembersFor(anchor, list);
+    return candidates.find((member) => !isGuestFully(member, list)) ?? null;
+  };
+
+  const closeForceSheet = () => {
+    setForceCheckinGuest(null);
+    setForceAnother(false);
+    setForceCard(null);
+  };
+
+  const handleForceCheckin = async (guest: Guest) => {
+    if (isGuestFully(guest) && isCardFully(guest)) {
+      toast.error(`${fullName(guest)} is already fully checked in.`, {
+        icon: <AlertCircle size={18} className="text-danger" />,
+      });
+      return;
+    }
+
     setBusyAction(true);
     try {
       const res = await fetch(`/api/guests/${guest.id}/checkin`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ checkedIn: true, allGroup }),
+        body: JSON.stringify({ checkedIn: true, force: true }),
         credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to force check in');
 
-      toast.success(data.message || `${fullName(guest)} checked in`, {
+      toast.success(data.message || `${fullName(guest)} force checked in`, {
         icon: <UserCheck size={18} className="text-success" />,
       });
-      setForceCheckinGuest(null);
-      setSelectedGuest(null);
-      loadGuests();
+
+      const fresh = (await loadGuests()) ?? guests;
+      const card = data.card as
+        | { fullyCheckedIn: boolean; count: number; total: number }
+        | undefined;
+
+      if (card?.fullyCheckedIn) {
+        closeForceSheet();
+        setSelectedGuest(null);
+        return;
+      }
+
+      const next = nextForceTarget(guest, fresh);
+      if (!next) {
+        closeForceSheet();
+        setSelectedGuest(null);
+        return;
+      }
+
+      setForceCheckinGuest(next);
+      setForceAnother(true);
+      setForceCard(card ? { count: card.count, total: card.total } : cardProgressFor(next, fresh));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Network error', {
         icon: <AlertCircle size={18} className="text-danger" />,
@@ -821,13 +910,15 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
 
       {/* ─── Header ─── */}
       <div className="space-y-3">
-        <Link
-          href={`/client/events/${eventId}`}
-          className={buttonClasses({ variant: 'ghost', size: 'sm', className: '-ml-2' })}
-        >
-          <ArrowLeft size={15} aria-hidden="true" />
-          Back to event
-        </Link>
+        {backHref === null ? null : (
+          <Link
+            href={backHref ?? `/client/events/${eventId}`}
+            className={buttonClasses({ variant: 'ghost', size: 'sm', className: '-ml-2' })}
+          >
+            <ArrowLeft size={15} aria-hidden="true" />
+            Back to event
+          </Link>
+        )}
 
         <AppCard tone="raised">
           {eventInfo ? (
@@ -1294,12 +1385,16 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
                 size="lg"
                 className="flex-1"
                 icon={<UserCheck size={16} />}
+                disabled={busyAction || isGuestFully(selectedGuest)}
                 onClick={() => {
+                  if (isGuestFully(selectedGuest)) return;
                   setForceCheckinGuest(selectedGuest);
+                  setForceAnother(false);
+                  setForceCard(cardProgressFor(selectedGuest));
                   setSelectedGuest(null);
                 }}
               >
-                Force in
+                {isGuestFully(selectedGuest) ? 'Fully in' : 'Force in'}
               </AppButton>
               <AppButton
                 variant="danger"
@@ -1401,64 +1496,42 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
       {/* ─── Force check-in confirm ─── */}
       <AppBottomSheet
         open={Boolean(forceCheckinGuest)}
-        onClose={() => setForceCheckinGuest(null)}
-        title="Force check-in"
+        onClose={closeForceSheet}
+        title={forceAnother ? 'Force Another?' : 'Force check-in'}
         description={
           forceCheckinGuest
-            ? isNumericGroupCard(forceCheckinGuest)
-              ? `Marks the whole card (${cardTotalFor(forceCheckinGuest)} scans) as arrived.`
-              : `Marks ${fullName(forceCheckinGuest)} as arrived, ignoring their card type.`
+            ? isCardFully(forceCheckinGuest)
+              ? `${fullName(forceCheckinGuest)} is already fully checked in.`
+              : forceAnother
+                ? 'Add another scan to this card?'
+                : `Adds one scan for ${fullName(forceCheckinGuest)}.`
             : undefined
         }
         footer={
           forceCheckinGuest ? (
             <div className="flex flex-col gap-2">
-              {isNumericGroupCard(forceCheckinGuest) ? (
-                <AppButton
-                  size="lg"
-                  fullWidth
-                  loading={busyAction}
-                  loadingText="Checking in…"
-                  icon={<Users size={16} />}
-                  onClick={() => handleForceCheckin(forceCheckinGuest, true)}
-                >
-                  Mark all {cardTotalFor(forceCheckinGuest)} on this card
-                </AppButton>
-              ) : groupMembersFor(forceCheckinGuest).length > 1 ? (
-                <>
-                  <AppButton
-                    size="lg"
-                    fullWidth
-                    loading={busyAction}
-                    loadingText="Checking in…"
-                    icon={<Users size={16} />}
-                    onClick={() => handleForceCheckin(forceCheckinGuest, true)}
-                  >
-                    All {groupMembersFor(forceCheckinGuest).length} guests
-                  </AppButton>
-                  <AppButton
-                    variant="secondary"
-                    size="lg"
-                    fullWidth
-                    disabled={busyAction}
-                    onClick={() => handleForceCheckin(forceCheckinGuest, false)}
-                  >
-                    Just {fullName(forceCheckinGuest)}
-                  </AppButton>
-                </>
-              ) : (
-                <AppButton
-                  size="lg"
-                  fullWidth
-                  loading={busyAction}
-                  loadingText="Checking in…"
-                  icon={<UserCheck size={16} />}
-                  onClick={() => handleForceCheckin(forceCheckinGuest, false)}
-                >
-                  Confirm check-in
-                </AppButton>
-              )}
-              <AppButton variant="ghost" size="md" fullWidth disabled={busyAction} onClick={() => setForceCheckinGuest(null)}>
+              <AppButton
+                size="lg"
+                fullWidth
+                loading={busyAction}
+                loadingText="Checking in…"
+                disabled={busyAction || isCardFully(forceCheckinGuest)}
+                icon={forceAnother ? <UserCheck size={16} /> : <Users size={16} />}
+                onClick={() => handleForceCheckin(forceCheckinGuest)}
+              >
+                {forceAnother
+                  ? 'Force'
+                  : forceCard && forceCard.total > 1
+                    ? 'Force 1×'
+                    : 'Force check-in'}
+              </AppButton>
+              <AppButton
+                variant="ghost"
+                size="md"
+                fullWidth
+                disabled={busyAction}
+                onClick={closeForceSheet}
+              >
                 Cancel
               </AppButton>
             </div>
@@ -1466,15 +1539,20 @@ export default function CheckInView({ eventId }: { eventId: string | null }) {
         }
       >
         {forceCheckinGuest ? (
-          <div className="flex items-center gap-3 rounded-tap bg-warn-soft p-3.5">
+          <div className="flex items-start gap-3 rounded-tap bg-warn-soft p-3.5">
             <UserCheck size={20} className="text-warn shrink-0" aria-hidden="true" />
-            <p className="text-[13px] text-gray-700 leading-snug">
-              {isNumericGroupCard(forceCheckinGuest)
-                ? `This card allows ${cardTotalFor(forceCheckinGuest)} scans.`
-                : groupMembersFor(forceCheckinGuest).length > 1
-                  ? `This card covers ${groupMembersFor(forceCheckinGuest).length} guests.`
-                  : 'They will be recorded as fully checked in.'}
-            </p>
+            <div className="min-w-0">
+              <p className="text-[13px] text-gray-700 leading-snug">
+                {isCardFully(forceCheckinGuest)
+                  ? 'A guest who is already fully checked in cannot be forced again.'
+                  : 'Each force adds exactly one scan. You can force another as long as the card is not full.'}
+              </p>
+              {forceCard && forceCard.total > 1 ? (
+                <p className="mt-1 text-[12px] font-semibold text-gray-600 tabular-nums">
+                  {forceCard.count}/{forceCard.total} on this card
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </AppBottomSheet>

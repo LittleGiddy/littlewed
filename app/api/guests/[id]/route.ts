@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizePhone } from '@/lib/phone';
 import { normalizeGuestTitle } from '@/lib/guestTypes';
 import { refundCreditsForUnsentDeleted } from '@/lib/credits';
+import { eventScopeWhere } from '@/lib/eventAccess';
 
 // ─── DELETE ─────────────────────────────────────────────────────────────
 export async function DELETE(
@@ -12,14 +13,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || (session.user as any).role !== 'CLIENT') {
+  const role = (session?.user as any)?.role;
+  if (!session || !['CLIENT', 'STAFF'].includes(role)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   const tenantId = (session.user as any).tenantId;
   const { id } = await params;
 
   const guest = await prisma.guest.findFirst({
-    where: { id, event: { tenantId } },
+    where:
+      role === 'STAFF'
+        ? { id, event: eventScopeWhere(session) }
+        : { id, event: { tenantId } },
     select: { id: true, eventId: true, invitationSentAt: true },
   });
   if (!guest) {

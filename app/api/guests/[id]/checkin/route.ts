@@ -210,8 +210,118 @@ export async function PATCH(
       });
     }
 
-    // ─── Collect the card's targets (shared card / numeric group card) ─
     const isGroup = groupSize > 1 || isNumericGroup;
+
+    // ─── FORCE: add exactly one scan per action ───────────────────────
+    // A force is a correction for one person at the door, not a shortcut that
+    // silently fills the whole card. DOUBLE and group cards therefore stay open
+    // so the operator can confirm "Force Another?" for each remaining scan.
+    if (body?.force === true) {
+      const cardMembers = isGroup ? groupMembers : [guest];
+      const accumulatorId = groupMembers[0]?.id;
+      const memberMax = (member: typeof guest) => {
+        if (isNumericGroup) {
+          return member.id === accumulatorId
+            ? Math.max(1, groupTotal - Math.max(0, groupSize - 1))
+            : 1;
+        }
+        if (groupSize > 1) return 1;
+        return guestTypeMaxScans(member.guestType, member.guestCount);
+      };
+
+      const cardTotal = isGroup ? groupTotal : guestMax;
+      const cardCount = cardMembers.reduce((sum, member) => sum + (member.checkInCount || 0), 0);
+
+      if (cardCount >= cardTotal) {
+        return NextResponse.json(
+          { error: `${guest.name} is already fully checked in - nothing to force.` },
+          { status: 400 }
+        );
+      }
+
+      // Prefer the selected guest while they still have a slot; otherwise move
+      // to the next person on the card. This keeps a completed guest from being
+      // force checked in again.
+      const selectedMax = memberMax(guest);
+      let target = (guest.checkInCount || 0) < selectedMax ? guest : null;
+      if (!target) {
+        target =
+          cardMembers.find((member) => (member.checkInCount || 0) < memberMax(member)) ?? null;
+      }
+      if (!target) {
+        return NextResponse.json(
+          { error: `${guest.name} is already fully checked in - nothing to force.` },
+          { status: 400 }
+        );
+      }
+
+      const targetMax = memberMax(target);
+      const newCount = (target.checkInCount || 0) + 1;
+      const targetFully = newCount >= targetMax;
+      const updated = await prisma.guest.update({
+        where: { id: target.id },
+        data: {
+          checkInCount: newCount,
+          checkedIn: targetFully,
+          checkedInAt: new Date(),
+        },
+      });
+
+      const nextCardCount = cardMembers.reduce(
+        (sum, member) =>
+          sum + (member.id === target.id ? newCount : member.checkInCount || 0),
+        0
+      );
+      const cardFully = nextCardCount >= cardTotal;
+
+      const fullName = updated.title ? `${updated.title} ${updated.name}` : updated.name;
+      sendPushToTenantRole(tenantId, 'CLIENT', {
+        title: `${fullName} force checked in`,
+        body: isGroup
+          ? `${fullName} force checked in. ${nextCardCount}/${cardTotal} scans on the card are now in.`
+          : `${fullName} force checked in (${newCount}/${targetMax}).`,
+        url: '/client/dashboard',
+        type: 'success',
+        sound: true,
+      }).catch(() => {});
+
+      return NextResponse.json({
+        success: true,
+        count: 1,
+        force: true,
+        message: isGroup
+          ? `${fullName} force checked in. ${nextCardCount}/${cardTotal} on the card now checked in.`
+          : `${fullName} force checked in (${newCount}/${targetMax})`,
+        guest: {
+          id: updated.id,
+          name: updated.name,
+          cardNumber: updated.cardNumber,
+          guestType: updated.guestType || 'SINGLE',
+          guestCount: updated.guestCount || null,
+          checkInCount: newCount,
+          maxCheckIns: targetMax,
+          fullyCheckedIn: targetFully,
+          checkedInAt: updated.checkedInAt,
+          cardGroupId: updated.cardGroupId,
+        },
+        updated: [
+          {
+            id: updated.id,
+            name: updated.name,
+            checkInCount: newCount,
+            maxCheckIns: targetMax,
+            fullyCheckedIn: targetFully,
+          },
+        ],
+        card: {
+          fullyCheckedIn: cardFully,
+          count: nextCardCount,
+          total: cardTotal,
+        },
+      });
+    }
+
+    // ─── Collect the card's targets (shared card / numeric group card) ─
     // A numeric group card ("Watu 20") is a SINGLE count-up bucket, so any
     // force/group action always covers the whole card. For a plain shared card
     // "all" means the whole card and a single action means just this guest; if
